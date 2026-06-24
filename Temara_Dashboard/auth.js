@@ -1,5 +1,5 @@
 /**
- * DentaFlow OS — centralized role + PIN authentication gate.
+ * DentaFlow OS — centralized username/password authentication gate.
  * Dispatches to POST /api/auth; unlocks Doctor or Assistant modules on success.
  */
 (function () {
@@ -8,11 +8,10 @@
   const AUTH_ENDPOINT = '/api/auth';
   const SESSION_ROLE_KEY = 'dentaflow_role';
   const SESSION_TOKEN_KEY = 'dentaflow_session';
-  const SESSION_PIN_KEY = 'dentaflow_pin';
 
-  let currentPin = '';
   let selectedRole = 'doctor';
   let authInitialized = false;
+  let isSubmitting = false;
 
   function initLoginReveal() {
     const card = document.getElementById('login-card');
@@ -22,33 +21,36 @@
     });
   }
 
-  function updatePinDots() {
-    document.querySelectorAll('.pin-dot').forEach((dot, index) => {
-      dot.classList.toggle('is-filled', index < currentPin.length);
-    });
+  function getLoginErrorEl() {
+    return document.getElementById('login-error');
   }
 
-  function resetPinDots() {
-    currentPin = '';
-    const dotsEl = document.getElementById('pin-dots');
-    dotsEl?.classList.remove('is-error', 'is-shaking');
-    updatePinDots();
+  function showLoginError(message) {
+    const errorEl = getLoginErrorEl();
+    const form = document.getElementById('login-form');
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+    form?.classList.add('is-error');
+    setTimeout(() => form?.classList.remove('is-error'), 650);
   }
 
-  function showInvalidPinFeedback() {
-    const dotsEl = document.getElementById('pin-dots');
-    const errorEl = document.getElementById('login-error');
-    dotsEl?.classList.add('is-error', 'is-shaking');
+  function clearLoginError() {
+    const errorEl = getLoginErrorEl();
+    const form = document.getElementById('login-form');
     if (errorEl) {
-      errorEl.textContent = 'Code incorrect';
-      errorEl.hidden = false;
+      errorEl.textContent = '';
+      errorEl.hidden = true;
     }
+    form?.classList.remove('is-error');
+  }
 
-    setTimeout(() => {
-      dotsEl?.classList.remove('is-error', 'is-shaking');
-      resetPinDots();
-      if (errorEl) errorEl.hidden = true;
-    }, 650);
+  function setSubmitLoading(loading) {
+    const submitBtn = document.getElementById('login-submit');
+    if (!submitBtn) return;
+    submitBtn.disabled = loading;
+    submitBtn.classList.toggle('is-loading', loading);
+    submitBtn.setAttribute('aria-busy', loading ? 'true' : 'false');
   }
 
   function setupRoleSelector() {
@@ -78,37 +80,48 @@
     setRole('doctor');
   }
 
-  function setupKeypad() {
-    const keypad = document.getElementById('pin-keypad');
-    if (!keypad || keypad.dataset.bound === 'true') return;
-    keypad.dataset.bound = 'true';
+  function setupPasswordToggle() {
+    const toggle = document.getElementById('login-password-toggle');
+    const passwordInput = document.getElementById('login-password');
+    if (!toggle || !passwordInput) return;
 
-    keypad.addEventListener('click', (e) => {
-      const btn = e.target.closest('.ios-key');
-      if (!btn || btn.disabled) return;
+    toggle.addEventListener('click', () => {
+      const isHidden = passwordInput.type === 'password';
+      passwordInput.type = isHidden ? 'text' : 'password';
+      toggle.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+      toggle.setAttribute('aria-label', isHidden ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+    });
+  }
 
-      if (btn.id === 'key-delete') {
-        currentPin = currentPin.slice(0, -1);
-        updatePinDots();
-        return;
-      }
+  function setupLoginForm() {
+    const form = document.getElementById('login-form');
+    if (!form || form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
 
-      if (btn.id === 'key-enter') {
-        if (currentPin.length === 4) setTimeout(submitAuth, 80);
-        return;
-      }
-
-      if (btn.dataset.digit && currentPin.length < 4) {
-        currentPin += btn.dataset.digit;
-        updatePinDots();
-        if (currentPin.length === 4) {
-          setTimeout(submitAuth, 120);
-        }
-      }
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void submitAuth();
     });
   }
 
   async function submitAuth() {
+    if (isSubmitting) return;
+
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    const username = usernameInput?.value?.trim() ?? '';
+    const password = passwordInput?.value ?? '';
+
+    clearLoginError();
+
+    if (!username || !password) {
+      showLoginError('Identifiant et mot de passe requis.');
+      return;
+    }
+
+    isSubmitting = true;
+    setSubmitLoading(true);
+
     try {
       const response = await fetch(AUTH_ENDPOINT, {
         method: 'POST',
@@ -116,32 +129,54 @@
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({ role: selectedRole, pin: currentPin }),
+        body: JSON.stringify({
+          role: selectedRole,
+          username,
+          password,
+        }),
       });
 
+      if (response.status === 429) {
+        let retryMessage = 'Trop de tentatives. Réessayez plus tard.';
+        try {
+          const payload = await response.json();
+          if (payload?.retryAfterSec) {
+            retryMessage = `Compte temporairement verrouillé. Réessayez dans ${payload.retryAfterSec}s.`;
+          } else if (payload?.message) {
+            retryMessage = payload.message;
+          }
+        } catch { /* keep default */ }
+        showLoginError(retryMessage);
+        return;
+      }
+
       if (response.status === 401 || response.status === 403) {
-        showInvalidPinFeedback();
+        showLoginError('Identifiants incorrects.');
         return;
       }
 
       if (!response.ok) {
-        showInvalidPinFeedback();
+        showLoginError('Connexion impossible. Réessayez.');
         return;
       }
 
       const payload = await response.json();
-      if (!payload?.ok) {
-        showInvalidPinFeedback();
+      if (!payload?.ok || !payload?.token) {
+        showLoginError('Identifiants incorrects.');
         return;
       }
 
-      sessionStorage.setItem(SESSION_ROLE_KEY, selectedRole);
-      sessionStorage.setItem(SESSION_TOKEN_KEY, payload.token || 'session-valid');
-      sessionStorage.setItem(SESSION_PIN_KEY, currentPin);
+      sessionStorage.setItem(SESSION_ROLE_KEY, payload.role || selectedRole);
+      sessionStorage.setItem(SESSION_TOKEN_KEY, payload.token);
 
-      await handleAuthSuccess(selectedRole);
+      if (passwordInput) passwordInput.value = '';
+
+      await handleAuthSuccess(payload.role || selectedRole);
     } catch {
-      showInvalidPinFeedback();
+      showLoginError('Connexion impossible. Vérifiez le réseau.');
+    } finally {
+      isSubmitting = false;
+      setSubmitLoading(false);
     }
   }
 
@@ -209,7 +244,10 @@
     if (mount && !mount.childElementCount) {
       const response = await fetch('/assistant-shell.html', { cache: 'no-store' });
       if (!response.ok) throw new Error('Assistant shell unavailable');
-      mount.innerHTML = await response.text();
+      const html = await response.text();
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      mount.replaceChildren(...template.content.childNodes);
     }
 
     showShell(assistantShell);
@@ -255,12 +293,13 @@
 
   function tryRestoreSession() {
     const role = sessionStorage.getItem(SESSION_ROLE_KEY);
-    const session = sessionStorage.getItem(SESSION_TOKEN_KEY);
+    const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
 
-    if (!role || !session) {
+    if (!role || !token) {
       initLoginReveal();
       setupRoleSelector();
-      setupKeypad();
+      setupPasswordToggle();
+      setupLoginForm();
       return;
     }
 
@@ -283,16 +322,31 @@
     initAuthGate();
   }
 
+  function getBearerToken() {
+    return sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+  }
+
+  function buildAuthHeaders(extra = {}) {
+    const headers = {
+      Accept: 'application/json',
+      ...extra,
+    };
+    const token = getBearerToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
   window.DentaFlowAuth = {
     SESSION_ROLE_KEY,
     SESSION_TOKEN_KEY,
-    SESSION_PIN_KEY,
     getRole: () => sessionStorage.getItem(SESSION_ROLE_KEY),
-    getSession: () => sessionStorage.getItem(SESSION_TOKEN_KEY),
+    getToken: getBearerToken,
+    getAuthHeaders: buildAuthHeaders,
     clearSession() {
       sessionStorage.removeItem(SESSION_ROLE_KEY);
       sessionStorage.removeItem(SESSION_TOKEN_KEY);
-      sessionStorage.removeItem(SESSION_PIN_KEY);
     },
   };
 })();

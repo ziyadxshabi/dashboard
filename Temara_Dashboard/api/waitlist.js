@@ -1,16 +1,23 @@
 /**
- * Waitlist proxy — keeps the n8n auth secret off the static client.
- * The dashboard is a static frontend on Vercel with no other backend;
- * this serverless function receives POST /api/waitlist and forwards
- * validated payloads to n8n with X-Agency-Auth attached server-side.
+ * Waitlist proxy — JWT-gated bridge to n8n waitlist webhook.
  */
+const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+
 module.exports = async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    applyCors(res, 'POST, OPTIONS');
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
+  const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
+  if (!session) return;
+
   const webhookUrl = process.env.N8N_WAITLIST_WEBHOOK;
-  const authKey = process.env.N8N_AGENCY_AUTH_KEY;
+  const authKey = process.env.N8N_AGENCY_AUTH_KEY || process.env.N8N_AUTH_KEY;
 
   if (!webhookUrl || !authKey) {
     return res.status(500).json({ ok: false, error: 'Server configuration missing' });
@@ -32,7 +39,7 @@ module.exports = async function handler(req, res) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'accept': 'application/json',
+        accept: 'application/json',
         'ngrok-skip-browser-warning': 'true',
         'x-agency-auth': authKey,
       },

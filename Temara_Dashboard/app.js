@@ -103,19 +103,27 @@ let handoffNotes = [];
   }
 
   function apiHeaders(extra = {}) {
+    const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
+      ? window.DentaFlowAuth.getAuthHeaders()
+      : { Accept: 'application/json' };
+
     return {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
       'ngrok-skip-browser-warning': 'true',
+      ...authHeaders,
       ...extra,
     };
   }
 
-  /** GET roster — no Content-Type to avoid unnecessary CORS preflight on simple requests */
+  /** GET roster — Bearer auth; no Content-Type to avoid unnecessary CORS preflight */
   function rosterFetchHeaders() {
+    const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
+      ? window.DentaFlowAuth.getAuthHeaders()
+      : { Accept: 'application/json' };
+
     return {
-      'Accept': 'application/json',
       'ngrok-skip-browser-warning': 'true',
+      ...authHeaders,
     };
   }
 
@@ -160,61 +168,92 @@ let handoffNotes = [];
       .replace(/'/g, '&#39;');
   }
 
-  function renderReadReceipts(readBy = []) {
-    const avatars = readBy.slice(0, 3);
-    if (!avatars.length) return '';
+  function createReadReceiptsElement(readBy) {
+    const avatars = Array.isArray(readBy)
+      ? readBy.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    if (!avatars.length) return null;
 
-    return `
-      <div class="handoff-note__receipts" aria-label="Lu par ${escapeHtml(avatars.join(', '))}">
-        ${avatars.map((initials) => `
-          <span class="handoff-note__avatar" title="${escapeHtml(initials)}">${escapeHtml(initials)}</span>
-        `).join('')}
-      </div>`;
+    const div = document.createElement('div');
+    div.className = 'handoff-note__receipts';
+    div.setAttribute('aria-label', `Lu par ${avatars.join(', ')}`);
+    avatars.forEach((initials) => {
+      const span = document.createElement('span');
+      span.className = 'handoff-note__avatar';
+      span.title = initials;
+      span.textContent = initials;
+      div.appendChild(span);
+    });
+    return div;
   }
 
-  function renderHandoffNote(note, options = {}) {
+  function createHandoffNoteElement(note, options = {}) {
     const isSystem = note.type === 'system';
     const categorySlug = getHandoffCategorySlug(note.category);
     const enterClass = options.isNew ? ' is-entering' : '';
 
-    const metaParts = [
-      `<span class="handoff-note__category handoff-note__category--${categorySlug}">${escapeHtml(note.category || 'Info')}</span>`,
-    ];
+    const article = document.createElement('article');
+    article.className = `handoff-note handoff-note--${categorySlug}${note.pinned ? ' handoff-note--pinned' : ''}${isSystem ? ' handoff-note--system' : ''}${enterClass}`;
+    article.dataset.noteId = String(note.id);
+    article.setAttribute('role', 'article');
+
+    const dot = document.createElement('span');
+    dot.className = `handoff-note__dot handoff-note__dot--${categorySlug}`;
+    dot.setAttribute('aria-hidden', 'true');
+
+    const body = document.createElement('div');
+    body.className = 'handoff-note__body';
+
+    const meta = document.createElement('div');
+    meta.className = 'handoff-note__meta';
+
+    const categorySpan = document.createElement('span');
+    categorySpan.className = `handoff-note__category handoff-note__category--${categorySlug}`;
+    categorySpan.textContent = note.category || 'Info';
+    meta.appendChild(categorySpan);
 
     if (isSystem) {
-      metaParts.push(`
-        <span class="handoff-note__system-icon" title="Événement système (n8n)" aria-label="Événement système">
-          ${SYSTEM_NOTE_SVG}
-        </span>`);
+      const systemIcon = document.createElement('span');
+      systemIcon.className = 'handoff-note__system-icon';
+      systemIcon.title = 'Événement système (n8n)';
+      systemIcon.setAttribute('aria-label', 'Événement système');
+      systemIcon.innerHTML = SYSTEM_NOTE_SVG;
+      meta.appendChild(systemIcon);
     } else if (note.author) {
-      metaParts.push(`<span class="handoff-note__author">${escapeHtml(note.author)}</span>`);
+      const authorSpan = document.createElement('span');
+      authorSpan.className = 'handoff-note__author';
+      authorSpan.textContent = note.author;
+      meta.appendChild(authorSpan);
     }
 
     if (note.time) {
-      metaParts.push(`<time class="handoff-note__time" datetime="${escapeHtml(note.time)}">${escapeHtml(note.time)}</time>`);
+      const timeEl = document.createElement('time');
+      timeEl.className = 'handoff-note__time';
+      timeEl.dateTime = note.time;
+      timeEl.textContent = note.time;
+      meta.appendChild(timeEl);
     }
 
     if (note.pinned) {
-      metaParts.push(`
-        <span class="handoff-note__pin-badge" aria-label="Note épinglée">
-          ${PIN_BADGE_SVG}
-          Épinglé
-        </span>`);
+      const pinBadge = document.createElement('span');
+      pinBadge.className = 'handoff-note__pin-badge';
+      pinBadge.setAttribute('aria-label', 'Note épinglée');
+      pinBadge.innerHTML = PIN_BADGE_SVG;
+      pinBadge.appendChild(document.createTextNode(' Épinglé'));
+      meta.appendChild(pinBadge);
     }
 
-    return `
-      <article
-        class="handoff-note handoff-note--${categorySlug}${note.pinned ? ' handoff-note--pinned' : ''}${isSystem ? ' handoff-note--system' : ''}${enterClass}"
-        data-note-id="${note.id}"
-        role="article"
-      >
-        <span class="handoff-note__dot handoff-note__dot--${categorySlug}" aria-hidden="true"></span>
-        <div class="handoff-note__body">
-          <div class="handoff-note__meta">${metaParts.join('')}</div>
-          <p class="handoff-note__text">${escapeHtml(note.text)}</p>
-        </div>
-        ${renderReadReceipts(note.readBy)}
-      </article>`;
+    const textP = document.createElement('p');
+    textP.className = 'handoff-note__text';
+    textP.textContent = note.text || '';
+
+    body.append(meta, textP);
+    article.append(dot, body);
+
+    const receipts = createReadReceiptsElement(note.readBy);
+    if (receipts) article.appendChild(receipts);
+
+    return article;
   }
 
   function renderHandoffBoard(options = {}) {
@@ -229,14 +268,23 @@ let handoffNotes = [];
     }
 
     window.requestAnimationFrame(() => {
+      feed.replaceChildren();
       if (options.errorMessage) {
-        feed.innerHTML = `<p class="handoff-feed__empty">${escapeHtml(options.errorMessage)}</p>`;
+        window.DentaFlowDom?.appendParagraph(feed, 'handoff-feed__empty', options.errorMessage);
       } else if (!sorted.length) {
-        feed.innerHTML = '<p class="handoff-feed__empty">Aucune note pour le moment. Ajoutez une transmission d\'équipe ci-dessus.</p>';
+        window.DentaFlowDom?.appendParagraph(
+          feed,
+          'handoff-feed__empty',
+          'Aucune note pour le moment. Ajoutez une transmission d\'équipe ci-dessus.'
+        );
       } else {
-        feed.innerHTML = sorted
-          .map((note) => renderHandoffNote(note, { isNew: note.id === newestId && options.animate }))
-          .join('');
+        const fragment = document.createDocumentFragment();
+        sorted.forEach((note) => {
+          fragment.appendChild(createHandoffNoteElement(note, {
+            isNew: note.id === newestId && options.animate,
+          }));
+        });
+        feed.appendChild(fragment);
       }
 
       feed.classList.remove('is-refreshing');
@@ -322,7 +370,8 @@ let handoffNotes = [];
   async function loadHandoffNotes() {
     const feed = $('handoff-feed');
     if (feed) {
-      feed.innerHTML = '<p class="handoff-feed__empty">Chargement des transmissions…</p>';
+      feed.replaceChildren();
+      window.DentaFlowDom?.appendParagraph(feed, 'handoff-feed__empty', 'Chargement des transmissions…');
     }
 
     try {
@@ -698,9 +747,34 @@ let handoffNotes = [];
       .filter((rowId) => rowId != null);
   }
 
-  function applyOptimisticBulkStatus(records, newStatus, badgeHtml, options = {}) {
+  function fillStatusPillElement(node, label, modifierClass = '') {
+    node.className = ['status-pill', modifierClass].filter(Boolean).join(' ');
+    if (window.DentaFlowDom?.setStatusPill) {
+      window.DentaFlowDom.setStatusPill(node, label);
+    } else {
+      node.replaceChildren();
+      node.appendChild(document.createTextNode(label || '—'));
+    }
+  }
+
+  function createStatusPillElement(label, modifierClass = '') {
+    if (window.DentaFlowDom?.createStatusPill) {
+      return window.DentaFlowDom.createStatusPill(label, modifierClass);
+    }
+    const pill = document.createElement('span');
+    fillStatusPillElement(pill, label, modifierClass);
+    return pill;
+  }
+
+  function applyOptimisticBulkStatus(records, newStatus, pillModifierClass, options = {}) {
     const { markRowCancelled = false, panelModifierClass = null } = options;
+    const resolvedModifier = pillModifierClass || getCrmStatutTagClass(newStatus);
     const snapshots = [];
+
+    const mountPillIn = (parent) => {
+      parent.replaceChildren();
+      parent.appendChild(createStatusPillElement(newStatus, resolvedModifier));
+    };
 
     records.forEach((record) => {
       const id = String(record.id);
@@ -726,13 +800,13 @@ let handoffNotes = [];
       const patchInner = (el) => {
         if (!el) return;
         snapshot.dom.push({ mode: 'inner', el, html: el.innerHTML });
-        el.innerHTML = badgeHtml;
+        mountPillIn(el);
       };
 
       const patchOuter = (el) => {
         if (!el) return;
         snapshot.dom.push({ mode: 'outer', parent: el.parentElement, html: el.outerHTML });
-        el.outerHTML = badgeHtml;
+        el.replaceWith(createStatusPillElement(newStatus, resolvedModifier));
       };
 
       const patchRowCancelled = (el) => {
@@ -768,7 +842,7 @@ let handoffNotes = [];
           innerHTML: panelStatus.innerHTML,
         });
         panelStatus.className = `crm-side-panel-statut status-pill ${panelClass}`.trim();
-        panelStatus.innerHTML = `<span class="status-pill__dot" aria-hidden="true"></span>${escapeHtml(newStatus)}`;
+        fillStatusPillElement(panelStatus, newStatus, panelClass);
       }
 
       snapshots.push(snapshot);
@@ -781,7 +855,7 @@ let handoffNotes = [];
     return applyOptimisticBulkStatus(
       records,
       'Confirmé',
-      buildCrmStatusBadge('Confirmé')
+      getCrmStatutTagClass('Confirmé')
     );
   }
 
@@ -789,7 +863,7 @@ let handoffNotes = [];
     return applyOptimisticBulkStatus(
       records,
       'Annulé',
-      buildStatusPill('Annulé', 'status-pill--attente'),
+      'status-pill--attente',
       { markRowCancelled: true, panelModifierClass: 'status-pill--attente' }
     );
   }
@@ -1002,15 +1076,23 @@ let handoffNotes = [];
 
       const tbody = $('roster-tbody');
       if (tbody && !tbody.querySelector('tr:not(.roster-empty):not(.roster-loading):not(.roster-error)')) {
-        tbody.innerHTML = `
-          <tr class="roster-empty">
-            <td colspan="5">${escapeHtml('Aucun rendez-vous prévu pour aujourd\'hui.')}</td>
-          </tr>`;
+        tbody.replaceChildren();
+        const emptyRow = document.createElement('tr');
+        emptyRow.className = 'roster-empty';
+        const cell = document.createElement('td');
+        cell.colSpan = 5;
+        cell.textContent = 'Aucun rendez-vous prévu pour aujourd\'hui.';
+        emptyRow.appendChild(cell);
+        tbody.appendChild(emptyRow);
       }
 
       const cards = $('roster-cards');
       if (cards && !cards.querySelector('.roster-card')) {
-        cards.innerHTML = `<p class="roster-cards__empty">${escapeHtml('Aucun rendez-vous prévu pour aujourd\'hui.')}</p>`;
+        cards.replaceChildren();
+        const empty = document.createElement('p');
+        empty.className = 'roster-cards__empty';
+        empty.textContent = 'Aucun rendez-vous prévu pour aujourd\'hui.';
+        cards.appendChild(empty);
       }
     };
 
@@ -1251,6 +1333,13 @@ let handoffNotes = [];
       ''
     ).trim();
 
+    const practitioner = String(
+      item['Praticien Assigné'] ??
+      item['Praticien'] ??
+      item.practitioner ??
+      'Dr. Tazi'
+    ).trim();
+
     const baserowRowId = parseBaserowRowId(
       item.id ?? item.ID ?? item.row_id ?? item.rowId
     );
@@ -1267,6 +1356,7 @@ let handoffNotes = [];
       phone,
       email,
       observations,
+      practitioner,
       time: formatAppointmentTime(rawDate),
       rawDate,
       noShow: Boolean(
@@ -1302,6 +1392,121 @@ let handoffNotes = [];
     return `<select class="status-select" aria-label="Modifier le statut" data-booking-id="${escapeHtml(record.calBookingId || '')}">${options}</select>`;
   }
 
+  function createStatusSelectElement(record) {
+    const select = document.createElement('select');
+    select.className = 'status-select';
+    select.setAttribute('aria-label', 'Modifier le statut');
+    if (record.calBookingId) {
+      select.dataset.bookingId = String(record.calBookingId);
+    }
+    const currentStatus = STATUS_OPTIONS.includes(record.status) ? record.status : 'Confirmé';
+    STATUS_OPTIONS.forEach((opt) => {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === currentStatus) option.selected = true;
+      select.appendChild(option);
+    });
+    return select;
+  }
+
+  function createRosterTableRow(record) {
+    const patientId = String(record.id);
+    const baserowRowId = extractBaserowRowId(record);
+    const scheduleDate = formatScheduleDate(record.rawDate);
+
+    const tr = document.createElement('tr');
+    tr.dataset.patientId = patientId;
+    tr.dataset.id = patientId;
+    if (scheduleDate) tr.dataset.scheduleDate = scheduleDate;
+    if (record.time) tr.dataset.startTime = String(record.time);
+    if (record.practitioner) tr.dataset.practitioner = String(record.practitioner);
+    if (record.calBookingId) tr.dataset.calBookingId = String(record.calBookingId);
+    if (record.status === 'No-show') tr.classList.add('is-cancelled');
+
+    const checkCell = document.createElement('td');
+    checkCell.className = 'roster-checkbox-cell';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'brutalist-checkbox row-checkbox';
+    if (baserowRowId != null) {
+      checkbox.dataset.rowId = String(baserowRowId);
+      checkbox.value = String(baserowRowId);
+      checkbox.setAttribute('aria-label', `Sélectionner ${record.name}`);
+    } else {
+      checkbox.disabled = true;
+    }
+    checkCell.appendChild(checkbox);
+
+    const timeCell = document.createElement('td');
+    timeCell.className = 'roster-time';
+    timeCell.textContent = record.time || '';
+
+    const patientCell = document.createElement('td');
+    const patientWrap = document.createElement('span');
+    patientWrap.className = 'roster-patient';
+    if (record.noShow) {
+      const flagSpan = document.createElement('span');
+      flagSpan.className = 'roster-noshow-flag';
+      flagSpan.title = 'Historique de no-shows — vigilance recommandée';
+      flagSpan.setAttribute('aria-label', 'Historique de no-shows');
+      flagSpan.innerHTML = NOSHOW_SVG;
+      patientWrap.appendChild(flagSpan);
+    }
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'roster-patient__name';
+    nameSpan.textContent = record.name || '';
+    patientWrap.appendChild(nameSpan);
+    patientCell.appendChild(patientWrap);
+
+    const treatmentCell = document.createElement('td');
+    treatmentCell.className = 'roster-treatment';
+    treatmentCell.textContent = record.treatment || '';
+
+    const statusCell = document.createElement('td');
+    statusCell.appendChild(createStatusSelectElement(record));
+
+    tr.append(checkCell, timeCell, patientCell, treatmentCell, statusCell);
+    return tr;
+  }
+
+  function createRosterCard(record) {
+    const patientId = String(record.id);
+    const article = document.createElement('article');
+    article.className = `roster-card${record.status === 'No-show' ? ' is-cancelled' : ''}`;
+    article.dataset.patientId = patientId;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'roster-time';
+    timeSpan.textContent = record.time || '';
+
+    const main = document.createElement('div');
+    main.className = 'roster-card__main';
+
+    const patientWrap = document.createElement('span');
+    patientWrap.className = 'roster-patient';
+    if (record.noShow) {
+      const flagSpan = document.createElement('span');
+      flagSpan.className = 'roster-noshow-flag';
+      flagSpan.title = 'Historique de no-shows — vigilance recommandée';
+      flagSpan.setAttribute('aria-label', 'Historique de no-shows');
+      flagSpan.innerHTML = NOSHOW_SVG;
+      patientWrap.appendChild(flagSpan);
+    }
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'roster-patient__name';
+    nameSpan.textContent = record.name || '';
+    patientWrap.appendChild(nameSpan);
+
+    const meta = document.createElement('div');
+    meta.className = 'roster-card__meta';
+    meta.textContent = record.treatment || '';
+
+    main.append(patientWrap, meta);
+    article.append(timeSpan, main, createStatusSelectElement(record));
+    return article;
+  }
+
   function renderPlanning(records) {
     const rows = Array.isArray(records) ? records.filter(Boolean) : [];
 
@@ -1314,33 +1519,19 @@ let handoffNotes = [];
 
     const tbody = $('roster-tbody');
     if (tbody) {
+      tbody.replaceChildren();
       if (!rows.length) {
-        tbody.innerHTML = `
-          <tr class="roster-empty">
-            <td colspan="5">${escapeHtml(emptyMessage)}</td>
-          </tr>`;
+        const emptyRow = document.createElement('tr');
+        emptyRow.className = 'roster-empty';
+        const cell = document.createElement('td');
+        cell.colSpan = 5;
+        cell.textContent = emptyMessage;
+        emptyRow.appendChild(cell);
+        tbody.appendChild(emptyRow);
       } else {
-        tbody.innerHTML = rows.map(record => {
-          const { id: patientId, name: patientName, treatment, status, time, noShow } = record;
-          const baserowRowId = extractBaserowRowId(record);
-          const rowIdAttr = baserowRowId != null ? String(baserowRowId) : '';
-
-          return `
-          <tr data-patient-id="${escapeHtml(patientId)}" data-id="${escapeHtml(patientId)}" class="${status === 'No-show' ? 'is-cancelled' : ''}">
-            <td class="roster-checkbox-cell">
-              <input type="checkbox" class="brutalist-checkbox row-checkbox" data-row-id="${rowIdAttr}" value="${rowIdAttr}" aria-label="Sélectionner ${escapeHtml(patientName)}"${baserowRowId == null ? ' disabled' : ''}>
-            </td>
-            <td class="roster-time">${escapeHtml(time)}</td>
-            <td>
-              <span class="roster-patient">
-                ${noShow ? buildNoShowFlag() : ''}
-                <span class="roster-patient__name">${escapeHtml(patientName)}</span>
-              </span>
-            </td>
-            <td class="roster-treatment">${escapeHtml(treatment)}</td>
-            <td>${buildStatusSelect(record)}</td>
-          </tr>`;
-        }).join('');
+        const fragment = document.createDocumentFragment();
+        rows.forEach((record) => fragment.appendChild(createRosterTableRow(record)));
+        tbody.appendChild(fragment);
       }
     }
 
@@ -1348,25 +1539,16 @@ let handoffNotes = [];
 
     const cards = $('roster-cards');
     if (cards) {
+      cards.replaceChildren();
       if (!rows.length) {
-        cards.innerHTML = `<p class="roster-cards__empty">${escapeHtml(emptyMessage)}</p>`;
+        const empty = document.createElement('p');
+        empty.className = 'roster-cards__empty';
+        empty.textContent = emptyMessage;
+        cards.appendChild(empty);
       } else {
-        cards.innerHTML = rows.map(record => {
-          const { id: patientId, name: patientName, treatment, status, time, noShow } = record;
-
-          return `
-          <article class="roster-card ${status === 'No-show' ? 'is-cancelled' : ''}" data-patient-id="${escapeHtml(patientId)}">
-            <span class="roster-time">${escapeHtml(time)}</span>
-            <div class="roster-card__main">
-              <span class="roster-patient">
-                ${noShow ? buildNoShowFlag() : ''}
-                <span class="roster-patient__name">${escapeHtml(patientName)}</span>
-              </span>
-              <div class="roster-card__meta">${escapeHtml(treatment)}</div>
-            </div>
-            ${buildStatusSelect(record)}
-          </article>`;
-        }).join('');
+        const fragment = document.createDocumentFragment();
+        rows.forEach((record) => fragment.appendChild(createRosterCard(record)));
+        cards.appendChild(fragment);
       }
     }
 
@@ -1382,35 +1564,53 @@ let handoffNotes = [];
 
   function showTableLoader() {
     const tbody = $('roster-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = `
-      <tr class="roster-loading">
-        <td colspan="5">
-          <span class="roster-loading__inner">
-            <span class="roster-loading__spinner" aria-hidden="true"></span>
-            <span>Chargement du planning…</span>
-          </span>
-        </td>
-      </tr>`;
+    if (tbody) {
+      tbody.replaceChildren();
+      const tr = document.createElement('tr');
+      tr.className = 'roster-loading';
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      const inner = document.createElement('span');
+      inner.className = 'roster-loading__inner';
+      const spinner = document.createElement('span');
+      spinner.className = 'roster-loading__spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      inner.append(spinner, document.createTextNode('Chargement du planning…'));
+      td.appendChild(inner);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
 
     const cards = $('roster-cards');
     if (cards) {
-      cards.innerHTML = `<p class="roster-cards__loading">Chargement du planning…</p>`;
+      cards.replaceChildren();
+      const loading = document.createElement('p');
+      loading.className = 'roster-cards__loading';
+      loading.textContent = 'Chargement du planning…';
+      cards.appendChild(loading);
     }
   }
 
   function showTableError(message = 'Impossible de charger le planning — Mode hors-ligne') {
-    const safeMessage = escapeHtml(message);
     const tbody = $('roster-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = `
-      <tr class="roster-error">
-        <td colspan="5">${safeMessage}</td>
-      </tr>`;
+    if (tbody) {
+      tbody.replaceChildren();
+      const tr = document.createElement('tr');
+      tr.className = 'roster-error';
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.textContent = message;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
 
     const cards = $('roster-cards');
     if (cards) {
-      cards.innerHTML = `<p class="roster-cards__error">${safeMessage}</p>`;
+      cards.replaceChildren();
+      const errorP = document.createElement('p');
+      errorP.className = 'roster-cards__error';
+      errorP.textContent = message;
+      cards.appendChild(errorP);
     }
 
     updateRosterStats([]);
@@ -1899,22 +2099,38 @@ let handoffNotes = [];
     ];
   }
 
-  function buildApptCardHTML(appt) {
-    return `
-      <div class="appt-card">
-        <span class="appt-time">${appt.time}</span>
-        <div class="appt-info">
-          <div class="appt-name">${appt.name}</div>
-          <span class="appt-tag appt-tag--${appt.tagClass}">${appt.treatment}</span>
-        </div>
-      </div>`;
+  function createApptCardElement(appt) {
+    const card = document.createElement('div');
+    card.className = 'appt-card';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'appt-time';
+    timeSpan.textContent = appt.time || '';
+
+    const info = document.createElement('div');
+    info.className = 'appt-info';
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'appt-name';
+    nameDiv.textContent = appt.name || '';
+
+    const tag = document.createElement('span');
+    tag.className = `appt-tag appt-tag--${appt.tagClass || 'consultation'}`;
+    tag.textContent = appt.treatment || '';
+
+    info.append(nameDiv, tag);
+    card.append(timeSpan, info);
+    return card;
   }
 
   function renderWaitlistPanel() {
     const container = $('waitlist-panel-list');
     if (!container) return;
     const waitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
-    container.innerHTML = waitlist.map(buildApptCardHTML).join('');
+    container.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    waitlist.forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+    container.appendChild(fragment);
   }
 
   function setWaitlistFormProcessing(form, isProcessing) {
@@ -2189,7 +2405,7 @@ let handoffNotes = [];
       const statusLabel = patientData.status || 'Confirmé';
       const mod = getCrmStatutTagClass(statusLabel);
       statusEl.className = `crm-side-panel-statut status-pill ${mod}`.trim();
-      statusEl.innerHTML = `<span class="status-pill__dot" aria-hidden="true"></span>${escapeHtml(statusLabel)}`;
+      fillStatusPillElement(statusEl, statusLabel, mod);
     }
   }
 
@@ -2199,13 +2415,16 @@ let handoffNotes = [];
 
     const rows = Array.isArray(appointmentsArray) ? appointmentsArray.filter(Boolean) : [];
     crmPatientsById = {};
-    tbody.innerHTML = '';
+    tbody.replaceChildren();
 
     if (!rows.length) {
-      tbody.innerHTML = `
-        <tr class="crm-table-empty">
-          <td colspan="5">Aucun patient pour aujourd'hui.</td>
-        </tr>`;
+      const emptyRow = document.createElement('tr');
+      emptyRow.className = 'crm-table-empty';
+      const cell = document.createElement('td');
+      cell.colSpan = 5;
+      cell.textContent = 'Aucun patient pour aujourd\'hui.';
+      emptyRow.appendChild(cell);
+      tbody.appendChild(emptyRow);
       return;
     }
 
@@ -2221,15 +2440,29 @@ let handoffNotes = [];
       tr.setAttribute('role', 'button');
       tr.dataset.patientId = String(patient.id);
 
-      tr.innerHTML = `
-        <td>${escapeHtml(patient.name)}</td>
-        <td>${escapeHtml(patient.phone || 'Non renseigné')}</td>
-        <td>${escapeHtml(patient.email || '—')}</td>
-        <td>${buildMotifPill(patient.motif)}</td>
-        <td>${buildCrmStatusBadge(patient.status)}</td>`;
+      const nameCell = document.createElement('td');
+      nameCell.textContent = patient.name || '';
 
+      const phoneCell = document.createElement('td');
+      phoneCell.textContent = patient.phone || 'Non renseigné';
+
+      const emailCell = document.createElement('td');
+      emailCell.textContent = patient.email || '—';
+
+      const motifCell = document.createElement('td');
+      motifCell.appendChild(createStatusPillElement(
+        patient.motif || 'Consultation',
+        'status-pill--neutral'
+      ));
+
+      const statusCell = document.createElement('td');
+      statusCell.appendChild(createStatusPillElement(
+        patient.status || 'Confirmé',
+        getCrmStatutTagClass(patient.status)
+      ));
+
+      tr.append(nameCell, phoneCell, emailCell, motifCell, statusCell);
       tr.addEventListener('click', () => activateCrmRow(tr));
-
       tbody.appendChild(tr);
     });
 
@@ -2386,10 +2619,13 @@ let handoffNotes = [];
       btnFillGap.disabled = true;
       try {
         const response = await fetch(
-          `${CONFIG.API_BASE}/webhook/fill-gap`,
-          { method: 'POST', headers: apiHeaders() }
+          CONFIG.FILL_GAP_PROXY,
+          { method: 'POST', headers: apiHeaders(), body: JSON.stringify({}) }
         );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
 
         btnFillGap.classList.add('is-success');
         showToast('Blast SMS envoyé à la liste d\'attente.', 'success');

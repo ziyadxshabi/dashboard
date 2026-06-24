@@ -1,16 +1,16 @@
 /**
- * Doctor dashboard data proxy — PIN-gated bridge to n8n dashboard webhook.
- * Set DOCTOR_PIN, N8N_WEBHOOK_URL_DASHBOARD, and DASHBOARD_AUTH_KEY in Vercel env.
+ * Doctor dashboard data proxy — JWT-gated bridge to n8n dashboard webhook.
+ * Set JWT_SECRET, N8N_WEBHOOK_DASHBOARD, and DASHBOARD_AUTH_KEY in Vercel env.
  */
+const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const DEFAULT_WEBHOOK_URL =
   'https://glade-rigor-perennial.ngrok-free.dev/webhook/dashboard-data';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, x-doctor-pin');
+    applyCors(res, 'GET, OPTIONS');
     return res.status(204).end();
   }
 
@@ -18,11 +18,8 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const clientPin = req.headers['x-doctor-pin'];
-
-  if (clientPin !== process.env.DOCTOR_PIN) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid PIN' });
-  }
+  const session = requireBearerSession(req, res, { allowedRoles: ['doctor'] });
+  if (!session) return;
 
   const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD || DEFAULT_WEBHOOK_URL;
 
@@ -37,7 +34,7 @@ module.exports = async function handler(req, res) {
         'content-type': 'application/json',
         'ngrok-skip-browser-warning': 'true',
         'user-agent': 'DentaFlow-Doctor-Proxy/1.0',
-        'x-agency-auth': process.env.DASHBOARD_AUTH_KEY,
+        'x-agency-auth': process.env.DASHBOARD_AUTH_KEY || process.env.N8N_AUTH_KEY || '',
       },
       signal: abortController.signal,
       redirect: 'follow',

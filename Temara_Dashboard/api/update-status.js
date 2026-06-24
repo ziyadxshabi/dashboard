@@ -1,22 +1,25 @@
 /**
  * Roster status update proxy — POST bridge to n8n webhook update-status.
- * Set N8N_WEBHOOK_URL_UPDATE_STATUS + optional N8N_AUTH_KEY in Vercel env.
+ * Set JWT_SECRET, N8N_WEBHOOK_UPDATE_STATUS + optional N8N_AUTH_KEY in Vercel env.
  */
+const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const DEFAULT_WEBHOOK_URL =
   'https://glade-rigor-perennial.ngrok-free.dev/webhook/update-status';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    applyCors(res, 'POST, OPTIONS');
     return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
+
+  const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
+  if (!session) return;
 
   const webhookUrl = process.env.N8N_WEBHOOK_UPDATE_STATUS || DEFAULT_WEBHOOK_URL;
   const authKey = process.env.N8N_AUTH_KEY;

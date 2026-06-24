@@ -1,9 +1,19 @@
-/* --- SECURITY — PIN gate handled by auth.js --- */
+/* --- SECURITY — auth gate handled by auth.js --- */
 const AUTH_CONFIG = {
   SESSION_KEY: 'dentaflow_session',
-  SESSION_PIN_KEY: 'dentaflow_pin',
-  PIN_HASH: null,
 };
+
+function getApiAuthHeaders(extra = {}) {
+  const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
+    ? window.DentaFlowAuth.getAuthHeaders()
+    : { Accept: 'application/json' };
+
+  return {
+    'ngrok-skip-browser-warning': 'true',
+    ...authHeaders,
+    ...extra,
+  };
+}
 
 function unlockDashboard({ skipDashboardFetch = false } = {}) {
   const overlay = document.getElementById('login-overlay');
@@ -278,6 +288,36 @@ function apptTagModifier(tagClass) {
   return 'appt-tag--consultation';
 }
 
+function createApptCardElement(appt) {
+  const mod = apptTagModifier(appt.tagClass);
+  const card = document.createElement('div');
+  card.className = 'appt-card';
+
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'appt-time';
+  timeSpan.textContent = appt.time || '';
+
+  const info = document.createElement('div');
+  info.className = 'appt-info';
+
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'appt-name';
+  nameDiv.textContent = appt.name || '';
+
+  const pill = window.DentaFlowDom?.createStatusPill
+    ? window.DentaFlowDom.createStatusPill(appt.treatment, mod)
+    : (() => {
+      const fallback = document.createElement('span');
+      fallback.className = mod;
+      fallback.textContent = appt.treatment || '';
+      return fallback;
+    })();
+
+  info.append(nameDiv, pill);
+  card.append(timeSpan, info);
+  return card;
+}
+
 function buildApptCardHTML(appt) {
   const mod = apptTagModifier(appt.tagClass);
   return `
@@ -471,7 +511,10 @@ function initChartToggles() {
 function renderAppointmentsList() {
   const container = document.getElementById('appointments-list');
   if (!container) return;
-  container.innerHTML = getDemoAppointments().map(buildApptCardHTML).join('');
+  container.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  getDemoAppointments().forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+  container.appendChild(fragment);
 }
 
 function renderWaitlistPanel() {
@@ -480,7 +523,10 @@ function renderWaitlistPanel() {
   const waitlist = getDemoAppointments()
     .sort((a, b) => a.priority - b.priority)
     .map(appt => ({ ...appt, time: `Priorité ${appt.priority}` }));
-  container.innerHTML = waitlist.map(buildApptCardHTML).join('');
+  container.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  waitlist.forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+  container.appendChild(fragment);
 }
 
 /* ── NO-SHOW RECOVERY — WAITLIST FORM ────────────────────────────────────── */
@@ -548,7 +594,7 @@ function initWaitlistForm() {
 async function submitWaitlistEntry(data) {
   const response = await fetch('/api/waitlist', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       nom:       data.nom,
       telephone: data.telephone,
@@ -566,14 +612,12 @@ function prependWaitlistEntry({ nom, telephone, priorite }) {
   if (!container) return;
 
   const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
-  const card = buildApptCardHTML({
+  container.prepend(createApptCardElement({
     time: 'Nouveau',
     name: nom,
     treatment: priorite,
     tagClass,
-  });
-
-  container.insertAdjacentHTML('afterbegin', card);
+  }));
 }
 
 /* ── SETTINGS PANEL ──────────────────────────────────────────────────────── */
@@ -585,7 +629,6 @@ const volatileSettings = {
   dailyGoal:       null,
   smsReminders:    true,
   emailReminders:  true,
-  pinHash:         null,
 };
 
 function applyTheme(theme) {
@@ -749,8 +792,6 @@ function initSettings() {
   if (smsToggle)   smsToggle.checked   = saved.smsReminders !== false;
   if (emailToggle) emailToggle.checked = saved.emailReminders !== false;
 
-  if (saved.pinHash) AUTH_CONFIG.PIN_HASH = saved.pinHash;
-
   goalEl?.addEventListener('change', () => {
     const val = parseInt(goalEl.value, 10);
     if (val >= 1000) {
@@ -762,30 +803,6 @@ function initSettings() {
 
   smsToggle?.addEventListener('change', () => saveSettings({ smsReminders: smsToggle.checked }));
   emailToggle?.addEventListener('change', () => saveSettings({ emailReminders: emailToggle.checked }));
-
-  const pinBtn = document.getElementById('settings-pin-save');
-  const pinInput = document.getElementById('settings-pin');
-  const pinStatus = document.getElementById('settings-pin-status');
-
-  pinBtn?.addEventListener('click', async () => {
-    const pin = pinInput?.value ?? '';
-    if (!/^\d{4}$/.test(pin)) {
-      showPinStatus(pinStatus, 'Le code doit contenir exactement 4 chiffres.', false);
-      return;
-    }
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
-    const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    AUTH_CONFIG.PIN_HASH = hash;
-    saveSettings({ pinHash: hash });
-    pinInput.value = '';
-    pinBtn.textContent = 'PIN Enregistré ✓';
-    pinBtn.classList.add('is-success');
-    showPinStatus(pinStatus, 'Nouveau code PIN actif.', true);
-    setTimeout(() => {
-      pinBtn.textContent = 'Enregistrer le PIN';
-      pinBtn.classList.remove('is-success');
-    }, 2500);
-  });
 }
 
 function loadSettings() {
@@ -794,13 +811,6 @@ function loadSettings() {
 
 function saveSettings(partial) {
   Object.assign(volatileSettings, partial);
-}
-
-function showPinStatus(el, message, ok) {
-  if (!el) return;
-  el.textContent = message;
-  el.hidden = false;
-  el.className = `settings-pin-status ${ok ? 'is-ok' : 'is-error'}`;
 }
 
 /* ── CRM PATIENT SEARCH ──────────────────────────────────────────────────── */
@@ -855,7 +865,11 @@ function populateCrmSidePanel(patient) {
     const label = patient.statut || '—';
     const mod = getCrmStatutTagClass(label);
     statutEl.className = `crm-side-panel-statut status-pill ${mod}`.trim();
-    statutEl.innerHTML = `<span class="status-pill__dot" aria-hidden="true"></span>${escapeHtml(label)}`;
+    if (window.DentaFlowDom?.setStatusPill) {
+      window.DentaFlowDom.setStatusPill(statutEl, label);
+    } else {
+      statutEl.textContent = label;
+    }
   }
 
   setText('crm-panel-amount', `${formatMAD(patient.amount)} MAD`);
@@ -1115,28 +1129,21 @@ async function parseDashboardJson(response) {
 }
 
 /* ── MAIN DATA FETCH ─────────────────────────────────────────────────────── */
-async function loadDashboard(enteredPin) {
+async function loadDashboard() {
   const errorBanner = document.getElementById('error-banner');
-  const doctorPin = enteredPin ?? sessionStorage.getItem(AUTH_CONFIG.SESSION_PIN_KEY) ?? '';
 
   try {
     applySkeletonState();
 
-    const headers = { Accept: 'application/json' };
-    if (doctorPin) {
-      headers['x-doctor-pin'] = doctorPin;
-    }
-
     const response = await fetch(CONFIG.DATA_URL, {
       method:  'GET',
-      headers,
+      headers: getApiAuthHeaders(),
       cache:   'no-store',
       signal:  AbortSignal.timeout(10_000),
     });
 
     if (response.status === 401) {
-      sessionStorage.removeItem(AUTH_CONFIG.SESSION_KEY);
-      sessionStorage.removeItem(AUTH_CONFIG.SESSION_PIN_KEY);
+      window.DentaFlowAuth?.clearSession?.();
       sessionStorage.removeItem('dentaflow_role');
       throw new Error('Session expirée — reconnectez-vous.');
     }
@@ -1483,13 +1490,21 @@ function renderAcceptanceChart(data) {
       { label: 'Accepté',    value: accepted, color: '#b8965a' },
       { label: 'En attente', value: pending,  color: chartTheme.pendingSegment },
     ];
-    legendEl.innerHTML = items.map(item => `
-      <div class="pie-legend-item">
-        <span class="pie-legend-dot" style="background:${item.color}"></span>
-        <span>${item.label}</span>
-        <span class="pie-legend-value">${item.value}</span>
-      </div>
-    `).join('');
+    legendEl.replaceChildren();
+    items.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'pie-legend-item';
+      const dot = document.createElement('span');
+      dot.className = 'pie-legend-dot';
+      dot.style.backgroundColor = item.color;
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = item.label;
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'pie-legend-value';
+      valueSpan.textContent = String(item.value);
+      row.append(dot, labelSpan, valueSpan);
+      legendEl.appendChild(row);
+    });
   }
 }
 
@@ -2095,13 +2110,23 @@ function sortDoctorAppointmentsByTime(a, b) {
   return timeA - timeB;
 }
 
-function buildDoctorTriageRow(record) {
-  return `<tr>
-    <td>${escapeHtml(record.time)}</td>
-    <td>${escapeHtml(record.name)}</td>
-    <td>${escapeHtml(record.treatment)}</td>
-    <td>${escapeHtml(record.status)}</td>
-  </tr>`;
+function createDoctorTriageRow(record) {
+  const tr = document.createElement('tr');
+
+  const timeCell = document.createElement('td');
+  timeCell.textContent = record.time || '';
+
+  const nameCell = document.createElement('td');
+  nameCell.textContent = record.name || '';
+
+  const treatmentCell = document.createElement('td');
+  treatmentCell.textContent = record.treatment || '';
+
+  const statusCell = document.createElement('td');
+  statusCell.textContent = record.status || '';
+
+  tr.append(timeCell, nameCell, treatmentCell, statusCell);
+  return tr;
 }
 
 function renderDoctorTriageRoster(records) {
@@ -2116,13 +2141,35 @@ function renderDoctorTriageRoster(records) {
   const emergencies = todayRows.filter(isDoctorEmergencyRecord);
   const waiting = todayRows.filter((record) => !isDoctorEmergencyRecord(record));
 
-  waitingBody.innerHTML = waiting.length
-    ? waiting.map(buildDoctorTriageRow).join('')
-    : '<tr class="triage-empty"><td colspan="4">Aucun patient en attente</td></tr>';
+  waitingBody.replaceChildren();
+  if (!waiting.length) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.className = 'triage-empty';
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.textContent = 'Aucun patient en attente';
+    emptyRow.appendChild(cell);
+    waitingBody.appendChild(emptyRow);
+  } else {
+    const fragment = document.createDocumentFragment();
+    waiting.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
+    waitingBody.appendChild(fragment);
+  }
 
-  emergencyBody.innerHTML = emergencies.length
-    ? emergencies.map(buildDoctorTriageRow).join('')
-    : '<tr class="triage-empty"><td colspan="4">Aucune urgence signalée</td></tr>';
+  emergencyBody.replaceChildren();
+  if (!emergencies.length) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.className = 'triage-empty';
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.textContent = 'Aucune urgence signalée';
+    emptyRow.appendChild(cell);
+    emergencyBody.appendChild(emptyRow);
+  } else {
+    const fragment = document.createDocumentFragment();
+    emergencies.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
+    emergencyBody.appendChild(fragment);
+  }
 }
 
 function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
@@ -2147,10 +2194,7 @@ async function loadDoctorHubData() {
   try {
     const response = await fetch(`${CONFIG.API_BASE}${CONFIG.ROSTER_ENDPOINT}`, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
+      headers: getApiAuthHeaders(),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     });
@@ -2403,27 +2447,63 @@ function isUrgentTeamNote(note) {
   return String(note.category || '').trim().toLowerCase() === 'urgent';
 }
 
-function renderTeamNoteItem(note) {
+function createTeamNoteElement(note) {
   const urgent = isUrgentTeamNote(note);
   const categorySlug = String(note.category || 'Info').toLowerCase().replace(/\s+/g, '-');
 
-  return `
-    <article
-      class="team-message${urgent ? ' team-message--urgent' : ''}${note.pinned ? ' team-message--pinned' : ''}"
-      data-note-id="${escapeHtml(note.id)}"
-      role="article"
-    >
-      <span class="team-message__indicator" aria-hidden="true"></span>
-      <div class="team-message__body">
-        <div class="team-message__meta">
-          ${note.time ? `<time class="team-message__time" datetime="${escapeHtml(note.time)}">${escapeHtml(note.time)}</time>` : ''}
-          ${note.author ? `<span class="team-message__author">${escapeHtml(note.author)}</span>` : ''}
-          <span class="team-message__category team-message__category--${escapeHtml(categorySlug)}"><span class="status-pill__dot" aria-hidden="true"></span>${escapeHtml(note.category || 'Info')}</span>
-          ${note.pinned ? '<span class="team-message__pin" aria-label="Message épinglé">Épinglé</span>' : ''}
-        </div>
-        <p class="team-message__text">${escapeHtml(note.text)}</p>
-      </div>
-    </article>`;
+  const article = document.createElement('article');
+  article.className = `team-message${urgent ? ' team-message--urgent' : ''}${note.pinned ? ' team-message--pinned' : ''}`;
+  article.dataset.noteId = String(note.id);
+  article.setAttribute('role', 'article');
+
+  const indicator = document.createElement('span');
+  indicator.className = 'team-message__indicator';
+  indicator.setAttribute('aria-hidden', 'true');
+
+  const body = document.createElement('div');
+  body.className = 'team-message__body';
+
+  const meta = document.createElement('div');
+  meta.className = 'team-message__meta';
+
+  if (note.time) {
+    const timeEl = document.createElement('time');
+    timeEl.className = 'team-message__time';
+    timeEl.dateTime = note.time;
+    timeEl.textContent = note.time;
+    meta.appendChild(timeEl);
+  }
+
+  if (note.author) {
+    const authorSpan = document.createElement('span');
+    authorSpan.className = 'team-message__author';
+    authorSpan.textContent = note.author;
+    meta.appendChild(authorSpan);
+  }
+
+  const categorySpan = document.createElement('span');
+  categorySpan.className = `team-message__category team-message__category--${categorySlug}`;
+  const categoryDot = document.createElement('span');
+  categoryDot.className = 'status-pill__dot';
+  categoryDot.setAttribute('aria-hidden', 'true');
+  categorySpan.append(categoryDot, document.createTextNode(note.category || 'Info'));
+  meta.appendChild(categorySpan);
+
+  if (note.pinned) {
+    const pinSpan = document.createElement('span');
+    pinSpan.className = 'team-message__pin';
+    pinSpan.setAttribute('aria-label', 'Message épinglé');
+    pinSpan.textContent = 'Épinglé';
+    meta.appendChild(pinSpan);
+  }
+
+  const textP = document.createElement('p');
+  textP.className = 'team-message__text';
+  textP.textContent = note.text || '';
+
+  body.append(meta, textP);
+  article.append(indicator, body);
+  return article;
 }
 
 function renderTeamNotesList(notes, { errorMessage = null } = {}) {
@@ -2432,9 +2512,10 @@ function renderTeamNotesList(notes, { errorMessage = null } = {}) {
   if (!listEl) return;
 
   listEl.setAttribute('aria-busy', 'false');
+  listEl.replaceChildren();
 
   if (errorMessage) {
-    listEl.innerHTML = `<p class="team-messages-empty team-messages-empty--error">${escapeHtml(errorMessage)}</p>`;
+    window.DentaFlowDom?.appendParagraph(listEl, 'team-messages-empty team-messages-empty--error', errorMessage);
     if (syncEl) syncEl.textContent = 'Hors-ligne';
     return;
   }
@@ -2442,12 +2523,14 @@ function renderTeamNotesList(notes, { errorMessage = null } = {}) {
   const sorted = sortTeamNotes(notes);
 
   if (!sorted.length) {
-    listEl.innerHTML = '<p class="team-messages-empty">Aucun message de l\'équipe pour le moment.</p>';
+    window.DentaFlowDom?.appendParagraph(listEl, 'team-messages-empty', 'Aucun message de l\'équipe pour le moment.');
     if (syncEl) syncEl.textContent = 'À jour';
     return;
   }
 
-  listEl.innerHTML = sorted.map(renderTeamNoteItem).join('');
+  const fragment = document.createDocumentFragment();
+  sorted.forEach((note) => fragment.appendChild(createTeamNoteElement(note)));
+  listEl.appendChild(fragment);
 
   if (syncEl) {
     const now = new Date().toLocaleTimeString('fr-FR', {
@@ -2473,10 +2556,7 @@ async function loadTeamNotes() {
   try {
     const response = await fetch(`${CONFIG.API_BASE}/webhook/get-notes`, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
+      headers: getApiAuthHeaders(),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     });

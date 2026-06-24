@@ -1,7 +1,9 @@
 /**
- * Dashboard KPI proxy — bridges the static frontend to n8n via Ngrok.
+ * Dashboard KPI proxy — JWT-gated bridge to n8n via Ngrok.
  * Secrets live in Vercel Environment Variables only (never on the client).
  */
+const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const DEFAULT_WEBHOOK_URL =
   'https://glade-rigor-perennial.ngrok-free.dev/webhook/dashboard-data';
@@ -92,15 +94,16 @@ async function fetchUpstreamWithRetry(webhookUrl, authKey) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    applyCors(res, 'GET, OPTIONS');
     return res.status(204).end();
   }
 
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
+
+  const session = requireBearerSession(req, res, { allowedRoles: ['doctor'] });
+  if (!session) return;
 
   const webhookUrl = process.env.N8N_WEBHOOK_ASSISTANT_PROXY || DEFAULT_WEBHOOK_URL;
   const authKey = process.env.N8N_AUTH_KEY;
