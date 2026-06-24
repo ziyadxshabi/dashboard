@@ -11,6 +11,7 @@ const CONFIG = {
   ROSTER_PROXY: '/api/roster',
   DELAY_ALERT_PROXY: '/api/n8n-delay-alert',
   UPDATE_STATUS_PROXY: '/api/update-status',
+  FILL_GAP_PROXY: '/api/fill-gap',
   ENDPOINTS: {
     GET_ROSTER: '/webhook/assistant-data',
     UPDATE_STATUS: '/webhook/update-status',
@@ -855,6 +856,38 @@ let handoffNotes = [];
       .filter((rowId) => rowId != null);
   }
 
+  function formatScheduleDate(rawDate) {
+    if (rawDate == null || rawDate === '') return '';
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+  }
+
+  function extractCancelMetadataFromRecord(record) {
+    const row = document.querySelector(`#roster-tbody tr[data-patient-id="${String(record.id)}"]`);
+    const rowId = extractBaserowRowId(record);
+    return {
+      rowId,
+      calBookingId: String(record.calBookingId ?? row?.dataset?.calBookingId ?? '').trim(),
+      scheduleDate: String(row?.dataset?.scheduleDate ?? formatScheduleDate(record.rawDate)).trim(),
+      startTime: String(row?.dataset?.startTime ?? record.time ?? '').trim(),
+      practitioner: String(row?.dataset?.practitioner ?? record.practitioner ?? 'Dr. Tazi').trim(),
+    };
+  }
+
+  function getSelectedBulkCancelPayload(ids = selectedPatientIds) {
+    const records = getRecordsForSelectedIds(ids);
+    const appointments = records
+      .map(extractCancelMetadataFromRecord)
+      .filter((entry) => entry.rowId != null);
+
+    return {
+      rowIds: appointments.map((entry) => entry.rowId),
+      calBookingIds: appointments.map((entry) => entry.calBookingId),
+      appointments,
+    };
+  }
+
   function isSameRowId(a, b) {
     return Number(a) === Number(b);
   }
@@ -870,22 +903,41 @@ let handoffNotes = [];
     updateBulkBarUI();
   }
 
-  async function postBulkAction(endpoint, rowIds) {
+  async function postBulkAction(endpoint, payload) {
+    const body = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+      ? payload
+      : { rowIds: payload };
+
     const response = await fetch(
       `${CONFIG.API_BASE}${endpoint}`,
       {
         method: 'POST',
         headers: apiHeaders(),
-        body: JSON.stringify({ rowIds }),
+        body: JSON.stringify(body),
       }
     );
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errText.slice(0, 160)}`);
+    const rawText = await response.text();
+    let parsed = null;
+    try {
+      parsed = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      parsed = { raw: rawText };
     }
 
-    return response;
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${String(rawText).slice(0, 160)}`);
+    }
+
+    if (parsed && parsed.ok === false) {
+      throw new Error(parsed.error || parsed.details || 'Upstream rejected request');
+    }
+
+    if (parsed && parsed.success === false) {
+      throw new Error(parsed.message || parsed.error || 'Bulk action failed');
+    }
+
+    return parsed ?? { success: true, message: rawText || 'OK' };
   }
 
   function updateBulkBarUI() {
@@ -1017,13 +1069,13 @@ let handoffNotes = [];
 
     const ids = [...selectedPatientIds];
     const records = getRecordsForSelectedIds(ids);
-    const targetRowIds = getSelectedRowIdsForApi(ids);
+    const cancelPayload = getSelectedBulkCancelPayload(ids);
     const optimisticSnapshots = applyOptimisticBulkCancel(records);
 
     try {
-      console.log('Payload sending:', { rowIds: targetRowIds });
+      console.log('Payload sending:', cancelPayload);
       await Promise.all([
-        postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, targetRowIds),
+        postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, cancelPayload),
         animateRowsVaporize(ids),
       ]);
 
@@ -1045,17 +1097,26 @@ let handoffNotes = [];
 
     const ids = [...selectedPatientIds];
     const targetRowIds = getSelectedRowIdsForApi(ids);
+    const btnBulkSms = $('btn-bulk-sms');
 
     clearBulkSelection();
     showToast('Envoi des SMS en cours d\'exécution en arrière-plan...', 'info');
 
+    btnBulkSms?.classList.add('is-loading');
+    if (btnBulkSms) btnBulkSms.disabled = true;
+
     try {
       console.log('Payload sending:', { rowIds: targetRowIds });
-      await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, targetRowIds);
+      const result = await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: targetRowIds });
+      const message = result?.message || 'SMS groupés envoyés avec succès.';
+      showToast(message, 'success');
     } catch (error) {
       console.error('[Bulk SMS] Failed:', error);
       restoreBulkSelection(ids);
       showToast('Erreur: envoi SMS échoué.', 'error');
+    } finally {
+      btnBulkSms?.classList.remove('is-loading');
+      if (btnBulkSms) btnBulkSms.disabled = false;
     }
   }
 
