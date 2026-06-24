@@ -1,0 +1,235 @@
+{
+  "name": "Dashboard - Bulk SMS Blast",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bulk-sms",
+        "options": {}
+      },
+      "id": "395e0f35-7586-438e-9e26-62cc634fc06a",
+      "name": "Webhook - Bulk SMS",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        -128
+      ],
+      "webhookId": "acec9404-b2b1-4008-85ed-80925546a3ce"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\nconst rowIds = Array.isArray(body.rowIds) ? body.rowIds : [];\n\nif (!rowIds.length) {\n  throw new Error('VALIDATION_FAIL: body.rowIds must be a non-empty array of Baserow row IDs');\n}\n\nconst MAX_BATCH = 100;\nif (rowIds.length > MAX_BATCH) {\n  throw new Error(`VALIDATION_FAIL: batch of ${rowIds.length} exceeds max ${MAX_BATCH}`);\n}\n\nreturn rowIds.map(id => ({ json: { rowId: id } }));"
+      },
+      "id": "4f331cb5-eab0-43b4-91ab-6fa38ccdc986",
+      "name": "Validate & Split IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "get",
+        "tableId": "YOUR_TABLE_ID",
+        "rowId": "={{ $json.rowId }}"
+      },
+      "id": "0ebf4a58-d8ce-4be7-b0af-0ef56ca694d4",
+      "name": "Baserow - Get Patient Phone",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -1168,
+        -128
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize Moroccan phone numbers to E.164 and pull correct Baserow columns.\n// Matches the same toE164MA() pattern used across the Concierge / Reminders / Leak-Protection engines.\nfunction toE164MA(raw) {\n  if (raw == null || raw === '') return '';\n  let phone = String(raw).replace(/[\\s\\-\\(\\)\\.]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('+')) return phone;\n  if (phone.startsWith('00')) return '+' + phone.slice(2);\n  if (phone.startsWith('212')) return '+' + phone;\n  if (phone.startsWith('0')) return '+212' + phone.slice(1);\n  return '+212' + phone;\n}\n\nconst item = $input.first().json;\nconst nom = item['Patient (Nom Complet)'] ?? item.Clean_Name ?? 'Patient';\nconst phone = toE164MA(item['Téléphone (WhatsApp)'] ?? item.Clean_Phone ?? '');\n\nreturn [{\n  json: {\n    id: item.id,\n    Nom: nom,\n    Phone: phone\n  }\n}];"
+      },
+      "id": "d8e585d8-3565-4298-900d-4f987b916cfe",
+      "name": "Format Phone E.164",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-valid-phone",
+              "leftValue": "={{ $json.Phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3e07d27c-71b8-4809-bcbe-11c7bb16a7a9",
+      "name": "If Valid Phone",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -736,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $json.Phone }}",
+        "message": "=Bonjour {{ $json.Nom }}, ceci est un message du cabinet dentaire. Veuillez nous contacter si besoin.",
+        "options": {
+          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+        }
+      },
+      "id": "6a3e020f-43da-4bb0-8329-c0f4e3a8eea4",
+      "name": "Twilio - Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        -192
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "agency-errors",
+          "mode": "name"
+        },
+        "text": "=⚠️ *Bulk SMS — Invalid Phone Skipped*\nRow ID: `{{ $json.id }}` — Patient: {{ $json.Nom }}\nNo usable phone number found; SMS not sent.",
+        "otherOptions": {}
+      },
+      "id": "f2cf4ebb-14d0-4253-8f5a-f6349954fb76",
+      "name": "Alert: Invalid Phone",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -512,
+        -32
+      ],
+      "webhookId": "61bc70cd-6aad-48ae-b896-e0354e6420be",
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Bulk SMS": {
+      "main": [
+        [
+          {
+            "node": "Validate & Split IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Split IDs": {
+      "main": [
+        [
+          {
+            "node": "Baserow - Get Patient Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - Get Patient Phone": {
+      "main": [
+        [
+          {
+            "node": "Format Phone E.164",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Phone E.164": {
+      "main": [
+        [
+          {
+            "node": "If Valid Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Valid Phone": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert: Invalid Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "1c52a499-b043-45f9-b1aa-5668be54621d",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "zwQW5a18pakQBFef",
+  "tags": []
+}

@@ -1,0 +1,157 @@
+{
+  "name": "Dashboard - Bulk Cancel",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bulk-cancel",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "72c3dc21-8959-4092-bddf-2060d65a37ef",
+      "name": "Webhook - Bulk Cancel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -48
+      ],
+      "webhookId": "2b613efc-a012-4c7a-90c4-eb8d04dbc376"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate payload shape before doing anything destructive.\nconst body = $input.first().json.body ?? {};\nconst rowIds = Array.isArray(body.rowIds) ? body.rowIds : [];\n\nif (!rowIds.length) {\n  throw new Error('VALIDATION_FAIL: body.rowIds must be a non-empty array of Baserow row IDs');\n}\n\n// Cap batch size to avoid runaway loops from a malformed frontend payload\nconst MAX_BATCH = 100;\nif (rowIds.length > MAX_BATCH) {\n  throw new Error(`VALIDATION_FAIL: batch of ${rowIds.length} exceeds max ${MAX_BATCH}`);\n}\n\nreturn rowIds.map(id => ({ json: { rowId: id } }));"
+      },
+      "id": "5582c12c-4fb5-41c4-8360-8d3d876da5f1",
+      "name": "Validate & Split IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "update",
+        "tableId": 1017856,
+        "rowId": "=={{ $json.rowId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 8941566,
+              "fieldValue": "Annulé"
+            }
+          ]
+        }
+      },
+      "id": "5f61f637-c2b9-4024-b920-1c321f40dbbf",
+      "name": "Baserow - Update to Annulé",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        -48
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate per-row results into a single summary so the frontend\n// can show 'X of Y cancelled' instead of just the last item's response.\nconst items = $input.all();\nreturn [{\n  json: {\n    success: true,\n    cancelledCount: items.length,\n    rowIds: items.map(i => i.json.id ?? i.json.rowId)\n  }\n}];"
+      },
+      "id": "f6dcdd61-69ae-4009-885b-7900e4d6e5bd",
+      "name": "Aggregate Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "e909b979-0bd8-4d56-b945-3047059fd7e1",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        -48
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Bulk Cancel": {
+      "main": [
+        [
+          {
+            "node": "Validate & Split IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Split IDs": {
+      "main": [
+        [
+          {
+            "node": "Baserow - Update to Annulé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - Update to Annulé": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Result": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "bac826ec-e16d-41f8-84ac-69697cad3ba3",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "MJPuoujZ6SBYiEjV",
+  "tags": []
+}

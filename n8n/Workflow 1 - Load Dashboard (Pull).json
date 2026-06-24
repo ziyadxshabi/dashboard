@@ -1,0 +1,89 @@
+{
+  "name": "Workflow 1 - Load Dashboard (Pull)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "assistant-data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d8c6aa74-8df0-431c-a759-a060efa628a6",
+      "name": "Webhook - Get Roster",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        -48
+      ],
+      "webhookId": "REPLACE_WITH_AUTO_GENERATED_ID"
+    },
+    {
+      "parameters": {
+        "tableId": "REPLACE_WITH_YOUR_APPOINTMENTS_TABLE_ID",
+        "returnAll": true,
+        "additionalOptions": {}
+      },
+      "id": "a19f901a-36cc-41ef-97be-163cd9378554",
+      "name": "Baserow - List Today's Rows",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -48
+      ],
+      "notes": "Configure the date filter manually in the node UI (Filters > Date field = Today). The 'filters' block above is a placeholder structure only."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "a552ae68-f6ac-4ce0-8216-4c8b8dc63cc9",
+      "name": "Respond to Webhook - Send Roster",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -48
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Get Roster": {
+      "main": [
+        [
+          {
+            "node": "Baserow - List Today's Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - List Today's Rows": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook - Send Roster",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b60d3a12-9947-43d4-a23d-c7d72dd37f7f",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "ohJBMLe0kskPzq9r",
+  "tags": []
+}

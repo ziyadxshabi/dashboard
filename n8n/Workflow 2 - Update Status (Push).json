@@ -1,0 +1,143 @@
+{
+  "name": "Workflow 2 - Update Status (Push)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update-status",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "389f16bd-e809-4c31-a6f7-152d4304d15d",
+      "name": "Webhook - Receive Status Update",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -48
+      ],
+      "webhookId": "REPLACE_WITH_AUTO_GENERATED_ID"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "REPLACE_WITH_YOUR_APPOINTMENTS_TABLE_ID",
+        "rowId": "={{ $json.body.patientId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldValue": "={{ $json.body.newStatus }}"
+            }
+          ]
+        }
+      },
+      "id": "e4a7e6b6-fdf1-4a6a-9d23-a28005f3c9bc",
+      "name": "Baserow - Update Status",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        -48
+      ],
+      "notes": "rowId maps to patientId from the webhook body. Update the field name/value mapping to match your actual Status column."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_SHEET_TAB_NAME",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "REPLACE_WITH_YOUR_PATIENT_ID_COLUMN"
+          ],
+          "value": {
+            "REPLACE_WITH_YOUR_PATIENT_ID_COLUMN": "={{ $('Webhook - Receive Status Update').item.json.body.patientId }}",
+            "REPLACE_WITH_YOUR_STATUS_COLUMN": "={{ $('Webhook - Receive Status Update').item.json.body.newStatus }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "8d38f589-11a7-40d5-8199-368ef7bb71e6",
+      "name": "Google Sheets - Mirror Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        128,
+        -48
+      ],
+      "notes": "This is the 'magic trick' step - it mirrors the update into her real Google Sheet so it looks like she did it manually. Make sure 'matchingColumns' points to whichever column uniquely identifies the patient row in the sheet (e.g. Patient ID)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true } }}",
+        "options": {}
+      },
+      "id": "06f4aaa9-2125-485c-9ec9-6f011d272b5a",
+      "name": "Respond to Webhook - Confirm",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -48
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Receive Status Update": {
+      "main": [
+        [
+          {
+            "node": "Baserow - Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - Update Status": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Mirror Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Mirror Status": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook - Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7bcab61d-db37-460d-9d13-875a84d4cccb",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "PQ5jPZQfxPIU1vwi",
+  "tags": []
+}

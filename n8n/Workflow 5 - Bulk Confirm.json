@@ -1,0 +1,126 @@
+{
+  "name": "Workflow 5 - Bulk Confirm",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bulk-confirm",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "085403c8-3f7c-4aa5-b9f8-741ef3e0f401",
+      "name": "Webhook - Bulk Confirm",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        -112
+      ],
+      "webhookId": "bulk-confirm"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.rowIds",
+        "options": {}
+      },
+      "id": "ba74dbe5-609b-40c2-9ec4-89168444e80e",
+      "name": "Split IDs",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        -176,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "update",
+        "tableId": 1017856,
+        "rowId": "={{ $json.rowIds }}"
+      },
+      "id": "e5e3efbc-464a-409f-b2b1-3e0c8ac32c40",
+      "name": "Baserow - Update Status",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -112
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Appointments confirmed\" } }}",
+        "options": {}
+      },
+      "id": "ab816842-b524-4e18-a20d-5e1aea18cd0e",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        -112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Bulk Confirm": {
+      "main": [
+        [
+          {
+            "node": "Split IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split IDs": {
+      "main": [
+        [
+          {
+            "node": "Baserow - Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - Update Status": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "d29ff2e1-0ca2-4438-85f4-a7af0bd32fa8",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "JB29X9ly2cozthWa",
+  "tags": []
+}

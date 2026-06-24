@@ -1,0 +1,248 @@
+{
+  "name": "No-Show Waitlist Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dashboard-waitlist-add",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook - Dashboard Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        96
+      ],
+      "id": "740231f7-c69d-4648-8e95-da3193f08690",
+      "webhookId": "096837e2-0acf-4838-97c1-8750c7097a00",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Bj7yfNEHZYYXRFOP",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Liste_Attente",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Nom": "={{$json.body.nom}}",
+            "Priorité": "={{$json.body.priorite}}",
+            "Téléphone (WhatsApp)": "={{$json.body.telephone}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Nom",
+              "displayName": "Nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Priorité",
+              "displayName": "Priorité",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone (WhatsApp)",
+              "displayName": "Téléphone (WhatsApp)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Google Sheets - Add Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        112,
+        96
+      ],
+      "id": "96d9de4c-5368-40df-8fce-9408ddd460f5",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calcom-cancellation",
+        "options": {}
+      },
+      "name": "Webhook - Cal.com Cancellation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        368
+      ],
+      "id": "c50a8821-ea71-497b-9e42-9c4d1d2723ac",
+      "webhookId": "a7905896-740f-43ce-ad96-d7dc10a9d03e"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 175191827,
+          "mode": "list",
+          "cachedResultName": "Liste_Attente",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=175191827"
+        },
+        "options": {}
+      },
+      "name": "Google Sheets - Find Top Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        112,
+        368
+      ],
+      "id": "a65a3295-fbea-428a-a69c-28fe7ec86630",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function toE164MA(raw) {\n  if (raw == null || raw === '') return '';\n  let phone = String(raw).replace(/[\\s\\-\\(\\)\\.]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('+')) return phone;\n  if (phone.startsWith('00')) return '+' + phone.slice(2);\n  if (phone.startsWith('212')) return '+' + phone;\n  if (phone.startsWith('0')) return '+212' + phone.slice(1);\n  return '+212' + phone;\n}\n\nconst PHONE_KEY = 'Téléphone (WhatsApp)';\n\nreturn $input.all().map(item => ({\n  json: {\n    ...item.json,\n    Nom: item.json.Nom ?? item.json.nom ?? 'Patient',\n    [PHONE_KEY]: toE164MA(item.json[PHONE_KEY] ?? '')\n  }\n}));"
+      },
+      "name": "Format Phone E.164",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        368
+      ],
+      "id": "e7ab8d40-83d8-4a52-94c7-a042a2bd060b"
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $json['Téléphone (WhatsApp)'] }}",
+        "message": "=Bonjour {{ $json.Nom }}, un créneau d'urgence vient de se libérer à la Clinique Dentaire Témara Mall. Réservez rapidement votre place ici : https://sites.google.com/view/portail-temara-mall/accueil",
+        "options": {
+          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+        }
+      },
+      "name": "Twilio - Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        352,
+        368
+      ],
+      "id": "dcd58ac8-2820-4699-8f2e-23ea927b4d5b",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Dashboard Form": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Add Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Cal.com Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Find Top Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Find Top Patient": {
+      "main": [
+        [
+          {
+            "node": "Format Phone E.164",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Phone E.164": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "4526ec1d-b7dc-4125-929b-e75bbd80859c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "gLsAoJ45LgrIZb3Y",
+  "tags": []
+}

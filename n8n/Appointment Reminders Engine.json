@@ -1,0 +1,183 @@
+{
+  "name": "Appointment Reminders Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        320
+      ],
+      "id": "a1rem001-0001-4000-8000-000000000001",
+      "name": "Daily 8AM Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -560,
+        320
+      ],
+      "id": "a1rem002-0002-4000-8000-000000000002",
+      "name": "Get Confirmed Appointments",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter appointments scheduled exactly 24 hours from now (Africa/Casablanca)\nconst TARGET_MS = 24 * 60 * 60 * 1000;\nconst TOLERANCE_MS = 30 * 60 * 1000; // ±30 min window\nconst now = Date.now();\nconst portalLink = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nfunction toE164MA(raw) {\n  if (raw == null || raw === '') return '';\n  let phone = String(raw).replace(/[\\s\\-\\(\\)\\.]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('+')) return phone;\n  if (phone.startsWith('00')) return '+' + phone.slice(2);\n  if (phone.startsWith('212')) return '+' + phone;\n  if (phone.startsWith('0')) return '+212' + phone.slice(1);\n  return '+212' + phone;\n}\n\nconst confirmed = $input.all().filter(item => {\n  const status = (item.json['Statut du RDV'] ?? '').toString().trim();\n  return status === 'Confirmé' || status === 'Confirme' || status === 'Confirmed';\n});\n\nconst due = confirmed.filter(item => {\n  const raw = item.json['Date & Heure du RDV'];\n  if (!raw) return false;\n  const appt = new Date(raw).getTime();\n  if (isNaN(appt)) return false;\n  const delta = appt - now;\n  return delta >= (TARGET_MS - TOLERANCE_MS) && delta <= (TARGET_MS + TOLERANCE_MS);\n});\n\nreturn due.map(item => ({\n  json: {\n    Nom: item.json['Patient (Nom Complet)'] ?? 'Patient',\n    Phone: toE164MA(item.json['Téléphone (WhatsApp)'] ?? ''),\n    Email: item.json['Email Contact'] ?? '',\n    DateHeure: item.json['Date & Heure du RDV'],\n    Link: portalLink\n  }\n})).filter(item => item.json.Phone);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        320
+      ],
+      "id": "a1rem003-0003-4000-8000-000000000003",
+      "name": "Filter 24h Window"
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $json.Phone }}",
+        "message": "=Bonjour {{ $json.Nom }}, nous vous rappelons votre consultation demain à la Clinique Dentaire Témara Mall. Pour gérer, modifier ou reporter votre visite, cliquez sur ce lien sécurisé : {{ $json.Link }}",
+        "options": {
+          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+        }
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        240
+      ],
+      "id": "a1rem004-0004-4000-8000-000000000004",
+      "name": "Send Reminder SMS",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "onboarding@resend.dev",
+        "to": "={{ $json.Email }}",
+        "subject": "=Rappel : votre consultation demain — Clinique Dentaire Témara Mall",
+        "html": "=<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>Rappel de consultation</title></head><body style=\"font-family:Helvetica,Arial,sans-serif;background:#0d0d14;color:#e8e8f0;padding:32px;\"><div style=\"max-width:560px;margin:0 auto;background:#111118;border-radius:12px;padding:32px;border-top:3px solid #b8965a;\"><p style=\"color:#b8965a;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;\">Rappel de consultation</p><p>Bonjour <strong>{{ $json.Nom }}</strong>,</p><p style=\"color:#9494b0;line-height:1.7;\">Nous vous rappelons votre consultation demain à la <strong>Clinique Dentaire Témara Mall</strong>.</p><p style=\"color:#9494b0;\">Date &amp; heure : <strong style=\"color:#e8e8f0;\">{{ $json.DateHeure }}</strong></p><p style=\"margin-top:24px;\"><a href=\"{{ $json.Link }}\" style=\"display:inline-block;background:linear-gradient(135deg,#b8965a,#e8c97a);color:#0d0d14;text-decoration:none;padding:14px 28px;border-radius:5px;font-weight:bold;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;\">Gérer mon rendez-vous →</a></p></div></body></html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        400
+      ],
+      "id": "a1rem005-0005-4000-8000-000000000005",
+      "name": "Send Reminder Email",
+      "credentials": {
+        "resendApi": {
+          "id": "AVgfTd80MtoAdSpf",
+          "name": "Resend account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 8AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Confirmed Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Confirmed Appointments": {
+      "main": [
+        [
+          {
+            "node": "Filter 24h Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter 24h Window": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder SMS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Reminder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reminder SMS": {
+      "main": [
+        []
+      ]
+    },
+    "Send Reminder Email": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a1rem999-9999-4000-8000-000000000999",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "ApptReminders001",
+  "tags": []
+}

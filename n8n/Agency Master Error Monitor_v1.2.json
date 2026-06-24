@@ -1,0 +1,156 @@
+{
+  "name": "Agency Master Error Monitor_v1.2",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        400
+      ],
+      "id": "0bf920d1-6057-4f87-a4ce-52c7bd66cb2c",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── SAFETY LAYER 1 : Input validation & enrichment ─────────────────────────\n// Validate that all expected error fields exist before proceeding.\n// Enrich with timestamp, environment tag, and n8n execution deep-link.\n\nconst item = $input.first().json;\n\n// Guard: must have at minimum a workflow name and an error message\nconst workflowName = item?.workflow?.name ?? 'Unknown Workflow';\nconst workflowId   = item?.workflow?.id   ?? 'unknown-id';\nconst errorMsg     = item?.execution?.error?.message ?? 'No error message provided';\nconst errorStack   = item?.execution?.error?.stack   ?? '';\nconst lastNode     = item?.execution?.lastNodeExecuted ?? 'Unknown Node';\nconst executionId  = item?.execution?.id ?? 'unknown-exec';\nconst nodeType     = item?.execution?.error?.node?.type ?? '';\n\n// ── SAFETY LAYER 2 : Deduplication key ──────────────────────────────────────\n// Key = workflowId + errorMsg (first 80 chars) + floored-to-5min window.\n// The downstream \"Check Duplicate\" node uses this to suppress repeated alerts.\nconst windowMs     = 5 * 60 * 1000; // 5-minute dedup window\nconst windowKey    = Math.floor(Date.now() / windowMs);\nconst dedupKey     = `${workflowId}:${errorMsg.substring(0, 80)}:${windowKey}`;\n\n// ── SAFETY LAYER 3 : Timezone-aware timestamp ────────────────────────────────\n// All timestamps normalised to Africa/Casablanca (GMT+1, DST-aware)\nconst now = new Date();\nconst tsLocal = now.toLocaleString('fr-MA', {\n  timeZone: 'Africa/Casablanca',\n  year:   'numeric', month:  '2-digit', day:    '2-digit',\n  hour:   '2-digit', minute: '2-digit', second: '2-digit'\n});\n\n// ── SAFETY LAYER 4 : Severity classification ─────────────────────────────────\n// Classify by node type and error keywords so the Slack message is colour-coded.\nlet severity = 'MEDIUM';\nlet severityEmoji = '⚠️';\nconst errLower = errorMsg.toLowerCase();\nif (errLower.includes('authentication') || errLower.includes('unauthorized') ||\n    errLower.includes('403') || errLower.includes('401')) {\n  severity = 'HIGH';   severityEmoji = '🔴';\n} else if (errLower.includes('timeout') || errLower.includes('rate limit') ||\n           errLower.includes('429')) {\n  severity = 'LOW';    severityEmoji = '🟡';\n} else if (errLower.includes('econnrefused') || errLower.includes('enotfound')) {\n  severity = 'HIGH';   severityEmoji = '🔴';\n}\n\n// ── Environment tag (set N8N_ENV=production in your n8n environment variables)\nconst env = $env?.N8N_ENV ?? 'production';\n\n// ── n8n execution deep-link (set N8N_BASE_URL in environment variables)\nconst baseUrl   = $env?.N8N_BASE_URL ?? 'https://glade-rigor-perennial.ngrok-free.app';\nconst execLink  = `${baseUrl}/execution/${executionId}`;\n\nreturn [{\n  json: {\n    workflowName,\n    workflowId,\n    errorMsg,\n    errorStack: errorStack.substring(0, 500), // cap stack trace length\n    lastNode,\n    executionId,\n    nodeType,\n    severity,\n    severityEmoji,\n    dedupKey,\n    tsLocal,\n    env,\n    execLink\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        400
+      ],
+      "id": "0103584a-c07c-4266-9bd4-2446990467d3",
+      "name": "Enrich & Validate Error"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── SAFETY LAYER 5 : Deduplication gate ─────────────────────────────────────\n// Uses a simple in-memory static Map to suppress duplicate alerts within a\n// 5-minute window (keyed by dedupKey built in the previous node).\n// NOTE: For multi-instance n8n deployments, replace this with a Redis/Baserow\n// external dedup store. For single-instance setups this is sufficient.\n\nconst item = $input.first().json;\nconst dedupKey = item.dedupKey;\n\n// Static map persists for the lifetime of the n8n process\nif (!global._errorMonitorDedup) {\n  global._errorMonitorDedup = new Map();\n}\n\nconst seen = global._errorMonitorDedup;\nconst now  = Date.now();\nconst TTL  = 5 * 60 * 1000; // 5 minutes\n\n// Purge expired entries to prevent memory leak\nfor (const [k, ts] of seen.entries()) {\n  if (now - ts > TTL) seen.delete(k);\n}\n\nif (seen.has(dedupKey)) {\n  // Suppress — return empty array so downstream nodes don't fire\n  return [];\n}\n\n// Mark as seen and pass through\nseen.set(dedupKey, now);\nreturn [$input.first()];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        400
+      ],
+      "id": "93ed0264-9988-4281-8eae-8015f6f0ebd9",
+      "name": "Dedup Gate (5-min window)"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "agency-errors",
+          "mode": "name"
+        },
+        "text": "={{ $json.severityEmoji }} *[{{ $json.severity }}] Workflow Failure — {{ $json.env.toUpperCase() }}*\n\n*🔧 Workflow:* `{{ $json.workflowName }}` (`{{ $json.workflowId }}`)\n*💥 Failing Node:* `{{ $json.lastNode }}`{{ $json.nodeType ? ' (' + $json.nodeType + ')' : '' }}\n*❗ Error:* {{ $json.errorMsg }}\n*🕐 Time (Casablanca):* {{ $json.tsLocal }}\n*🆔 Execution:* `{{ $json.executionId }}`\n*🔗 Debug Link:* {{ $json.execLink }}\n\n_Alert suppressed for 5 min if identical error repeats._",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -624,
+        320
+      ],
+      "id": "46171511-6e68-47a0-9453-e277bfadbce9",
+      "name": "Slack Alert (Primary)",
+      "webhookId": "03b22b80-a158-4e1c-a11e-590d047b95d6",
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "agency-errors",
+          "mode": "name"
+        },
+        "text": "⚫ *[META] Error Monitor itself failed to send alert*\n\nThe Slack alert for workflow *{{ $json.workflowName }}* could not be delivered.\n*Execution:* `{{ $json.executionId }}`\n*Time:* {{ $json.tsLocal }}\n\n_This fallback used a separate Slack node. Check Slack credentials._",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -624,
+        480
+      ],
+      "id": "91995795-8c1a-4f9d-b310-c1aae131e291",
+      "name": "Slack Alert (Fallback — Slack down)",
+      "webhookId": "714f4af5-f93e-4c93-9551-3dff712ff4f9",
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Enrich & Validate Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich & Validate Error": {
+      "main": [
+        [
+          {
+            "node": "Dedup Gate (5-min window)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup Gate (5-min window)": {
+      "main": [
+        [
+          {
+            "node": "Slack Alert (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Alert (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Slack Alert (Fallback — Slack down)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "348df1a8-a68b-40fb-bba7-69613d7b2598",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "Bn61UktJ39ZsSg1g",
+  "tags": []
+}

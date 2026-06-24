@@ -1,0 +1,1688 @@
+{
+  "name": "Production Concierge Engine v2",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "create",
+        "tableId": 1017856,
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 8941564,
+              "fieldValue": "={{ $('Edit Fields').item.json.Clean_Name }}"
+            },
+            {
+              "fieldId": 8941664,
+              "fieldValue": "={{ $('Edit Fields').item.json.body.payload.attendees[0].email }}"
+            },
+            {
+              "fieldId": 8941665,
+              "fieldValue": "={{ $('Edit Fields').item.json.body.payload.startTime }}"
+            },
+            {
+              "fieldId": 8941667,
+              "fieldValue": "={{ $('Edit Fields').item.json.body.payload.userFieldsResponses.bottleneck.value }}"
+            },
+            {
+              "fieldId": 8975009,
+              "fieldValue": "={{ $('Edit Fields').item.json.body.payload.uid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        384
+      ],
+      "name": "Create a row",
+      "id": "b684c464-95a7-46ec-b3c3-d94ac6aa59fc",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "new-channel",
+          "mode": "name"
+        },
+        "text": "=✅ Nouveau RDV: {{ $('Edit Fields').item.json.Clean_Name }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -352,
+        512
+      ],
+      "name": "Send a message",
+      "id": "7894b33a-aad8-4951-85b2-72b98a0a4d96",
+      "webhookId": "f294c1dc-d6b2-4180-8b38-59f8b5a69906",
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "af30b14e-34bc-4ff8-a29d-e84209833c90",
+              "name": "Clean_Name",
+              "value": "={{ $json.body.payload.attendees[0].name.toUpperCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "phone-normalization-v1",
+              "name": "Clean_Phone",
+              "value": "={{ $json.body.payload.responses.attendeePhoneNumber.value }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1136,
+        512
+      ],
+      "name": "Edit Fields",
+      "id": "e068873c-5c8d-4077-a6cb-a6016922ee9c"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.triggerEvent }}",
+                    "rightValue": "BOOKING_CREATED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "New Booking"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.triggerEvent }}",
+                    "rightValue": "BOOKING_CANCELLED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Canceled"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.triggerEvent }}",
+                    "rightValue": "BOOKING_RESCHEDULED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rescheduled"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -928,
+        624
+      ],
+      "name": "Switch",
+      "id": "e2220ff2-b1cc-4705-8c65-afec45ba455a"
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "tableId": 1017856,
+        "returnAll": true,
+        "additionalOptions": {
+          "filters": {
+            "fields": [
+              {
+                "field": 8975009,
+                "value": "={{ $('Edit Fields').item.json.body.payload.uid }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        640
+      ],
+      "name": "Get many rows",
+      "id": "c75c249d-1b1c-42fb-8c54-c18d3e09b669",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "update",
+        "tableId": 1017856,
+        "rowId": "={{ $json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 8941566,
+              "fieldValue": "Annulé"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -432,
+        688
+      ],
+      "name": "Update a row",
+      "id": "b7d301b8-15a3-42b5-a6b6-516e902eb09a",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "new-channel",
+          "mode": "name"
+        },
+        "text": "=🚨 *Rendez-vous Annulé* 🚨 Le patient {{ $('Edit Fields').item.json.Clean_Name }} vient d'annuler son rendez-vous. Un créneau s'est libéré dans l'agenda. Veuillez vérifier Cal.com pour les disponibilités mises à jour.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -192,
+        816
+      ],
+      "name": "Send a message1",
+      "id": "25f0af91-c7b1-4b28-a364-b1e350662b57",
+      "webhookId": "fbabef24-5929-4ba0-b810-ed96cba264be",
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "update",
+        "tableId": 1017856,
+        "rowId": "={{ $json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 8941665,
+              "fieldValue": "={{ $('Edit Fields').item.json.body.payload.startTime }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -400,
+        912
+      ],
+      "name": "Update a row1",
+      "id": "4651d324-a893-42a7-a411-d6751b1e3070",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "new-channel"
+        },
+        "text": "=🔄 *Rendez-vous Modifié* 🔄\nLe patient {{ $('Edit Fields').item.json.Clean_Name }} a modifié son rendez-vous.\nNouvelle date et heure : {{ $('Edit Fields').item.json.body.payload.startTime }}\nL'agenda a été mis à jour automatiquement.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -144,
+        1024
+      ],
+      "name": "Send a message2",
+      "id": "b3f615cd-908a-46df-af83-e0711f24d189",
+      "webhookId": "fae7997c-f5b6-4143-9d63-4871bd7198d5",
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "tableId": 1017856,
+        "returnAll": true,
+        "additionalOptions": {
+          "filters": {
+            "fields": [
+              {
+                "field": 8975009,
+                "value": "={{ $json.body.payload.rescheduleUid }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        880
+      ],
+      "name": "Get many rows1",
+      "id": "f148e864-73a3-4cbd-86b6-b7e55f8d9382",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $('Edit Fields').item.json.Clean_Phone }}",
+        "message": "=Bonjour {{ $('Edit Fields').item.json.Clean_Name }}, la modification de votre RDV a bien été prise en compte.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        192,
+        992
+      ],
+      "name": "Send an SMS/MMS/WhatsApp message1",
+      "id": "7237bba1-3ebb-4fca-bd4b-9fc3a504b3a8",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "onboarding@resend.dev",
+        "to": "={{ $('Edit Fields').item.json.body.payload.attendees[0].email }}",
+        "subject": "=🚨 Nouveau rendez-vous : {{$('Edit Fields').item.json.Clean_Name}}",
+        "html": "=<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"fr\" xml:lang=\"fr\">\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <meta name=\"color-scheme\" content=\"dark\" />\n  <meta name=\"supported-color-schemes\" content=\"dark\" />\n  <title>Confirmation de rendez-vous — Clinique Dentaire Témara Mall</title>\n  <style type=\"text/css\">\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }\n    u + #body a { color: #e8c97a; text-decoration: none; }\n    .cta-btn { transition: all 0.3s ease-in-out !important; }\n    .cta-btn:hover { background: linear-gradient(135deg, #e8c97a 0%, #b8965a 100%) !important; box-shadow: 0 4px 15px rgba(184,150,90,0.3) !important; transform: translateY(-1px) !important; }\n    .link-hover { transition: color 0.3s ease !important; }\n    .link-hover:hover { color: #e8c97a !important; }\n    @media screen and (max-width: 620px) {\n      .email-wrapper  { width: 100% !important; }\n      .email-body     { padding: 28px 20px !important; }\n      .detail-table td { display: block !important; text-align: left !important; padding-bottom: 4px !important; }\n      .detail-table .val-cell { text-align: left !important; padding-bottom: 16px !important; }\n      .hero-name      { font-size: 26px !important; }\n      .cta-btn        { display: block !important; text-align: center !important; }\n    }\n  </style>\n</head>\n<body id=\"body\" style=\"margin: 0; padding: 0; background-color: #0d0d14; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;\">\n<div style=\"display:none;max-height:0;overflow:hidden;mso-hide:all;\">\n  Votre rendez-vous est confirmé ✦ Clinique Dentaire Témara Mall — consultez les détails ci-dessous.\n</div>\n<table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color:#0d0d14;\">\n  <tr>\n    <td align=\"center\" style=\"padding: 40px 16px 48px;\">\n      <table class=\"email-wrapper\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"max-width: 600px; background-color: #111118; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);\">\n        <tr>\n          <td style=\"padding: 0; line-height: 0; font-size: 0; background: linear-gradient(90deg, #7a5c2a 0%, #b8965a 30%, #e8c97a 50%, #b8965a 70%, #7a5c2a 100%); height: 3px; display: block;\">&nbsp;</td>\n        </tr>\n        <tr>\n          <td align=\"center\" style=\"background-color: #111118; padding: 40px 40px 32px; border-bottom: 1px solid #1e1e2c;\">\n            <p class=\"hero-name\" style=\"margin: 0 0 6px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 30px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.1; color: #e8e8f0;\">Clinique Dentaire <span style=\"color:#b8965a;\">Témara</span></p>\n            <p style=\"margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: bold; letter-spacing: 0.18em; text-transform: uppercase; color: #9494b0;\">Témara Mall &nbsp;·&nbsp; Excellence Dentaire</p>\n          </td>\n        </tr>\n        <tr>\n          <td class=\"email-body\" style=\"padding: 40px 48px; background-color: #111118;\">\n            <p style=\"margin: 0 0 22px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: bold; letter-spacing: 0.12em; text-transform: uppercase; color: #b8965a;\">✦ &nbsp;Confirmation de rendez-vous</p>\n            <p style=\"margin: 0 0 14px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 400; line-height: 1.6; color: #e8e8f0;\">Bonjour <strong style=\"font-weight:600;color:#e8e8f0;\">{{ $('Edit Fields').item.json.Clean_Name }}</strong>,</p>\n            <p style=\"margin: 0 0 32px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.75; color: #9494b0; letter-spacing: 0.01em;\">Votre rendez-vous a été <strong style=\"font-weight:500;color:#e8e8f0;\">confirmé avec succès</strong>. Notre équipe prend soin de préparer votre consultation dans les meilleures conditions. Nous avons hâte de vous accueillir.</p>\n            <table class=\"detail-table\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color: #16161f; border-radius: 10px; border-left: 3px solid #b8965a; margin-bottom: 32px; overflow: hidden;\">\n              <tr>\n                <td style=\"padding: 18px 24px 10px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; font-weight: bold; letter-spacing: 0.09em; text-transform: uppercase; color: #9494b0; vertical-align: top; width: 45%;\">Date &amp; Heure</td>\n                <td class=\"val-cell\" style=\"padding: 18px 24px 10px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 600; color: #e8e8f0; text-align: right; letter-spacing: 0.01em; vertical-align: top;\">{{ $('Edit Fields').item.json.body.payload.startTime }}</td>\n              </tr>\n              <tr>\n                <td style=\"padding: 14px 24px 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; font-weight: bold; letter-spacing: 0.09em; text-transform: uppercase; color: #9494b0; vertical-align: top;\">Motif</td>\n                <td class=\"val-cell\" style=\"padding: 14px 24px 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 400; color: #e8e8f0; text-align: right;\">{{ $('Edit Fields').item.json.body.payload.userFieldsResponses.bottleneck.value }}</td>\n              </tr>\n            </table>\n            <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n              <tr>\n                <td align=\"center\">\n                  <a href=\"{{ $('Webhook').item.json.body.reschedule_url }}\" class=\"cta-btn\" style=\"display: inline-block; background: linear-gradient(135deg, #b8965a 0%, #e8c97a 50%, #b8965a 100%); color: #0d0d14; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; font-weight: bold; letter-spacing: 0.10em; text-transform: uppercase; text-decoration: none; padding: 16px 36px; border-radius: 5px; mso-padding-alt: 0;\">Gérer mon rendez-vous &nbsp;→</a>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        192
+      ],
+      "name": "Send a new email",
+      "id": "b2c3a534-27d1-4855-853c-1d462e700695",
+      "webhookId": "1efe356d-9183-4926-b12d-9a94380cbc95",
+      "credentials": {
+        "resendApi": {
+          "id": "AVgfTd80MtoAdSpf",
+          "name": "Resend account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "onboarding@resend.dev",
+        "to": "={{ $('Edit Fields').item.json.body.payload.attendees[0].email }}",
+        "subject": "=❌ Rendez-vous Annulé : {{$('Edit Fields').item.json.Clean_Name}}",
+        "html": "=<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"fr\" xml:lang=\"fr\">\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <meta name=\"color-scheme\" content=\"dark\" />\n  <meta name=\"supported-color-schemes\" content=\"dark\" />\n  <title>Annulation de rendez-vous — Clinique Dentaire Témara Mall</title>\n  <style type=\"text/css\">\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }\n    .cta-btn { transition: all 0.3s ease-in-out !important; }\n    .cta-btn:hover { background: linear-gradient(135deg, #e8c97a 0%, #b8965a 100%) !important; box-shadow: 0 4px 15px rgba(184,150,90,0.3) !important; transform: translateY(-1px) !important; }\n    @media screen and (max-width: 620px) {\n      .email-wrapper  { width: 100% !important; }\n      .email-body     { padding: 28px 20px !important; }\n      .detail-table td { display: block !important; text-align: left !important; padding-bottom: 4px !important; }\n      .detail-table .val-cell { text-align: left !important; padding-bottom: 16px !important; }\n      .hero-name      { font-size: 26px !important; }\n      .cta-btn        { display: block !important; text-align: center !important; }\n    }\n  </style>\n</head>\n<body id=\"body\" style=\"margin: 0; padding: 0; background-color: #0d0d14; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;\">\n<table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color:#0d0d14;\">\n  <tr>\n    <td align=\"center\" style=\"padding: 40px 16px 48px;\">\n      <table class=\"email-wrapper\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"max-width: 600px; background-color: #111118; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);\">\n        <tr><td style=\"padding: 0; line-height: 0; font-size: 0; background: linear-gradient(90deg, #7a5c2a 0%, #b8965a 30%, #e8c97a 50%, #b8965a 70%, #7a5c2a 100%); height: 3px; display: block;\">&nbsp;</td></tr>\n        <tr>\n          <td align=\"center\" style=\"background-color: #111118; padding: 40px 40px 32px; border-bottom: 1px solid #1e1e2c;\">\n            <p class=\"hero-name\" style=\"margin: 0 0 6px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 30px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.1; color: #e8e8f0;\">Clinique Dentaire <span style=\"color:#b8965a;\">Témara</span></p>\n          </td>\n        </tr>\n        <tr>\n          <td class=\"email-body\" style=\"padding: 40px 48px; background-color: #111118;\">\n            <p style=\"margin: 0 0 22px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: bold; letter-spacing: 0.12em; text-transform: uppercase; color: #b8965a;\">✦ &nbsp;Annulation de rendez-vous</p>\n            <p style=\"margin: 0 0 14px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 400; line-height: 1.6; color: #e8e8f0;\">Bonjour <strong style=\"font-weight:600;color:#e8e8f0;\">{{ $('Edit Fields').item.json.Clean_Name }}</strong>,</p>\n            <p style=\"margin: 0 0 32px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.75; color: #9494b0; letter-spacing: 0.01em;\">Votre rendez-vous prévu le <strong style=\"font-weight:500;color:#e8e8f0;\">{{ $('Edit Fields').item.json.body.payload.startTime }}</strong> a bien été <strong style=\"font-weight:500;color:#e8e8f0;\">annulé</strong>.</p>\n            <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n              <tr>\n                <td align=\"center\">\n                  <a href=\"{{ $('Webhook').item.json.body.reschedule_url }}\" class=\"cta-btn\" style=\"display: inline-block; background: transparent; border: 1px solid #b8965a; color: #e8c97a; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; font-weight: bold; letter-spacing: 0.10em; text-transform: uppercase; text-decoration: none; padding: 16px 36px; border-radius: 5px; mso-padding-alt: 0;\">Prendre un nouveau RDV &nbsp;→</a>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        16,
+        704
+      ],
+      "name": "Send a new email1",
+      "id": "8b33df56-c35b-49d2-93f0-d23a86b4946f",
+      "webhookId": "cf466126-9921-4c45-9cd6-75c4c0994039",
+      "credentials": {
+        "resendApi": {
+          "id": "AVgfTd80MtoAdSpf",
+          "name": "Resend account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "onboarding@resend.dev",
+        "to": "={{ $('Edit Fields').item.json.body.payload.attendees[0].email }}",
+        "subject": "=🔄 Rendez-vous Reporté : {{$('Edit Fields').item.json.Clean_Name}}",
+        "html": "=<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"fr\" xml:lang=\"fr\">\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <meta name=\"color-scheme\" content=\"dark\" />\n  <meta name=\"supported-color-schemes\" content=\"dark\" />\n  <title>Modification de rendez-vous — Clinique Dentaire Témara Mall</title>\n  <style type=\"text/css\">\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }\n    u + #body a { color: #e8c97a; text-decoration: none; }\n    .cta-btn { transition: all 0.3s ease-in-out !important; }\n    .cta-btn:hover { background: linear-gradient(135deg, #e8c97a 0%, #b8965a 100%) !important; box-shadow: 0 4px 15px rgba(184,150,90,0.3) !important; transform: translateY(-1px) !important; }\n    .link-hover { transition: color 0.3s ease !important; }\n    .link-hover:hover { color: #e8c97a !important; }\n    @media screen and (max-width: 620px) {\n      .email-wrapper  { width: 100% !important; }\n      .email-body     { padding: 28px 20px !important; }\n      .detail-table td { display: block !important; text-align: left !important; padding-bottom: 4px !important; }\n      .detail-table .val-cell { text-align: left !important; padding-bottom: 16px !important; }\n      .hero-name      { font-size: 26px !important; }\n      .cta-btn        { display: block !important; text-align: center !important; }\n    }\n  </style>\n</head>\n<body id=\"body\" style=\"margin: 0; padding: 0; background-color: #0d0d14; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;\">\n<div style=\"display:none;max-height:0;overflow:hidden;mso-hide:all;\">Votre rendez-vous a été modifié ✦ Clinique Dentaire Témara Mall</div>\n<table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color:#0d0d14;\">\n  <tr>\n    <td align=\"center\" style=\"padding: 40px 16px 48px;\">\n      <table class=\"email-wrapper\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"max-width: 600px; background-color: #111118; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);\">\n        <tr><td style=\"padding: 0; line-height: 0; font-size: 0; background: linear-gradient(90deg, #7a5c2a 0%, #b8965a 30%, #e8c97a 50%, #b8965a 70%, #7a5c2a 100%); height: 3px; display: block;\">&nbsp;</td></tr>\n        <tr>\n          <td align=\"center\" style=\"background-color: #111118; padding: 40px 40px 32px; border-bottom: 1px solid #1e1e2c;\">\n            <p class=\"hero-name\" style=\"margin: 0 0 6px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 30px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.1; color: #e8e8f0;\">Clinique Dentaire <span style=\"color:#b8965a;\">Témara</span></p>\n          </td>\n        </tr>\n        <tr>\n          <td class=\"email-body\" style=\"padding: 40px 48px; background-color: #111118;\">\n            <p style=\"margin: 0 0 22px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: bold; letter-spacing: 0.12em; text-transform: uppercase; color: #b8965a;\">✦ &nbsp;Modification de rendez-vous</p>\n            <p style=\"margin: 0 0 14px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 400; line-height: 1.6; color: #e8e8f0;\">Bonjour <strong style=\"font-weight:600;color:#e8e8f0;\">{{ $('Edit Fields').item.json.Clean_Name }}</strong>,</p>\n            <p style=\"margin: 0 0 32px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.75; color: #9494b0; letter-spacing: 0.01em;\">Votre rendez-vous a été <strong style=\"font-weight:500;color:#e8e8f0;\">modifié avec succès</strong>. Veuillez noter vos nouveaux horaires ci-dessous.</p>\n            <table class=\"detail-table\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color: #16161f; border-radius: 10px; border-left: 3px solid #b8965a; margin-bottom: 32px; overflow: hidden;\">\n              <tr>\n                <td style=\"padding: 18px 24px 10px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; font-weight: bold; letter-spacing: 0.09em; text-transform: uppercase; color: #9494b0; vertical-align: top; width: 45%;\">Nouveau Créneau</td>\n                <td class=\"val-cell\" style=\"padding: 18px 24px 10px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 600; color: #e8e8f0; text-align: right; letter-spacing: 0.01em; vertical-align: top;\">{{ $('Edit Fields').item.json.body.payload.startTime }}</td>\n              </tr>\n            </table>\n            <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n              <tr>\n                <td align=\"center\">\n                  <a href=\"{{ $('Webhook').item.json.body.reschedule_url }}\" class=\"cta-btn\" style=\"display: inline-block; background: linear-gradient(135deg, #b8965a 0%, #e8c97a 50%, #b8965a 100%); color: #0d0d14; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; font-weight: bold; letter-spacing: 0.10em; text-transform: uppercase; text-decoration: none; padding: 16px 36px; border-radius: 5px; mso-padding-alt: 0;\">Gérer mon rendez-vous &nbsp;→</a>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        16,
+        1008
+      ],
+      "name": "Send a new email2",
+      "id": "38321d70-f22d-4173-a41d-0a5427217f21",
+      "webhookId": "9c718a5c-3f5d-472d-ae86-eb8de7b5f5e3",
+      "credentials": {
+        "resendApi": {
+          "id": "AVgfTd80MtoAdSpf",
+          "name": "Resend account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Patient (Nom Complet)": "={{ $('Edit Fields').item.json.Clean_Name }}",
+            "Email Contact": "={{ $('Edit Fields').item.json.body.payload.attendees[0].email }}",
+            "Motif de Consultation": "={{ $('Edit Fields').item.json.body.payload.userFieldsResponses.bottleneck.value }}",
+            "Date & Heure du RDV": "={{ $('Edit Fields').item.json.body.payload.startTime }}",
+            "Cal Booking ID": "={{ $('Edit Fields').item.json.body.payload.uid }}",
+            "Téléphone (WhatsApp)": "={{ $('Edit Fields').item.json.Clean_Phone }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Patient (Nom Complet)",
+              "displayName": "Patient (Nom Complet)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Contact",
+              "displayName": "Email Contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone (WhatsApp)",
+              "displayName": "Téléphone (WhatsApp)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date & Heure du RDV",
+              "displayName": "Date & Heure du RDV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Motif de Consultation",
+              "displayName": "Motif de Consultation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Observations Médicales",
+              "displayName": "Observations Médicales",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut du RDV",
+              "displayName": "Statut du RDV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut Facturation",
+              "displayName": "Statut Facturation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Montant (MAD)",
+              "displayName": "Montant (MAD)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Couverture Médicale",
+              "displayName": "Couverture Médicale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "N° d'Assurance",
+              "displayName": "N° d'Assurance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cal Booking ID",
+              "displayName": "Cal Booking ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nouveau Patient ?",
+              "displayName": "Nouveau Patient ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Médecin Traitant",
+              "displayName": "Médecin Traitant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -272,
+        352
+      ],
+      "name": "Append row in sheet",
+      "id": "0021b63a-735e-4bff-9b69-9b748a6cbd24",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "final-booking-engine-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        512
+      ],
+      "id": "9b732b9c-aca8-48d2-89e7-a70c487260b1",
+      "name": "Webhook",
+      "webhookId": "569c4a11-227e-44ff-a272-12393a98a3fd"
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $('Edit Fields').item.json.Clean_Phone }}",
+        "message": "=Bonjour {{ $('Edit Fields').item.json.Clean_Name }} ! 🦷\n\nVotre consultation à la Clinique Dentaire Témara Mall est bien confirmée. À très bientôt !",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        16
+      ],
+      "name": "Instant SMS Confirmation",
+      "id": "ab3528e5-458e-4c6e-9d19-867bcb69896d",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cal Booking ID": "={{ $('Edit Fields').item.json.body.payload.uid }}",
+            "Statut du RDV": "Annulé"
+          },
+          "matchingColumns": [
+            "Cal Booking ID"
+          ],
+          "schema": [
+            {
+              "id": "Patient (Nom Complet)",
+              "displayName": "Patient (Nom Complet)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Contact",
+              "displayName": "Email Contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone (WhatsApp)",
+              "displayName": "Téléphone (WhatsApp)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date & Heure du RDV",
+              "displayName": "Date & Heure du RDV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Motif de Consultation",
+              "displayName": "Motif de Consultation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Observations Médicales",
+              "displayName": "Observations Médicales",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut du RDV",
+              "displayName": "Statut du RDV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut Facturation",
+              "displayName": "Statut Facturation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Montant (MAD)",
+              "displayName": "Montant (MAD)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Couverture Médicale",
+              "displayName": "Couverture Médicale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "N° d'Assurance",
+              "displayName": "N° d'Assurance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cal Booking ID",
+              "displayName": "Cal Booking ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nouveau Patient ?",
+              "displayName": "Nouveau Patient ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Médecin Traitant",
+              "displayName": "Médecin Traitant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -160,
+        624
+      ],
+      "id": "40adbbba-ed9e-4150-9c22-670d4fbe9561",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cal Booking ID": "={{ $json[\"Cal Booking ID\"] }}"
+          },
+          "matchingColumns": [
+            "Cal Booking ID"
+          ],
+          "schema": [
+            {
+              "id": "Patient (Nom Complet)",
+              "displayName": "Patient (Nom Complet)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Contact",
+              "displayName": "Email Contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone (WhatsApp)",
+              "displayName": "Téléphone (WhatsApp)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date & Heure du RDV",
+              "displayName": "Date & Heure du RDV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Motif de Consultation",
+              "displayName": "Motif de Consultation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Observations Médicales",
+              "displayName": "Observations Médicales",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut du RDV",
+              "displayName": "Statut du RDV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut Facturation",
+              "displayName": "Statut Facturation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Montant (MAD)",
+              "displayName": "Montant (MAD)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Couverture Médicale",
+              "displayName": "Couverture Médicale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "N° d'Assurance",
+              "displayName": "N° d'Assurance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cal Booking ID",
+              "displayName": "Cal Booking ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nouveau Patient ?",
+              "displayName": "Nouveau Patient ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Médecin Traitant",
+              "displayName": "Médecin Traitant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -144,
+        1248
+      ],
+      "id": "1cbd8f96-2b75-47fe-8cbe-ecc4a0aaa739",
+      "name": "Update row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Layer 1: RAM Idempotency Lock — 10-minute TTL synchronous Map lock\nconst TTL_MS = 10 * 60 * 1000;\nif (!global._bookingLocks) global._bookingLocks = new Map();\n\nconst items = $input.all();\nconst bookingUid = items[0]?.json?.body?.payload?.uid;\nconst now = Date.now();\n\nfor (const [key, ts] of global._bookingLocks.entries()) {\n  if (now - ts >= TTL_MS) global._bookingLocks.delete(key);\n}\n\nif (bookingUid) {\n  const existing = global._bookingLocks.get(bookingUid);\n  if (existing !== undefined && (now - existing) < TTL_MS) {\n    return [];\n  }\n  global._bookingLocks.set(bookingUid, now);\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1240,
+        512
+      ],
+      "name": "RAM Idempotency Lock",
+      "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890"
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "tableId": 1017856,
+        "returnAll": true,
+        "additionalOptions": {
+          "filters": {
+            "fields": [
+              {
+                "field": 8975009,
+                "value": "={{ $('Edit Fields').item.json.body.payload.uid }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -800,
+        384
+      ],
+      "name": "DB Idempotency Lookup",
+      "id": "a2b3c4d5-e6f7-8901-bcde-f12345678901",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "idempotency-length-check",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -560,
+        384
+      ],
+      "name": "Idempotency Check",
+      "id": "b3c4d5e6-f789-0123-cdef-123456789012"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Liste_Attente",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        48,
+        624
+      ],
+      "name": "Get Waitlist Rows",
+      "id": "c4d5e6f7-8901-2345-def0-234567890123",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Proactive Chair-Filler: slice top 3 highest-priority waitlist patients\nconst rows = $input.all().map(i => i.json);\nconst cancelledSlot = $('Edit Fields').item.json.body.payload.startTime;\nconst bookingUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nrows.sort((a, b) => {\n  const pa = Number(a['Priorité'] ?? a['Priorite'] ?? a['Priority'] ?? 999);\n  const pb = Number(b['Priorité'] ?? b['Priorite'] ?? b['Priority'] ?? 999);\n  return pa - pb;\n});\n\nconst top3 = rows.slice(0, 3);\n\nif (!global._waitlistNotifications) global._waitlistNotifications = [];\nglobal._waitlistNotifications.push({\n  slot: cancelledSlot,\n  notified: top3.map(r => ({\n    nom: r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient',\n    phone: r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '',\n    bookingUrl\n  })),\n  bookedBy: null,\n  ts: Date.now()\n});\n\nreturn top3.map(r => ({\n  json: {\n    Nom: r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient',\n    Phone: r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '',\n    Booking_URL: bookingUrl,\n    cancelledSlot\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        624
+      ],
+      "name": "Slice Top 3 Waitlist",
+      "id": "d5e6f7a8-9012-3456-ef01-345678901234"
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $json.Phone }}",
+        "message": "=Bonjour {{ $json.Nom }}, un créneau vient de se libérer aujourd'hui à la Clinique Dentaire Témara Mall. Cliquez rapidement ici pour réserver l'emplacement : {{ $json.Booking_URL }}",
+        "options": {
+          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+        }
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        464,
+        624
+      ],
+      "name": "Waitlist Slot Alert SMS",
+      "id": "e6f7a890-1234-5678-f012-456789012345",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Slot Filled Cleanup: match new booking against open cancellation windows\nconst startTime = $('Edit Fields').item.json.body.payload.startTime;\nconst bookerPhone = ($('Edit Fields').item.json.Clean_Phone ?? '').toString().trim();\nconst portalUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nif (!global._waitlistNotifications) return [];\n\nconst match = global._waitlistNotifications.find(n =>\n  n.slot === startTime && !n.bookedBy && (Date.now() - n.ts) < 24 * 60 * 60 * 1000\n);\nif (!match) return [];\n\nmatch.bookedBy = bookerPhone;\nconst remaining = match.notified\n  .filter(p => (p.phone ?? '').toString().trim() !== bookerPhone)\n  .slice(0, 2);\n\nreturn remaining.map(p => ({\n  json: {\n    Nom: p.nom ?? 'Patient',\n    Phone: p.phone,\n    Portal_URL: portalUrl\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        192
+      ],
+      "name": "Slot Match Evaluator",
+      "id": "f7a89012-3456-7890-0123-567890123456"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "slot-match-length-check",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        192
+      ],
+      "name": "If Slot Matched",
+      "id": "a8901234-5678-9012-1234-678901234567"
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $json.Phone }}",
+        "message": "=Le créneau d'urgence du jour a été comblé, mais vous pouvez planifier une autre date directement via notre portail patient : {{ $json.Portal_URL }}",
+        "options": {
+          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+        }
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        192
+      ],
+      "name": "Slot Filled Cleanup SMS",
+      "id": "b9012345-6789-0123-2345-789012345678",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-sms-status",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        1400
+      ],
+      "id": "c0123456-7890-1234-3456-890123456789",
+      "name": "Twilio SMS Status Webhook",
+      "webhookId": "d0123456-7890-1234-3456-890123456789"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Twilio delivery status callback payload\nconst body = $input.first().json.body ?? $input.first().json;\nconst messageSid = (body.MessageSid ?? body.messageSid ?? '').toString().trim();\nconst messageStatus = (body.MessageStatus ?? body.messageStatus ?? body.SmsStatus ?? 'unknown').toString().trim();\nreturn [{ json: { messageSid, messageStatus } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        1400
+      ],
+      "name": "Parse Twilio Status",
+      "id": "d1234567-8901-2345-4567-901234567890"
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "tableId": 1017856,
+        "returnAll": true,
+        "additionalOptions": {
+          "filters": {
+            "fields": [
+              {
+                "field": 9045156,
+                "value": "={{ $json.messageSid }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -880,
+        1400
+      ],
+      "name": "Lookup SMS Log Row",
+      "id": "e2345678-9012-3456-5678-012345678901",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "update",
+        "tableId": 1017856,
+        "rowId": "={{ $json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 8941566,
+              "fieldValue": "={{ $(\"Parse Twilio Status\").item.json.messageStatus }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        1400
+      ],
+      "name": "Update SMS Delivery Status",
+      "id": "f3456789-0123-4567-6789-123456789012",
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a new email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Instant SMS Confirmation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slot Match Evaluator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "DB Idempotency Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Send a new email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row1": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Send a new email2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows1": {
+      "main": [
+        [
+          {
+            "node": "Update a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a new email2": {
+      "main": [
+        [
+          {
+            "node": "Send an SMS/MMS/WhatsApp message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "RAM Idempotency Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAM Idempotency Lock": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB Idempotency Lookup": {
+      "main": [
+        [
+          {
+            "node": "Idempotency Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idempotency Check": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Get Waitlist Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Waitlist Rows": {
+      "main": [
+        [
+          {
+            "node": "Slice Top 3 Waitlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slice Top 3 Waitlist": {
+      "main": [
+        [
+          {
+            "node": "Waitlist Slot Alert SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waitlist Slot Alert SMS": {
+      "main": [
+        []
+      ]
+    },
+    "Slot Match Evaluator": {
+      "main": [
+        [
+          {
+            "node": "If Slot Matched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Slot Matched": {
+      "main": [
+        [
+          {
+            "node": "Slot Filled Cleanup SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Slot Filled Cleanup SMS": {
+      "main": [
+        []
+      ]
+    },
+    "Twilio SMS Status Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Twilio Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Twilio Status": {
+      "main": [
+        [
+          {
+            "node": "Lookup SMS Log Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup SMS Log Row": {
+      "main": [
+        [
+          {
+            "node": "Update SMS Delivery Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update SMS Delivery Status": {
+      "main": [
+        []
+      ]
+    },
+    "Send a new email1": {
+      "main": [
+        []
+      ]
+    },
+    "Send an SMS/MMS/WhatsApp message1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "5DfK8FVISZSmRkth",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "9673ca19-26f0-4eef-ad00-f232826a21c5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "K6uZInEO76TJHTFi",
+  "tags": []
+}

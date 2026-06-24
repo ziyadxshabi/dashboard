@@ -1,0 +1,408 @@
+{
+  "name": "Dashboard Data Endpoint",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "dashboard-data",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -256,
+        64
+      ],
+      "id": "50555694-2ec5-4505-881d-f7e99cdbb7fd",
+      "name": "Webhook Data Request",
+      "webhookId": "dashboard-data-v1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "qj9L5Zqs1jBDskUw",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── GATE 1: API Key Authentication ──────────────────────────────────────────\nconst headers   = $input.first().json.headers ?? {};\nconst incoming = (headers['x-agency-auth'] ?? '').toString().trim();\n\n// Hardcoded for the clinic demo to bypass the n8n environment variable block\nconst expected = $env.get('DASHBOARD_AUTH_KEY');\n\nif (!incoming || incoming !== expected) {\n  throw new Error(`AUTH_FAIL: Invalid or missing X-Dashboard-Key header`);\n}\n\n// ── GATE 2: Rate Limiting ─────────────────────────────────────────────────────\nif (!global._dashboardRateLimit) {\n  global._dashboardRateLimit = { count: 0, windowStart: Date.now() };\n}\n\nconst rl      = global._dashboardRateLimit;\nconst now     = Date.now();\nconst WINDOW  = 5 * 60 * 1000;  // 5 minutes\nconst MAX_REQ = 30;\n\nif (now - rl.windowStart > WINDOW) {\n  rl.count       = 0;\n  rl.windowStart = now;\n}\n\nrl.count++;\n\nif (rl.count > MAX_REQ) {\n  throw new Error(`RATE_LIMIT: ${rl.count} requests in 5-min window (max ${MAX_REQ})`);\n}\n\n// ── GATE 3: Serve from cache if fresh ────────────────────────────────────────\nconst CACHE_TTL_MS = 60_000; \n\nif (\n  global._dashboardCache &&\n  global._dashboardCache.data &&\n  (now - global._dashboardCache.fetchedAt) < CACHE_TTL_MS\n) {\n  return [{\n    json: {\n      _fromCache:  true,\n      _cacheAgeMs: now - global._dashboardCache.fetchedAt,\n      ...global._dashboardCache.data\n    }\n  }];\n}\n\nreturn [{ json: { _fromCache: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        64
+      ],
+      "id": "6446ef77-c2d3-43d4-b46b-e5e2f3378166",
+      "name": "Auth + Rate Limit + Cache Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._fromCache }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        64
+      ],
+      "id": "94a4c990-e6fa-4d30-b7b1-d5598d9e3bde",
+      "name": "Cache Hit?"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 248239956,
+          "mode": "list",
+          "cachedResultName": "Dashboard_KPIs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=248239956"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        416,
+        144
+      ],
+      "id": "ade2e885-43fb-4869-9472-14a0744763e8",
+      "name": "Get Dashboard KPIs",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Transform & Validate Google Sheets rows → typed KPI object ───────────────\n//\n// EXPECTED SHEET STRUCTURE (tab: Calculs, range A1:B30)\n//   Row 1 : header  →  Metric | Valeur\n//   Row 2 : patients_today  | <COUNTIFS formula result>\n//   Row 3 : no_shows        | <COUNTIFS formula result>\n//   Row 4 : revenue_today   | <SUMIFS formula result>\n//   Row 5 : new_patients    | <COUNTIFS formula result>\n//   Row 6 : accepted_plans  | <COUNTIF formula result>\n//   Row 7 : pending_plans   | <COUNTIF formula result>\n//   Row 8-18 : hour_08 through hour_18 (one per hour)\n//\n// SCHEMA: these are the only metric names the dashboard trusts.\n// Any key not in this set is stripped from the output (defence-in-depth).\n\nconst NUMERIC_METRICS = new Set([\n  'patients_today',\n  'no_shows',\n  'revenue_today',\n  'new_patients',\n  'accepted_plans',\n  'pending_plans',\n  'hour_08', 'hour_09', 'hour_10', 'hour_11', 'hour_12',\n  'hour_13', 'hour_14', 'hour_15', 'hour_16', 'hour_17', 'hour_18',\n]);\n\nconst STRING_METRICS = new Set([\n  // reserved for future string metrics, e.g. next_patient_name\n]);\n\nconst ALL_METRICS = new Set([...NUMERIC_METRICS, ...STRING_METRICS]);\n\n// Safe parse: coerce to number, fallback to 0\nfunction safeNum(v) {\n  if (v === null || v === undefined || v === '') return 0;\n  const n = Number(String(v).replace(/\\s/g, '').replace(',', '.'));\n  return isFinite(n) ? n : 0;\n}\n\nconst rows   = $input.all();\nconst result = {};\nconst errors = [];\n\nfor (const r of rows) {\n  const raw = r.json ?? {};\n\n  // Normalise column name capitalisation:\n  // Sheets may return 'Metric'/'Valeur' or 'metric'/'valeur' depending on\n  // sheet locale and n8n version.\n  const metricKey = (\n    raw['Metric'] ?? raw['metric'] ?? raw['METRIC'] ?? ''\n  ).toString().trim();\n\n  const rawValue = raw['Valeur'] ?? raw['valeur'] ?? raw['VALEUR'] ?? '';\n\n  // Skip empty / header rows\n  if (!metricKey || metricKey === 'Metric') continue;\n\n  // Skip unknown metrics (schema guard)\n  if (!ALL_METRICS.has(metricKey)) {\n    errors.push(`Unknown metric ignored: '${metricKey}'`);\n    continue;\n  }\n\n  // Type coercion\n  if (NUMERIC_METRICS.has(metricKey)) {\n    result[metricKey] = safeNum(rawValue);\n  } else {\n    result[metricKey] = String(rawValue).trim();\n  }\n}\n\n// Fill any missing metrics with safe defaults so the dashboard\n// always gets a complete object — never undefined keys.\nfor (const m of NUMERIC_METRICS) {\n  if (!(m in result)) {\n    result[m] = 0;\n    errors.push(`Missing metric in Sheets: '${m}' — defaulted to 0`);\n  }\n}\n\n// Schema validation summary\nif (errors.length > 0) {\n  console.warn('[Dashboard] Schema warnings:', errors.join(' | '));\n}\n\n// Timezone-aware timestamp (Africa/Casablanca)\nconst now = new Date();\nconst fetchedAt = now.toLocaleString('fr-MA', {\n  timeZone: 'Africa/Casablanca',\n  year: 'numeric', month: '2-digit', day: '2-digit',\n  hour: '2-digit', minute: '2-digit', second: '2-digit',\n});\n\n// Update in-process cache\nif (!global._dashboardCache) global._dashboardCache = {};\nglobal._dashboardCache.fetchedAt = Date.now();\nglobal._dashboardCache.data = {\n  ...result,\n  last_updated:    fetchedAt,\n  schema_warnings: errors,\n};\n\nreturn [{  json: {\n    ...result,\n    last_updated:    fetchedAt,\n    _fromCache:      false,\n    schema_warnings: errors,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        144
+      ],
+      "id": "3069bc4f-f018-4d42-9458-acd14cc8cedf",
+      "name": "Transform & Validate KPIs"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Merge cache-hit path and fresh-fetch path ────────────────────────────────\n// Both the cache-hit branch (true branch of IF) and the fresh-fetch branch\n// (Transform & Validate) merge here before responding.\n// This node just passes through — it exists to give the Merge a clear name.\n\nconst item = $input.first();\nconst payload = item.json;\n\n// Add a trace/request ID for debugging\nconst traceId = `dash-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;\n\nreturn [{\n  json: {\n    ok:          true,\n    trace_id:    traceId,\n    from_cache:  payload._fromCache ?? false,\n    ...payload,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        64
+      ],
+      "id": "a7d45608-1aae-4043-91f8-3cd1c4c747d3",
+      "name": "Finalise Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "=*"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-Frame-Options",
+                "value": "DENY"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        64
+      ],
+      "id": "3f940c04-0dfc-4207-877a-f4f777aa66f5",
+      "name": "Send Data to Dashboard"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Error Handler: build a structured error response ─────────────────────────\n// This node fires when Auth + Rate Limit throws (AUTH_FAIL / RATE_LIMIT)\n// OR when Get Dashboard KPIs / Transform nodes throw.\n// It NEVER exposes internal stack traces to the client.\n\nconst err      = $input.first()?.json ?? {};\nconst errMsg   = (err.message ?? err.error ?? 'Internal error').toString();\nconst isAuth   = errMsg.startsWith('AUTH_FAIL');\nconst isRate   = errMsg.startsWith('RATE_LIMIT');\n\n// Log full error internally\nconsole.error('[Dashboard] Error:', errMsg);\n\nconst now = new Date().toLocaleString('fr-MA', {\n  timeZone: 'Africa/Casablanca',\n  year: 'numeric', month: '2-digit', day: '2-digit',\n  hour: '2-digit', minute: '2-digit', second: '2-digit',\n});\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : isRate ? 429 : 503,\n    body: {\n      ok:          false,\n      error:       isAuth ? 'Unauthorized'\n                 : isRate ? 'Too Many Requests'\n                 : 'Service temporarily unavailable',\n      message:     isAuth ? 'Invalid or missing X-Dashboard-Key'\n                 : isRate ? 'Rate limit exceeded. Retry in 5 minutes.'\n                 : 'Could not read data from Google Sheets. Retry in 30 seconds.',\n      timestamp:   now,\n      trace_id:    `err-${Date.now().toString(36)}`,\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        288
+      ],
+      "id": "0d29f786-817d-4494-8f87-2c4af8947643",
+      "name": "Build Error Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "=*"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        288
+      ],
+      "id": "e046038d-6d54-4c75-933e-f91540fdf00e",
+      "name": "Send Error Response"
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "dashboard-data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        288
+      ],
+      "id": "7a5c5d7e-5a9c-408b-ac6b-4696999ecae7",
+      "name": "CORS Preflight Handler",
+      "webhookId": "dashboard-data-v1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "=*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Dashboard-Key"
+              },
+              {
+                "name": "Access-Control-Max-Age",
+                "value": "86400"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        288
+      ],
+      "id": "b729921d-d647-4e28-a3c4-477893db1440",
+      "name": "CORS Preflight Reply"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Data Request": {
+      "main": [
+        [
+          {
+            "node": "Auth + Rate Limit + Cache Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth + Rate Limit + Cache Check": {
+      "main": [
+        [
+          {
+            "node": "Cache Hit?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cache Hit?": {
+      "main": [
+        [
+          {
+            "node": "Finalise Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Dashboard KPIs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Dashboard KPIs": {
+      "main": [
+        [
+          {
+            "node": "Transform & Validate KPIs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform & Validate KPIs": {
+      "main": [
+        [
+          {
+            "node": "Finalise Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalise Response": {
+      "main": [
+        [
+          {
+            "node": "Send Data to Dashboard",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Response": {
+      "main": [
+        [
+          {
+            "node": "Send Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CORS Preflight Handler": {
+      "main": [
+        [
+          {
+            "node": "CORS Preflight Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "none"
+  },
+  "versionId": "d8730d15-3174-4d96-b3ba-f57683c38b35",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "iXf14uTtvlMa50u9",
+  "tags": []
+}

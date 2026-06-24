@@ -1,0 +1,284 @@
+{
+  "name": "Workflow 2 - Update Patient Status (Two-Way Sync)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update-status",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bf6f0c82-4cba-4b41-8b2d-c5863e81c778",
+      "name": "Webhook Catch Status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        128
+      ],
+      "webhookId": "update-status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-bookingId",
+              "leftValue": "={{ $json.body.bookingId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-newStatus",
+              "leftValue": "={{ $json.body.newStatus }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5a894fa8-6628-4d37-9313-02e07a6004ac",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Missing bookingId or newStatus in request\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "38231352-60eb-4eec-80a0-8f7ecc695587",
+      "name": "Respond - Bad Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cal Booking ID": "={{ $('Webhook Catch Status').item.json.body.bookingId }}",
+            "Statut du RDV": "={{ $('Webhook Catch Status').item.json.body.newStatus }}"
+          },
+          "matchingColumns": [
+            "Cal Booking ID"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e4bf0b3a-5fb7-4e3a-99a2-7e19895e6ff3",
+      "name": "Update Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -368,
+        -32
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "tableId": 1017856,
+        "returnAll": true,
+        "additionalOptions": {
+          "filters": {
+            "fields": [
+              {
+                "field": 8975009,
+                "value": "={{ $('Webhook Catch Status').item.json.body.bookingId }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "d2b57427-95ac-42ca-aa7a-439666b3fb0a",
+      "name": "Baserow Lookup ID",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        -32
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "update",
+        "tableId": 1017856,
+        "rowId": "={{ $json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 8941566,
+              "fieldValue": "={{ $('Webhook Catch Status').item.json.body.newStatus }}"
+            }
+          ]
+        }
+      },
+      "id": "ccbceb58-08a3-41fa-b7f1-8dac67f9ca09",
+      "name": "Baserow Update Status",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        -32
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"updatedStatus\": $('Webhook Catch Status').item.json.body.newStatus } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "7b0d6a38-6f63-4cf9-9ca1-641b44769b3e",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        304,
+        -32
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Catch Status": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Update Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Bad Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Baserow Lookup ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow Lookup ID": {
+      "main": [
+        [
+          {
+            "node": "Baserow Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow Update Status": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "f893b91f-078e-49ab-821e-3046754ce979",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "NvvVFvLkI3246anr",
+  "tags": []
+}

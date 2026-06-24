@@ -1,0 +1,183 @@
+{
+  "name": "Leak Protection Follow-up Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        320
+      ],
+      "id": "b2leak001-0001-4000-8000-000000000001",
+      "name": "Daily 9AM Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -560,
+        320
+      ],
+      "id": "b2leak002-0002-4000-8000-000000000002",
+      "name": "Get Pending Quotes",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Age Matrix: filter records exactly 3, 7, or 14 days old today\nconst TARGET_DAYS = [3, 7, 14];\nconst portalLink = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nfunction toE164MA(raw) {\n  if (raw == null || raw === '') return '';\n  let phone = String(raw).replace(/[\\s\\-\\(\\)\\.]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('+')) return phone;\n  if (phone.startsWith('00')) return '+' + phone.slice(2);\n  if (phone.startsWith('212')) return '+' + phone;\n  if (phone.startsWith('0')) return '+212' + phone.slice(1);\n  return '+212' + phone;\n}\n\nfunction daysSince(dateStr) {\n  if (!dateStr) return null;\n  const d = new Date(dateStr);\n  if (isNaN(d.getTime())) return null;\n  const today = new Date();\n  today.setHours(0, 0, 0, 0);\n  d.setHours(0, 0, 0, 0);\n  return Math.round((today - d) / (24 * 60 * 60 * 1000));\n}\n\nconst DRIP_COPY = {\n  3: {\n    sms: 'Bonjour [Nom], votre plan de traitement dentaire est prêt. Nos spécialistes restent disponibles pour répondre à vos questions. Réservez ici : [Link]',\n    subject: 'Votre plan de traitement vous attend — J+3',\n    body: 'Il y a 3 jours, nous avons préparé votre devis personnalisé. Notre équipe est disponible pour vous accompagner dans votre décision.'\n  },\n  7: {\n    sms: 'Bonjour [Nom], rappel amical : votre plan de soins dentaires est toujours disponible. Prenez rendez-vous pour démarrer votre traitement : [Link]',\n    subject: 'Rappel J+7 — Finalisez votre plan de traitement',\n    body: 'Une semaine s\\'est écoulée depuis votre devis. N\\'hésitez pas à nous contacter pour toute question sur votre plan de soins.'\n  },\n  14: {\n    sms: 'Bonjour [Nom], dernière relance : votre plan de traitement dentaire expire bientôt. Sécurisez votre créneau dès maintenant : [Link]',\n    subject: 'Dernière relance J+14 — Votre plan de traitement',\n    body: 'Deux semaines se sont écoulées. Nous restons à votre disposition pour planifier votre traitement et répondre à toutes vos questions.'\n  }\n};\n\nconst pending = $input.all().filter(item => {\n  const status = (item.json['Statut du RDV'] ?? '').toString().trim();\n  return status === 'En attente';\n});\n\nconst cohort = pending.filter(item => {\n  const quoteDate = item.json['Date & Heure du RDV'] ?? item.json['Date Devis'] ?? item.json['Date Creation'];\n  const age = daysSince(quoteDate);\n  return age !== null && TARGET_DAYS.includes(age);\n});\n\nreturn cohort.map(item => {\n  const quoteDate = item.json['Date & Heure du RDV'] ?? item.json['Date Devis'] ?? item.json['Date Creation'];\n  const age = daysSince(quoteDate);\n  const copy = DRIP_COPY[age];\n  const nom = item.json['Patient (Nom Complet)'] ?? 'Patient';\n  return {\n    json: {\n      Nom: nom,\n      Phone: toE164MA(item.json['Téléphone (WhatsApp)'] ?? ''),\n      Email: item.json['Email Contact'] ?? '',\n      AgeDays: age,\n      Link: portalLink,\n      SmsMessage: copy.sms.replace('[Nom]', nom).replace('[Link]', portalLink),\n      EmailSubject: copy.subject,\n      EmailBody: copy.body\n    }\n  };\n}).filter(item => item.json.Phone);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        320
+      ],
+      "id": "b2leak003-0003-4000-8000-000000000003",
+      "name": "Age Matrix Filter"
+    },
+    {
+      "parameters": {
+        "from": "+13252255943",
+        "to": "={{ $json.Phone }}",
+        "message": "={{ $json.SmsMessage }}",
+        "options": {
+          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+        }
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        240
+      ],
+      "id": "b2leak004-0004-4000-8000-000000000004",
+      "name": "Send Drip SMS",
+      "credentials": {
+        "twilioApi": {
+          "id": "sBZ1f7hTyGe4YGVj",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "onboarding@resend.dev",
+        "to": "={{ $json.Email }}",
+        "subject": "={{ $json.EmailSubject }}",
+        "html": "=<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"><title>{{ $json.EmailSubject }}</title></head><body style=\"font-family:Helvetica,Arial,sans-serif;background:#0d0d14;color:#e8e8f0;padding:32px;\"><div style=\"max-width:560px;margin:0 auto;background:#111118;border-radius:12px;padding:32px;border-top:3px solid #b8965a;\"><p style=\"color:#b8965a;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;\">Suivi de votre plan de traitement — J+{{ $json.AgeDays }}</p><p>Bonjour <strong>{{ $json.Nom }}</strong>,</p><p style=\"color:#9494b0;line-height:1.7;\">{{ $json.EmailBody }}</p><p style=\"margin-top:24px;\"><a href=\"{{ $json.Link }}\" style=\"display:inline-block;background:linear-gradient(135deg,#b8965a,#e8c97a);color:#0d0d14;text-decoration:none;padding:14px 28px;border-radius:5px;font-weight:bold;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;\">Réserver mon traitement →</a></p></div></body></html>",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        400
+      ],
+      "id": "b2leak005-0005-4000-8000-000000000005",
+      "name": "Send Drip Email",
+      "credentials": {
+        "resendApi": {
+          "id": "AVgfTd80MtoAdSpf",
+          "name": "Resend account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 9AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Quotes": {
+      "main": [
+        [
+          {
+            "node": "Age Matrix Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Age Matrix Filter": {
+      "main": [
+        [
+          {
+            "node": "Send Drip SMS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Drip Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip SMS": {
+      "main": [
+        []
+      ]
+    },
+    "Send Drip Email": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "b2leak999-9999-4000-8000-000000000999",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "LeakProtect001",
+  "tags": []
+}

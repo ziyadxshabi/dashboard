@@ -1,0 +1,100 @@
+{
+  "name": "Workflow 4 - Waitlist Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waitlist-add",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "90022332-f9df-4164-8e3b-abefefbc5b5d",
+      "name": "Webhook - Waitlist Add",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -128
+      ],
+      "webhookId": "waitlist-add"
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "create",
+        "tableId": 1039940
+      },
+      "id": "e8382b1d-d5c2-47c7-ab83-427531c81951",
+      "name": "Baserow - Add to Waitlist",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        -128
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true } }}",
+        "options": {}
+      },
+      "id": "2eefb0ff-9ea0-46ed-8767-8e46f9f2f72b",
+      "name": "Respond - Waitlist Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        96,
+        -128
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Waitlist Add": {
+      "main": [
+        [
+          {
+            "node": "Baserow - Add to Waitlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - Add to Waitlist": {
+      "main": [
+        [
+          {
+            "node": "Respond - Waitlist Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "dd7a61de-a73b-4470-ba4f-9bc777754a23",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "zwVIkxRIaMXYPIfN",
+  "tags": []
+}
