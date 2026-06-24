@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="oak-lounge">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>DentaFlow OS — Clinique Dentaire Témara Mall</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DentaFlow">
+  <!-- DentaFlow Apple Touch Icon — polished gold monogram -->
+  <svg id="dentaflow-apple-touch-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none">
+    <defs>
+      <linearGradient id="df-touch-gold" x1="48" y1="32" x2="132" y2="148" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#e8c97a"/>
+        <stop offset="0.5" stop-color="#b8965a"/>
+        <stop offset="1" stop-color="#8a6d3b"/>
+      </linearGradient>
+      <linearGradient id="df-touch-shine" x1="70" y1="50" x2="110" y2="90" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <rect width="180" height="180" rx="40" fill="#0C0F14"/>
+    <path fill="url(#df-touch-gold)" d="M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z"/>
+    <path fill="url(#df-touch-shine)" d="M78 70c8-6 18-8 28-6 6 1 11 4 14 8-10 2-20 6-28 12-6 5-10 11-12 18-2-10 0-22 8-32z" opacity="0.6"/>
+  </svg>
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='48' y1='32' x2='132' y2='148' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23e8c97a'/%3E%3Cstop offset='0.5' stop-color='%23b8965a'/%3E%3Cstop offset='1' stop-color='%238a6d3b'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x1='70' y1='50' x2='110' y2='90' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23ffffff' stop-opacity='0.35'/%3E%3Cstop offset='1' stop-color='%23ffffff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='40' fill='%230C0F14'/%3E%3Cpath fill='url(%23g)' d='M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z'/%3E%3Cpath fill='url(%23s)' d='M78 70c8-6 18-8 28-6 6 1 11 4 14 8-10 2-20 6-28 12-6 5-10 11-12 18-2-10 0-22 8-32z' opacity='0.6'/%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      document.documentElement.setAttribute('data-theme', 'oak-lounge');
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="dashboard_style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.23/dist/lenis.css" />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.3.23/dist/lenis.min.js"></script>
+</head>
+<body class="os-boot-pending auth-gate-active">
+
+  <!-- ═══ CLIENT BOOKING PORTAL (public — #reserver) ═══════════════════════ -->
+  <div id="client-portal" class="client-portal" aria-label="Portail de réservation patient">
+    <header class="client-portal-header">
+      <div class="client-portal-brand">
+        <span class="client-portal-logo" aria-hidden="true">🦷</span>
+        <div>
+          <h1 class="client-portal-title">Clinique Dentaire Témara Mall</h1>
+          <p class="client-portal-sub">Réservez votre rendez-vous en ligne</p>
+        </div>
+      </div>
+      <a class="client-portal-staff-link" href="#" id="link-doctor-app">Espace praticien →</a>
+    </header>
+
+    <div class="booking-wizard" id="booking-wizard">
+      <nav class="booking-progress" aria-label="Étapes de réservation">
+        <div class="booking-progress-step is-active" data-step-indicator="1">
+          <span class="booking-progress-num">1</span>
+          <span class="booking-progress-label">Service</span>
+        </div>
+        <div class="booking-progress-line" aria-hidden="true"></div>
+        <div class="booking-progress-step" data-step-indicator="2">
+          <span class="booking-progress-num">2</span>
+          <span class="booking-progress-label">Date</span>
+        </div>
+        <div class="booking-progress-line" aria-hidden="true"></div>
+        <div class="booking-progress-step" data-step-indicator="3">
+          <span class="booking-progress-num">3</span>
+          <span class="booking-progress-label">Confirmation</span>
+        </div>
+      </nav>
+
+      <div class="booking-steps-viewport">
+        <!-- Step 1: Select Service -->
+        <section class="booking-step is-active" id="booking-step-1" data-step="1" aria-label="Choisir un service">
+          <h2 class="booking-step-title">Quel soin souhaitez-vous ?</h2>
+          <p class="booking-step-desc">Sélectionnez le type de consultation pour continuer.</p>
+          <div class="service-grid" id="service-grid">
+            <button type="button" class="service-card" data-service="consultation" data-service-label="Consultation générale">
+              <span class="service-card-icon">🩺</span>
+              <span class="service-card-name">Consultation</span>
+              <span class="service-card-meta">30 min · Dès 350 MAD</span>
+            </button>
+            <button type="button" class="service-card" data-service="detartrage" data-service-label="Détartrage &amp; polissage">
+              <span class="service-card-icon">✨</span>
+              <span class="service-card-name">Détartrage</span>
+              <span class="service-card-meta">45 min · Dès 450 MAD</span>
+            </button>
+            <button type="button" class="service-card" data-service="urgence" data-service-label="Urgence dentaire">
+              <span class="service-card-icon">🚨</span>
+              <span class="service-card-name">Urgence</span>
+              <span class="service-card-meta">Prioritaire · Même jour</span>
+            </button>
+            <button type="button" class="service-card" data-service="blanchiment" data-service-label="Blanchiment professionnel">
+              <span class="service-card-icon">💎</span>
+              <span class="service-card-name">Blanchiment</span>
+              <span class="service-card-meta">60 min · Dès 890 MAD</span>
+            </button>
+          </div>
+          <div class="booking-step-actions">
+            <button type="button" class="btn-booking btn-booking--primary" id="btn-step1-next" disabled>Suivant</button>
+          </div>
+        </section>
+
+        <!-- Step 2: Choose Date (Cal.com embed placeholder) -->
+        <section class="booking-step" id="booking-step-2" data-step="2" aria-label="Choisir une date" hidden>
+          <h2 class="booking-step-title">Choisissez votre créneau</h2>
+          <p class="booking-step-desc">Calendrier en ligne — intégration Cal.com à brancher ici.</p>
+          <div class="cal-embed-placeholder" id="cal-embed-slot">
+            <div class="cal-embed-placeholder-inner">
+              <span class="cal-embed-badge">Cal.com Embed</span>
+              <p>Webhook: <code>/webhook/final-booking-engine-v2</code></p>
+              <p class="cal-embed-hint">Remplacez ce bloc par votre iframe Cal.com</p>
+            </div>
+          </div>
+          <div class="booking-step-actions booking-step-actions--split">
+            <button type="button" class="btn-booking btn-booking--ghost" id="btn-step2-back">Retour</button>
+            <button type="button" class="btn-booking btn-booking--primary" id="btn-step2-next">Suivant</button>
+          </div>
+        </section>
+
+        <!-- Step 3: Confirm -->
+        <section class="booking-step" id="booking-step-3" data-step="3" aria-label="Confirmer la réservation" hidden>
+          <h2 class="booking-step-title">Confirmez votre rendez-vous</h2>
+          <p class="booking-step-desc">Vérifiez les informations avant validation finale.</p>
+          <div class="booking-summary" id="booking-summary">
+            <div class="booking-summary-row">
+              <span class="booking-summary-label">Service</span>
+              <span class="booking-summary-value" id="summary-service">—</span>
+            </div>
+            <div class="booking-summary-row">
+              <span class="booking-summary-label">Clinique</span>
+              <span class="booking-summary-value">Témara Mall</span>
+            </div>
+            <div class="booking-summary-row">
+              <span class="booking-summary-label">Créneau</span>
+              <span class="booking-summary-value" id="summary-slot">À confirmer via Cal.com</span>
+            </div>
+          </div>
+          <div class="booking-step-actions booking-step-actions--split">
+            <button type="button" class="btn-booking btn-booking--ghost" id="btn-step3-back">Retour</button>
+            <button type="button" class="btn-booking btn-booking--confirm" id="btn-booking-confirm">Confirmer</button>
+          </div>
+          <p class="booking-success" id="booking-success" hidden>Rendez-vous enregistré — vous recevrez une confirmation par SMS.</p>
+        </section>
+      </div>
+    </div>
+
+    <footer class="client-portal-footer">
+      <p>🔒 Données protégées · Loi 09-08 · Propulsé par DentaFlow</p>
+    </footer>
+  </div>
+
+  <!-- PIN ACCESS — Oak Lounge secure gateway -->
+  <div id="login-overlay" class="login-overlay is-visible">
+    <div class="login-coalesce" id="login-card">
+      <div class="login-panel-front">
+        <header class="login-brand login-coalesce-item" data-coalesce="brand">
+          <div class="login-brand-mark" aria-hidden="true">
+            <span class="login-mark-icon">🦷</span>
+          </div>
+          <h1 class="login-title">DentaFlow OS</h1>
+          <p class="login-tagline">Passerelle Sécurisée</p>
+          <p class="login-clinic">Clinique Dentaire Témara Mall</p>
+        </header>
+
+        <div class="login-role-section login-coalesce-item" data-coalesce="role">
+          <p class="login-pin-label">Profil d'accès</p>
+          <div class="login-role-switch" role="group" aria-label="Choisir le profil">
+            <button type="button" class="login-role-btn is-active" id="role-btn-doctor" aria-pressed="true">Praticien (Doctor)</button>
+            <button type="button" class="login-role-btn" id="role-btn-assistant" aria-pressed="false">Assistante (Assistant)</button>
+          </div>
+        </div>
+
+        <div class="login-pin-section login-coalesce-item" data-coalesce="pin">
+          <p class="login-pin-label">Code d'accès à 4 chiffres</p>
+
+          <div class="pin-dots" id="pin-dots" role="group" aria-label="Indicateur de code PIN">
+            <span class="pin-dot" data-slot="0" aria-hidden="true"></span>
+            <span class="pin-dot" data-slot="1" aria-hidden="true"></span>
+            <span class="pin-dot" data-slot="2" aria-hidden="true"></span>
+            <span class="pin-dot" data-slot="3" aria-hidden="true"></span>
+          </div>
+
+          <div class="ios-keypad" id="pin-keypad">
+            <button type="button" class="ios-key" data-digit="1">1</button>
+            <button type="button" class="ios-key" data-digit="2">2</button>
+            <button type="button" class="ios-key" data-digit="3">3</button>
+            <button type="button" class="ios-key" data-digit="4">4</button>
+            <button type="button" class="ios-key" data-digit="5">5</button>
+            <button type="button" class="ios-key" data-digit="6">6</button>
+            <button type="button" class="ios-key" data-digit="7">7</button>
+            <button type="button" class="ios-key" data-digit="8">8</button>
+            <button type="button" class="ios-key" data-digit="9">9</button>
+            <button type="button" class="ios-key ios-key--action" id="key-delete" aria-label="Effacer">
+              <svg class="ios-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10l6 6M15 10l-6 6" stroke="currentColor" stroke-width="1.75" fill="none"/><path d="M5 7h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5l-3-4z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <button type="button" class="ios-key" data-digit="0">0</button>
+            <button type="button" class="ios-key ios-key--action" id="key-enter" aria-label="Valider">
+              <svg class="ios-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 8l4 4-4 4" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+
+          <p class="login-error" id="login-error" hidden></p>
+        </div>
+
+        <footer class="login-security-banner login-coalesce-item" data-coalesce="footer">
+          <span class="login-security-text">🔒 Chiffré de bout en bout</span>
+          <span class="login-security-sep" aria-hidden="true">•</span>
+          <span class="login-security-text">Propulsé par DentaFlow</span>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <div id="doctor-shell" class="app-shell" hidden>
+
+    <!-- ── SIDEBAR (desktop) ─────────────────────────────────────────────── -->
+    <aside class="sidebar" aria-label="Navigation principale">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-icon" aria-hidden="true">🦷</span>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-name">DentaFlow OS</span>
+          <span class="sidebar-brand-sub">Témara Mall</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" data-lenis-prevent>
+        <a href="#" class="nav-link is-active" data-nav="overview">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+          <span>Vue d'ensemble</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="doctor-hub">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-2 2 2 2"/><path d="M16 15h6"/></svg>
+          <span>Cabinet Live</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="calendar">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Calendrier</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="waitlist">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Liste d'attente</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="crm">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
+          <span>Dossiers Patients</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="pipeline">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="8" width="7" height="13" rx="2"/></svg>
+          <span>Devis &amp; Finances</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="sms">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Campagnes SMS</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Paramètres</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-profile">
+        <div class="profile-avatar" id="profile-avatar" aria-hidden="true">DT</div>
+        <div class="profile-info">
+          <span class="profile-name" id="profile-name">Dr. Tazi</span>
+          <span class="profile-role" id="profile-role">Chirurgien-dentiste</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MOBILE BOTTOM TAB BAR — horizontal swipe ribbon (8 items) ─────── -->
+    <nav class="mobile-tabbar" aria-label="Navigation mobile" data-lenis-prevent>
+      <a href="#" class="tab-link is-active" data-nav="overview" aria-label="Vue d'ensemble">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+        <span>Vue d'ensemble</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="doctor-hub" aria-label="Cabinet Live">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-2 2 2 2"/><path d="M16 15h6"/></svg>
+        <span>Cabinet Live</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="calendar" aria-label="Calendrier">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendrier</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="waitlist" aria-label="Liste d'attente">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Liste d'attente</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="crm" aria-label="Dossiers Patients">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
+        <span>Dossiers Patients</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="pipeline" aria-label="Devis et Finances">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="8" width="7" height="13" rx="2"/></svg>
+        <span>Devis &amp; Finances</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="sms" aria-label="Campagnes SMS">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Campagnes SMS</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="settings" aria-label="Paramètres">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Paramètres</span>
+      </a>
+    </nav>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────────────── -->
+    <main class="main">
+
+      <section id="view-overview" class="dashboard-view active" aria-label="Vue d'ensemble">
+
+        <header class="hero-header">
+          <div class="hero-text">
+            <h1 class="hero-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name">Dr. Tazi</span></h1>
+            <p class="hero-date" id="hero-date">—</p>
+          </div>
+          <div class="hero-sync">
+            <span class="sync-dot" id="sync-dot"></span>
+            <span class="sync-label" id="sync-label">Chargement…</span>
+          </div>
+        </header>
+
+        <section class="reclaimed-banner" aria-label="Revenu récupéré par DentaFlow">
+          <div class="reclaimed-banner__glow" aria-hidden="true"></div>
+          <div class="reclaimed-banner__content">
+            <h2 class="reclaimed-banner__title">REVENU RÉCUPÉRÉ PAR DENTAFLOW</h2>
+            <div class="reclaimed-banner__amount">
+              <span class="reclaimed-banner__value" id="val-reclaimed" data-target="0" aria-live="polite">—</span>
+              <span class="reclaimed-banner__currency">MAD</span>
+            </div>
+            <p class="reclaimed-banner__subtitle">Généré par le rattrapage des annulations et la conversion automatique des devis</p>
+          </div>
+        </section>
+
+        <section class="kpi-row" aria-label="Indicateurs clés du jour">
+
+          <article class="kpi-card" id="card-patients">
+            <div class="kpi-label">Patients Aujourd'hui</div>
+            <div class="kpi-number" id="val-patients" data-target="0" aria-live="polite">—</div>
+            <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
+            <div class="kpi-trend" id="trend-patients"></div>
+          </article>
+
+          <article class="kpi-card" id="card-noshows">
+            <div class="kpi-label">Annulations / No-Shows</div>
+            <div class="kpi-number" id="val-noshows" data-target="0" aria-live="assertive">—</div>
+            <div class="kpi-sub" id="sub-noshows">Créneaux à combler</div>
+            <div class="kpi-trend" id="trend-noshows"></div>
+          </article>
+
+          <article class="kpi-card kpi-card--wide" id="card-production">
+            <div class="kpi-label">Production du Jour</div>
+            <div class="kpi-number-row">
+              <span class="kpi-number kpi-number--sm" id="val-revenue" data-target="0">—</span>
+              <span class="kpi-goal-label">/ <span id="val-goal">15 000</span> MAD</span>
+            </div>
+            <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Objectif de production">
+              <div class="progress-fill" id="progress-fill"></div>
+              <div class="progress-pct" id="progress-pct">0%</div>
+            </div>
+            <div class="kpi-sub" id="sub-production">Revenus facturés aujourd'hui</div>
+          </article>
+
+          <article class="kpi-card" id="card-new">
+            <div class="kpi-label">Nouveaux Patients</div>
+            <div class="kpi-number" id="val-new" data-target="0" aria-live="polite">—</div>
+            <div class="kpi-sub" id="sub-new">Formulaires d'entrée requis</div>
+            <div class="kpi-trend" id="trend-new"></div>
+          </article>
+
+        </section>
+
+        <section class="team-messages-panel" aria-label="Messages de l'équipe">
+          <article class="team-messages-card">
+            <header class="team-messages-header">
+              <div>
+                <h3 class="chart-title">Messages de l'équipe</h3>
+                <p class="chart-sub">Transmissions assistante — synchronisation automatique</p>
+              </div>
+              <span class="team-messages-sync" id="team-notes-sync" aria-live="polite">Chargement…</span>
+            </header>
+            <div class="team-messages-list" id="team-notes-list" data-lenis-prevent role="feed" aria-busy="true">
+              <p class="team-messages-empty">Chargement des messages…</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="dashboard-grid" aria-label="Analyses et planning">
+
+          <article class="chart-card chart-card--main">
+            <div class="chart-header">
+              <div class="chart-header-top">
+                <div>
+                  <div class="chart-title">Affluence Horaire</div>
+                  <div class="chart-sub">Patients par heure — identifiez les créneaux chargés</div>
+                </div>
+                <div class="chart-toggle" id="chart-toggle" role="group" aria-label="Période d'affichage">
+                  <div class="chart-toggle-slider" id="chart-toggle-slider" aria-hidden="true"></div>
+                  <button type="button" class="chart-toggle-btn is-active" data-period="today">Aujourd'hui</button>
+                  <button type="button" class="chart-toggle-btn" data-period="week">Semaine</button>
+                  <button type="button" class="chart-toggle-btn" data-period="month">Mois</button>
+                </div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="chart-hours" role="img" aria-label="Graphique d'affluence horaire"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-card chart-card--side">
+            <div class="chart-header">
+              <div class="chart-title">Taux d'Acceptation</div>
+              <div class="chart-sub">Plans de traitement acceptés vs. en attente</div>
+            </div>
+            <div class="chart-body chart-body--pie">
+              <canvas id="chart-acceptance" role="img" aria-label="Graphique d'acceptation des traitements"></canvas>
+            </div>
+            <div class="pie-legend" id="pie-legend"></div>
+          </article>
+
+          <article class="schedule-widget" aria-label="Prochains rendez-vous">
+            <div class="schedule-header">
+              <div class="chart-title">Prochains Rendez-vous</div>
+              <div class="chart-sub">Aujourd'hui — ordre chronologique</div>
+            </div>
+            <div class="schedule-list" id="appointments-list" data-lenis-prevent>
+              <!-- populated by renderAppointmentsList() -->
+            </div>
+          </article>
+
+        </section>
+
+      </section>
+
+      <!-- ── DOCTOR HUB — snappy efficiency view (GSAP) ─────────────────── -->
+      <section id="view-doctor-hub" class="dashboard-view" aria-label="Cabinet live" aria-hidden="true">
+
+        <header class="view-page-header">
+          <h2 class="view-page-title">Cabinet Live</h2>
+          <p class="view-page-sub">Vue opérationnelle — patients du jour et notes cliniques</p>
+        </header>
+
+        <div class="doctor-metrics" id="doctor-metrics">
+          <article class="doctor-metric-card" data-metric="patients">
+            <span class="doctor-metric-label">Patients Aujourd'hui</span>
+            <span class="doctor-metric-value" id="hub-val-patients">8</span>
+            <span class="doctor-metric-delta doctor-metric-delta--up">+2 vs hier</span>
+          </article>
+          <article class="doctor-metric-card" data-metric="pending">
+            <span class="doctor-metric-label">En Attente</span>
+            <span class="doctor-metric-value" id="hub-val-pending">3</span>
+            <span class="doctor-metric-delta">Devis à valider</span>
+          </article>
+          <article class="doctor-metric-card" data-metric="noshows">
+            <span class="doctor-metric-label">No-Shows</span>
+            <span class="doctor-metric-value" id="hub-val-noshows">2</span>
+            <span class="doctor-metric-delta doctor-metric-delta--warn">Créneaux libres</span>
+          </article>
+          <article class="doctor-metric-card" data-metric="production">
+            <span class="doctor-metric-label">Production Jour</span>
+            <span class="doctor-metric-value" id="hub-val-production">9.4k</span>
+            <span class="doctor-metric-delta">MAD facturés</span>
+          </article>
+        </div>
+
+        <div class="brutalist-triage-grid" aria-label="Centre de triage">
+          <article class="brutalist-triage-panel" aria-label="Salle d'attente">
+            <header class="brutalist-triage-panel__header">
+              <h3 class="brutalist-triage-panel__title">Salle d'Attente</h3>
+              <p class="brutalist-triage-panel__sub">Patients confirmés — ordre chronologique</p>
+            </header>
+            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent>
+              <table class="brutalist-triage-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Heure</th>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Motif</th>
+                    <th scope="col">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="doctor-waiting-room-body">
+                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="brutalist-triage-panel" aria-label="Urgences">
+            <header class="brutalist-triage-panel__header">
+              <h3 class="brutalist-triage-panel__title">Urgences</h3>
+              <p class="brutalist-triage-panel__sub">Cas prioritaires — traitement immédiat</p>
+            </header>
+            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent>
+              <table class="brutalist-triage-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Heure</th>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Motif</th>
+                    <th scope="col">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="doctor-emergencies-body">
+                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <div class="brutalist-digest-container">
+          <h3 class="digest-title">SYNTHÈSE DE FIN DE JOURNÉE</h3>
+          <div class="digest-grid">
+            <div class="digest-metric">
+              <span class="metric-label">Patients Vus</span>
+              <span class="metric-value" id="digest-patients-vus">0</span>
+            </div>
+            <div class="digest-metric">
+              <span class="metric-label">Annulations</span>
+              <span class="metric-value metric-red" id="digest-annulations">0</span>
+            </div>
+            <div class="digest-metric digest-revenue">
+              <div class="rev-header">
+                <span class="metric-label">Objectif Journalier</span>
+                <span class="metric-value" id="digest-revenue">0 MAD</span>
+              </div>
+              <div class="rev-progress-bar">
+                <div class="rev-progress-fill" id="digest-progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Calendrier Clinique</h2>
+          <p class="view-page-sub">Agenda de gestion — consultations et créneaux de la semaine</p>
+        </header>
+
+        <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
+          <div class="calendar-embed-header">
+            <div class="chart-title">Planning Hebdomadaire</div>
+            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
+          </div>
+          <div id="dashboard-cal-inline"></div>
+        </article>
+      </section>
+
+      <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Gestion de la Liste d'Attente</h2>
+          <p class="view-page-sub">No-Show Recovery — inscrivez les patients pour le prochain créneau libéré</p>
+        </header>
+
+        <div class="waitlist-layout">
+
+          <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
+            <div class="waitlist-form-header">
+              <div class="chart-title">Nouveau Patient</div>
+              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+            </div>
+
+            <form id="waitlist-form" class="waitlist-form" novalidate>
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-name">Nom du patient</label>
+                <input
+                  class="waitlist-input"
+                  type="text"
+                  id="waitlist-name"
+                  name="nom"
+                  placeholder="ex. Fatima Zahra"
+                  autocomplete="name"
+                  required
+                />
+              </div>
+
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-phone">Numéro de téléphone</label>
+                <input
+                  class="waitlist-input"
+                  type="tel"
+                  id="waitlist-phone"
+                  name="telephone"
+                  placeholder="+212 6XX XXX XXX"
+                  autocomplete="tel"
+                  inputmode="tel"
+                  required
+                />
+              </div>
+
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-priority">Priorité</label>
+                <select class="waitlist-select" id="waitlist-priority" name="priorite" required>
+                  <option value="Haute">Haute</option>
+                  <option value="Normale" selected>Normale</option>
+                </select>
+              </div>
+
+              <div class="form-consent-row">
+                <label class="form-consent-label" for="waitlist-sms-consent">
+                  <input
+                    type="checkbox"
+                    id="waitlist-sms-consent"
+                    class="form-consent-checkbox"
+                    name="sms_consent"
+                    required
+                  />
+                  <span class="form-consent-text">J'accepte de recevoir des notifications par SMS concernant mon rendez-vous (Loi 09-08).</span>
+                </label>
+              </div>
+
+              <button type="submit" class="waitlist-submit-btn" id="waitlist-submit-btn">
+                Ajouter à la liste
+              </button>
+            </form>
+          </article>
+
+          <article class="schedule-widget schedule-widget--full" aria-label="Liste d'attente complète">
+            <div class="schedule-header">
+              <div class="chart-title">Patients Prioritaires</div>
+              <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
+            </div>
+            <div class="schedule-list schedule-list--full" id="waitlist-panel-list">
+              <!-- populated by renderWaitlistPanel() -->
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
+        <header class="view-page-header view-page-header--row">
+          <div>
+            <h2 class="view-page-title">Dossiers Patients</h2>
+            <p class="view-page-sub">CRM clinique — fiches et coordonnées patients</p>
+          </div>
+          <div class="crm-search-wrap">
+            <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
+            <input
+              class="waitlist-input crm-search-input"
+              type="search"
+              id="crm-search"
+              placeholder="Rechercher par nom, téléphone ou email…"
+              autocomplete="off"
+            />
+          </div>
+        </header>
+
+        <article class="crm-table-panel" aria-label="Liste des patients">
+          <div class="crm-table-scroll" data-lenis-prevent>
+            <table class="crm-table" id="crm-patient-table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Téléphone</th>
+                  <th>Email</th>
+                  <th>Motif</th>
+                </tr>
+              </thead>
+              <tbody id="crm-table-body">
+                <tr
+                  class="crm-table-row"
+                  tabindex="0"
+                  role="button"
+                  data-name="Fatima Zahra"
+                  data-phone="+212 612 345 678"
+                  data-email="fatima.z@email.ma"
+                  data-motif="Consultation"
+                  data-statut="Confirmé"
+                  data-amount="6200"
+                  data-insurance="CNSS"
+                  data-observations="Détartrage et polissage — suivi semestriel recommandé."
+                >
+                  <td>Fatima Zahra</td>
+                  <td>+212 612 345 678</td>
+                  <td>fatima.z@email.ma</td>
+                  <td><span class="crm-tag">Consultation</span></td>
+                </tr>
+                <tr
+                  class="crm-table-row"
+                  tabindex="0"
+                  role="button"
+                  data-name="Youssef Benali"
+                  data-phone="+212 661 234 567"
+                  data-email="y.benali@email.ma"
+                  data-motif="Urgence"
+                  data-statut="En attente"
+                  data-amount="12500"
+                  data-insurance="Sans couverture"
+                  data-observations="Douleur aiguë molaire supérieure droite — radiographie demandée."
+                >
+                  <td>Youssef Benali</td>
+                  <td>+212 661 234 567</td>
+                  <td>y.benali@email.ma</td>
+                  <td><span class="crm-tag crm-tag--urgence">Urgence</span></td>
+                </tr>
+                <tr
+                  class="crm-table-row"
+                  tabindex="0"
+                  role="button"
+                  data-name="Amina El Fassi"
+                  data-phone="+212 678 901 234"
+                  data-email="amina.f@email.ma"
+                  data-motif="Blanchiment"
+                  data-statut="Confirmé"
+                  data-amount="8900"
+                  data-insurance="CNOPS"
+                  data-observations="Blanchiment professionnel — sensibilité légère signalée."
+                >
+                  <td>Amina El Fassi</td>
+                  <td>+212 678 901 234</td>
+                  <td>amina.f@email.ma</td>
+                  <td><span class="crm-tag crm-tag--gold">Blanchiment</span></td>
+                </tr>
+                <tr
+                  class="crm-table-row"
+                  tabindex="0"
+                  role="button"
+                  data-name="Karim Alami"
+                  data-phone="+212 655 432 109"
+                  data-email="k.alami@email.ma"
+                  data-motif="Contrôle"
+                  data-statut="Confirmé"
+                  data-amount="2400"
+                  data-insurance="CNSS"
+                  data-observations="Contrôle post-traitement implant — cicatrisation satisfaisante."
+                >
+                  <td>Karim Alami</td>
+                  <td>+212 655 432 109</td>
+                  <td>k.alami@email.ma</td>
+                  <td><span class="crm-tag">Contrôle</span></td>
+                </tr>
+                <tr
+                  class="crm-table-row"
+                  tabindex="0"
+                  role="button"
+                  data-name="Salma Berrada"
+                  data-phone="+212 699 876 543"
+                  data-email="s.berrada@email.ma"
+                  data-motif="Implant"
+                  data-statut="En attente"
+                  data-amount="15750"
+                  data-insurance="Couverture privée"
+                  data-observations="Orthodontie phase 1 — plan de traitement en cours de validation."
+                >
+                  <td>Salma Berrada</td>
+                  <td>+212 699 876 543</td>
+                  <td>s.berrada@email.ma</td>
+                  <td><span class="crm-tag">Implant</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-pipeline" class="dashboard-view" aria-label="Devis et finances" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Devis &amp; Finances</h2>
+          <p class="view-page-sub">Pipeline des plans de traitement — suivi des devis en MAD</p>
+        </header>
+
+        <div class="pipeline-board">
+          <div class="pipeline-column">
+            <div class="pipeline-column-header">
+              <span class="pipeline-column-title">En attente</span>
+              <span class="pipeline-column-count">3</span>
+            </div>
+            <div class="pipeline-cards">
+              <article class="pipeline-card">
+                <span class="pipeline-card-name">Youssef Benali</span>
+                <span class="pipeline-card-amount">12 500 MAD</span>
+                <span class="pipeline-card-meta">Couronnes céramiques</span>
+              </article>
+              <article class="pipeline-card">
+                <span class="pipeline-card-name">Amina El Fassi</span>
+                <span class="pipeline-card-amount">8 900 MAD</span>
+                <span class="pipeline-card-meta">Blanchiment professionnel</span>
+              </article>
+              <article class="pipeline-card">
+                <span class="pipeline-card-name">Karim Alami</span>
+                <span class="pipeline-card-amount">24 000 MAD</span>
+                <span class="pipeline-card-meta">Implant + couronne</span>
+              </article>
+            </div>
+          </div>
+
+          <div class="pipeline-column pipeline-column--closed">
+            <div class="pipeline-column-header">
+              <span class="pipeline-column-title">Confirmé</span>
+              <span class="pipeline-column-count">2</span>
+            </div>
+            <div class="pipeline-cards">
+              <article class="pipeline-card pipeline-card--closed">
+                <span class="pipeline-card-name">Fatima Zahra</span>
+                <span class="pipeline-card-amount">6 200 MAD</span>
+                <span class="pipeline-card-meta">Détartrage + polissage</span>
+              </article>
+              <article class="pipeline-card pipeline-card--closed">
+                <span class="pipeline-card-name">Salma Berrada</span>
+                <span class="pipeline-card-amount">15 750 MAD</span>
+                <span class="pipeline-card-meta">Orthodontie — phase 1</span>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-sms" class="dashboard-view" aria-label="Campagnes SMS" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Campagnes SMS</h2>
+          <p class="view-page-sub">Diffusion globale — rappels et communications patients</p>
+        </header>
+
+        <article class="sms-campaign-panel" aria-label="Composer une campagne SMS">
+          <div class="sms-campaign-header">
+            <div class="chart-title">Nouvelle Campagne</div>
+            <div class="chart-sub">Message diffusé à l'ensemble de la base patients active</div>
+          </div>
+
+          <form id="sms-campaign-form" class="sms-campaign-form" novalidate>
+            <div class="settings-field">
+              <label class="settings-label" for="sms-campaign-body">Corps du message</label>
+              <textarea
+                class="waitlist-input sms-textarea"
+                id="sms-campaign-body"
+                name="message"
+                rows="6"
+                maxlength="320"
+                placeholder="Bonjour, la Clinique Dentaire Témara Mall vous informe que…"
+                required
+              ></textarea>
+              <div class="sms-char-counter">
+                <span id="sms-char-count">0</span> / 320 caractères
+              </div>
+            </div>
+            <button type="submit" class="btn-gold" id="sms-campaign-submit">
+              Envoyer la Campagne (Diffusion globale)
+            </button>
+          </form>
+        </article>
+      </section>
+
+      <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Paramètres du Système</h2>
+          <p class="view-page-sub">Configuration de la clinique, des notifications et des intégrations n8n</p>
+        </header>
+
+        <div class="settings-grid">
+
+          <!-- Card 0: Profil Utilisateur -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <h3 class="settings-card-title">Profil Utilisateur</h3>
+            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du tableau de bord.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-name">Nom Complet</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-name"
+                name="profile_name"
+                value="Dr. Tazi"
+                autocomplete="name"
+              />
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-specialty">Spécialité</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-specialty"
+                name="profile_specialty"
+                value="Chirurgien-dentiste"
+              />
+            </div>
+          </article>
+
+          <!-- Card: Apparence -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </div>
+            <h3 class="settings-card-title">Apparence</h3>
+            <p class="settings-card-desc">Choisissez le thème visuel du tableau de bord clinique.</p>
+            <div class="theme-switcher" role="group" aria-label="Thème de l'application">
+              <button
+                type="button"
+                class="theme-switch-btn is-active"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
+                aria-pressed="true"
+              >Oak Lounge</button>
+              <button
+                type="button"
+                class="theme-switch-btn"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
+                aria-pressed="false"
+              >Pearl Clinic</button>
+            </div>
+          </article>
+
+          <!-- Card 1: Objectif & Clinique -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <h3 class="settings-card-title">Objectif &amp; Clinique</h3>
+            <p class="settings-card-desc">Définissez l'objectif de production journalier affiché sur le tableau de bord.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-daily-goal">Objectif Journalier (MAD)</label>
+              <input
+                class="waitlist-input settings-input"
+                type="number"
+                id="settings-daily-goal"
+                name="daily_goal"
+                value="15000"
+                min="1000"
+                step="500"
+                inputmode="numeric"
+              />
+            </div>
+          </article>
+
+          <!-- Card 2: Notifications -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <h3 class="settings-card-title">Notifications</h3>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via n8n.</p>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels SMS</span>
+                <span class="settings-toggle-hint">Twilio — rappels 24h avant le RDV</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sms-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels Email</span>
+                <span class="settings-toggle-hint">Resend — confirmations et relances</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-email-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </article>
+
+          <!-- Card 3: Sécurité -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h3 class="settings-card-title">Sécurité</h3>
+            <p class="settings-card-desc">Modifiez le code PIN d'accès au tableau de bord clinique.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-pin">Nouveau Code PIN (4 chiffres)</label>
+              <input
+                class="waitlist-input settings-input"
+                type="password"
+                id="settings-pin"
+                name="pin"
+                maxlength="4"
+                pattern="[0-9]{4}"
+                inputmode="numeric"
+                autocomplete="new-password"
+                placeholder="••••"
+              />
+            </div>
+            <button type="button" class="btn-gold" id="settings-pin-save">Enregistrer le PIN</button>
+            <p class="settings-pin-status" id="settings-pin-status" hidden></p>
+          </article>
+
+          <!-- Card 4: Système (n8n) -->
+          <article class="settings-card settings-card--wide">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2"/></svg>
+            </div>
+            <h3 class="settings-card-title">Système (n8n)</h3>
+            <p class="settings-card-desc">Points de terminaison webhook actifs — lecture seule.</p>
+
+            <div class="settings-field">
+              <label class="settings-label" for="settings-webhook-dashboard">Dashboard Data (Proxy)</label>
+              <input
+                class="waitlist-input settings-input settings-input--readonly"
+                type="text"
+                id="settings-webhook-dashboard"
+                readonly
+                value="/api/n8n-proxy"
+              />
+            </div>
+
+            <div class="settings-field">
+              <label class="settings-label" for="settings-webhook-waitlist">Liste d'Attente — Ajout Patient</label>
+              <input
+                class="waitlist-input settings-input settings-input--readonly"
+                type="text"
+                id="settings-webhook-waitlist"
+                readonly
+                value="/api/waitlist"
+              />
+            </div>
+
+            <div class="settings-field">
+              <label class="settings-label" for="settings-webhook-booking">Moteur de Réservation (Cal.com)</label>
+              <input
+                class="waitlist-input settings-input settings-input--readonly"
+                type="text"
+                id="settings-webhook-booking"
+                readonly
+                value="https://glade-rigor-perennial.ngrok-free.dev/webhook/final-booking-engine-v2"
+              />
+            </div>
+
+            <div class="settings-field">
+              <label class="settings-label" for="settings-webhook-sms">Twilio — Statut SMS</label>
+              <input
+                class="waitlist-input settings-input settings-input--readonly"
+                type="text"
+                id="settings-webhook-sms"
+                readonly
+                value="https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+              />
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- CRM — Dossier Patient slide-over panel -->
+  <div id="crm-side-panel" class="crm-side-panel-root" aria-hidden="true">
+    <div class="crm-side-panel-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
+    <aside
+      class="crm-side-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crm-panel-name"
+      aria-describedby="crm-panel-subtitle"
+    >
+      <button type="button" class="crm-side-panel-close" id="crm-side-panel-close" aria-label="Fermer le dossier">×</button>
+
+      <header class="crm-side-panel-header">
+        <p class="crm-side-panel-eyebrow">Dossier Patient</p>
+        <h2 class="crm-side-panel-name" id="crm-panel-name">—</h2>
+        <p class="crm-side-panel-subtitle" id="crm-panel-subtitle"></p>
+        <span class="crm-side-panel-statut crm-tag" id="crm-panel-statut">—</span>
+      </header>
+
+      <div class="crm-side-panel-body" data-lenis-prevent>
+        <section class="crm-side-panel-section" aria-label="Détails financiers">
+          <h3 class="crm-side-panel-section-title">Détails Financiers</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Montant</dt>
+              <dd id="crm-panel-amount">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Couverture Médicale</dt>
+              <dd id="crm-panel-insurance">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Notes cliniques">
+          <h3 class="crm-side-panel-section-title">Notes Cliniques</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Motif de Consultation</dt>
+              <dd id="crm-panel-motif">—</dd>
+            </div>
+            <div class="crm-side-panel-field crm-side-panel-field--block">
+              <dt>Observations Médicales</dt>
+              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <div id="assistant-mount" hidden></div>
+
+  <div class="error-banner" id="error-banner" hidden>
+    ⚠️ Impossible de charger les données. Vérifiez la connexion n8n.
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" referrerpolicy="no-referrer"></script>
+  <script src="auth.js"></script>
+  <script src="dashboard_app.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="oak-lounge">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Command Center Assistante — DentaFlow OS</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DentaFlow Assistante">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      var STORAGE_KEY = 'dentaflow_assistant_prefs';
+      var theme = 'oak-lounge';
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          var prefs = JSON.parse(raw);
+          theme = prefs.theme === 'pearl-clinic' || prefs.theme === 'light' ? 'pearl-clinic' : 'oak-lounge';
+        }
+      } catch (e) { /* keep default */ }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <link rel="stylesheet" href="dashboard_style.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+</head>
+<body class="os-boot-pending auth-gate-active" data-auth-mode="assistant-only">
+
+  <div id="login-overlay" class="login-overlay is-visible">
+    <div class="login-coalesce" id="login-card">
+      <div class="login-panel-front">
+        <header class="login-brand login-coalesce-item" data-coalesce="brand">
+          <div class="login-brand-mark" aria-hidden="true">
+            <span class="login-mark-icon">🦷</span>
+          </div>
+          <h1 class="login-title">DentaFlow OS</h1>
+          <p class="login-tagline">Command Center Assistante</p>
+          <p class="login-clinic">Clinique Dentaire Témara Mall</p>
+        </header>
+
+        <div class="login-role-section login-coalesce-item" data-coalesce="role">
+          <p class="login-pin-label">Profil d'accès</p>
+          <div class="login-role-switch" role="group" aria-label="Choisir le profil">
+            <button type="button" class="login-role-btn" id="role-btn-doctor" hidden>Praticien (Doctor)</button>
+            <button type="button" class="login-role-btn is-active" id="role-btn-assistant" aria-pressed="true">Assistante (Assistant)</button>
+          </div>
+        </div>
+
+        <div class="login-pin-section login-coalesce-item" data-coalesce="pin">
+          <p class="login-pin-label">Code d'accès à 4 chiffres</p>
+
+          <div class="pin-dots" id="pin-dots" role="group" aria-label="Indicateur de code PIN">
+            <span class="pin-dot" data-slot="0" aria-hidden="true"></span>
+            <span class="pin-dot" data-slot="1" aria-hidden="true"></span>
+            <span class="pin-dot" data-slot="2" aria-hidden="true"></span>
+            <span class="pin-dot" data-slot="3" aria-hidden="true"></span>
+          </div>
+
+          <div class="ios-keypad" id="pin-keypad">
+            <button type="button" class="ios-key" data-digit="1">1</button>
+            <button type="button" class="ios-key" data-digit="2">2</button>
+            <button type="button" class="ios-key" data-digit="3">3</button>
+            <button type="button" class="ios-key" data-digit="4">4</button>
+            <button type="button" class="ios-key" data-digit="5">5</button>
+            <button type="button" class="ios-key" data-digit="6">6</button>
+            <button type="button" class="ios-key" data-digit="7">7</button>
+            <button type="button" class="ios-key" data-digit="8">8</button>
+            <button type="button" class="ios-key" data-digit="9">9</button>
+            <button type="button" class="ios-key ios-key--action" id="key-delete" aria-label="Effacer">
+              <svg class="ios-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10l6 6M15 10l-6 6" stroke="currentColor" stroke-width="1.75" fill="none"/><path d="M5 7h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5l-3-4z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <button type="button" class="ios-key" data-digit="0">0</button>
+            <button type="button" class="ios-key ios-key--action" id="key-enter" aria-label="Valider">
+              <svg class="ios-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 8l4 4-4 4" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+
+          <p class="login-error" id="login-error" hidden></p>
+        </div>
+
+        <footer class="login-security-banner login-coalesce-item" data-coalesce="footer">
+          <span class="login-security-text">🔒 Chiffré de bout en bout</span>
+          <span class="login-security-sep" aria-hidden="true">•</span>
+          <span class="login-security-text">Propulsé par DentaFlow</span>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <div id="assistant-shell" class="app-shell" hidden>
+
+    <aside class="sidebar assistant-sidebar" aria-label="Navigation assistante">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-icon" aria-hidden="true">🦷</span>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-name">DentaFlow OS</span>
+          <span class="sidebar-brand-sub">Command Center</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Navigation principale">
+        <a href="#" class="nav-link is-active" data-nav="overview" aria-current="page">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="2"/>
+            <rect x="14" y="3" width="7" height="7" rx="2"/>
+            <rect x="3" y="14" width="7" height="7" rx="2"/>
+            <rect x="14" y="14" width="7" height="7" rx="2"/>
+          </svg>
+          <span>Vue du jour</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="calendar">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="3"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span>Calendrier</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="waitlist">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 7v5l3 3"/>
+          </svg>
+          <span>Liste d'attente</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="crm">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 .87 6.87"/>
+          </svg>
+          <span>Dossiers Patients</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Paramètres</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-profile sidebar-profile--assistant">
+        <div class="profile-avatar" id="profile-avatar" aria-hidden="true">SA</div>
+        <div class="profile-info">
+          <span class="profile-name" id="profile-name">Sanae Amrani</span>
+          <span class="profile-role" id="profile-role">Assistante dentaire</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="assistant-main" id="assistant-content">
+
+      <header class="assistant-mobile-bar" aria-label="En-tête mobile">
+        <span class="assistant-mobile-bar__brand">Command Center</span>
+      </header>
+
+      <section id="view-overview" class="dashboard-view active" aria-label="Vue du jour">
+
+        <header class="assistant-header">
+          <div>
+            <h1 class="assistant-header__title">Bonjour, <span id="hero-profile-name">Sanae</span></h1>
+            <p class="assistant-header__sub" id="assistant-date">—</p>
+          </div>
+          <div class="assistant-header__meta">
+            <span class="assistant-stat-pill">
+              <strong id="roster-count">0</strong> rendez-vous aujourd'hui
+            </span>
+            <span class="assistant-stat-pill">
+              <strong id="roster-confirmed">0</strong> confirmés ·
+              <strong id="roster-waiting">0</strong> en attente
+            </span>
+            <div class="hero-sync">
+              <span class="sync-dot ok" aria-hidden="true"></span>
+              <span class="sync-label">Synchronisé · Typebot actif</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="assistant-pulse" aria-label="Indicateurs opérationnels du jour">
+          <div class="assistant-pulse-grid" id="assistant-pulse-grid">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        <div class="assistant-grid">
+
+        <section class="assistant-panel assistant-panel--roster" aria-labelledby="roster-title">
+          <div class="assistant-panel__head">
+            <div>
+              <h2 class="assistant-panel__title" id="roster-title">Planning du Jour</h2>
+              <p class="assistant-panel__desc">Vue prioritaire — ordre chronologique des rendez-vous</p>
+            </div>
+            <div class="roster-panel-controls">
+              <span class="assistant-panel__badge">Priorité</span>
+            </div>
+          </div>
+
+          <div class="roster-table-wrap">
+            <table class="roster-table" aria-describedby="roster-title">
+              <thead>
+                <tr>
+                  <th scope="col" class="roster-checkbox-col"><span class="visually-hidden">Sélection</span></th>
+                  <th scope="col">Heure</th>
+                  <th scope="col">Patient</th>
+                  <th scope="col">Traitement</th>
+                  <th scope="col">Statut</th>
+                </tr>
+              </thead>
+              <tbody id="roster-tbody">
+                <!-- rendered by app.js -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        <section class="assistant-panel assistant-panel--actions" aria-labelledby="actions-title">
+          <div class="assistant-panel__head">
+            <div>
+              <h2 class="assistant-panel__title" id="actions-title">Superpouvoirs</h2>
+              <p class="assistant-panel__desc">Actions rapides pour la journée</p>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button type="button" class="btn-super" id="btn-daily-report">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="8" y1="13" x2="16" y2="13"/>
+                  <line x1="8" y1="17" x2="16" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Générer Rapport Journalier</span>
+                <span class="btn-super__hint">Export automatique des rendez-vous et statuts du jour</span>
+              </span>
+            </button>
+
+            <button type="button" class="btn-super" id="btn-fill-gap">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <path d="M8 10h8"/>
+                  <path d="M8 14h5"/>
+                </svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Remplir un Créneau Vide</span>
+                <span class="btn-super__hint">Blast SMS à la liste d'attente après une annulation</span>
+              </span>
+            </button>
+
+            <button type="button" class="btn-super" id="btn-alerte-retard" data-action="doctor-delayed">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="14" r="7"/>
+                  <path d="M11 11v3.5"/>
+                  <path d="M11 16h.01"/>
+                  <path d="M18 4l1.5 1.5"/>
+                  <path d="M19.5 3.5v3"/>
+                  <path d="M18 5.5h3"/>
+                </svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Alerte Retard Praticien</span>
+                <span class="btn-super__hint">Envoi d'un SMS d'excuse automatique aux prochains patients si le cabinet accumule du retard</span>
+              </span>
+            </button>
+
+            <button type="button" class="btn-super" id="btn-force-reminders">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="13" height="14" rx="2"/>
+                  <line x1="3" y1="9" x2="16" y2="9"/>
+                  <line x1="7" y1="2" x2="7" y2="5"/>
+                  <line x1="12" y1="2" x2="12" y2="5"/>
+                  <path d="M14 18l7-3.5L14 11v7z"/>
+                  <path d="M21 14.5L14 18"/>
+                </svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Forcer Rappels (Demain)</span>
+                <span class="btn-super__hint">Déclencher manuellement l'envoi des SMS de rappel pour les rendez-vous de demain</span>
+              </span>
+            </button>
+
+            <p class="quick-actions__note">
+              Les actions déclenchent vos workflows n8n via Twilio (SMS) et Resend (e-mail). Planification et communication uniquement.
+            </p>
+          </div>
+        </section>
+
+        <section class="assistant-panel assistant-panel--handoff" aria-labelledby="handoff-title">
+          <div class="assistant-panel__head">
+            <div>
+              <h2 class="assistant-panel__title" id="handoff-title">Tableau de Transmission</h2>
+              <p class="assistant-panel__desc">Notes d'équipe et événements système pour la relève</p>
+            </div>
+          </div>
+
+          <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
+            <input
+              type="text"
+              class="handoff-compose__input"
+              id="handoff-input"
+              name="handoff-text"
+              placeholder="Ajouter une note d'équipe..."
+              autocomplete="off"
+              maxlength="280"
+              required
+            />
+            <select class="handoff-compose__select" id="handoff-category" name="handoff-category" aria-label="Catégorie">
+              <option value="Info">Info</option>
+              <option value="Urgent">Urgent</option>
+              <option value="Planning">Planning</option>
+            </select>
+            <label class="handoff-compose__pin">
+              <input type="checkbox" id="handoff-pin" name="handoff-pin" />
+              <span>Pin</span>
+            </label>
+            <button type="submit" class="handoff-compose__submit">Publier</button>
+          </form>
+
+          <div class="handoff-feed" id="handoff-feed" role="feed" aria-labelledby="handoff-title">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        </div>
+
+      </section>
+
+      <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Calendrier</h2>
+          <p class="view-page-sub">Agenda du cabinet — vue hebdomadaire et créneaux disponibles</p>
+        </header>
+
+        <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
+          <div class="calendar-embed-header">
+            <div class="chart-title">Planning Hebdomadaire</div>
+            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
+          </div>
+          <div id="dashboard-cal-inline"></div>
+        </article>
+      </section>
+
+      <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Liste d'attente</h2>
+          <p class="view-page-sub">Gestion des urgences et patients en attente de créneau</p>
+        </header>
+
+        <div class="waitlist-layout">
+          <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
+            <div class="waitlist-form-header">
+              <div class="chart-title">Nouveau Patient</div>
+              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+            </div>
+
+            <form id="waitlist-form" class="waitlist-form" novalidate>
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-name">Nom du patient</label>
+                <input
+                  class="waitlist-input"
+                  type="text"
+                  id="waitlist-name"
+                  name="nom"
+                  placeholder="ex. Fatima Zahra"
+                  autocomplete="name"
+                  required
+                />
+              </div>
+
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-phone">Numéro de téléphone</label>
+                <input
+                  class="waitlist-input"
+                  type="tel"
+                  id="waitlist-phone"
+                  name="telephone"
+                  placeholder="+212 6XX XXX XXX"
+                  autocomplete="tel"
+                  inputmode="tel"
+                  required
+                />
+              </div>
+
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-priority">Priorité</label>
+                <select class="waitlist-select" id="waitlist-priority" name="priorite" required>
+                  <option value="Haute">Haute</option>
+                  <option value="Normale" selected>Normale</option>
+                </select>
+              </div>
+
+              <div class="form-consent-row">
+                <label class="form-consent-label" for="waitlist-sms-consent">
+                  <input
+                    type="checkbox"
+                    id="waitlist-sms-consent"
+                    class="form-consent-checkbox"
+                    name="sms_consent"
+                    required
+                  />
+                  <span class="form-consent-text">J'accepte de recevoir des notifications par SMS concernant mon rendez-vous (Loi 09-08).</span>
+                </label>
+              </div>
+
+              <button type="submit" class="waitlist-submit-btn" id="waitlist-submit-btn">
+                Ajouter à la liste
+              </button>
+            </form>
+          </article>
+
+          <article class="schedule-widget schedule-widget--full" aria-label="Liste d'attente complète">
+            <div class="schedule-header">
+              <div class="chart-title">Patients Prioritaires</div>
+              <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
+            </div>
+            <div class="schedule-list schedule-list--full" id="waitlist-panel-list">
+              <!-- populated by renderWaitlistPanel() -->
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
+        <header class="view-page-header view-page-header--row">
+          <div>
+            <h2 class="view-page-title">Dossiers Patients</h2>
+            <p class="view-page-sub">Coordonnées patients et statut des rendez-vous</p>
+          </div>
+          <div class="crm-search-wrap">
+            <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
+            <input
+              class="waitlist-input crm-search-input"
+              type="search"
+              id="crm-search"
+              placeholder="Rechercher par nom, téléphone ou email…"
+              autocomplete="off"
+            />
+          </div>
+        </header>
+
+        <article class="crm-table-panel" aria-label="Liste des patients">
+          <div class="crm-table-scroll">
+            <table class="crm-table" id="crm-patient-table">
+              <thead>
+                <tr>
+                  <th scope="col">Nom</th>
+                  <th scope="col">Téléphone</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Motif</th>
+                  <th scope="col">Statut</th>
+                </tr>
+              </thead>
+              <tbody id="crm-table-body">
+                <!-- populated by renderCRMTable() from Vue du jour data -->
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Paramètres</h2>
+          <p class="view-page-sub">Préférences assistante, notifications SMS et modèles Resend</p>
+        </header>
+
+        <div class="settings-grid">
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <h3 class="settings-card-title">Profil Utilisateur</h3>
+            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du command center.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-name">Nom Complet</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-name"
+                name="profile_name"
+                value="Sanae Amrani"
+                autocomplete="name"
+              />
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-specialty">Fonction</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-specialty"
+                name="profile_specialty"
+                value="Assistante dentaire"
+              />
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </div>
+            <h3 class="settings-card-title">Apparence</h3>
+            <p class="settings-card-desc">Choisissez le thème visuel du command center.</p>
+            <div class="theme-switcher" role="group" aria-label="Thème de l'application">
+              <button
+                type="button"
+                class="theme-switch-btn is-active"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
+                aria-pressed="true"
+              >Oak Lounge</button>
+              <button
+                type="button"
+                class="theme-switch-btn"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
+                aria-pressed="false"
+              >Pearl Clinic</button>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <h3 class="settings-card-title">Notifications</h3>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via n8n.</p>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels SMS</span>
+                <span class="settings-toggle-hint">Twilio — rappels 24h avant le RDV</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sms-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels Email</span>
+                <span class="settings-toggle-hint">Resend — confirmations et relances</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-email-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </article>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="assistant-toast" id="assistant-toast" role="status" aria-live="polite"></div>
+
+  <div id="crm-side-panel" class="crm-side-panel-root" aria-hidden="true">
+    <div class="crm-side-panel-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
+    <aside
+      class="crm-side-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crm-panel-name"
+      aria-describedby="crm-panel-subtitle"
+    >
+      <button type="button" class="crm-side-panel-close" id="crm-side-panel-close" aria-label="Fermer le dossier">×</button>
+
+      <header class="crm-side-panel-header">
+        <p class="crm-side-panel-eyebrow">Dossier Patient</p>
+        <h2 class="crm-side-panel-name" id="crm-panel-name">—</h2>
+        <p class="crm-side-panel-subtitle" id="crm-panel-subtitle"></p>
+        <span class="crm-side-panel-statut crm-tag" id="crm-panel-status">—</span>
+      </header>
+
+      <div class="crm-side-panel-body">
+        <section class="crm-side-panel-section" aria-label="Coordonnées">
+          <h3 class="crm-side-panel-section-title">Coordonnées</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Téléphone</dt>
+              <dd id="crm-panel-phone">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Email</dt>
+              <dd id="crm-panel-email">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Rendez-vous">
+          <h3 class="crm-side-panel-section-title">Rendez-vous</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Date du rendez-vous</dt>
+              <dd id="crm-panel-last-visit">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Motif de Consultation</dt>
+              <dd id="crm-panel-motif">—</dd>
+            </div>
+            <div class="crm-side-panel-field crm-side-panel-field--block">
+              <dt>Notes</dt>
+              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <div id="bulk-action-bar" class="bulk-bar-hidden">
+    <span id="bulk-selection-count" class="bulk-text"></span>
+    <div class="bulk-actions">
+      <button type="button" id="btn-bulk-confirm" class="btn-brutalist-primary">Confirmer</button>
+      <button type="button" id="btn-bulk-cancel" class="btn-brutalist-secondary">Annuler</button>
+      <button type="button" id="btn-bulk-sms" class="btn-brutalist-secondary">Envoyer SMS</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
