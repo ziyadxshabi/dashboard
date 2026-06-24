@@ -5,7 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "bulk-cancel",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "72c3dc21-8959-4092-bddf-2060d65a37ef",
@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate payload shape before doing anything destructive.\nconst body = $input.first().json.body ?? {};\nconst rowIds = Array.isArray(body.rowIds) ? body.rowIds : [];\n\nif (!rowIds.length) {\n  throw new Error('VALIDATION_FAIL: body.rowIds must be a non-empty array of Baserow row IDs');\n}\n\n// Cap batch size to avoid runaway loops from a malformed frontend payload\nconst MAX_BATCH = 100;\nif (rowIds.length > MAX_BATCH) {\n  throw new Error(`VALIDATION_FAIL: batch of ${rowIds.length} exceeds max ${MAX_BATCH}`);\n}\n\nreturn rowIds.map(id => ({ json: { rowId: id } }));"
+        "jsCode": "// Validate payload shape before doing anything destructive.\n// Accepts parallel arrays: rowIds (Baserow) + calBookingIds (Google Sheets key).\nconst body = $input.first().json.body ?? {};\nconst rowIds = Array.isArray(body.rowIds) ? body.rowIds : [];\nconst calBookingIds = Array.isArray(body.calBookingIds) ? body.calBookingIds : [];\n\nif (!rowIds.length) {\n  throw new Error('VALIDATION_FAIL: body.rowIds must be a non-empty array of Baserow row IDs');\n}\n\nconst MAX_BATCH = 100;\nif (rowIds.length > MAX_BATCH) {\n  throw new Error(`VALIDATION_FAIL: batch of ${rowIds.length} exceeds max ${MAX_BATCH}`);\n}\n\nreturn rowIds.map((id, index) => ({\n  json: {\n    rowId: id,\n    calBookingId: String(calBookingIds[index] ?? '').trim(),\n  },\n}));"
       },
       "id": "5582c12c-4fb5-41c4-8360-8d3d876da5f1",
       "name": "Validate & Split IDs",
@@ -36,7 +36,7 @@
         "authentication": "databaseToken",
         "operation": "update",
         "tableId": 1017856,
-        "rowId": "=={{ $json.rowId }}",
+        "rowId": "={{ $json.rowId }}",
         "fieldsUi": {
           "fieldValues": [
             {
@@ -63,14 +63,109 @@
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate per-row results into a single summary so the frontend\n// can show 'X of Y cancelled' instead of just the last item's response.\nconst items = $input.all();\nreturn [{\n  json: {\n    success: true,\n    cancelledCount: items.length,\n    rowIds: items.map(i => i.json.id ?? i.json.rowId)\n  }\n}];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-cal-booking-id",
+              "leftValue": "={{ $json.calBookingId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-sheets-gate01",
+      "name": "Has Cal Booking ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cal Booking ID": "={{ $json.calBookingId }}",
+            "Statut du RDV": "Annulé"
+          },
+          "matchingColumns": [
+            "Cal Booking ID"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-sheets-update01",
+      "name": "Google Sheets - Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        384,
+        -128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Dual-write: mirror Baserow cancel into Feuille 1 via Cal Booking ID."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-0123-def0-merge-dual01",
+      "name": "Merge Dual-Write Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        608,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate per-row results after BOTH Baserow + Sheets writes complete.\nconst items = $input.all();\nreturn [{\n  json: {\n    success: true,\n    cancelledCount: items.length,\n    rowIds: items.map(i => i.json.id ?? i.json.rowId).filter(Boolean),\n    calBookingIds: items.map(i => i.json.calBookingId).filter(Boolean),\n    dualWrite: true,\n  },\n}];"
       },
       "id": "f6dcdd61-69ae-4009-885b-7900e4d6e5bd",
       "name": "Aggregate Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        192,
+        832,
         -48
       ]
     },
@@ -78,14 +173,16 @@
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}",
-        "options": {}
+        "options": {
+          "responseCode": 200
+        }
       },
       "id": "e909b979-0bd8-4d56-b945-3047059fd7e1",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        400,
+        1056,
         -48
       ]
     }
@@ -115,6 +212,46 @@
       ]
     },
     "Baserow - Update to Annulé": {
+      "main": [
+        [
+          {
+            "node": "Has Cal Booking ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Cal Booking ID?": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Dual-Write Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Update Row": {
+      "main": [
+        [
+          {
+            "node": "Merge Dual-Write Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Dual-Write Results": {
       "main": [
         [
           {

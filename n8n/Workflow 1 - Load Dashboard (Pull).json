@@ -15,36 +15,86 @@
         -288,
         -48
       ],
-      "webhookId": "REPLACE_WITH_AUTO_GENERATED_ID"
+      "webhookId": "assistant-data-roster-v2"
     },
     {
       "parameters": {
-        "tableId": "REPLACE_WITH_YOUR_APPOINTMENTS_TABLE_ID",
-        "returnAll": true,
-        "additionalOptions": {}
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "options": {}
       },
       "id": "a19f901a-36cc-41ef-97be-163cd9378554",
-      "name": "Baserow - List Today's Rows",
-      "type": "n8n-nodes-base.baserow",
-      "typeVersion": 1,
+      "name": "Google Sheets - Read Feuille 1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
       "position": [
         -64,
         -48
       ],
-      "notes": "Configure the date filter manually in the node UI (Filters > Date field = Today). The 'filters' block above is a placeholder structure only."
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Master read path — assistant roster pulls from Feuille 1 so manual Sheet edits are visible immediately."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return the full Feuille 1 grid as a JSON array for the assistant dashboard.\n// Column headers must match the clinic sheet schema:\n//   Patient (Nom Complet), Date & Heure du RDV, Statut du RDV,\n//   Cal Booking ID, Téléphone (WhatsApp), Email Contact, Motif de Consultation, etc.\n\nconst rows = $input.all().map(item => item.json ?? {});\n\nreturn [{ json: rows }];"
+      },
+      "id": "b7c4e812-9f2a-4d1e-a6c3-roster-array-wrap",
+      "name": "Assemble Roster Array",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -48
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}",
-        "options": {}
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
       },
       "id": "a552ae68-f6ac-4ce0-8216-4c8b8dc63cc9",
       "name": "Respond to Webhook - Send Roster",
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
+      "typeVersion": 1.1,
       "position": [
-        160,
+        384,
         -48
       ]
     }
@@ -55,14 +105,25 @@
       "main": [
         [
           {
-            "node": "Baserow - List Today's Rows",
+            "node": "Google Sheets - Read Feuille 1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Baserow - List Today's Rows": {
+    "Google Sheets - Read Feuille 1": {
+      "main": [
+        [
+          {
+            "node": "Assemble Roster Array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Roster Array": {
       "main": [
         [
           {
@@ -74,10 +135,11 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "timezone": "Africa/Casablanca"
   },
   "versionId": "b60d3a12-9947-43d4-a23d-c7d72dd37f7f",
   "meta": {
