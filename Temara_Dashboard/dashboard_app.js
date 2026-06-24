@@ -219,10 +219,14 @@ let pendingDigestKinetics = null;
 let digestKineticsStarted = false;
 
 /* --- ENTRY POINT ---------------------------------------------------- */
-function bootDoctorDashboard() {
+let doctorDashboardInitialized = false;
+
+function initializeDoctorDashboard() {
+  if (doctorDashboardInitialized) return;
   if (document.body.classList.contains('mode-client')) return;
   if (document.body.classList.contains('mode-assistant')) return;
 
+  doctorDashboardInitialized = true;
   initMotionStack();
   initHeroGreeting();
   initNavigation();
@@ -248,15 +252,8 @@ function bootDoctorDashboard() {
   }
 }
 
-window.bootDoctorDashboard = bootDoctorDashboard;
-
-document.addEventListener('DOMContentLoaded', () => {
-  if (document.body.classList.contains('auth-gate-active')) return;
-  if (document.body.classList.contains('mode-client')) return;
-  if (sessionStorage.getItem('dentaflow_role') === 'doctor' && sessionStorage.getItem('dentaflow_session')) {
-    bootDoctorDashboard();
-  }
-});
+window.initializeDoctorDashboard = initializeDoctorDashboard;
+window.bootDoctorDashboard = initializeDoctorDashboard;
 
 /* ── APPOINTMENT LIST DATA ───────────────────────────────────────────────── */
 function getDemoAppointments() {
@@ -404,7 +401,7 @@ let activeView = 'overview';
 function initNavigation() {
   const links = document.querySelectorAll('.nav-link, .tab-link');
   links.forEach(link => {
-    link.addEventListener('click', (e) => {
+    link?.addEventListener('click', (e) => {
       e.preventDefault();
       const nav = link.dataset.nav;
       if (nav && VIEW_MAP[nav]) navigateToView(nav);
@@ -466,7 +463,7 @@ function initChartToggles() {
   }
 
   buttons.forEach((btn, index) => {
-    btn.addEventListener('click', () => activate(btn, index));
+    btn?.addEventListener('click', () => activate(btn, index));
   });
 }
 
@@ -491,7 +488,7 @@ function initWaitlistForm() {
   const form = document.getElementById('waitlist-form');
   if (!form) return;
 
-  form.addEventListener('submit', async (e) => {
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const btn        = document.getElementById('waitlist-submit-btn');
@@ -659,11 +656,11 @@ function initThemeSwitcher() {
 
   applyTheme(resolveInitialTheme());
 
-  oakBtn.addEventListener('click', () => {
+  oakBtn?.addEventListener('click', () => {
     applyTheme('oak-lounge');
     persistThemePreference('oak-lounge');
   });
-  pearlBtn.addEventListener('click', () => {
+  pearlBtn?.addEventListener('click', () => {
     applyTheme('pearl-clinic');
     persistThemePreference('pearl-clinic');
   });
@@ -812,7 +809,7 @@ function initCrmSearch() {
   const tbody    = document.getElementById('crm-table-body');
   if (!searchEl || !tbody) return;
 
-  searchEl.addEventListener('input', () => {
+  searchEl?.addEventListener('input', () => {
     const query = searchEl.value.trim().toLowerCase();
     tbody.querySelectorAll('tr').forEach(row => {
       const text = row.textContent.toLowerCase();
@@ -912,12 +909,12 @@ function initCrmSidePanel() {
     openCrmSidePanel(readCrmRowData(row), row);
   }
 
-  tbody.addEventListener('click', (e) => {
+  tbody?.addEventListener('click', (e) => {
     const row = e.target.closest('.crm-table-row');
     if (row) handleRowActivate(row);
   });
 
-  tbody.addEventListener('keydown', (e) => {
+  tbody?.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const row = e.target.closest('.crm-table-row');
     if (!row) return;
@@ -953,10 +950,10 @@ function initSmsCampaign() {
     counterWrap?.classList.toggle('is-limit', len >= SMS_MAX_CHARS);
   }
 
-  textarea.addEventListener('input', updateCounter);
+  textarea?.addEventListener('input', updateCounter);
   updateCounter();
 
-  form.addEventListener('submit', (e) => {
+  form?.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!textarea.value.trim() || !submitBtn) return;
 
@@ -1618,7 +1615,7 @@ function enterDoctorApp() {
   history.replaceState(null, '', window.location.pathname + window.location.search);
 
   if (!document.body.classList.contains('auth-gate-active')) {
-    bootDoctorDashboard();
+    initializeDoctorDashboard();
     if (sessionStorage.getItem('dentaflow_session')) {
       unlockDashboard();
     }
@@ -1838,7 +1835,7 @@ function initDoctorHub() {
     gsap.set(el, { height: 0, overflow: 'hidden' });
   });
 
-  list.addEventListener('click', (e) => {
+  list?.addEventListener('click', (e) => {
     const header = e.target.closest('.patient-row__header');
     if (!header) return;
     const row = header.closest('.patient-row');
@@ -2300,6 +2297,9 @@ function runDoctorOsBootSequence() {
     revealDoctorOsBootFallback();
   }
 }
+
+window.queueDoctorOsBootSequence = queueOsBootSequence;
+window.revealDoctorOsBootFallback = revealDoctorOsBootFallback;
 
 /* ── Team Messages (Assistant → Doctor handoff feed) ─────────────────────── */
 

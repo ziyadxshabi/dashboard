@@ -3,6 +3,9 @@
  * Clinique Dentaire Témara Mall · DentaFlow OS
  */
 
+(function () {
+  'use strict';
+
 const CONFIG = {
   API_BASE: 'https://glade-rigor-perennial.ngrok-free.dev',
   ROSTER_PROXY: '/api/roster',
@@ -85,9 +88,6 @@ const OPERATIONAL_PULSE = {
 };
 
 let handoffNotes = [];
-
-(function () {
-  'use strict';
 
   let toastTimer = null;
   let rosterData = [];
@@ -406,7 +406,7 @@ let handoffNotes = [];
     const form = $('handoff-form');
     if (!form) return;
 
-    form.addEventListener('submit', async (event) => {
+    form?.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       const input = $('handoff-input');
@@ -1615,7 +1615,7 @@ let handoffNotes = [];
 
   function initNavigation() {
     document.querySelectorAll('.nav-link[data-nav]').forEach(link => {
-      link.addEventListener('click', event => {
+      link?.addEventListener('click', event => {
         event.preventDefault();
         const nav = link.dataset.nav;
         if (nav && VIEW_MAP[nav]) navigateToView(nav);
@@ -1867,7 +1867,7 @@ let handoffNotes = [];
     const form = $('waitlist-form');
     if (!form) return;
 
-    form.addEventListener('submit', async (event) => {
+    form?.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       const btn = $('waitlist-submit-btn');
@@ -1982,8 +1982,8 @@ let handoffNotes = [];
     if (!oakBtn || !pearlBtn) return;
 
     updateThemeSwitcherUI(volatileSettings.theme);
-    oakBtn.addEventListener('click', () => applyTheme('oak-lounge'));
-    pearlBtn.addEventListener('click', () => applyTheme('pearl-clinic'));
+    oakBtn?.addEventListener('click', () => applyTheme('oak-lounge'));
+    pearlBtn?.addEventListener('click', () => applyTheme('pearl-clinic'));
   }
 
   function extractInitials(fullName) {
@@ -2247,7 +2247,7 @@ let handoffNotes = [];
     const tbody = $('crm-table-body');
     if (!searchEl || !tbody) return;
 
-    searchEl.addEventListener('input', () => {
+    searchEl?.addEventListener('input', () => {
       const query = searchEl.value.trim().toLowerCase();
       tbody.querySelectorAll('tr').forEach(row => {
         const text = row.textContent.toLowerCase();
@@ -2267,7 +2267,7 @@ let handoffNotes = [];
       activateCrmRow(row);
     }
 
-    tbody.addEventListener('keydown', (event) => {
+    tbody?.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
       const row = event.target.closest('.crm-table-row');
       if (!row) return;
@@ -2445,18 +2445,16 @@ let handoffNotes = [];
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', maybeBootAssistant);
-  } else {
-    maybeBootAssistant();
+  let assistantDashboardInitialized = false;
+
+  function initializeAssistantDashboard() {
+    if (assistantDashboardInitialized) return;
+    assistantDashboardInitialized = true;
+    init();
   }
 
-  function maybeBootAssistant() {
-    if (document.body.classList.contains('auth-gate-active')) return;
-    if (sessionStorage.getItem('dentaflow_role') === 'assistant' && sessionStorage.getItem('dentaflow_session')) {
-      init();
-    }
-  }
-
-  window.bootAssistantApp = init;
+  window.initializeAssistantDashboard = initializeAssistantDashboard;
+  window.bootAssistantApp = initializeAssistantDashboard;
+  window.queueAssistantOsBootSequence = queueOsBootSequence;
+  window.revealAssistantOsBootFallback = revealOsBootFallback;
 })();

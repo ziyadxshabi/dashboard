@@ -71,7 +71,7 @@
 
     if (assistantOnly) {
       setRole('assistant');
-      doctorBtn?.hidden = true;
+      if (doctorBtn) doctorBtn.hidden = true;
       return;
     }
 
@@ -152,44 +152,68 @@
     setTimeout(() => overlay.remove(), 400);
   }
 
-  function isolateDoctorShell() {
-    document.getElementById('assistant-mount')?.replaceChildren();
-    const assistantMount = document.getElementById('assistant-mount');
-    if (assistantMount) assistantMount.hidden = true;
+  function showShell(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = '';
+  }
 
-    const inlineAssistant = document.getElementById('assistant-shell');
-    if (inlineAssistant) {
-      inlineAssistant.hidden = true;
-      inlineAssistant.remove();
+  function hideShell(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = 'none';
+  }
+
+  function clearAuthBootClasses() {
+    document.body.classList.remove('os-boot-pending');
+  }
+
+  function triggerRoleBootSequence(role) {
+    if (role === 'assistant') {
+      if (typeof window.queueAssistantOsBootSequence === 'function') {
+        window.queueAssistantOsBootSequence();
+      } else if (typeof window.revealAssistantOsBootFallback === 'function') {
+        window.revealAssistantOsBootFallback();
+      }
+      return;
     }
 
-    const doctorShell = document.getElementById('doctor-shell');
-    if (doctorShell) doctorShell.hidden = false;
+    if (typeof window.queueDoctorOsBootSequence === 'function') {
+      window.queueDoctorOsBootSequence();
+    } else if (typeof window.revealDoctorOsBootFallback === 'function') {
+      window.revealDoctorOsBootFallback();
+    }
+  }
+
+  function isolateDoctorShell() {
+    const assistantShell = document.getElementById('assistant-shell');
+    const assistantMount = document.getElementById('assistant-mount');
+
+    assistantMount?.replaceChildren();
+    hideShell(assistantShell);
+    hideShell(assistantMount);
+
+    showShell(document.getElementById('doctor-shell'));
   }
 
   async function isolateAssistantShell() {
     const doctorShell = document.getElementById('doctor-shell');
     if (doctorShell) {
-      doctorShell.hidden = true;
+      hideShell(doctorShell);
       doctorShell.remove();
     }
 
-    const inlineShell = document.getElementById('assistant-shell');
-    if (inlineShell) {
-      inlineShell.hidden = false;
-      return;
-    }
-
+    const assistantShell = document.getElementById('assistant-shell');
     const mount = document.getElementById('assistant-mount');
-    if (!mount) return;
 
-    if (!mount.childElementCount) {
+    if (mount && !mount.childElementCount) {
       const response = await fetch('/assistant-shell.html', { cache: 'no-store' });
       if (!response.ok) throw new Error('Assistant shell unavailable');
       mount.innerHTML = await response.text();
     }
 
-    mount.hidden = false;
+    showShell(assistantShell);
+    showShell(mount);
   }
 
   async function unlockDoctorModule() {
@@ -197,8 +221,8 @@
     document.body.classList.remove('mode-assistant');
     isolateDoctorShell();
 
-    if (typeof window.bootDoctorDashboard === 'function') {
-      window.bootDoctorDashboard();
+    if (typeof window.initializeDoctorDashboard === 'function') {
+      window.initializeDoctorDashboard();
     }
     if (typeof window.unlockDashboard === 'function') {
       window.unlockDashboard();
@@ -210,8 +234,8 @@
     document.body.classList.remove('mode-doctor');
     await isolateAssistantShell();
 
-    if (typeof window.bootAssistantApp === 'function') {
-      window.bootAssistantApp();
+    if (typeof window.initializeAssistantDashboard === 'function') {
+      window.initializeAssistantDashboard();
     }
   }
 
@@ -221,10 +245,12 @@
 
     if (role === 'assistant') {
       await unlockAssistantModule();
-      return;
+    } else {
+      await unlockDoctorModule();
     }
 
-    await unlockDoctorModule();
+    clearAuthBootClasses();
+    triggerRoleBootSequence(role);
   }
 
   function tryRestoreSession() {
