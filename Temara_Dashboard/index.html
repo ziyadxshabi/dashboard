@@ -532,8 +532,19 @@
               <div class="chart-title">Patients Prioritaires</div>
               <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
             </div>
-            <div class="schedule-list schedule-list--full" id="waitlist-panel-list">
-              <!-- populated by renderWaitlistPanel() -->
+            <div class="waitlist-table-wrap" data-lenis-prevent>
+              <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
+                <thead>
+                  <tr>
+                    <th scope="col">Patient</th>
+                    <th scope="col" class="col-numeric">Téléphone</th>
+                    <th scope="col">Priorité</th>
+                  </tr>
+                </thead>
+                <tbody id="waitlist-panel-list">
+                  <!-- populated by renderWaitlistPanel() -->
+                </tbody>
+              </table>
             </div>
           </article>
 

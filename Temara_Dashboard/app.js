@@ -819,9 +819,23 @@ let handoffNotes = [];
         el.classList.add('is-cancelled');
       };
 
-      const rosterRow = document.querySelector(`#roster-tbody tr[data-patient-id="${id}"]`);
-      if (rosterRow?.cells?.[4]) patchInner(rosterRow.cells[4]);
-      patchRowCancelled(rosterRow);
+      const timelineItem = document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${id}"]`);
+      const timelineStatusWrap = timelineItem?.querySelector('.timeline-item__status');
+      if (timelineStatusWrap) {
+        const select = timelineStatusWrap.querySelector('.status-select');
+        if (select) {
+          snapshot.dom.push({ mode: 'select', el: select, value: select.value });
+          select.value = newStatus;
+          applyMatteSelectSkin(select, newStatus);
+        } else {
+          patchInner(timelineStatusWrap);
+        }
+      }
+      patchRowCancelled(timelineItem);
+
+      const legacyRow = document.querySelector(`#roster-tbody tr[data-patient-id="${id}"]`);
+      if (legacyRow?.cells?.[4]) patchInner(legacyRow.cells[4]);
+      patchRowCancelled(legacyRow);
 
       const crmRow = document.querySelector(`#crm-table-body tr[data-patient-id="${id}"]`);
       if (crmRow?.cells?.[4]) patchInner(crmRow.cells[4]);
@@ -889,6 +903,12 @@ let handoffNotes = [];
       }
 
       dom.forEach((patch) => {
+        if (patch.mode === 'select' && patch.el) {
+          patch.el.value = patch.value;
+          applyMatteSelectSkin(patch.el, patch.value);
+          return;
+        }
+
         if (patch.mode === 'inner' && patch.el) {
           patch.el.innerHTML = patch.html;
           return;
@@ -938,7 +958,8 @@ let handoffNotes = [];
   }
 
   function extractCancelMetadataFromRecord(record) {
-    const row = document.querySelector(`#roster-tbody tr[data-patient-id="${String(record.id)}"]`);
+    const row = document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${String(record.id)}"]`)
+      || document.querySelector(`#roster-tbody tr[data-patient-id="${String(record.id)}"]`);
     const rowId = extractBaserowRowId(record);
     return {
       rowId,
@@ -970,7 +991,7 @@ let handoffNotes = [];
     selectedPatientIds = ids
       .map((id) => parseBaserowRowId(id))
       .filter((rowId) => rowId != null);
-    document.querySelectorAll('#roster-tbody .row-checkbox').forEach((checkbox) => {
+    document.querySelectorAll('#planning-timeline .row-checkbox, #roster-tbody .row-checkbox').forEach((checkbox) => {
       const rowId = parseBaserowRowId(checkbox.dataset.rowId);
       checkbox.checked = rowId != null && selectedPatientIds.includes(rowId);
     });
@@ -1035,7 +1056,7 @@ let handoffNotes = [];
 
   function clearBulkSelection() {
     selectedPatientIds = [];
-    document.querySelectorAll('#roster-tbody .row-checkbox').forEach((checkbox) => {
+    document.querySelectorAll('#planning-timeline .row-checkbox, #roster-tbody .row-checkbox').forEach((checkbox) => {
       checkbox.checked = false;
     });
     updateBulkBarUI();
@@ -1062,7 +1083,8 @@ let handoffNotes = [];
 
   async function animateRowsVaporize(rowIds) {
     const rows = rowIds
-      .map((id) => document.querySelector(`#roster-tbody tr[data-patient-id="${String(id)}"]`))
+      .map((id) => document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${String(id)}"]`)
+        || document.querySelector(`#roster-tbody tr[data-patient-id="${String(id)}"]`))
       .filter(Boolean);
 
     if (!rows.length) return;
@@ -1073,6 +1095,15 @@ let handoffNotes = [];
         row.remove();
         document.querySelector(`.roster-card[data-patient-id="${patientId}"]`)?.remove();
       });
+
+      const timeline = $('planning-timeline');
+      if (timeline && !timeline.querySelector('.timeline-item:not(.timeline-empty):not(.timeline-loading):not(.timeline-error)')) {
+        timeline.replaceChildren();
+        const empty = document.createElement('div');
+        empty.className = 'timeline-empty planning-timeline__message';
+        empty.textContent = 'Aucun rendez-vous prévu pour aujourd\'hui.';
+        timeline.appendChild(empty);
+      }
 
       const tbody = $('roster-tbody');
       if (tbody && !tbody.querySelector('tr:not(.roster-empty):not(.roster-loading):not(.roster-error)')) {
@@ -1102,7 +1133,13 @@ let handoffNotes = [];
       return;
     }
 
-    const cells = rows.flatMap((row) => Array.from(row.querySelectorAll('td')));
+    const cells = rows.flatMap((row) => {
+      if (row.classList.contains('timeline-item')) {
+        const card = row.querySelector('.timeline-item__card');
+        return card ? [card] : [row];
+      }
+      return Array.from(row.querySelectorAll('td'));
+    });
 
     await new Promise((resolve) => {
       gsap.to(cells, {
@@ -1133,7 +1170,7 @@ let handoffNotes = [];
       await postBulkAction(CONFIG.ENDPOINTS.BULK_CONFIRM, targetRowIds);
 
       selectedPatientIds = [];
-      document.querySelectorAll('#roster-tbody .row-checkbox').forEach((checkbox) => {
+      document.querySelectorAll('#planning-timeline .row-checkbox, #roster-tbody .row-checkbox').forEach((checkbox) => {
         checkbox.checked = false;
       });
       updateBulkBarUI();
@@ -1203,8 +1240,10 @@ let handoffNotes = [];
   }
 
   function initBulkActionBar() {
+    const timeline = $('planning-timeline');
     const tbody = $('roster-tbody');
-    tbody?.addEventListener('change', (event) => {
+
+    function handleCheckboxChange(event) {
       if (!event.target.classList.contains('row-checkbox')) return;
 
       const rowId = parseBaserowRowId(event.target.dataset.rowId);
@@ -1217,7 +1256,10 @@ let handoffNotes = [];
       }
 
       updateBulkBarUI();
-    });
+    }
+
+    timeline?.addEventListener('change', handleCheckboxChange);
+    tbody?.addEventListener('change', handleCheckboxChange);
 
     $('btn-bulk-confirm')?.addEventListener('click', bulkConfirmSelected);
     $('btn-bulk-cancel')?.addEventListener('click', bulkCancelSelected);
@@ -1384,6 +1426,84 @@ let handoffNotes = [];
     return `<span class="roster-noshow-flag" title="Historique de no-shows — vigilance recommandée" aria-label="Historique de no-shows">${NOSHOW_SVG}</span>`;
   }
 
+  function getMatteChipModifier(label) {
+    const n = (label ?? '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    if (n.includes('urgence')) return 'urgence';
+    if (n.includes('confirm')) return 'confirmé';
+    if (n.includes('annul') || n.includes('no-show')) return 'annulé';
+    if (n.includes('attente') || n.includes('soin')) return 'attente';
+    if (n.includes('termin')) return 'confirmé';
+    return 'attente';
+  }
+
+  function applyMatteSelectSkin(selectEl, status) {
+    if (!selectEl) return;
+    selectEl.dataset.matte = getMatteChipModifier(status ?? selectEl.value);
+  }
+
+  function createMatteChip(label) {
+    const chip = document.createElement('span');
+    chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
+    chip.textContent = label || '—';
+    return chip;
+  }
+
+  function createPatientAvatar(name) {
+    const avatar = document.createElement('span');
+    avatar.className = 'patient-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.textContent = extractInitials(name);
+    return avatar;
+  }
+
+  function createPatientIdentity(name, options = {}) {
+    const { showNoShow = false } = options;
+    const wrap = document.createElement('div');
+    wrap.className = 'patient-identity';
+
+    wrap.appendChild(createPatientAvatar(name));
+
+    const labelWrap = document.createElement('span');
+    labelWrap.className = 'patient-identity__name';
+
+    if (showNoShow) {
+      const flagSpan = document.createElement('span');
+      flagSpan.className = 'roster-noshow-flag';
+      flagSpan.title = 'Historique de no-shows — vigilance recommandée';
+      flagSpan.setAttribute('aria-label', 'Historique de no-shows');
+      flagSpan.innerHTML = NOSHOW_SVG;
+      labelWrap.appendChild(flagSpan);
+      labelWrap.appendChild(document.createTextNode(' '));
+    }
+
+    const nameText = document.createElement('span');
+    nameText.textContent = name || '';
+    labelWrap.appendChild(nameText);
+    wrap.appendChild(labelWrap);
+    return wrap;
+  }
+
+  function parseAppointmentMinutes(timeStr) {
+    const match = String(timeStr || '').match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  }
+
+  function isAppointmentPast(record) {
+    const appointmentMins = parseAppointmentMinutes(record.time);
+    if (appointmentMins == null) return false;
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    return appointmentMins < nowMins;
+  }
+
+  function getWaitlistPriorityLabel(appt) {
+    if (appt.statusLabel) return appt.statusLabel;
+    const treatment = String(appt.treatment ?? appt.priorite ?? '').toLowerCase();
+    if (appt.tagClass === 'urgence' || treatment === 'haute') return 'Urgence';
+    return 'En attente';
+  }
+
   function buildStatusSelect(record) {
     const currentStatus = STATUS_OPTIONS.includes(record.status) ? record.status : 'Confirmé';
     const options = STATUS_OPTIONS.map(opt =>
@@ -1407,9 +1527,79 @@ let handoffNotes = [];
       if (opt === currentStatus) option.selected = true;
       select.appendChild(option);
     });
+    applyMatteSelectSkin(select, currentStatus);
     return select;
   }
 
+  function createPlanningTimelineItem(record) {
+    const patientId = String(record.id);
+    const baserowRowId = extractBaserowRowId(record);
+    const scheduleDate = formatScheduleDate(record.rawDate);
+
+    const item = document.createElement('article');
+    item.className = 'timeline-item';
+    item.setAttribute('role', 'listitem');
+    item.dataset.patientId = patientId;
+    item.dataset.id = patientId;
+    if (scheduleDate) item.dataset.scheduleDate = scheduleDate;
+    if (record.time) item.dataset.startTime = String(record.time);
+    if (record.practitioner) item.dataset.practitioner = String(record.practitioner);
+    if (record.calBookingId) item.dataset.calBookingId = String(record.calBookingId);
+    if (record.status === 'No-show') item.classList.add('is-cancelled');
+    if (isAppointmentPast(record)) item.classList.add('timeline-item--past');
+
+    const timeEl = document.createElement('div');
+    timeEl.className = 'timeline-item__time';
+    timeEl.textContent = record.time || '';
+
+    const rail = document.createElement('div');
+    rail.className = 'timeline-item__rail';
+    const node = document.createElement('span');
+    node.className = 'timeline-item__node';
+    node.setAttribute('aria-hidden', 'true');
+    rail.appendChild(node);
+
+    const card = document.createElement('div');
+    card.className = 'timeline-item__card';
+
+    const checkboxWrap = document.createElement('div');
+    checkboxWrap.className = 'timeline-item__checkbox';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'brutalist-checkbox row-checkbox';
+    if (baserowRowId != null) {
+      checkbox.dataset.rowId = String(baserowRowId);
+      checkbox.value = String(baserowRowId);
+      checkbox.setAttribute('aria-label', `Sélectionner ${record.name}`);
+    } else {
+      checkbox.disabled = true;
+    }
+    checkboxWrap.appendChild(checkbox);
+
+    const main = document.createElement('div');
+    main.className = 'timeline-item__main';
+    main.appendChild(createPatientIdentity(record.name, { showNoShow: record.noShow }));
+
+    const treatment = document.createElement('div');
+    treatment.className = 'timeline-item__treatment cell-truncate';
+    treatment.textContent = record.treatment || '';
+    if (record.treatment) treatment.title = record.treatment;
+    main.appendChild(treatment);
+
+    const meta = document.createElement('div');
+    meta.className = 'timeline-item__meta';
+
+    const statusWrap = document.createElement('div');
+    statusWrap.className = 'timeline-item__status';
+    statusWrap.appendChild(createStatusSelectElement(record));
+
+    meta.appendChild(statusWrap);
+    card.append(checkboxWrap, main, meta);
+    item.append(timeEl, rail, card);
+    return item;
+  }
+
+  /** @deprecated Legacy table row — kept for backward compatibility */
   function createRosterTableRow(record) {
     const patientId = String(record.id);
     const baserowRowId = extractBaserowRowId(record);
@@ -1482,29 +1672,34 @@ let handoffNotes = [];
 
     const main = document.createElement('div');
     main.className = 'roster-card__main';
-
-    const patientWrap = document.createElement('span');
-    patientWrap.className = 'roster-patient';
-    if (record.noShow) {
-      const flagSpan = document.createElement('span');
-      flagSpan.className = 'roster-noshow-flag';
-      flagSpan.title = 'Historique de no-shows — vigilance recommandée';
-      flagSpan.setAttribute('aria-label', 'Historique de no-shows');
-      flagSpan.innerHTML = NOSHOW_SVG;
-      patientWrap.appendChild(flagSpan);
-    }
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'roster-patient__name';
-    nameSpan.textContent = record.name || '';
-    patientWrap.appendChild(nameSpan);
+    main.appendChild(createPatientIdentity(record.name, { showNoShow: record.noShow }));
 
     const meta = document.createElement('div');
-    meta.className = 'roster-card__meta';
+    meta.className = 'roster-card__meta cell-truncate';
     meta.textContent = record.treatment || '';
+    if (record.treatment) meta.title = record.treatment;
 
-    main.append(patientWrap, meta);
+    main.appendChild(meta);
     article.append(timeSpan, main, createStatusSelectElement(record));
     return article;
+  }
+
+  function createWaitlistTableRow(appt) {
+    const tr = document.createElement('tr');
+    tr.className = 'waitlist-row';
+
+    const patientTd = document.createElement('td');
+    patientTd.appendChild(createPatientIdentity(appt.name));
+
+    const phoneTd = document.createElement('td');
+    phoneTd.className = 'col-numeric';
+    phoneTd.textContent = appt.phone || appt.telephone || '—';
+
+    const priorityTd = document.createElement('td');
+    priorityTd.appendChild(createMatteChip(getWaitlistPriorityLabel(appt)));
+
+    tr.append(patientTd, phoneTd, priorityTd);
+    return tr;
   }
 
   function renderPlanning(records) {
@@ -1516,6 +1711,21 @@ let handoffNotes = [];
     updateRosterStats(rosterData);
 
     const emptyMessage = 'Aucun rendez-vous prévu pour aujourd\'hui.';
+
+    const timeline = $('planning-timeline');
+    if (timeline) {
+      timeline.replaceChildren();
+      if (!rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'timeline-empty planning-timeline__message';
+        empty.textContent = emptyMessage;
+        timeline.appendChild(empty);
+      } else {
+        const fragment = document.createDocumentFragment();
+        rows.forEach((record) => fragment.appendChild(createPlanningTimelineItem(record)));
+        timeline.appendChild(fragment);
+      }
+    }
 
     const tbody = $('roster-tbody');
     if (tbody) {
@@ -1563,6 +1773,21 @@ let handoffNotes = [];
   }
 
   function showTableLoader() {
+    const timeline = $('planning-timeline');
+    if (timeline) {
+      timeline.replaceChildren();
+      const loading = document.createElement('div');
+      loading.className = 'timeline-loading planning-timeline__message';
+      const inner = document.createElement('span');
+      inner.className = 'roster-loading__inner';
+      const spinner = document.createElement('span');
+      spinner.className = 'roster-loading__spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      inner.append(spinner, document.createTextNode('Chargement du planning…'));
+      loading.appendChild(inner);
+      timeline.appendChild(loading);
+    }
+
     const tbody = $('roster-tbody');
     if (tbody) {
       tbody.replaceChildren();
@@ -1592,6 +1817,15 @@ let handoffNotes = [];
   }
 
   function showTableError(message = 'Impossible de charger le planning — Mode hors-ligne') {
+    const timeline = $('planning-timeline');
+    if (timeline) {
+      timeline.replaceChildren();
+      const error = document.createElement('div');
+      error.className = 'timeline-error planning-timeline__message';
+      error.textContent = message;
+      timeline.appendChild(error);
+    }
+
     const tbody = $('roster-tbody');
     if (tbody) {
       tbody.replaceChildren();
@@ -1680,7 +1914,7 @@ let handoffNotes = [];
     sidebar: '.assistant-sidebar',
     pulseCards: '#assistant-pulse-grid .pulse-card',
     gridPanels: '#view-overview .assistant-grid .assistant-panel',
-    dataRows: '#roster-tbody tr:not(.roster-empty):not(.roster-loading):not(.roster-error), #crm-table-body tr.crm-table-row',
+    dataRows: '#planning-timeline .timeline-item:not(.timeline-empty):not(.timeline-loading):not(.timeline-error), #waitlist-panel-list tr:not(.waitlist-empty), #crm-table-body tr.crm-table-row',
   };
 
   function collectOsBootTargets() {
@@ -1828,9 +2062,14 @@ let handoffNotes = [];
 
       if (patientId) {
         document.querySelectorAll(`[data-patient-id="${patientId}"] .status-select`).forEach(otherSelect => {
-          if (otherSelect !== selectEl) otherSelect.value = newStatus;
+          if (otherSelect !== selectEl) {
+            otherSelect.value = newStatus;
+            applyMatteSelectSkin(otherSelect, newStatus);
+          }
         });
-        const row = document.querySelector(`tr[data-patient-id="${patientId}"]`);
+        applyMatteSelectSkin(selectEl, newStatus);
+        const row = document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${patientId}"]`)
+          || document.querySelector(`tr[data-patient-id="${patientId}"]`);
         const card = document.querySelector(`.roster-card[data-patient-id="${patientId}"]`);
         if (row) row.classList.toggle('is-cancelled', newStatus === 'No-show');
         if (card) card.classList.toggle('is-cancelled', newStatus === 'No-show');
@@ -1843,6 +2082,7 @@ let handoffNotes = [];
     } catch (error) {
       console.error('[Roster Status] Update failed:', error);
       selectEl.value = previousStatus;
+      applyMatteSelectSkin(selectEl, previousStatus);
       selectEl.classList.remove('status-updating');
       selectEl.classList.add('status-error');
       selectEl.disabled = false;
@@ -1852,6 +2092,7 @@ let handoffNotes = [];
   }
 
   function initStatusListener() {
+    const timeline = $('planning-timeline');
     const table = document.querySelector('.roster-table');
     const cards = $('roster-cards');
 
@@ -1868,8 +2109,10 @@ let handoffNotes = [];
       updateRosterStatus(select, previousStatus);
     }
 
+    timeline?.addEventListener('focusin', rememberPreviousStatus);
     table?.addEventListener('focusin', rememberPreviousStatus);
     cards?.addEventListener('focusin', rememberPreviousStatus);
+    timeline?.addEventListener('change', handleChange);
     table?.addEventListener('change', handleChange);
     cards?.addEventListener('change', handleChange);
   }
@@ -2092,35 +2335,15 @@ let handoffNotes = [];
 
   function getDemoWaitlistPatients() {
     return [
-      { time: 'Priorité 1', name: 'Fatima Zahra', treatment: 'Haute', tagClass: 'urgence', priority: 1 },
-      { time: 'Priorité 1', name: 'Youssef Benali', treatment: 'Haute', tagClass: 'urgence', priority: 1 },
-      { time: 'Priorité 2', name: 'Amina El Fassi', treatment: 'Normale', tagClass: 'consultation', priority: 2 },
-      { time: 'Priorité 2', name: 'Salma Berrada', treatment: 'Normale', tagClass: 'consultation', priority: 2 },
+      { name: 'Fatima Zahra', phone: '+212 661 234 567', treatment: 'Haute', tagClass: 'urgence', priority: 1, statusLabel: 'Urgence' },
+      { name: 'Youssef Benali', phone: '+212 612 987 654', treatment: 'Haute', tagClass: 'urgence', priority: 1, statusLabel: 'Urgence' },
+      { name: 'Amina El Fassi', phone: '+212 678 445 120', treatment: 'Normale', tagClass: 'consultation', priority: 2, statusLabel: 'En attente' },
+      { name: 'Salma Berrada', phone: '+212 655 332 891', treatment: 'Normale', tagClass: 'consultation', priority: 2, statusLabel: 'En attente' },
     ];
   }
 
   function createApptCardElement(appt) {
-    const card = document.createElement('div');
-    card.className = 'appt-card';
-
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'appt-time';
-    timeSpan.textContent = appt.time || '';
-
-    const info = document.createElement('div');
-    info.className = 'appt-info';
-
-    const nameDiv = document.createElement('div');
-    nameDiv.className = 'appt-name';
-    nameDiv.textContent = appt.name || '';
-
-    const tag = document.createElement('span');
-    tag.className = `appt-tag appt-tag--${appt.tagClass || 'consultation'}`;
-    tag.textContent = appt.treatment || '';
-
-    info.append(nameDiv, tag);
-    card.append(timeSpan, info);
-    return card;
+    return createWaitlistTableRow(appt);
   }
 
   function renderWaitlistPanel() {
@@ -2128,8 +2351,18 @@ let handoffNotes = [];
     if (!container) return;
     const waitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
     container.replaceChildren();
+    if (!waitlist.length) {
+      const emptyRow = document.createElement('tr');
+      emptyRow.className = 'waitlist-empty';
+      const cell = document.createElement('td');
+      cell.colSpan = 3;
+      cell.textContent = 'Aucun patient en liste d\'attente.';
+      emptyRow.appendChild(cell);
+      container.appendChild(emptyRow);
+      return;
+    }
     const fragment = document.createDocumentFragment();
-    waitlist.forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+    waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
     container.appendChild(fragment);
   }
 
@@ -2207,6 +2440,7 @@ let handoffNotes = [];
         priorityEl.value = 'Normale';
         prependWaitlistEntry({
           nom: patientName,
+          telephone: patientPhone,
           priorite: patientPriority,
         });
         showToast('Patient ajouté à la liste d\'attente avec succès', 'success');
@@ -2221,17 +2455,19 @@ let handoffNotes = [];
     });
   }
 
-  function prependWaitlistEntry({ nom, priorite }) {
+  function prependWaitlistEntry({ nom, telephone, priorite }) {
     const container = $('waitlist-panel-list');
     if (!container) return;
 
     const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
-    container.insertAdjacentHTML('afterbegin', buildApptCardHTML({
-      time: 'Nouveau',
+    const row = createWaitlistTableRow({
       name: nom,
+      phone: telephone || '—',
       treatment: priorite,
       tagClass,
-    }));
+      priorite,
+    });
+    container.prepend(row);
   }
 
   function applyTheme(theme) {

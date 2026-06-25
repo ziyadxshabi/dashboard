@@ -4753,3 +4753,33 @@ body.os-boot-pending #doctor-emergencies-body tr:not(.triage-empty) {
     will-change: auto;
   }
 }
+
+/* Data-driven waitlist + planning timeline (doctor dashboard tokens) */
+.waitlist-table th,
+.waitlist-table td,
+.planning-timeline .timeline-item__time {
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-theme="pearl-clinic"] .patient-avatar {
+  background: #f1f5f9;
+  border-color: rgba(15, 23, 42, 0.08);
+  color: #334155;
+}
+
+html[data-theme="pearl-clinic"] .timeline-item__card {
+  background: rgba(15, 23, 42, 0.02);
+  border-color: rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="pearl-clinic"] .planning-timeline::before {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="pearl-clinic"] .waitlist-table tbody tr {
+  border-bottom-color: rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
+  background: rgba(15, 23, 42, 0.02);
+}

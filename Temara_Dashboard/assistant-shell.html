@@ -109,21 +109,10 @@
             </div>
           </div>
 
-          <div class="roster-table-wrap">
-            <table class="roster-table" aria-describedby="roster-title">
-              <thead>
-                <tr>
-                  <th scope="col" class="roster-checkbox-col"><span class="visually-hidden">Sélection</span></th>
-                  <th scope="col">Heure</th>
-                  <th scope="col">Patient</th>
-                  <th scope="col">Traitement</th>
-                  <th scope="col">Statut</th>
-                </tr>
-              </thead>
-              <tbody id="roster-tbody">
-                <!-- rendered by app.js -->
-              </tbody>
-            </table>
+          <div class="planning-timeline-wrap" data-lenis-prevent>
+            <div class="planning-timeline" id="planning-timeline" aria-labelledby="roster-title" role="list">
+              <!-- rendered by app.js — vertical chronological timeline -->
+            </div>
           </div>
 
           <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
@@ -338,8 +327,19 @@
               <div class="chart-title">Patients Prioritaires</div>
               <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
             </div>
-            <div class="schedule-list schedule-list--full" id="waitlist-panel-list">
-              <!-- populated by renderWaitlistPanel() -->
+            <div class="waitlist-table-wrap" data-lenis-prevent>
+              <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
+                <thead>
+                  <tr>
+                    <th scope="col">Patient</th>
+                    <th scope="col" class="col-numeric">Téléphone</th>
+                    <th scope="col">Priorité</th>
+                  </tr>
+                </thead>
+                <tbody id="waitlist-panel-list">
+                  <!-- populated by renderWaitlistPanel() -->
+                </tbody>
+              </table>
             </div>
           </article>
         </div>

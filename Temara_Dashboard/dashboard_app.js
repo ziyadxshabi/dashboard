@@ -268,11 +268,11 @@ window.bootDoctorDashboard = initializeDoctorDashboard;
 /* ── APPOINTMENT LIST DATA ───────────────────────────────────────────────── */
 function getDemoAppointments() {
   return [
-    { time: '08:30', name: 'Fatima Zahra',   treatment: 'Consultation', tagClass: 'consultation', priority: 1 },
-    { time: '09:15', name: 'Youssef Benali', treatment: 'Urgence',      tagClass: 'urgence',      priority: 1 },
-    { time: '10:30', name: 'Amina El Fassi', treatment: 'Blanchiment',  tagClass: 'blanchiment',  priority: 2 },
-    { time: '11:45', name: 'Karim Alami',    treatment: 'Consultation', tagClass: 'consultation', priority: 3 },
-    { time: '14:00', name: 'Salma Berrada',  treatment: 'Consultation', tagClass: 'consultation', priority: 2 },
+    { time: '08:30', name: 'Fatima Zahra',   phone: '+212 661 234 567', treatment: 'Consultation', tagClass: 'consultation', priority: 1 },
+    { time: '09:15', name: 'Youssef Benali', phone: '+212 612 987 654', treatment: 'Urgence',      tagClass: 'urgence',      priority: 1 },
+    { time: '10:30', name: 'Amina El Fassi', phone: '+212 678 445 120', treatment: 'Blanchiment',  tagClass: 'blanchiment',  priority: 2 },
+    { time: '11:45', name: 'Karim Alami',    phone: '+212 655 332 891', treatment: 'Consultation', tagClass: 'consultation', priority: 3 },
+    { time: '14:00', name: 'Salma Berrada',  phone: '+212 600 112 233', treatment: 'Consultation', tagClass: 'consultation', priority: 2 },
   ];
 }
 
@@ -288,34 +288,80 @@ function apptTagModifier(tagClass) {
   return 'appt-tag--consultation';
 }
 
+function extractPatientInitials(fullName) {
+  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '??';
+  return parts
+    .slice(0, 2)
+    .map((part) => part.replace(/\./g, '')[0] ?? '')
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || '??';
+}
+
+function getMatteChipModifier(label) {
+  const n = (label ?? '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  if (n.includes('urgence')) return 'urgence';
+  if (n.includes('confirm')) return 'confirmé';
+  if (n.includes('annul') || n.includes('no-show')) return 'annulé';
+  if (n.includes('attente') || n.includes('soin')) return 'attente';
+  if (n.includes('termin')) return 'confirmé';
+  return 'attente';
+}
+
+function createMatteChip(label) {
+  const chip = document.createElement('span');
+  chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
+  chip.textContent = label || '—';
+  return chip;
+}
+
+function createPatientAvatar(name) {
+  const avatar = document.createElement('span');
+  avatar.className = 'patient-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.textContent = extractPatientInitials(name);
+  return avatar;
+}
+
+function createPatientIdentity(name) {
+  const wrap = document.createElement('div');
+  wrap.className = 'patient-identity';
+  wrap.appendChild(createPatientAvatar(name));
+  const nameEl = document.createElement('span');
+  nameEl.className = 'patient-identity__name';
+  nameEl.textContent = name || '';
+  wrap.appendChild(nameEl);
+  return wrap;
+}
+
+function getWaitlistPriorityLabel(appt) {
+  if (appt.statusLabel) return appt.statusLabel;
+  const treatment = String(appt.treatment ?? appt.priorite ?? '').toLowerCase();
+  if (appt.tagClass === 'urgence' || treatment === 'haute') return 'Urgence';
+  return 'En attente';
+}
+
+function createWaitlistTableRow(appt) {
+  const tr = document.createElement('tr');
+  tr.className = 'waitlist-row';
+
+  const patientTd = document.createElement('td');
+  patientTd.appendChild(createPatientIdentity(appt.name));
+
+  const phoneTd = document.createElement('td');
+  phoneTd.className = 'col-numeric';
+  phoneTd.textContent = appt.phone || appt.telephone || '—';
+
+  const priorityTd = document.createElement('td');
+  priorityTd.appendChild(createMatteChip(getWaitlistPriorityLabel(appt)));
+
+  tr.append(patientTd, phoneTd, priorityTd);
+  return tr;
+}
+
 function createApptCardElement(appt) {
-  const mod = apptTagModifier(appt.tagClass);
-  const card = document.createElement('div');
-  card.className = 'appt-card';
-
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'appt-time';
-  timeSpan.textContent = appt.time || '';
-
-  const info = document.createElement('div');
-  info.className = 'appt-info';
-
-  const nameDiv = document.createElement('div');
-  nameDiv.className = 'appt-name';
-  nameDiv.textContent = appt.name || '';
-
-  const pill = window.DentaFlowDom?.createStatusPill
-    ? window.DentaFlowDom.createStatusPill(appt.treatment, mod)
-    : (() => {
-      const fallback = document.createElement('span');
-      fallback.className = mod;
-      fallback.textContent = appt.treatment || '';
-      return fallback;
-    })();
-
-  info.append(nameDiv, pill);
-  card.append(timeSpan, info);
-  return card;
+  return createWaitlistTableRow(appt);
 }
 
 function buildApptCardHTML(appt) {
@@ -522,10 +568,23 @@ function renderWaitlistPanel() {
   if (!container) return;
   const waitlist = getDemoAppointments()
     .sort((a, b) => a.priority - b.priority)
-    .map(appt => ({ ...appt, time: `Priorité ${appt.priority}` }));
+    .map((appt) => ({
+      ...appt,
+      statusLabel: appt.tagClass === 'urgence' ? 'Urgence' : 'En attente',
+    }));
   container.replaceChildren();
+  if (!waitlist.length) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.className = 'waitlist-empty';
+    const cell = document.createElement('td');
+    cell.colSpan = 3;
+    cell.textContent = 'Aucun patient en liste d\'attente.';
+    emptyRow.appendChild(cell);
+    container.appendChild(emptyRow);
+    return;
+  }
   const fragment = document.createDocumentFragment();
-  waitlist.forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+  waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
   container.appendChild(fragment);
 }
 
@@ -612,11 +671,12 @@ function prependWaitlistEntry({ nom, telephone, priorite }) {
   if (!container) return;
 
   const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
-  container.prepend(createApptCardElement({
-    time: 'Nouveau',
+  container.prepend(createWaitlistTableRow({
     name: nom,
+    phone: telephone || '—',
     treatment: priorite,
     tagClass,
+    priorite,
   }));
 }
 
