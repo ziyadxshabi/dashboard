@@ -901,6 +901,90 @@ function initCrmSearch() {
 }
 
 /* ── CRM DOSSIER PATIENT — SLIDE-OVER PANEL ─────────────────────────────── */
+let crmPatientsById = {};
+
+function getCrmMotifTagClass(motif) {
+  const normalised = String(motif ?? '').toLowerCase();
+  if (normalised.includes('urgence')) return 'crm-tag--urgence';
+  if (normalised.includes('blanch')) return 'crm-tag--gold';
+  return '';
+}
+
+function toCrmPatient(record) {
+  if (!record) return null;
+  return {
+    id: record.id ?? record.rowId,
+    name: record.name || 'Non spécifié',
+    phone: record.phone || '',
+    email: record.email || '',
+    motif: record.treatment || 'Consultation',
+    statut: record.status || 'Confirmé',
+    observations: record.observations || 'Aucune observation enregistrée.',
+    insurance: record.insurance || '—',
+    amount: Number(record.amount) || 0,
+  };
+}
+
+function renderCRMTable(records) {
+  const tbody = document.getElementById('crm-table-body');
+  if (!tbody) return;
+
+  const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+  crmPatientsById = {};
+  tbody.replaceChildren();
+
+  if (!rows.length) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.className = 'crm-table-empty';
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.textContent = 'Aucun patient trouvé';
+    emptyRow.appendChild(cell);
+    tbody.appendChild(emptyRow);
+    return;
+  }
+
+  rows.forEach((record) => {
+    const patient = toCrmPatient(record);
+    if (!patient?.id) return;
+
+    crmPatientsById[String(patient.id)] = patient;
+
+    const tr = document.createElement('tr');
+    tr.className = 'crm-table-row';
+    tr.tabIndex = 0;
+    tr.setAttribute('role', 'button');
+    tr.dataset.patientId = String(patient.id);
+    tr.dataset.name = patient.name;
+    tr.dataset.phone = patient.phone;
+    tr.dataset.email = patient.email;
+    tr.dataset.motif = patient.motif;
+    tr.dataset.statut = patient.statut;
+    tr.dataset.amount = String(patient.amount);
+    tr.dataset.insurance = patient.insurance;
+    tr.dataset.observations = patient.observations;
+
+    const nameCell = document.createElement('td');
+    nameCell.textContent = patient.name;
+
+    const phoneCell = document.createElement('td');
+    phoneCell.textContent = patient.phone || '—';
+
+    const emailCell = document.createElement('td');
+    emailCell.textContent = patient.email || '—';
+
+    const motifCell = document.createElement('td');
+    const motifTag = document.createElement('span');
+    const motifMod = getCrmMotifTagClass(patient.motif);
+    motifTag.className = ['crm-tag', motifMod].filter(Boolean).join(' ');
+    motifTag.textContent = patient.motif;
+    motifCell.appendChild(motifTag);
+
+    tr.append(nameCell, phoneCell, emailCell, motifCell);
+    tbody.appendChild(tr);
+  });
+}
+
 function getCrmStatutTagClass(statut) {
   const normalised = (statut ?? '').toLowerCase();
   if (normalised.includes('confirm')) return 'crm-tag--confirmé';
@@ -910,6 +994,11 @@ function getCrmStatutTagClass(statut) {
 }
 
 function readCrmRowData(row) {
+  const patientId = row?.dataset?.patientId;
+  if (patientId && crmPatientsById[patientId]) {
+    return crmPatientsById[patientId];
+  }
+
   const { dataset } = row;
   return {
     name:          dataset.name          ?? row.cells[0]?.textContent.trim() ?? '—',
@@ -1041,22 +1130,8 @@ function initSmsCampaign() {
 
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!textarea.value.trim() || !submitBtn) return;
-
-    const lock = lockSubmitButton(submitBtn);
-
-    setTimeout(() => {
-      submitBtn.textContent = 'Campagne Envoyée ✓';
-      submitBtn.classList.add('is-success');
-
-      setTimeout(() => {
-        submitBtn.textContent = lock.defaultLabel;
-        submitBtn.classList.remove('is-success');
-        submitBtn.disabled = false;
-        form.reset();
-        updateCounter();
-      }, 2500);
-    }, lock.minRemaining());
+    console.warn('SMS module not yet wired to backend');
+    alert('La fonction de campagne SMS sera disponible dans la prochaine mise à jour.');
   });
 }
 
@@ -2014,6 +2089,41 @@ function normalizeDoctorAppointment(raw) {
     item.treatment ??
     'Consultation';
 
+  const phone = String(
+    item['Téléphone (WhatsApp)'] ??
+    item.Clean_Phone ??
+    item.telephone ??
+    item.phone ??
+    ''
+  ).trim();
+
+  const email = String(
+    item['Email Contact'] ??
+    item.email ??
+    ''
+  ).trim();
+
+  const observations = String(
+    item['Observations Médicales'] ??
+    item.observations ??
+    ''
+  ).trim();
+
+  const insurance = String(
+    item['N° d\'Assurance'] ??
+    item['Couverture Médicale'] ??
+    item.insurance ??
+    '—'
+  ).trim();
+
+  const amountRaw =
+    item['Montant (MAD)'] ??
+    item.amount ??
+    item.montant ??
+    0;
+  const amount = Number(amountRaw);
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+
   return {
     id: baserowRowId ?? item.id,
     rowId: baserowRowId,
@@ -2022,6 +2132,11 @@ function normalizeDoctorAppointment(raw) {
     status: String(extractBaserowFieldValue(statusRaw) || 'Confirmé').trim(),
     rawDate,
     time: formatDoctorAppointmentTime(rawDate),
+    phone,
+    email,
+    observations,
+    insurance,
+    amount: safeAmount,
   };
 }
 
@@ -2349,11 +2464,13 @@ async function loadDoctorHubData() {
 
     renderEndOfDayDigest(computeEndOfDayDigest(records));
     renderDoctorTriageRoster(records);
+    renderCRMTable(records);
     queueOsBootSequence();
   } catch (err) {
     console.error('[Doctor Hub] Digest load failed:', err);
     renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, totalRevenue: 0 });
     renderDoctorTriageRoster([]);
+    renderCRMTable([]);
     queueOsBootSequence();
   }
 }

@@ -154,7 +154,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
           <span>Dossiers Patients</span>
         </a>
-        <a href="#" class="nav-link" data-nav="pipeline">
+        <a href="#" class="nav-link" data-nav="pipeline" hidden>
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="8" width="7" height="13" rx="2"/></svg>
           <span>Devis &amp; Finances</span>
         </a>
@@ -199,7 +199,7 @@
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
         <span>Dossiers Patients</span>
       </a>
-      <a href="#" class="tab-link" data-nav="pipeline" aria-label="Devis et Finances">
+      <a href="#" class="tab-link" data-nav="pipeline" aria-label="Devis et Finances" hidden>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="8" width="7" height="13" rx="2"/></svg>
         <span>Devis &amp; Finances</span>
       </a>
@@ -609,95 +609,8 @@
                 </tr>
               </thead>
               <tbody id="crm-table-body">
-                <tr
-                  class="crm-table-row"
-                  tabindex="0"
-                  role="button"
-                  data-name="Fatima Zahra"
-                  data-phone="+212 612 345 678"
-                  data-email="fatima.z@email.ma"
-                  data-motif="Consultation"
-                  data-statut="Confirmé"
-                  data-amount="6200"
-                  data-insurance="CNSS"
-                  data-observations="Détartrage et polissage — suivi semestriel recommandé."
-                >
-                  <td>Fatima Zahra</td>
-                  <td>+212 612 345 678</td>
-                  <td>fatima.z@email.ma</td>
-                  <td><span class="crm-tag">Consultation</span></td>
-                </tr>
-                <tr
-                  class="crm-table-row"
-                  tabindex="0"
-                  role="button"
-                  data-name="Youssef Benali"
-                  data-phone="+212 661 234 567"
-                  data-email="y.benali@email.ma"
-                  data-motif="Urgence"
-                  data-statut="En attente"
-                  data-amount="12500"
-                  data-insurance="Sans couverture"
-                  data-observations="Douleur aiguë molaire supérieure droite — radiographie demandée."
-                >
-                  <td>Youssef Benali</td>
-                  <td>+212 661 234 567</td>
-                  <td>y.benali@email.ma</td>
-                  <td><span class="crm-tag crm-tag--urgence">Urgence</span></td>
-                </tr>
-                <tr
-                  class="crm-table-row"
-                  tabindex="0"
-                  role="button"
-                  data-name="Amina El Fassi"
-                  data-phone="+212 678 901 234"
-                  data-email="amina.f@email.ma"
-                  data-motif="Blanchiment"
-                  data-statut="Confirmé"
-                  data-amount="8900"
-                  data-insurance="CNOPS"
-                  data-observations="Blanchiment professionnel — sensibilité légère signalée."
-                >
-                  <td>Amina El Fassi</td>
-                  <td>+212 678 901 234</td>
-                  <td>amina.f@email.ma</td>
-                  <td><span class="crm-tag crm-tag--gold">Blanchiment</span></td>
-                </tr>
-                <tr
-                  class="crm-table-row"
-                  tabindex="0"
-                  role="button"
-                  data-name="Karim Alami"
-                  data-phone="+212 655 432 109"
-                  data-email="k.alami@email.ma"
-                  data-motif="Contrôle"
-                  data-statut="Confirmé"
-                  data-amount="2400"
-                  data-insurance="CNSS"
-                  data-observations="Contrôle post-traitement implant — cicatrisation satisfaisante."
-                >
-                  <td>Karim Alami</td>
-                  <td>+212 655 432 109</td>
-                  <td>k.alami@email.ma</td>
-                  <td><span class="crm-tag">Contrôle</span></td>
-                </tr>
-                <tr
-                  class="crm-table-row"
-                  tabindex="0"
-                  role="button"
-                  data-name="Salma Berrada"
-                  data-phone="+212 699 876 543"
-                  data-email="s.berrada@email.ma"
-                  data-motif="Implant"
-                  data-statut="En attente"
-                  data-amount="15750"
-                  data-insurance="Couverture privée"
-                  data-observations="Orthodontie phase 1 — plan de traitement en cours de validation."
-                >
-                  <td>Salma Berrada</td>
-                  <td>+212 699 876 543</td>
-                  <td>s.berrada@email.ma</td>
-                  <td><span class="crm-tag">Implant</span></td>
+                <tr class="crm-table-empty">
+                  <td colspan="4">Aucun patient trouvé</td>
                 </tr>
               </tbody>
             </table>
