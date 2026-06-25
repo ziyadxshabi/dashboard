@@ -78,15 +78,59 @@ const PIN_BADGE_SVG = `
     <path d="M12 17v5M9 3h6l1 7-4 2-4-2 1-7z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
-const OPERATIONAL_PULSE = {
-  patientsSeen: 18,
-  patientsPlanned: 22,
-  cancellations: 2,
-  punctuality: 85,
-  punctualityTrend: 'up',
-  turnoverMinutes: 12,
-  turnoverTrend: 'down',
-};
+const PLANNING_UPSTREAM_ERROR_MESSAGE =
+  'Erreur de connexion au serveur (503). Veuillez rafraîchir la page ou contacter le support.';
+
+function normalizePulseStatus(status) {
+  return String(status || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\u2019/g, "'");
+}
+
+const PULSE_SEEN_STATUSES = new Set(
+  ['En salle d\'attente', 'En soin', 'Terminé'].map(normalizePulseStatus)
+);
+const PULSE_CANCELLED_STATUSES = new Set(
+  ['No-show', 'Annulé', 'noshow'].map(normalizePulseStatus)
+);
+
+function isPulseSeenStatus(status) {
+  const key = normalizePulseStatus(status);
+  if (PULSE_SEEN_STATUSES.has(key)) return true;
+  return key.includes('salle') && key.includes('attente');
+}
+
+function isPulseCancelledStatus(status) {
+  const key = normalizePulseStatus(status);
+  if (PULSE_CANCELLED_STATUSES.has(key)) return true;
+  return key.includes('annul') || key.includes('no-show') || key === 'noshow';
+}
+
+function createEmptyOperationalPulse() {
+  return {
+    patientsSeen: 0,
+    patientsPlanned: 0,
+    cancellations: 0,
+    punctuality: null,
+    turnoverMinutes: null,
+  };
+}
+
+function computeOperationalPulse(records) {
+  const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+  if (!rows.length) return createEmptyOperationalPulse();
+
+  return {
+    patientsSeen: rows.filter((record) => isPulseSeenStatus(record.status)).length,
+    patientsPlanned: rows.length,
+    cancellations: rows.filter((record) => isPulseCancelledStatus(record.status)).length,
+    punctuality: null,
+    turnoverMinutes: null,
+  };
+}
 
 let handoffNotes = [];
 
@@ -404,16 +448,14 @@ let handoffNotes = [];
     }
   }
 
-  function renderOperationalPulse() {
+  function renderOperationalPulse(pulseData = createEmptyOperationalPulse()) {
     return safeRender('renderOperationalPulse', () => {
     const grid = $('assistant-pulse-grid');
     if (!grid) return;
 
-    const data = OPERATIONAL_PULSE;
-    const punctualityTrendClass = data.punctualityTrend === 'up' ? 'pulse-card__trend--up' : 'pulse-card__trend--down';
-    const turnoverTrendClass = data.turnoverTrend === 'up' ? 'pulse-card__trend--up' : 'pulse-card__trend--down';
-    const punctualityTrendSvg = data.punctualityTrend === 'up' ? TREND_UP_SVG : TREND_DOWN_SVG;
-    const turnoverTrendSvg = data.turnoverTrend === 'up' ? TREND_UP_SVG : TREND_DOWN_SVG;
+    const data = pulseData ?? createEmptyOperationalPulse();
+    const punctualityLabel = data.punctuality != null ? `${data.punctuality}%` : '--';
+    const turnoverLabel = data.turnoverMinutes != null ? `${data.turnoverMinutes} min` : '--';
 
     grid.innerHTML = `
       <article class="pulse-card">
@@ -435,20 +477,14 @@ let handoffNotes = [];
       <article class="pulse-card">
         <p class="pulse-card__label" data-tooltip="Pourcentage de patients arrivés à l'heure">Taux de Ponctualité</p>
         <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${data.punctuality}%</p>
-          <span class="pulse-card__trend ${punctualityTrendClass}" aria-label="Tendance à la hausse">
-            ${punctualityTrendSvg}
-          </span>
+          <p class="pulse-card__value">${punctualityLabel}</p>
         </div>
       </article>
 
       <article class="pulse-card">
         <p class="pulse-card__label" data-tooltip="Durée moyenne entre l'arrivée et le début du soin">Temps de Rotation Moyen</p>
         <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${data.turnoverMinutes} min</p>
-          <span class="pulse-card__trend ${turnoverTrendClass}" aria-label="Tendance à la baisse">
-            ${turnoverTrendSvg}
-          </span>
+          <p class="pulse-card__value">${turnoverLabel}</p>
         </div>
       </article>`;
     });
@@ -1290,13 +1326,36 @@ let handoffNotes = [];
     });
   }
 
+  function parseUpstreamErrorDetail(detail) {
+    const raw = String(detail || '').trim();
+    if (!raw) return null;
+    if (!raw.startsWith('{')) return raw;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return String(parsed.error || parsed.message || parsed.details || raw);
+      }
+    } catch {
+      return raw;
+    }
+    return raw;
+  }
+
   function formatRosterErrorMessage(error) {
-    const msg = String(error?.message || '');
+    let msg = String(error?.message || '').trim();
+    msg = parseUpstreamErrorDetail(msg) || msg;
 
     if (window.location.protocol === 'file:') {
       return 'Ouvrez le dashboard via un serveur HTTP local (Live Server, Vercel) — file:// bloque les appels API.';
     }
 
+    if (/service unavailable|upstream http error|upstream timeout|upstream error/i.test(msg)) {
+      return PLANNING_UPSTREAM_ERROR_MESSAGE;
+    }
+    if (/503/.test(msg)) {
+      return PLANNING_UPSTREAM_ERROR_MESSAGE;
+    }
     if (msg.includes('not registered') || msg.includes('Webhook n8n inactif')) {
       return 'Webhook n8n inactif — activez « Workflow 1 - Load Dashboard » dans n8n, puis réessayez.';
     }
@@ -1304,13 +1363,16 @@ let handoffNotes = [];
       return 'Endpoint introuvable (HTTP 404) — le workflow n8n doit être publié et actif.';
     }
     if (/^HTTP 5\d{2}\b/.test(msg)) {
-      return 'Erreur serveur n8n — réessayez dans quelques instants.';
+      return PLANNING_UPSTREAM_ERROR_MESSAGE;
     }
     if (/failed to fetch|networkerror|load failed/i.test(msg)) {
       return 'Impossible de charger le planning — Mode hors-ligne';
     }
-    if (/réponse vide|respond to webhook|upstream timeout|webhook not registered/i.test(msg)) {
+    if (/réponse vide|respond to webhook|webhook not registered/i.test(msg)) {
       return msg;
+    }
+    if (msg.startsWith('{') && msg.includes('"error"')) {
+      return PLANNING_UPSTREAM_ERROR_MESSAGE;
     }
     if (msg && msg.length <= 160) {
       return msg;
@@ -2768,6 +2830,9 @@ let handoffNotes = [];
     if (rows.length) {
       updateCRMSidePanel(toCrmPatient(rows[0]));
     }
+
+    renderOperationalPulse(computeOperationalPulse(rows));
+    refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     });
   }
 
@@ -2816,14 +2881,22 @@ let handoffNotes = [];
   }
 
   function showTableError(message = 'Impossible de charger le planning — Mode hors-ligne') {
+    const friendlyMessage = typeof message === 'string' && message.includes('Erreur de connexion au serveur')
+      ? message
+      : formatRosterErrorMessage({ message });
+
     const timeline = $('planning-timeline');
     if (timeline) {
       timeline.replaceChildren();
-      const error = document.createElement('div');
-      error.className = 'timeline-error planning-timeline__message';
-      error.textContent = message;
-      timeline.appendChild(error);
+      const emptyState = document.createElement('div');
+      emptyState.className = 'planning-empty-state';
+      const paragraph = document.createElement('p');
+      paragraph.textContent = friendlyMessage;
+      emptyState.appendChild(paragraph);
+      timeline.appendChild(emptyState);
     }
+
+    clearEmptyState('planning-empty-state');
 
     const tbody = $('roster-tbody');
     if (tbody) {
@@ -2832,7 +2905,7 @@ let handoffNotes = [];
       tr.className = 'roster-error';
       const td = document.createElement('td');
       td.colSpan = 5;
-      td.textContent = message;
+      td.textContent = friendlyMessage;
       tr.appendChild(td);
       tbody.appendChild(tr);
     }
@@ -2842,11 +2915,13 @@ let handoffNotes = [];
       cards.replaceChildren();
       const errorP = document.createElement('p');
       errorP.className = 'roster-cards__error';
-      errorP.textContent = message;
+      errorP.textContent = friendlyMessage;
       cards.appendChild(errorP);
     }
 
     updateRosterStats([]);
+    renderOperationalPulse(createEmptyOperationalPulse());
+    refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     setSyncIndicator('error');
   }
 
@@ -4019,7 +4094,7 @@ let handoffNotes = [];
     runInitStep('invisibleUI', () => initInvisibleUI());
     runInitStep('progressiveDisclosure', () => initProgressiveDisclosure());
     runInitStep('operationalPulse', () => {
-      renderOperationalPulse();
+      renderOperationalPulse(createEmptyOperationalPulse());
       refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     });
     runInitStep('handoff', () => {
