@@ -6,9 +6,9 @@ const crypto = require('crypto');
 
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 const DEFAULT_JWT_TTL_SEC = 8 * 60 * 60;
-const MAX_LOGIN_FAILURES = 5;
-const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
-const LOGIN_WINDOW_MS = 5 * 60 * 1000;
+const LOGIN_RATE_LIMIT_MAX = 5;
+const LOGIN_RATE_LIMIT_TTL_SEC = 900;
+const REDIS_TIMEOUT_MS = 5000;
 
 function base64url(buffer) {
   return Buffer.from(buffer).toString('base64url');
@@ -84,63 +84,108 @@ function verifyJwt(token, secret) {
   return payload;
 }
 
-function getClientFingerprint(req) {
+function getClientIp(req) {
   const forwarded = req.headers['x-forwarded-for'] || req.headers['x-real-ip'];
-  const ip = String(forwarded || req.socket?.remoteAddress || 'unknown')
-    .split(',')[0]
-    .trim();
+  if (forwarded) {
+    return String(forwarded).split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || 'unknown_ip';
+}
+
+function getClientFingerprint(req) {
+  const ip = getClientIp(req);
   const ua = String(req.headers['user-agent'] || '').slice(0, 120);
   return `${ip}|${ua}`;
 }
 
-function getLoginRateState(fingerprint) {
-  if (!global._dentaflowLoginRate) {
-    global._dentaflowLoginRate = new Map();
+function redisBaseUrl() {
+  return String(process.env.REDIS_CONNECTION_URL || '').replace(/\/+$/, '');
+}
+
+function redisHeaders() {
+  const token = String(process.env.REDIS_REST_TOKEN || '').trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function redisPost(path) {
+  const base = redisBaseUrl();
+  if (!base) {
+    throw new Error('REDIS_CONNECTION_URL missing');
   }
 
-  const now = Date.now();
-  const map = global._dentaflowLoginRate;
-
-  for (const [key, entry] of map.entries()) {
-    if (entry.lockUntil && entry.lockUntil < now - LOGIN_LOCKOUT_MS) {
-      map.delete(key);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: redisHeaders(),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) {
+      throw new Error(`Redis HTTP ${response.status}`);
     }
-  }
-
-  let entry = map.get(fingerprint);
-  if (!entry) {
-    entry = { fails: 0, windowStart: now, lockUntil: 0 };
-    map.set(fingerprint, entry);
-  }
-
-  if (entry.lockUntil > now) {
-    return {
-      blocked: true,
-      retryAfterSec: Math.ceil((entry.lockUntil - now) / 1000),
-      entry,
-    };
-  }
-
-  if (now - entry.windowStart > LOGIN_WINDOW_MS) {
-    entry.fails = 0;
-    entry.windowStart = now;
-  }
-
-  return { blocked: false, retryAfterSec: 0, entry };
-}
-
-function recordLoginFailure(entry) {
-  entry.fails += 1;
-  if (entry.fails >= MAX_LOGIN_FAILURES) {
-    entry.lockUntil = Date.now() + LOGIN_LOCKOUT_MS;
-    entry.fails = 0;
+    return response.json();
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
   }
 }
 
-function resetLoginFailures(entry) {
-  entry.fails = 0;
-  entry.lockUntil = 0;
-  entry.windowStart = Date.now();
+/**
+ * Distributed login rate limit via Upstash Redis INCR + EXPIRE.
+ * Allows LOGIN_RATE_LIMIT_MAX attempts per IP per 15-minute window.
+ * Fails open when Redis is unavailable.
+ */
+async function checkLoginRateLimit(req) {
+  const clientIp = getClientIp(req);
+  const redisKey = `ratelimit:login:${clientIp}`;
+
+  try {
+    const incrResult = await redisPost(`/incr/${encodeURIComponent(redisKey)}`);
+    const count = Number(incrResult?.result);
+
+    if (count === 1) {
+      await redisPost(`/expire/${encodeURIComponent(redisKey)}/${LOGIN_RATE_LIMIT_TTL_SEC}`);
+    }
+
+    if (count > LOGIN_RATE_LIMIT_MAX) {
+      let retryAfterSec = LOGIN_RATE_LIMIT_TTL_SEC;
+      try {
+        const ttlResult = await redisPost(`/ttl/${encodeURIComponent(redisKey)}`);
+        const ttl = Number(ttlResult?.result);
+        if (Number.isFinite(ttl) && ttl > 0) {
+          retryAfterSec = ttl;
+        }
+      } catch {
+        // keep default window length
+      }
+
+      return { blocked: true, retryAfterSec };
+    }
+
+    return { blocked: false, retryAfterSec: 0 };
+  } catch (err) {
+    console.error('[Rate Limit Bypass] Redis unavailable:', err?.message || err);
+    return { blocked: false, retryAfterSec: 0, bypassed: true };
+  }
+}
+
+/** No-op: attempt counting happens in checkLoginRateLimit (INCR per login request). */
+async function recordLoginFailure() {
+  return undefined;
+}
+
+/** Clear rate-limit counter after a successful login. */
+async function resetLoginFailures(req) {
+  const clientIp = getClientIp(req);
+  const redisKey = `ratelimit:login:${clientIp}`;
+
+  try {
+    await redisPost(`/del/${encodeURIComponent(redisKey)}`);
+  } catch (err) {
+    console.error('[Rate Limit] Redis DEL failed on login success:', err?.message || err);
+  }
 }
 
 function extractBearerToken(req) {
@@ -206,7 +251,8 @@ module.exports = {
   signJwt,
   verifyJwt,
   getClientFingerprint,
-  getLoginRateState,
+  getClientIp,
+  checkLoginRateLimit,
   recordLoginFailure,
   resetLoginFailures,
   extractBearerToken,

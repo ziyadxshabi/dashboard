@@ -11,8 +11,7 @@
  */
 const {
   applyCors,
-  getClientFingerprint,
-  getLoginRateState,
+  checkLoginRateLimit,
   getRoleCredentials,
   recordLoginFailure,
   resetLoginFailures,
@@ -35,8 +34,7 @@ module.exports = async function handler(req, res) {
     return res.status(503).json({ ok: false, error: 'Auth not configured' });
   }
 
-  const fingerprint = getClientFingerprint(req);
-  const rate = getLoginRateState(fingerprint);
+  const rate = await checkLoginRateLimit(req);
 
   if (rate.blocked) {
     res.setHeader('Retry-After', String(rate.retryAfterSec));
@@ -54,7 +52,7 @@ module.exports = async function handler(req, res) {
   const normalizedPassword = typeof password === 'string' ? password : '';
 
   if (!normalizedRole || !normalizedUsername || !normalizedPassword) {
-    recordLoginFailure(rate.entry);
+    await recordLoginFailure();
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
 
@@ -68,11 +66,11 @@ module.exports = async function handler(req, res) {
   const passwordMatch = verifyPassword(normalizedPassword, creds.passwordHash);
 
   if (!usernameMatch || !passwordMatch) {
-    recordLoginFailure(rate.entry);
+    await recordLoginFailure();
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
 
-  resetLoginFailures(rate.entry);
+  await resetLoginFailures(req);
 
   const token = signJwt(
     {
