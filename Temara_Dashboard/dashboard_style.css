@@ -69,6 +69,13 @@ html[data-theme="oak-lounge"] {
   --text-main:     #F4F1EE;
   --text-muted:    #9E948C;
 
+  --text-hierarchy-primary:   #F3F4F6;
+  --text-hierarchy-secondary: #9CA3AF;
+  --text-hierarchy-tertiary:  rgba(255, 255, 255, 0.5);
+  --divider-subtle:           rgba(255, 255, 255, 0.06);
+  --surface-row-hover:        rgba(255, 255, 255, 0.03);
+  --card-padding:             1.5rem;
+
   --tabbar-float-bg:     rgba(34, 30, 28, 0.9);
   --tabbar-float-border: rgba(227, 193, 143, 0.15);
   --tabbar-float-shadow: none;
@@ -113,6 +120,13 @@ html[data-theme="pearl-clinic"] {
   --card-border-executive: rgba(0, 0, 0, 0.85);
   --text-main:     #262322;
   --text-muted:    #7A726A;
+
+  --text-hierarchy-primary:   #1A1714;
+  --text-hierarchy-secondary: #7A726A;
+  --text-hierarchy-tertiary:  rgba(38, 35, 34, 0.55);
+  --divider-subtle:           rgba(0, 0, 0, 0.06);
+  --surface-row-hover:        rgba(0, 0, 0, 0.03);
+  --card-padding:             1.5rem;
 
   --tabbar-float-bg:     rgba(253, 252, 250, 0.92);
   --tabbar-float-border: rgba(0, 0, 0, 0.85);
@@ -1315,7 +1329,7 @@ h1, h2, h3,
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 24px 26px 22px;
+  padding: var(--card-padding, 1.5rem);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1346,15 +1360,15 @@ h1, h2, h3,
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-hierarchy-secondary, var(--text-muted));
 }
 
 .kpi-number {
   font-size: clamp(2rem, 5vw, 3.25rem);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.03em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, var(--text-main));
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1368,7 +1382,7 @@ h1, h2, h3,
 .kpi-sub {
   font-size: 12px;
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--text-hierarchy-tertiary, var(--text-muted));
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1422,7 +1436,7 @@ h1, h2, h3,
 .kpi-goal-label {
   font-size: 16px;
   font-weight: 500;
-  color: var(--text-dim);
+  color: var(--text-hierarchy-secondary, var(--text-muted));
 }
 
 .progress-track {
@@ -1475,7 +1489,7 @@ h1, h2, h3,
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 24px 26px;
+  padding: var(--card-padding, 1.5rem);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1768,7 +1782,7 @@ html[data-theme="pearl-clinic"] .team-message__category--urgent {
 .schedule-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
   overflow-y: auto;
   max-height: 340px;
   padding-right: 6px;
@@ -1806,26 +1820,32 @@ html[data-theme="pearl-clinic"] .team-message__category--urgent {
   flex-wrap: nowrap;
   gap: 14px;
   min-width: 0;
-  padding: 14px 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  transition: var(--transition);
+  padding: 12px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 6px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   cursor: default;
 }
 
+.appt-card:last-child {
+  border-bottom-color: transparent;
+}
+
 .appt-card:hover {
-  border-color: var(--border-2);
+  background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
+  border-color: transparent;
 }
 
 .appt-time {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--accent-gold);
+  color: var(--text-hierarchy-secondary, #9CA3AF);
   font-variant-numeric: tabular-nums;
   min-width: 48px;
   flex-shrink: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
 }
 
 .appt-info {
@@ -1836,7 +1856,7 @@ html[data-theme="pearl-clinic"] .team-message__category--urgent {
 .appt-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-hierarchy-primary, #F3F4F6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1846,8 +1866,8 @@ html[data-theme="pearl-clinic"] .team-message__category--urgent {
   flex-shrink: 0;
   white-space: nowrap;
   font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-weight: 400;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
 }
@@ -4888,7 +4908,7 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, #F3F4F6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4898,7 +4918,8 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   display: block;
   margin-top: 2px;
   font-size: 10px;
-  color: var(--text-muted);
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4928,6 +4949,13 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-account-menu:focus-visible {
+  outline: 2px solid rgba(227, 193, 143, 0.45);
+  outline-offset: 2px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .account-menu-popover,
@@ -4978,9 +5006,19 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   transition: letter-spacing 0.2s ease, color 0.2s ease, opacity 0.2s ease;
 }
 
+.kinetic-label {
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-weight: 500;
+}
+
+.kinetic-value {
+  color: var(--text-hierarchy-primary, #F3F4F6);
+  font-weight: 600;
+}
+
 .kinetic-label:hover {
   letter-spacing: 0.06em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 .kinetic-value:hover {
@@ -4996,19 +5034,23 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   font-size: 12px;
 }
 
-#doctor-shell .view-page-title {
-  font-size: clamp(1rem, 1.8vw, 1.25rem);
-  font-weight: 500;
-}
-
-#doctor-shell .view-page-sub,
-#doctor-shell .chart-sub {
-  font-size: 11.5px;
-}
-
 #doctor-shell .chart-title {
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--text-hierarchy-primary, #F3F4F6);
+}
+
+#doctor-shell .chart-sub,
+#doctor-shell .view-page-sub {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+}
+
+#doctor-shell .view-page-title {
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  font-weight: 600;
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 #doctor-shell .reclaimed-banner__title {
@@ -5020,7 +5062,7 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   background: #121110;
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
-  padding: 14px 16px 12px;
+  padding: var(--card-padding, 1.5rem);
 }
 
 .kpi-card--matte::before {
@@ -5039,6 +5081,8 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   font-size: 9.5px;
   letter-spacing: 0.08em;
   margin-bottom: 0;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-weight: 500;
 }
 
 .kpi-card--matte .kpi-trend {
@@ -5050,6 +5094,7 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 .kpi-card--matte .kpi-number {
   font-size: clamp(1.25rem, 2.5vw, 1.75rem);
   font-weight: 600;
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 .kpi-card--matte .kpi-number--sm {
@@ -5059,13 +5104,15 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 .kpi-card--matte .kpi-sub {
   font-size: 10px;
   letter-spacing: 0.03em;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+  font-weight: 400;
 }
 
 .doctor-metric-card--matte {
   background: #121110;
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
-  padding: 14px 16px;
+  padding: var(--card-padding, 1.5rem);
 }
 
 .doctor-metric-card__head {
@@ -5078,6 +5125,8 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 .doctor-metric-card--matte .doctor-metric-label {
   font-size: 9.5px;
   letter-spacing: 0.08em;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-weight: 500;
 }
 
 .doctor-metric-chart {
@@ -5089,10 +5138,13 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 .doctor-metric-card--matte .doctor-metric-value {
   font-size: 1.375rem;
   font-weight: 600;
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 .doctor-metric-card--matte .doctor-metric-delta {
   font-size: 10px;
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
 }
 
 .pulse-sparkline--gold { color: var(--accent-gold); }
@@ -5203,4 +5255,42 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
+}
+
+/* ── Foundational UI polish: hierarchy, proximity, affordances ─────────── */
+
+.team-messages-card,
+.team-message {
+  border-color: var(--divider-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.team-message + .team-message {
+  border-top: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.06));
+}
+
+#doctor-shell .schedule-widget .chart-title,
+.schedule-widget .chart-title {
+  font-weight: 600;
+  color: var(--text-hierarchy-primary, #F3F4F6);
+}
+
+#doctor-shell .schedule-widget .chart-sub,
+.schedule-widget .chart-sub {
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+}
+
+.status-indicator__label {
+  font-weight: 500;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+}
+
+.row-action-btn:hover {
+  color: #fff;
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.06));
+}
+
+.row-action-btn:focus-visible {
+  outline: 2px solid rgba(227, 193, 143, 0.4);
+  outline-offset: 1px;
 }

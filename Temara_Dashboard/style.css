@@ -40,7 +40,13 @@ html[data-theme="oak-lounge"] {
   --text-main:     #F4F1EE;
   --text-muted:    #9E948C;
 
-  --shadow-card:   none;
+  /* Visual hierarchy — contrast over scale */
+  --text-hierarchy-primary:   #F3F4F6;
+  --text-hierarchy-secondary: #9CA3AF;
+  --text-hierarchy-tertiary:  rgba(255, 255, 255, 0.5);
+  --divider-subtle:           rgba(255, 255, 255, 0.06);
+  --surface-row-hover:        rgba(255, 255, 255, 0.03);
+  --card-padding:             1.5rem;
   --shadow-hover:  none;
   --border-hairline: 1px solid rgba(255, 255, 255, 0.08);
   --glass-blur:    blur(16px) saturate(110%);
@@ -75,6 +81,13 @@ html[data-theme="pearl-clinic"] {
   --accent-gold:   #B8935A;
   --text-main:     #1A1A1A;
   --text-muted:    #6B7280;
+
+  --text-hierarchy-primary:   #111827;
+  --text-hierarchy-secondary: #6B7280;
+  --text-hierarchy-tertiary:  rgba(17, 24, 39, 0.55);
+  --divider-subtle:           rgba(0, 0, 0, 0.06);
+  --surface-row-hover:        rgba(0, 0, 0, 0.03);
+  --card-padding:             1.5rem;
 
   --shadow-card:   none;
   --shadow-hover:  none;
@@ -642,7 +655,7 @@ body.mode-assistant {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 22px 24px 24px;
+  padding: var(--card-padding, 1.5rem);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   min-width: 0;
@@ -696,7 +709,7 @@ body.mode-assistant {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-hierarchy-secondary, var(--text-muted));
   margin-bottom: 8px;
   line-height: 1.35;
 }
@@ -712,7 +725,7 @@ body.mode-assistant {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, var(--text-main));
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
@@ -722,7 +735,7 @@ body.mode-assistant {
 }
 
 .pulse-card__value--split span {
-  color: var(--text-muted);
+  color: var(--text-hierarchy-secondary, var(--text-muted));
   font-weight: 500;
 }
 
@@ -866,10 +879,14 @@ body.mode-assistant {
   gap: 10px 12px;
   align-items: start;
   padding: 12px 14px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.06));
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.02);
-  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.2s ease;
+  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.handoff-note:hover {
+  background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
 }
 
 .handoff-note.is-entering {
@@ -2192,7 +2209,7 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 24px 26px;
+  padding: var(--card-padding, 1.5rem);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2206,7 +2223,7 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
 .schedule-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
   overflow-y: auto;
   max-height: 340px;
   padding-right: 6px;
@@ -2222,16 +2239,27 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   flex-wrap: nowrap;
   gap: 14px;
   min-width: 0;
-  padding: 14px 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 6px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.appt-card:last-child {
+  border-bottom-color: transparent;
+}
+
+.appt-card:hover {
+  background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
+  border-color: transparent;
 }
 
 .appt-time {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--accent-gold);
+  color: var(--text-hierarchy-secondary, #9CA3AF);
   font-variant-numeric: tabular-nums;
   min-width: 48px;
   flex-shrink: 0;
@@ -2245,7 +2273,7 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
 .appt-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, #F3F4F6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2255,8 +2283,8 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   flex-shrink: 0;
   white-space: nowrap;
   font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-weight: 400;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3204,11 +3232,15 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   user-select: none;
 }
 
-.patient-identity__name {
+.patient-identity__name,
+.patient-identity__name .cell-truncate {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-hierarchy-primary, #F3F4F6);
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 
 .matte-chip {
@@ -3293,10 +3325,11 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   justify-content: flex-end;
   padding-right: 12px;
   font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-secondary, #94a3b8);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
   letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 .timeline-item__rail {
@@ -3327,10 +3360,21 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   gap: 12px;
   min-height: 64px;
   min-width: 0;
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.06));
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.timeline-item:last-child .timeline-item__card {
+  border-bottom-color: transparent;
+}
+
+.timeline-item__card:hover {
+  background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
+  border-color: transparent;
 }
 
 .timeline-item__main {
@@ -3340,7 +3384,8 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
 .timeline-item__treatment {
   font-size: 0.8125rem;
-  color: var(--text-secondary, #94a3b8);
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
   margin-top: 2px;
 }
 
@@ -3457,12 +3502,16 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
 .waitlist-table tbody tr {
   height: 64px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  transition: background 0.15s ease;
+  border-bottom: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.06));
+  transition: background-color 0.2s ease;
 }
 
 .waitlist-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
+}
+
+.waitlist-table tbody tr:hover .waitlist-row__inner {
+  background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
 }
 
 .waitlist-table tbody td {
@@ -3473,13 +3522,16 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .waitlist-table tbody td.col-numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-hierarchy-secondary, #9CA3AF);
   font-size: 0.875rem;
+  font-weight: 400;
   white-space: nowrap;
 }
 
 .waitlist-table tbody td.col-numeric .copyable {
   white-space: nowrap;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-weight: 400;
 }
 
 .waitlist-empty {
@@ -3576,14 +3628,16 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 }
 
 .btn-icon-menu:hover {
-  color: var(--text-main);
-  background: var(--accent-dim);
-  border-color: var(--border-2);
+  color: var(--text-hierarchy-primary, var(--text-main));
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.06));
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .btn-icon-menu:focus-visible {
-  outline: 2px solid var(--accent-gold);
+  outline: 2px solid rgba(227, 193, 143, 0.45);
   outline-offset: 2px;
+  color: var(--text-hierarchy-primary, var(--text-main));
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .btn-icon-menu svg {
@@ -3600,7 +3654,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   padding: 6px;
   border-radius: 10px;
   background: var(--surface-2);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--divider-subtle, rgba(255, 255, 255, 0.08));
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
@@ -3634,18 +3688,24 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, var(--text-main));
   font-family: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .actions-popover__item:hover:not(:disabled) {
-  background: var(--accent-dim);
-  color: var(--text-main);
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-hierarchy-primary, var(--text-main));
+}
+
+.actions-popover__item:focus-visible {
+  outline: 2px solid rgba(227, 193, 143, 0.4);
+  outline-offset: -1px;
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.05));
 }
 
 .actions-popover__item:disabled {
@@ -3739,6 +3799,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   gap: 12px;
   width: 100%;
   min-width: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
 }
 
 .waitlist-row__main,
@@ -4006,7 +4069,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, #F3F4F6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4016,7 +4079,8 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   display: block;
   margin-top: 2px;
   font-size: 10px;
-  color: var(--text-muted);
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4049,6 +4113,14 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   color: #fff;
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-account-menu:focus-visible,
+.btn-row-menu:focus-visible {
+  outline: 2px solid rgba(227, 193, 143, 0.45);
+  outline-offset: 2px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .account-menu-popover,
@@ -4100,9 +4172,19 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   transition: letter-spacing 0.2s ease, color 0.2s ease, opacity 0.2s ease;
 }
 
+.kinetic-label {
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-weight: 500;
+}
+
+.kinetic-value {
+  color: var(--text-hierarchy-primary, #F3F4F6);
+  font-weight: 600;
+}
+
 .kinetic-label:hover {
   letter-spacing: 0.06em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 .kinetic-value:hover {
@@ -4120,11 +4202,14 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
 .assistant-panel__title {
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--text-hierarchy-primary, var(--text-main));
 }
 
 .assistant-panel__desc {
   font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
 }
 
 .pulse-card--matte {
@@ -4133,7 +4218,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  padding: 12px 14px;
+  padding: var(--card-padding, 1.5rem);
 }
 
 .pulse-card__head {
@@ -4148,6 +4233,8 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-size: 9.5px;
   letter-spacing: 0.08em;
   margin-bottom: 0;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-weight: 500;
 }
 
 .pulse-card__chart {
@@ -4158,6 +4245,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .pulse-card__value {
   font-size: 1.25rem;
   font-weight: 600;
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 .pulse-card__value--split {
@@ -4168,8 +4256,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   margin-top: 4px;
   font-size: 10px;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
   text-transform: lowercase;
+  font-weight: 400;
 }
 
 .pulse-sparkline--gold { color: var(--accent-gold); }
@@ -4297,4 +4386,32 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   .assistant-pulse-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* ── Foundational UI polish: hierarchy, proximity, affordances ─────────── */
+
+.assistant-header__sub {
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+  font-weight: 400;
+}
+
+.handoff-note__meta,
+.handoff-note__time,
+.handoff-note__author {
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+  font-weight: 400;
+}
+
+.handoff-note__text {
+  color: var(--text-hierarchy-primary, #F3F4F6);
+  font-weight: 500;
+}
+
+.status-indicator__label {
+  font-weight: 500;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+}
+
+.timeline-item:hover .timeline-item__card {
+  background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
 }
