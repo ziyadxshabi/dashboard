@@ -405,6 +405,7 @@ let handoffNotes = [];
   }
 
   function renderOperationalPulse() {
+    return safeRender('renderOperationalPulse', () => {
     const grid = $('assistant-pulse-grid');
     if (!grid) return;
 
@@ -450,6 +451,7 @@ let handoffNotes = [];
           </span>
         </div>
       </article>`;
+    });
   }
 
   function initHandoffForm() {
@@ -1237,30 +1239,23 @@ let handoffNotes = [];
   }
 
   function initBulkActionBar() {
-    const timeline = $('planning-timeline');
-    const tbody = $('roster-tbody');
+    // Checkbox + bulk actions use document-level delegation (bindCoreDelegation).
+  }
 
-    function handleCheckboxChange(event) {
-      if (!event.target.classList.contains('row-checkbox')) return;
+  function handleDelegatedCheckboxChange(event) {
+    if (!event.target.classList.contains('row-checkbox')) return;
+    if (!event.target.closest('#planning-timeline, #roster-tbody')) return;
 
-      const rowId = parseBaserowRowId(event.target.dataset.rowId);
-      if (rowId == null) return;
+    const rowId = parseBaserowRowId(event.target.dataset.rowId);
+    if (rowId == null) return;
 
-      if (event.target.checked) {
-        if (!selectedPatientIds.includes(rowId)) selectedPatientIds.push(rowId);
-      } else {
-        selectedPatientIds = selectedPatientIds.filter((id) => id !== rowId);
-      }
-
-      updateBulkBarUI();
+    if (event.target.checked) {
+      if (!selectedPatientIds.includes(rowId)) selectedPatientIds.push(rowId);
+    } else {
+      selectedPatientIds = selectedPatientIds.filter((id) => id !== rowId);
     }
 
-    timeline?.addEventListener('change', handleCheckboxChange);
-    tbody?.addEventListener('change', handleCheckboxChange);
-
-    $('btn-bulk-confirm')?.addEventListener('click', bulkConfirmSelected);
-    $('btn-bulk-cancel')?.addEventListener('click', bulkCancelSelected);
-    $('btn-bulk-sms')?.addEventListener('click', bulkSmsSelected);
+    updateBulkBarUI();
   }
 
   function isAppointmentToday(rawDate) {
@@ -1767,9 +1762,18 @@ let handoffNotes = [];
     if (!popover) return;
 
     const finish = () => {
-      popover.classList.remove('is-open');
+      popover.classList.remove('is-open', 'is-portaled');
       popover.hidden = true;
       popover.style.pointerEvents = 'none';
+      popover.style.opacity = '';
+      popover.style.transform = '';
+      popover.style.top = '';
+      popover.style.right = '';
+      popover.style.left = '';
+      popover.style.bottom = '';
+      if (typeof gsap !== 'undefined') {
+        gsap.set(popover, { clearProps: 'opacity,transform,pointerEvents' });
+      }
       dockActionsPopover(popover);
       if (trigger) trigger.setAttribute('aria-expanded', 'false');
       openPopovers.delete(popover);
@@ -2048,7 +2052,9 @@ let handoffNotes = [];
     const tip = ensureGlobalTooltip();
     if (!text) return;
     tip.textContent = text;
+    tip.classList.add('is-visible');
     tip.setAttribute('aria-hidden', 'false');
+    tip.style.pointerEvents = 'none';
     positionGlobalTooltip(clientX, clientY);
     if (typeof gsap === 'undefined' || prefersReducedMotion()) {
       tip.style.opacity = '1';
@@ -2064,8 +2070,10 @@ let handoffNotes = [];
     tooltipTargetEl = null;
     const tip = globalTooltipEl;
     const finish = () => {
+      tip.classList.remove('is-visible');
       tip.setAttribute('aria-hidden', 'true');
       tip.textContent = '';
+      tip.style.pointerEvents = 'none';
     };
     if (typeof gsap === 'undefined' || prefersReducedMotion()) {
       tip.style.opacity = '0';
@@ -2127,7 +2135,7 @@ let handoffNotes = [];
     const raw = String(value || '').trim();
     span.className = 'copyable';
     span.dataset.value = raw;
-    span.textContent = displayLabel ?? raw || '—';
+    span.textContent = displayLabel ?? (raw || '—');
     span.setAttribute('role', 'button');
     span.setAttribute('tabindex', '0');
     span.setAttribute('aria-label', `Copier ${span.textContent}`);
@@ -2190,20 +2198,68 @@ let handoffNotes = [];
   }
 
   function initCopyableInteractions() {
+    // Handled by bindCoreDelegation() — kept for API compatibility.
+  }
+
+  function safeRender(label, fn) {
+    try {
+      return fn();
+    } catch (error) {
+      console.warn(`[DentaFlow] ${label} failed:`, error);
+      return null;
+    }
+  }
+
+  let coreDelegationBound = false;
+
+  function bindCoreDelegation() {
+    if (coreDelegationBound) return;
+    coreDelegationBound = true;
+
+    document.addEventListener('change', handleDelegatedCheckboxChange);
+
     document.addEventListener('click', (event) => {
-      const el = event.target.closest('.copyable');
-      if (!el) return;
-      event.preventDefault();
-      event.stopPropagation();
-      kineticCopyFeedback(el, el.dataset.value);
+      const copyEl = event.target.closest('.copyable');
+      if (copyEl) {
+        event.preventDefault();
+        event.stopPropagation();
+        kineticCopyFeedback(copyEl, copyEl.dataset.value);
+        return;
+      }
+
+      const confirmBtn = event.target.closest('#btn-bulk-confirm');
+      if (confirmBtn && !confirmBtn.disabled) {
+        event.preventDefault();
+        bulkConfirmSelected();
+        return;
+      }
+
+      const cancelBtn = event.target.closest('#btn-bulk-cancel');
+      if (cancelBtn && !cancelBtn.disabled) {
+        event.preventDefault();
+        bulkCancelSelected();
+        return;
+      }
+
+      const smsBtn = event.target.closest('#btn-bulk-sms');
+      if (smsBtn && !smsBtn.disabled) {
+        event.preventDefault();
+        bulkSmsSelected();
+        return;
+      }
+
+      const crmRow = event.target.closest('#crm-table-body .crm-table-row');
+      if (crmRow && !crmRow.classList.contains('crm-table-empty')) {
+        activateCrmRow(crmRow);
+      }
     });
 
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
-      const el = event.target.closest('.copyable');
-      if (!el) return;
+      const copyEl = event.target.closest('.copyable');
+      if (!copyEl) return;
       event.preventDefault();
-      kineticCopyFeedback(el, el.dataset.value);
+      kineticCopyFeedback(copyEl, copyEl.dataset.value);
     });
   }
 
@@ -2351,15 +2407,16 @@ let handoffNotes = [];
     });
   }
 
-  function refreshInvisibleUIDecorations(root = document) {
-    const scope = root === document ? document : root;
+  function refreshInvisibleUIDecorations(root) {
+    const scope = !root || root === document ? document : root;
+    if (!scope || typeof scope.querySelectorAll !== 'function') return;
 
-    scope.querySelectorAll?.('.row-action-btn[aria-label]:not([data-tooltip])').forEach((btn) => {
+    scope.querySelectorAll('.row-action-btn[aria-label]:not([data-tooltip])').forEach((btn) => {
       const label = btn.getAttribute('aria-label');
       if (label) btn.dataset.tooltip = label;
     });
 
-    scope.querySelectorAll?.('.cell-truncate[title]:not([data-tooltip])').forEach((el) => {
+    scope.querySelectorAll('.cell-truncate[title]:not([data-tooltip])').forEach((el) => {
       const title = el.getAttribute('title');
       if (title) {
         el.dataset.tooltip = title;
@@ -2367,7 +2424,7 @@ let handoffNotes = [];
       }
     });
 
-    if (root === document) hydrateStaticCrmTableRows();
+    if (!root || root === document) hydrateStaticCrmTableRows();
     pulseNotesIndicators(scope);
   }
 
@@ -2379,7 +2436,6 @@ let handoffNotes = [];
     invisibleUIInitialized = true;
     ensureGlobalTooltip();
     initGlobalTooltipEngine();
-    initCopyableInteractions();
     refreshInvisibleUIDecorations();
   }
 
@@ -2633,6 +2689,7 @@ let handoffNotes = [];
   }
 
   function renderPlanning(records) {
+    return safeRender('renderPlanning', () => {
     const rows = Array.isArray(records) ? records.filter(Boolean) : [];
 
     rosterData = rows.map(record => ({ ...record }));
@@ -2701,6 +2758,7 @@ let handoffNotes = [];
     if (rows.length) {
       updateCRMSidePanel(toCrmPatient(rows[0]));
     }
+    });
   }
 
   function showTableLoader() {
@@ -3278,6 +3336,7 @@ let handoffNotes = [];
   }
 
   function renderWaitlistPanel() {
+    return safeRender('renderWaitlistPanel', () => {
     const container = $('waitlist-panel-list');
     if (!container) return;
     const waitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
@@ -3300,6 +3359,7 @@ let handoffNotes = [];
     waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
     container.appendChild(fragment);
     refreshInvisibleUIDecorations(container);
+    });
   }
 
   function setWaitlistFormProcessing(form, isProcessing) {
@@ -3588,6 +3648,7 @@ let handoffNotes = [];
   }
 
   function renderCRMTable(appointmentsArray) {
+    return safeRender('renderCRMTable', () => {
     const tbody = document.getElementById('crm-table-body');
     if (!tbody) return;
 
@@ -3656,13 +3717,13 @@ let handoffNotes = [];
       ));
 
       tr.append(nameCell, phoneCell, emailCell, motifCell, statusCell);
-      tr.addEventListener('click', () => activateCrmRow(tr));
       tbody.appendChild(tr);
     });
 
     const firstRow = tbody.querySelector('.crm-table-row');
     if (firstRow) firstRow.classList.add('active-row');
     refreshInvisibleUIDecorations(tbody);
+    });
   }
 
   function readCrmRowData(row) {
@@ -3911,36 +3972,57 @@ let handoffNotes = [];
   }
 
   function init() {
-    loadSettings();
-    applyTheme(volatileSettings.theme);
-    setHeaderDate();
-    initNavigation();
-    initStatusListener();
-    initQuickActions();
-    initBulkActionBar();
-    initInvisibleUI();
-    initProgressiveDisclosure();
-    renderOperationalPulse();
-    refreshInvisibleUIDecorations($('assistant-pulse-grid'));
-    loadHandoffNotes();
-    initHandoffForm();
-    initWaitlistForm();
-    initSettings();
-    initThemeSwitcher();
-    initUserProfile();
-    initCrmSearch();
-    initCrmSidePanel();
-    renderWaitlistPanel();
-    loadPlanning();
+    bindCoreDelegation();
 
-    const activeViewEl = document.getElementById(VIEW_MAP[activeView]);
-    if (activeViewEl) {
-      activateDashboardView(activeViewEl, { animate: false });
-    }
+    const runInitStep = (label, fn) => {
+      try {
+        fn();
+      } catch (error) {
+        console.warn(`[DentaFlow] init step "${label}" failed:`, error);
+      }
+    };
 
-    if (activeView === 'calendar') {
-      initDashboardCalendar();
-    }
+    runInitStep('settings', () => {
+      loadSettings();
+      applyTheme(volatileSettings.theme);
+    });
+    runInitStep('header', () => setHeaderDate());
+    runInitStep('navigation', () => initNavigation());
+    runInitStep('status', () => initStatusListener());
+    runInitStep('quickActions', () => initQuickActions());
+    runInitStep('bulkBar', () => initBulkActionBar());
+    runInitStep('invisibleUI', () => initInvisibleUI());
+    runInitStep('progressiveDisclosure', () => initProgressiveDisclosure());
+    runInitStep('operationalPulse', () => {
+      renderOperationalPulse();
+      refreshInvisibleUIDecorations($('assistant-pulse-grid'));
+    });
+    runInitStep('handoff', () => {
+      loadHandoffNotes();
+      initHandoffForm();
+    });
+    runInitStep('waitlist', () => {
+      initWaitlistForm();
+      renderWaitlistPanel();
+    });
+    runInitStep('settingsUI', () => initSettings());
+    runInitStep('theme', () => initThemeSwitcher());
+    runInitStep('profile', () => initUserProfile());
+    runInitStep('crm', () => {
+      initCrmSearch();
+      initCrmSidePanel();
+    });
+    runInitStep('planning', () => loadPlanning());
+
+    runInitStep('activeView', () => {
+      const activeViewEl = document.getElementById(VIEW_MAP[activeView]);
+      if (activeViewEl) {
+        activateDashboardView(activeViewEl, { animate: false });
+      }
+      if (activeView === 'calendar') {
+        initDashboardCalendar();
+      }
+    });
   }
 
   let assistantDashboardInitialized = false;
@@ -3958,6 +4040,10 @@ let handoffNotes = [];
   window.initProgressiveDisclosure = initProgressiveDisclosure;
   window.initInvisibleUI = initInvisibleUI;
   window.refreshInvisibleUIDecorations = refreshInvisibleUIDecorations;
+  window.bindCoreDelegation = bindCoreDelegation;
+
+  bindCoreDelegation();
+
   window.DentaFlowRowUI = {
     createRowActionGroup,
     createWaitlistTableRow,

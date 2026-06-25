@@ -2382,8 +2382,13 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   pointer-events: none;
 }
 
+.crm-side-panel-root:not(.is-active) {
+  visibility: hidden;
+}
+
 .crm-side-panel-root.is-active {
   pointer-events: auto;
+  visibility: visible;
 }
 
 .crm-side-panel-overlay {
@@ -2946,14 +2951,16 @@ body {
 
 .bulk-bar-hidden {
   opacity: 0;
-  pointer-events: none;
+  pointer-events: none !important;
+  visibility: hidden;
   transform: translate(-50%, 20px);
   transition: all 0.2s ease-out;
 }
 
 .bulk-bar-visible {
   opacity: 1;
-  pointer-events: auto;
+  pointer-events: auto !important;
+  visibility: visible;
   transform: translate(-50%, 0);
   transition: all 0.2s ease-out;
 }
@@ -3560,7 +3567,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   transform-origin: top right;
   opacity: 0;
   visibility: hidden;
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 .actions-popover.is-portaled {
@@ -3570,7 +3577,14 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
 .actions-popover.is-open {
   visibility: visible;
-  pointer-events: auto;
+  pointer-events: auto !important;
+}
+
+.actions-popover[hidden] {
+  display: block;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 .actions-popover__item {
@@ -3793,8 +3807,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
 #global-tooltip {
   position: fixed;
-  pointer-events: none;
+  pointer-events: none !important;
   opacity: 0;
+  visibility: hidden;
   max-width: min(280px, calc(100vw - 24px));
   padding: 6px 12px;
   border-radius: 6px;
@@ -3812,6 +3827,10 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   transform: scale(0.95);
   transform-origin: center bottom;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+#global-tooltip.is-visible {
+  visibility: visible;
 }
 
 .copyable {
