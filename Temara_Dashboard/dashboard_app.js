@@ -259,6 +259,9 @@ function initializeDoctorDashboard() {
 
   document.querySelectorAll('.dashboard-view').forEach(view => {
     view.setAttribute('aria-hidden', view.classList.contains('active') ? 'false' : 'true');
+    if (view.classList.contains('active')) {
+      view.classList.add('view-enter-ready');
+    }
   });
 
   if (activeView === 'calendar') {
@@ -510,6 +513,7 @@ function navigateToView(viewKey) {
   views.forEach(view => {
     const isTarget = view.id === targetId;
     view.classList.toggle('active', isTarget);
+    view.classList.toggle('view-enter-ready', isTarget);
     view.setAttribute('aria-hidden', isTarget ? 'false' : 'true');
   });
 

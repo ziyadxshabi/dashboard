@@ -451,6 +451,7 @@ body.mode-assistant {
 
 .dashboard-view.active {
   display: flex;
+  pointer-events: auto;
 }
 
 .dashboard-view.active.view-enter {

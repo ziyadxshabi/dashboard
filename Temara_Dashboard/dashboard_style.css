@@ -426,6 +426,7 @@ h1, h2, h3,
 .dashboard-view.active {
   display: flex;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .view-page-header {
