@@ -2,7 +2,11 @@
 
     <aside class="sidebar assistant-sidebar" aria-label="Navigation assistante">
       <div class="sidebar-brand">
-        <span class="sidebar-brand-icon" aria-hidden="true">🦷</span>
+        <span class="sidebar-brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3c-2.5 0-4.5 2.2-4.5 5 0 2.2 1.2 4.2 2.8 5.5-.3 2.5-.8 5-2.3 6.5 2.5-.5 4.5-2 5.5-4 1 2 3 3.5 5.5 4-1.5-1.5-2-4-2.3-6.5 1.6-1.3 2.8-3.3 2.8-5.5C16.5 5.2 14.5 3 12 3z"/>
+          </svg>
+        </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
           <span class="sidebar-brand-sub">Command Center</span>
@@ -44,20 +48,44 @@
           </svg>
           <span>Dossiers Patients</span>
         </a>
-        <a href="#" class="nav-link" data-nav="settings">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          <span>Paramètres</span>
-        </a>
       </nav>
 
-      <div class="sidebar-profile sidebar-profile--assistant">
-        <div class="profile-avatar" id="profile-avatar" aria-hidden="true">SA</div>
-        <div class="profile-info">
-          <span class="profile-name" id="profile-name">Sanae Amrani</span>
-          <span class="profile-role" id="profile-role">Assistante dentaire</span>
+      <div class="account-card" data-popover-root>
+        <div class="account-card__body">
+          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">SA</div>
+          <div class="account-card__info">
+            <span class="account-card__name kinetic-label" id="profile-name">Sanae Amrani</span>
+            <span class="account-card__role" id="profile-role">Assistante dentaire</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn-account-menu"
+          id="account-menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="account-menu-popover"
+          aria-label="Menu compte"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.75"/>
+            <circle cx="12" cy="12" r="1.75"/>
+            <circle cx="12" cy="19" r="1.75"/>
+          </svg>
+        </button>
+        <div class="actions-popover account-menu-popover" id="account-menu-popover" role="menu" hidden>
+          <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Paramètres
+          </button>
+          <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Facturation
+          </button>
+          <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Déconnexion
+          </button>
         </div>
       </div>
     </aside>
@@ -72,17 +100,10 @@
 
         <header class="assistant-header">
           <div>
-            <h1 class="assistant-header__title">Bonjour, <span id="hero-profile-name">Sanae</span></h1>
+            <h1 class="assistant-header__title kinetic-title">Bonjour, <span id="hero-profile-name">Sanae</span></h1>
             <p class="assistant-header__sub" id="assistant-date">—</p>
           </div>
           <div class="assistant-header__meta">
-            <span class="assistant-stat-pill">
-              <strong id="roster-count">0</strong> rendez-vous aujourd'hui
-            </span>
-            <span class="assistant-stat-pill">
-              <strong id="roster-confirmed">0</strong> confirmés ·
-              <strong id="roster-waiting">0</strong> en attente
-            </span>
             <div class="hero-sync">
               <span class="sync-dot ok" aria-hidden="true"></span>
               <span class="sync-label">Synchronisé · Typebot actif</span>
@@ -484,16 +505,18 @@
 
   <div class="assistant-toast" id="assistant-toast" role="status" aria-live="polite"></div>
 
-  <div id="crm-side-panel" class="crm-side-panel-root" aria-hidden="true">
-    <div class="crm-side-panel-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
+  <div id="crm-side-panel" class="crm-side-panel-root crm-modal-root" aria-hidden="true">
+    <div class="crm-side-panel-overlay crm-modal-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
     <aside
-      class="crm-side-panel"
+      class="crm-side-panel crm-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="crm-panel-name"
       aria-describedby="crm-panel-subtitle"
     >
-      <button type="button" class="crm-side-panel-close" id="crm-side-panel-close" aria-label="Fermer le dossier">×</button>
+      <button type="button" class="crm-side-panel-close crm-modal-close" id="crm-side-panel-close" aria-label="Fermer le dossier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
 
       <header class="crm-side-panel-header">
         <p class="crm-side-panel-eyebrow">Dossier Patient</p>

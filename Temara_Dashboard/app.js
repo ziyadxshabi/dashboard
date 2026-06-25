@@ -456,38 +456,91 @@ let handoffNotes = [];
     const data = pulseData ?? createEmptyOperationalPulse();
     const punctualityLabel = data.punctuality != null ? `${data.punctuality}%` : '--';
     const turnoverLabel = data.turnoverMinutes != null ? `${data.turnoverMinutes} min` : '--';
+    const seenRatio = data.patientsPlanned > 0
+      ? data.patientsSeen / data.patientsPlanned
+      : 0;
+    const cancelRatio = data.patientsPlanned > 0
+      ? data.cancellations / data.patientsPlanned
+      : 0;
+    const seenSeries = [0.25, 0.4, 0.55, seenRatio || 0.15, Math.min(1, seenRatio + 0.1)];
+    const cancelBars = [0.15, cancelRatio, 0.08, cancelRatio * 0.6, 0.12];
+    const punctualityPct = data.punctuality ?? (Math.round(seenRatio * 100) || 0);
+    const turnoverSeries = [0.35, 0.42, 0.38, 0.5, 0.45];
 
     grid.innerHTML = `
-      <article class="pulse-card">
-        <p class="pulse-card__label" data-tooltip="Patients déjà reçus sur le total prévu aujourd'hui">Patients Vus / Prévus</p>
-        <div class="pulse-card__value-row">
-          <p class="pulse-card__value pulse-card__value--split">
-            ${data.patientsSeen} <span>/ ${data.patientsPlanned}</span>
-          </p>
+      <article class="pulse-card pulse-card--matte">
+        <div class="pulse-card__head">
+          <p class="pulse-card__label kinetic-label" data-tooltip="Patients déjà reçus sur le total prévu aujourd'hui">Flux patients</p>
+          <div class="pulse-card__chart">${buildSparklineSvg(seenSeries, { tone: 'gold' })}</div>
         </div>
+        <p class="pulse-card__value pulse-card__value--split kinetic-value">
+          ${data.patientsSeen} <span>/ ${data.patientsPlanned}</span>
+        </p>
+        <p class="pulse-card__meta">vus / prévus</p>
       </article>
 
-      <article class="pulse-card">
-        <p class="pulse-card__label" data-tooltip="Annulations et absences non signalées du jour">Annulations / No-Shows</p>
-        <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${data.cancellations}</p>
+      <article class="pulse-card pulse-card--matte">
+        <div class="pulse-card__head">
+          <p class="pulse-card__label kinetic-label" data-tooltip="Annulations et absences non signalées du jour">Absences</p>
+          <div class="pulse-card__chart">${buildBarChartSvg(cancelBars, { tone: 'danger' })}</div>
         </div>
+        <p class="pulse-card__value kinetic-value">${data.cancellations}</p>
+        <p class="pulse-card__meta">annulations · no-shows</p>
       </article>
 
-      <article class="pulse-card">
-        <p class="pulse-card__label" data-tooltip="Pourcentage de patients arrivés à l'heure">Taux de Ponctualité</p>
-        <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${punctualityLabel}</p>
+      <article class="pulse-card pulse-card--matte">
+        <div class="pulse-card__head">
+          <p class="pulse-card__label kinetic-label" data-tooltip="Pourcentage de patients arrivés à l'heure">Ponctualité</p>
+          <div class="pulse-card__chart">${buildDoughnutSvg(punctualityPct, { tone: 'success' })}</div>
         </div>
+        <p class="pulse-card__value kinetic-value">${punctualityLabel}</p>
+        <p class="pulse-card__meta">taux d'arrivée</p>
       </article>
 
-      <article class="pulse-card">
-        <p class="pulse-card__label" data-tooltip="Durée moyenne entre l'arrivée et le début du soin">Temps de Rotation Moyen</p>
-        <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${turnoverLabel}</p>
+      <article class="pulse-card pulse-card--matte">
+        <div class="pulse-card__head">
+          <p class="pulse-card__label kinetic-label" data-tooltip="Durée moyenne entre l'arrivée et le début du soin">Rotation</p>
+          <div class="pulse-card__chart">${buildSparklineSvg(turnoverSeries, { tone: 'muted' })}</div>
         </div>
+        <p class="pulse-card__value kinetic-value">${turnoverLabel}</p>
+        <p class="pulse-card__meta">temps moyen salle</p>
       </article>`;
     });
+  }
+
+  function buildSparklineSvg(values, { width = 52, height = 22, tone = 'gold' } = {}) {
+    const pts = Array.isArray(values) && values.length ? values : [0.3, 0.5, 0.4];
+    const max = Math.max(...pts, 1);
+    const min = Math.min(...pts, 0);
+    const range = max - min || 1;
+    const step = width / Math.max(pts.length - 1, 1);
+    const coords = pts.map((value, index) => {
+      const x = index * step;
+      const y = height - ((value - min) / range) * (height - 4) - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${coords}"/></svg>`;
+  }
+
+  function buildBarChartSvg(values, { width = 52, height = 22, tone = 'danger' } = {}) {
+    const pts = Array.isArray(values) && values.length ? values : [0.2, 0.5, 0.3];
+    const max = Math.max(...pts, 0.01);
+    const barW = Math.max(4, (width - (pts.length - 1) * 3) / pts.length);
+    const bars = pts.map((value, index) => {
+      const barH = Math.max(2, (value / max) * (height - 4));
+      const x = index * (barW + 3);
+      const y = height - barH - 2;
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1"/>`;
+    }).join('');
+    return `<svg class="pulse-bars pulse-bars--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${bars}</svg>`;
+  }
+
+  function buildDoughnutSvg(percent, { size = 28, tone = 'success' } = {}) {
+    const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+    const radius = 10;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - pct / 100);
+    return `<svg class="pulse-doughnut pulse-doughnut--${tone}" viewBox="0 0 28 28" width="${size}" height="${size}" aria-hidden="true"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5"/><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>`;
   }
 
   function initHandoffForm() {
@@ -1545,6 +1598,34 @@ let handoffNotes = [];
     selectEl.dataset.matte = getMatteChipModifier(status ?? selectEl.value);
   }
 
+  function createStatusDot(label) {
+    const dot = document.createElement('span');
+    dot.className = `status-dot status-dot--${getMatteChipModifier(label)}`;
+    dot.title = label;
+    dot.setAttribute('aria-label', label);
+    return dot;
+  }
+
+  function createPriorityIndicator(label) {
+    const wrap = document.createElement('span');
+    wrap.className = 'status-indicator';
+    wrap.appendChild(createStatusDot(label));
+    const text = document.createElement('span');
+    text.className = 'status-indicator__label kinetic-label';
+    text.textContent = label;
+    wrap.appendChild(text);
+    return wrap;
+  }
+
+  function updateStatusDotForSelect(selectEl) {
+    const wrap = selectEl.closest('.status-control');
+    const dot = wrap?.querySelector('.status-dot');
+    if (!dot) return;
+    dot.className = `status-dot status-dot--${getMatteChipModifier(selectEl.value)}`;
+    dot.title = selectEl.value;
+    dot.setAttribute('aria-label', selectEl.value);
+  }
+
   function createMatteChip(label) {
     const chip = document.createElement('span');
     chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
@@ -1626,6 +1707,7 @@ let handoffNotes = [];
     edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
     sms: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
     copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    menu: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>',
   };
 
   const EMPTY_STATE_SVG_CALENDAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
@@ -1689,47 +1771,93 @@ let handoffNotes = [];
     if (priorityEl && appt.priorite) priorityEl.value = appt.priorite;
   }
 
-  function createRowActionGroup(context) {
-    const group = document.createElement('div');
-    group.className = 'action-group';
-    group.setAttribute('aria-label', 'Actions secondaires');
+  function createPopoverMenuItem(label, iconSvg, onClick, options = {}) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'actions-popover__item';
+    if (options.danger) item.classList.add('actions-popover__item--danger');
+    if (options.disabled) {
+      item.classList.add('v-disabled');
+      item.disabled = true;
+    }
+    item.setAttribute('role', 'menuitem');
+    item.innerHTML = `${iconSvg}<span>${escapeHtml(label)}</span>`;
+    item.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (item.disabled) return;
+      onClick(event);
+      const root = item.closest('[data-popover-root]');
+      const popover = root?.querySelector('.actions-popover');
+      const trigger = root?.querySelector('.btn-row-menu, .btn-icon-menu, .btn-account-menu');
+      closeActionsPopover(popover, trigger);
+    });
+    return item;
+  }
+
+  function createRowActionsMenu(context) {
+    const root = document.createElement('div');
+    root.className = 'row-actions-menu';
+    root.dataset.popoverRoot = '';
+
+    const popoverId = `row-menu-${Math.random().toString(36).slice(2, 9)}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-row-menu';
+    btn.setAttribute('aria-haspopup', 'menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', popoverId);
+    btn.setAttribute('aria-label', 'Actions');
+    btn.innerHTML = ROW_ACTION_SVG.menu;
+
+    const popover = document.createElement('div');
+    popover.className = 'actions-popover row-actions-popover';
+    popover.id = popoverId;
+    popover.hidden = true;
+    popover.setAttribute('role', 'menu');
 
     const phone = context.phone || context.telephone || context.record?.phone || '';
 
     if (context.kind === 'waitlist') {
-      group.append(
-        createRowActionButton('edit', 'Modifier le patient', ROW_ACTION_SVG.edit, () => {
+      popover.append(
+        createPopoverMenuItem('Modifier le patient', ROW_ACTION_SVG.edit, () => {
           prefillWaitlistFormFromRow(context.appt || context);
           if (VIEW_MAP.waitlist) navigateToView('waitlist');
           $('waitlist-name')?.focus();
         }),
-        createRowActionButton('sms', 'Envoyer un SMS rapide', ROW_ACTION_SVG.sms, () => {
+        createPopoverMenuItem('Envoyer un SMS', ROW_ACTION_SVG.sms, () => {
           showToast('Notification SMS planifiée via n8n.', 'info');
         }),
-        createRowActionButton('copy', 'Copier le numéro', ROW_ACTION_SVG.copy, () => {
+        createPopoverMenuItem('Copier le numéro', ROW_ACTION_SVG.copy, () => {
           copyTextToClipboard(phone);
         })
       );
-      return group;
+      root.append(btn, popover);
+      return root;
     }
 
     const record = context.record || {};
     const rowId = extractBaserowRowId(record);
 
-    group.append(
-      createRowActionButton('edit', 'Modifier le statut', ROW_ACTION_SVG.edit, () => {
+    popover.append(
+      createPopoverMenuItem('Modifier le statut', ROW_ACTION_SVG.edit, () => {
         const row = document.querySelector(`[data-patient-id="${String(record.id)}"] .status-select`);
         row?.focus();
       }),
-      createRowActionButton('sms', 'Envoyer un SMS rapide', ROW_ACTION_SVG.sms, () => {
+      createPopoverMenuItem('Envoyer un SMS', ROW_ACTION_SVG.sms, () => {
         if (rowId != null) sendQuickSmsToRow(rowId);
         else showToast('SMS rapide indisponible pour ce rendez-vous.', 'warning');
       }),
-      createRowActionButton('copy', 'Copier les informations', ROW_ACTION_SVG.copy, () => {
+      createPopoverMenuItem('Copier les infos', ROW_ACTION_SVG.copy, () => {
         copyTextToClipboard(`${record.name || ''} — ${record.time || ''}`);
       })
     );
-    return group;
+
+    root.append(btn, popover);
+    return root;
+  }
+
+  function createRowActionGroup(context) {
+    return createRowActionsMenu(context);
   }
 
   function createEmptyState(options = {}) {
@@ -1936,7 +2064,7 @@ let handoffNotes = [];
       popoverClickBound = true;
 
       document.addEventListener('click', (event) => {
-        const trigger = event.target.closest('.btn-icon-menu');
+        const trigger = event.target.closest('.btn-icon-menu, .btn-row-menu, .btn-account-menu');
         if (trigger) {
           const root = trigger.closest('[data-popover-root]');
           const popover = root?.querySelector('.actions-popover');
@@ -1996,27 +2124,17 @@ let handoffNotes = [];
     }
   }
 
+  function initAccountCardMenu() {
+    $('account-menu-settings')?.addEventListener('click', () => {
+      if (VIEW_MAP.settings) navigateToView('settings');
+    });
+    $('account-menu-logout')?.addEventListener('click', () => {
+      window.DentaFlowAuth?.clearSession?.();
+    });
+  }
+
   function initRowActionHover() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    let activeRow = null;
-
-    document.addEventListener('mouseover', (event) => {
-      const row = event.target.closest('[data-row-interactive]');
-      if (!row || row === activeRow) return;
-      if (activeRow && !activeRow.contains(event.relatedTarget)) {
-        animateRowActionGroup(activeRow.querySelector('.action-group'), false);
-      }
-      activeRow = row;
-      animateRowActionGroup(row.querySelector('.action-group'), true);
-    });
-
-    document.addEventListener('mouseout', (event) => {
-      const row = event.target.closest('[data-row-interactive]');
-      if (!row || row.contains(event.relatedTarget)) return;
-      animateRowActionGroup(row.querySelector('.action-group'), false);
-      if (activeRow === row) activeRow = null;
-    });
+    /* Row actions now use persistent triple-dot menus — hover reveal disabled. */
   }
 
   function initMatteButtonPress() {
@@ -2546,13 +2664,18 @@ let handoffNotes = [];
   }
 
   function createStatusSelectElement(record) {
+    const wrap = document.createElement('div');
+    wrap.className = 'status-control';
+
+    const currentStatus = STATUS_OPTIONS.includes(record.status) ? record.status : 'Confirmé';
+    wrap.appendChild(createStatusDot(currentStatus));
+
     const select = document.createElement('select');
-    select.className = 'status-select';
+    select.className = 'status-select status-select--ghost';
     select.setAttribute('aria-label', 'Modifier le statut');
     if (record.calBookingId) {
       select.dataset.bookingId = String(record.calBookingId);
     }
-    const currentStatus = STATUS_OPTIONS.includes(record.status) ? record.status : 'Confirmé';
     STATUS_OPTIONS.forEach((opt) => {
       const option = document.createElement('option');
       option.value = opt;
@@ -2561,7 +2684,9 @@ let handoffNotes = [];
       select.appendChild(option);
     });
     applyMatteSelectSkin(select, currentStatus);
-    return select;
+    select.addEventListener('change', () => updateStatusDotForSelect(select));
+    wrap.appendChild(select);
+    return wrap;
   }
 
   function createPlanningTimelineItem(record) {
@@ -2626,13 +2751,12 @@ let handoffNotes = [];
     const meta = document.createElement('div');
     meta.className = 'timeline-item__meta';
 
-    meta.appendChild(createRowActionGroup({ kind: 'planning', record }));
-
     const statusWrap = document.createElement('div');
     statusWrap.className = 'timeline-item__status';
     statusWrap.appendChild(createStatusSelectElement(record));
 
     meta.appendChild(statusWrap);
+    meta.appendChild(createRowActionGroup({ kind: 'planning', record }));
     card.append(checkboxWrap, main, meta);
     item.append(timeEl, rail, card);
     return item;
@@ -2759,7 +2883,7 @@ let handoffNotes = [];
     }
 
     const priorityTd = document.createElement('td');
-    priorityTd.appendChild(createMatteChip(getWaitlistPriorityLabel(appt)));
+    priorityTd.appendChild(createPriorityIndicator(getWaitlistPriorityLabel(appt)));
 
     tr.append(patientTd, phoneTd, priorityTd);
     return tr;
@@ -4062,7 +4186,10 @@ let handoffNotes = [];
     });
     runInitStep('settingsUI', () => initSettings());
     runInitStep('theme', () => initThemeSwitcher());
-    runInitStep('profile', () => initUserProfile());
+    runInitStep('profile', () => {
+      initUserProfile();
+      initAccountCardMenu();
+    });
     runInitStep('crm', () => {
       initCrmSearch();
       initCrmSidePanel();

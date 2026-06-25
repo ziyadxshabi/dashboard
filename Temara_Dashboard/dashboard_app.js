@@ -1452,7 +1452,7 @@ function renderKPICards(data) {
 
   setText('sub-production',
     pct >= 100
-      ? `🎯 Objectif atteint ! (${revFormatted})`
+      ? `Objectif atteint (${revFormatted})`
       : `${revFormatted} / ${goalFormatted} MAD facturés`
   );
 
@@ -1460,7 +1460,7 @@ function renderKPICards(data) {
   setKPINumber('val-new', new_patients, true);
   setText('sub-new',
     new_patients === 0
-      ? 'Aucun formulaire en attente ✓'
+      ? 'Aucun formulaire en attente'
       : `${new_patients} formulaire${new_patients > 1 ? 's' : ''} d'entrée requis`
   );
 }

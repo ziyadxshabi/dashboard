@@ -3890,3 +3890,355 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .waitlist-row.is-confirm-success {
   transition: background-color 0.3s ease;
 }
+
+/* ── Premium Command Center refresh ─────────────────────────────────────── */
+
+.sidebar-brand-icon svg,
+.login-mark-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: var(--accent-gold);
+}
+
+.assistant-sidebar {
+  padding: 18px 10px 14px;
+}
+
+.assistant-sidebar .sidebar-brand {
+  padding: 4px 8px 18px;
+  gap: 10px;
+}
+
+.assistant-sidebar .nav-link {
+  padding: 10px 12px;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.assistant-sidebar .nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.account-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 10px;
+  background: #121110;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.account-card__body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.account-card__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(201, 169, 98, 0.14);
+  color: var(--accent-gold);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-card__info {
+  min-width: 0;
+}
+
+.account-card__name {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-card__role {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-account-menu,
+.btn-row-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-account-menu svg,
+.btn-row-menu svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-account-menu:hover,
+.btn-row-menu:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.account-menu-popover {
+  min-width: 180px;
+}
+
+.actions-popover__item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.account-menu-popover .actions-popover__item,
+.row-actions-popover .actions-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kinetic-title {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  transition: letter-spacing 0.25s ease, opacity 0.25s ease;
+}
+
+.kinetic-title:hover {
+  letter-spacing: -0.02em;
+}
+
+.kinetic-label,
+.kinetic-value {
+  transition: letter-spacing 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.kinetic-label:hover {
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+}
+
+.kinetic-value:hover {
+  letter-spacing: -0.01em;
+}
+
+.assistant-header__title {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  font-weight: 400;
+}
+
+.assistant-header__sub {
+  font-size: 12px;
+}
+
+.assistant-panel__title {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.assistant-panel__desc {
+  font-size: 11.5px;
+}
+
+.pulse-card--matte {
+  background: #121110;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 12px 14px;
+}
+
+.pulse-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pulse-card__label {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  margin-bottom: 0;
+}
+
+.pulse-card__chart {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.pulse-card__value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.pulse-card__value--split {
+  font-size: 1.125rem;
+}
+
+.pulse-card__meta {
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: lowercase;
+}
+
+.pulse-sparkline--gold { color: var(--accent-gold); }
+.pulse-sparkline--muted { color: rgba(255, 255, 255, 0.35); }
+.pulse-bars--danger { color: #f87171; fill: currentColor; }
+.pulse-doughnut--success { color: #4ade80; }
+
+.row-actions-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.row-actions-popover {
+  min-width: 168px;
+}
+
+.timeline-item__meta {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.timeline-item__status {
+  min-width: 0;
+}
+
+.status-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
+}
+
+.status-dot--confirmé,
+.status-dot--confirme { background: #4ade80; }
+.status-dot--attente,
+.status-dot--en-attente { background: #fbbf24; }
+.status-dot--urgence { background: #f87171; }
+.status-dot--annulé,
+.status-dot--annule { background: #94a3b8; }
+.status-dot--gold { background: var(--accent-gold); }
+
+.status-select--ghost {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 2px 22px 2px 0;
+  border: none;
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 2px center;
+}
+
+.status-select--ghost:focus-visible {
+  outline: 1px solid rgba(201, 169, 98, 0.45);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-indicator__label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.crm-modal-root .crm-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  right: auto;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(82vh, 620px);
+  height: auto;
+  transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+  opacity: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.crm-modal-root.is-active .crm-modal {
+  right: auto;
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.crm-modal-close {
+  font-size: 0;
+}
+
+.crm-modal-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.crm-side-panel-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.crm-side-panel-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+@media (max-width: 768px) {
+  .assistant-pulse-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
