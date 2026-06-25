@@ -416,7 +416,7 @@ let handoffNotes = [];
 
     grid.innerHTML = `
       <article class="pulse-card">
-        <p class="pulse-card__label">Patients Vus / Prévus</p>
+        <p class="pulse-card__label" data-tooltip="Patients déjà reçus sur le total prévu aujourd'hui">Patients Vus / Prévus</p>
         <div class="pulse-card__value-row">
           <p class="pulse-card__value pulse-card__value--split">
             ${data.patientsSeen} <span>/ ${data.patientsPlanned}</span>
@@ -425,14 +425,14 @@ let handoffNotes = [];
       </article>
 
       <article class="pulse-card">
-        <p class="pulse-card__label">Annulations / No-Shows</p>
+        <p class="pulse-card__label" data-tooltip="Annulations et absences non signalées du jour">Annulations / No-Shows</p>
         <div class="pulse-card__value-row">
           <p class="pulse-card__value">${data.cancellations}</p>
         </div>
       </article>
 
       <article class="pulse-card">
-        <p class="pulse-card__label">Taux de Ponctualité</p>
+        <p class="pulse-card__label" data-tooltip="Pourcentage de patients arrivés à l'heure">Taux de Ponctualité</p>
         <div class="pulse-card__value-row">
           <p class="pulse-card__value">${data.punctuality}%</p>
           <span class="pulse-card__trend ${punctualityTrendClass}" aria-label="Tendance à la hausse">
@@ -442,7 +442,7 @@ let handoffNotes = [];
       </article>
 
       <article class="pulse-card">
-        <p class="pulse-card__label">Temps de Rotation Moyen</p>
+        <p class="pulse-card__label" data-tooltip="Durée moyenne entre l'arrivée et le début du soin">Temps de Rotation Moyen</p>
         <div class="pulse-card__value-row">
           <p class="pulse-card__value">${data.turnoverMinutes} min</p>
           <span class="pulse-card__trend ${turnoverTrendClass}" aria-label="Tendance à la baisse">
@@ -1171,8 +1171,8 @@ let handoffNotes = [];
         checkbox.checked = false;
       });
       updateBulkBarUI();
+      animateInlineConfirmSuccess(ids);
       showToast(`${ids.length} rendez-vous confirmés avec succès`, 'success');
-      loadPlanning();
     } catch (error) {
       console.error('[Bulk Confirm] Failed:', error);
       revertOptimisticBulkSnapshots(optimisticSnapshots);
@@ -1372,6 +1372,13 @@ let handoffNotes = [];
       ''
     ).trim();
 
+    const insurance = String(
+      item['N° d\'Assurance'] ??
+      item['Couverture Médicale'] ??
+      item.insurance ??
+      ''
+    ).trim();
+
     const practitioner = String(
       item['Praticien Assigné'] ??
       item['Praticien'] ??
@@ -1395,6 +1402,7 @@ let handoffNotes = [];
       phone,
       email,
       observations,
+      insurance,
       practitioner,
       time: formatAppointmentTime(rawDate),
       rawDate,
@@ -1454,7 +1462,7 @@ let handoffNotes = [];
   }
 
   function createPatientIdentity(name, options = {}) {
-    const { showNoShow = false } = options;
+    const { showNoShow = false, hasNotes = false } = options;
     const wrap = document.createElement('div');
     wrap.className = 'patient-identity';
 
@@ -1466,7 +1474,7 @@ let handoffNotes = [];
     if (showNoShow) {
       const flagSpan = document.createElement('span');
       flagSpan.className = 'roster-noshow-flag';
-      flagSpan.title = 'Historique de no-shows — vigilance recommandée';
+      flagSpan.dataset.tooltip = 'Historique de no-shows — vigilance recommandée';
       flagSpan.setAttribute('aria-label', 'Historique de no-shows');
       flagSpan.innerHTML = NOSHOW_SVG;
       labelWrap.appendChild(flagSpan);
@@ -1475,7 +1483,21 @@ let handoffNotes = [];
 
     const nameText = document.createElement('span');
     nameText.textContent = name || '';
+    if (name) {
+      nameText.classList.add('cell-truncate');
+      nameText.dataset.tooltip = name;
+    }
     labelWrap.appendChild(nameText);
+
+    if (hasNotes) {
+      labelWrap.classList.add('has-notes');
+      const indicator = document.createElement('span');
+      indicator.className = 'notes-indicator';
+      indicator.setAttribute('aria-hidden', 'true');
+      indicator.dataset.tooltip = 'Notes internes disponibles';
+      labelWrap.appendChild(indicator);
+    }
+
     wrap.appendChild(labelWrap);
     return wrap;
   }
@@ -1529,10 +1551,14 @@ let handoffNotes = [];
     return btn;
   }
 
-  function copyTextToClipboard(text) {
+  function copyTextToClipboard(text, sourceEl) {
     const value = String(text || '').trim();
     if (!value || value === '—') {
       showToast('Aucun numéro à copier.', 'warning');
+      return;
+    }
+    if (sourceEl?.classList?.contains('copyable')) {
+      kineticCopyFeedback(sourceEl, value);
       return;
     }
     navigator.clipboard?.writeText(value)
@@ -1973,6 +1999,390 @@ let handoffNotes = [];
     }
   }
 
+  /* ── Invisible UI: dynamic tooltips, kinetic copy, inline confirm, notes pulse ── */
+
+  let globalTooltipEl = null;
+  let invisibleUIInitialized = false;
+  let tooltipTargetEl = null;
+  const notesIndicatorTweens = new WeakMap();
+
+  function prefersReducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function ensureGlobalTooltip() {
+    if (globalTooltipEl?.isConnected) return globalTooltipEl;
+    globalTooltipEl = document.getElementById('global-tooltip');
+    if (!globalTooltipEl) {
+      globalTooltipEl = document.createElement('div');
+      globalTooltipEl.id = 'global-tooltip';
+      globalTooltipEl.setAttribute('role', 'tooltip');
+      globalTooltipEl.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(globalTooltipEl);
+    }
+    if (typeof gsap !== 'undefined') {
+      gsap.set(globalTooltipEl, { opacity: 0, scale: 0.95 });
+    } else {
+      globalTooltipEl.style.opacity = '0';
+      globalTooltipEl.style.transform = 'scale(0.95)';
+    }
+    return globalTooltipEl;
+  }
+
+  function positionGlobalTooltip(clientX, clientY) {
+    const el = globalTooltipEl;
+    if (!el) return;
+    const offset = 14;
+    const rect = el.getBoundingClientRect();
+    let left = clientX + offset;
+    let top = clientY + offset;
+    const maxLeft = window.innerWidth - rect.width - 8;
+    const maxTop = window.innerHeight - rect.height - 8;
+    if (left > maxLeft) left = Math.max(8, clientX - rect.width - offset);
+    if (top > maxTop) top = Math.max(8, clientY - rect.height - offset);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
+
+  function showGlobalTooltip(text, clientX, clientY) {
+    const tip = ensureGlobalTooltip();
+    if (!text) return;
+    tip.textContent = text;
+    tip.setAttribute('aria-hidden', 'false');
+    positionGlobalTooltip(clientX, clientY);
+    if (typeof gsap === 'undefined' || prefersReducedMotion()) {
+      tip.style.opacity = '1';
+      tip.style.transform = 'scale(1)';
+      return;
+    }
+    gsap.killTweensOf(tip);
+    gsap.to(tip, { opacity: 1, scale: 1, duration: 0.2, ease: 'back.out(1.5)' });
+  }
+
+  function hideGlobalTooltip() {
+    if (!globalTooltipEl) return;
+    tooltipTargetEl = null;
+    const tip = globalTooltipEl;
+    const finish = () => {
+      tip.setAttribute('aria-hidden', 'true');
+      tip.textContent = '';
+    };
+    if (typeof gsap === 'undefined' || prefersReducedMotion()) {
+      tip.style.opacity = '0';
+      tip.style.transform = 'scale(0.95)';
+      finish();
+      return;
+    }
+    gsap.killTweensOf(tip);
+    gsap.to(tip, {
+      opacity: 0,
+      scale: 0.95,
+      duration: 0.15,
+      ease: 'power2.in',
+      onComplete: finish,
+    });
+  }
+
+  function initGlobalTooltipEngine() {
+    document.addEventListener('mouseover', (event) => {
+      const target = event.target.closest('[data-tooltip]');
+      if (!target) return;
+      const text = target.dataset.tooltip?.trim();
+      if (!text) return;
+      tooltipTargetEl = target;
+      showGlobalTooltip(text, event.clientX, event.clientY);
+    });
+
+    document.addEventListener('mousemove', (event) => {
+      if (!tooltipTargetEl || !globalTooltipEl) return;
+      if (!event.target.closest('[data-tooltip]')) return;
+      positionGlobalTooltip(event.clientX, event.clientY);
+    });
+
+    document.addEventListener('mouseout', (event) => {
+      const from = event.target.closest('[data-tooltip]');
+      if (!from) return;
+      const related = event.relatedTarget;
+      if (related && from.contains(related)) return;
+      if (tooltipTargetEl === from) hideGlobalTooltip();
+    });
+
+    document.addEventListener('focusin', (event) => {
+      const target = event.target.closest('[data-tooltip]');
+      if (!target) return;
+      const text = target.dataset.tooltip?.trim();
+      if (!text) return;
+      const rect = target.getBoundingClientRect();
+      tooltipTargetEl = target;
+      showGlobalTooltip(text, rect.left + rect.width / 2, rect.top);
+    });
+
+    document.addEventListener('focusout', (event) => {
+      if (event.target.closest('[data-tooltip]')) hideGlobalTooltip();
+    });
+  }
+
+  function createCopyableSpan(value, displayLabel) {
+    const span = document.createElement('span');
+    const raw = String(value || '').trim();
+    span.className = 'copyable';
+    span.dataset.value = raw;
+    span.textContent = displayLabel ?? raw || '—';
+    span.setAttribute('role', 'button');
+    span.setAttribute('tabindex', '0');
+    span.setAttribute('aria-label', `Copier ${span.textContent}`);
+    if (raw) span.dataset.tooltip = 'Cliquer pour copier';
+    return span;
+  }
+
+  function setCopyableField(elementId, value, fallback = '—') {
+    const el = $(elementId);
+    if (!el) return;
+    const raw = String(value || '').trim();
+    el.replaceChildren();
+    if (raw && raw !== '—' && raw !== 'Non renseigné') {
+      el.appendChild(createCopyableSpan(raw));
+    } else {
+      el.textContent = fallback;
+    }
+  }
+
+  function kineticCopyFeedback(el, value) {
+    const text = String(value || el.dataset.value || '').trim();
+    if (!text) {
+      showToast('Aucune valeur à copier.', 'warning');
+      return;
+    }
+
+    const write = navigator.clipboard?.writeText(text);
+    const onSuccess = () => {
+      if (!el.dataset.originalText) el.dataset.originalText = el.textContent;
+      const originalText = el.dataset.originalText;
+      el.textContent = 'Copié !';
+      el.classList.add('is-copied');
+      el.setAttribute('aria-label', 'Copié dans le presse-papiers');
+
+      if (typeof gsap !== 'undefined' && !prefersReducedMotion()) {
+        gsap.fromTo(
+          el,
+          { scale: 1, y: 0 },
+          { scale: 1.05, y: -2, duration: 0.15, ease: 'power2.out', yoyo: true, repeat: 1 }
+        );
+      }
+
+      window.setTimeout(() => {
+        el.textContent = originalText;
+        el.classList.remove('is-copied');
+        el.setAttribute('aria-label', `Copier ${originalText}`);
+        if (typeof gsap !== 'undefined' && !prefersReducedMotion()) {
+          gsap.to(el, { scale: 1, y: 0, duration: 0.2, ease: 'power2.out' });
+        }
+      }, 1500);
+    };
+
+    if (write?.then) {
+      write.then(onSuccess).catch(() => {
+        showToast('Copie impossible — sélectionnez la valeur manuellement.', 'error');
+      });
+    } else {
+      onSuccess();
+    }
+  }
+
+  function initCopyableInteractions() {
+    document.addEventListener('click', (event) => {
+      const el = event.target.closest('.copyable');
+      if (!el) return;
+      event.preventDefault();
+      event.stopPropagation();
+      kineticCopyFeedback(el, el.dataset.value);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const el = event.target.closest('.copyable');
+      if (!el) return;
+      event.preventDefault();
+      kineticCopyFeedback(el, el.dataset.value);
+    });
+  }
+
+  function getPatientRowElement(patientId) {
+    const id = String(patientId);
+    return (
+      document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${id}"]`)
+      || document.querySelector(`#roster-tbody tr[data-patient-id="${id}"]`)
+      || document.querySelector(`#crm-table-body tr[data-patient-id="${id}"]`)
+    );
+  }
+
+  function animateRowConfirmSuccess(patientId, index = 0) {
+    const row = getPatientRowElement(patientId);
+    if (!row) return;
+
+    const surface = row.querySelector('.timeline-item__card') || row;
+    const statusEl = row.querySelector('.status-select')
+      || row.querySelector('.status-pill')
+      || row.querySelector('.matte-chip');
+    const checkbox = row.querySelector('.row-checkbox');
+
+    row.classList.add('is-confirm-success');
+
+    if (statusEl?.tagName === 'SELECT') {
+      statusEl.value = 'Confirmé';
+      applyMatteSelectSkin(statusEl, 'Confirmé');
+    } else if (statusEl) {
+      statusEl.textContent = 'Confirmé';
+      statusEl.className = 'status-pill crm-tag--confirmé matte-chip matte-chip--confirmé';
+    }
+
+    if (prefersReducedMotion() || typeof gsap === 'undefined') {
+      surface.style.borderLeft = '4px solid #34d399';
+      surface.style.backgroundColor = 'rgba(52, 211, 153, 0.05)';
+      window.setTimeout(() => {
+        surface.style.backgroundColor = '';
+      }, 1000);
+      if (checkbox) checkbox.checked = false;
+      return;
+    }
+
+    const tl = gsap.timeline({ delay: index * 0.06 });
+
+    if (checkbox?.checked) {
+      tl.to(checkbox, {
+        opacity: 0,
+        scale: 0.8,
+        duration: 0.2,
+        ease: 'power2.in',
+        onComplete: () => {
+          checkbox.checked = false;
+          gsap.set(checkbox, { clearProps: 'opacity,transform' });
+        },
+      }, 0);
+    }
+
+    tl.fromTo(
+      surface,
+      { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.05)' },
+      { borderLeftWidth: 4, borderLeftColor: '#34d399', duration: 0.3, ease: 'power2.out' },
+      0
+    );
+
+    if (statusEl) {
+      tl.fromTo(
+        statusEl,
+        { scale: 0.92, backgroundColor: 'rgba(255,255,255,0.04)' },
+        {
+          scale: 1,
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          color: '#34d399',
+          duration: 0.3,
+          ease: 'back.out(1.4)',
+        },
+        0.12
+      );
+    }
+
+    tl.fromTo(
+      surface,
+      { backgroundColor: 'rgba(52, 211, 153, 0.05)' },
+      { backgroundColor: 'transparent', duration: 1, ease: 'sine.out' },
+      0.2
+    );
+  }
+
+  function animateInlineConfirmSuccess(patientIds) {
+    const ids = Array.isArray(patientIds) ? patientIds.map(String) : [];
+    if (!ids.length) return;
+
+    const btnConfirm = $('btn-bulk-confirm');
+    if (btnConfirm && typeof gsap !== 'undefined' && !prefersReducedMotion()) {
+      gsap.to(btnConfirm, {
+        opacity: 0,
+        scale: 0.8,
+        duration: 0.2,
+        ease: 'power2.in',
+        onComplete: () => {
+          gsap.set(btnConfirm, { clearProps: 'opacity,transform' });
+        },
+      });
+    }
+
+    ids.forEach((id, index) => animateRowConfirmSuccess(id, index));
+  }
+
+  function pulseNotesIndicators(scope = document) {
+    scope.querySelectorAll('.notes-indicator').forEach((indicator) => {
+      if (notesIndicatorTweens.has(indicator)) return;
+      if (prefersReducedMotion() || typeof gsap === 'undefined') return;
+      gsap.set(indicator, { opacity: 1 });
+      const tween = gsap.to(indicator, {
+        opacity: 0.4,
+        duration: 2,
+        yoyo: true,
+        repeat: -1,
+        ease: 'sine.inOut',
+      });
+      notesIndicatorTweens.set(indicator, tween);
+    });
+  }
+
+  function hydrateStaticCrmTableRows() {
+    document.querySelectorAll('#crm-table-body .crm-table-row').forEach((row) => {
+      const obs = String(row.dataset.observations || '').trim();
+      const nameCell = row.cells?.[0];
+      const phoneCell = row.cells?.[1];
+
+      if (nameCell && obs && !nameCell.querySelector('.notes-indicator')) {
+        nameCell.classList.add('has-notes');
+        const indicator = document.createElement('span');
+        indicator.className = 'notes-indicator';
+        indicator.setAttribute('aria-hidden', 'true');
+        indicator.dataset.tooltip = 'Notes internes disponibles';
+        nameCell.appendChild(indicator);
+      }
+
+      if (phoneCell && !phoneCell.querySelector('.copyable')) {
+        const phone = String(row.dataset.phone || phoneCell.textContent || '').trim();
+        phoneCell.replaceChildren();
+        if (phone) phoneCell.appendChild(createCopyableSpan(phone));
+        else phoneCell.textContent = '—';
+      }
+    });
+  }
+
+  function refreshInvisibleUIDecorations(root = document) {
+    const scope = root === document ? document : root;
+
+    scope.querySelectorAll?.('.row-action-btn[aria-label]:not([data-tooltip])').forEach((btn) => {
+      const label = btn.getAttribute('aria-label');
+      if (label) btn.dataset.tooltip = label;
+    });
+
+    scope.querySelectorAll?.('.cell-truncate[title]:not([data-tooltip])').forEach((el) => {
+      const title = el.getAttribute('title');
+      if (title) {
+        el.dataset.tooltip = title;
+        el.removeAttribute('title');
+      }
+    });
+
+    if (root === document) hydrateStaticCrmTableRows();
+    pulseNotesIndicators(scope);
+  }
+
+  function initInvisibleUI() {
+    if (invisibleUIInitialized) {
+      refreshInvisibleUIDecorations();
+      return;
+    }
+    invisibleUIInitialized = true;
+    ensureGlobalTooltip();
+    initGlobalTooltipEngine();
+    initCopyableInteractions();
+    refreshInvisibleUIDecorations();
+  }
+
   function initProgressiveDisclosure() {
     initActionsPopovers();
     if (!progressiveDisclosureInitialized) {
@@ -2069,12 +2479,15 @@ let handoffNotes = [];
 
     const main = document.createElement('div');
     main.className = 'timeline-item__main';
-    main.appendChild(createPatientIdentity(record.name, { showNoShow: record.noShow }));
+    main.appendChild(createPatientIdentity(record.name, {
+      showNoShow: record.noShow,
+      hasNotes: Boolean(String(record.observations || '').trim()),
+    }));
 
     const treatment = document.createElement('div');
     treatment.className = 'timeline-item__treatment cell-truncate';
     treatment.textContent = record.treatment || '';
-    if (record.treatment) treatment.title = record.treatment;
+    if (record.treatment) treatment.dataset.tooltip = record.treatment;
     main.appendChild(treatment);
 
     const meta = document.createElement('div');
@@ -2205,7 +2618,12 @@ let handoffNotes = [];
 
     const phoneTd = document.createElement('td');
     phoneTd.className = 'col-numeric';
-    phoneTd.textContent = appt.phone || appt.telephone || '—';
+    const phoneValue = String(appt.phone || appt.telephone || '').trim();
+    if (phoneValue) {
+      phoneTd.appendChild(createCopyableSpan(phoneValue));
+    } else {
+      phoneTd.textContent = '—';
+    }
 
     const priorityTd = document.createElement('td');
     priorityTd.appendChild(createMatteChip(getWaitlistPriorityLabel(appt)));
@@ -2237,6 +2655,8 @@ let handoffNotes = [];
         timeline.appendChild(fragment);
       }
     }
+
+    refreshInvisibleUIDecorations(timeline);
 
     const tbody = $('roster-tbody');
     if (tbody) {
@@ -2879,6 +3299,7 @@ let handoffNotes = [];
     const fragment = document.createDocumentFragment();
     waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
     container.appendChild(fragment);
+    refreshInvisibleUIDecorations(container);
   }
 
   function setWaitlistFormProcessing(form, isProcessing) {
@@ -3116,6 +3537,7 @@ let handoffNotes = [];
       motif: record.treatment || 'Consultation',
       status: record.status || 'Confirmé',
       observations: record.observations || '',
+      insurance: record.insurance || '',
       lastVisit: formatCrmLastVisit(record.rawDate),
     };
   }
@@ -3138,7 +3560,8 @@ let handoffNotes = [];
     if (!patientData) return;
 
     setText('crm-panel-name', patientData.name || 'Non spécifié');
-    setText('crm-panel-phone', patientData.phone || 'Non renseigné');
+    setCopyableField('crm-panel-phone', patientData.phone, 'Non renseigné');
+    setCopyableField('crm-panel-insurance', patientData.insurance, 'Non renseigné');
     setText('crm-panel-last-visit', patientData.lastVisit || 'Non renseigné');
     setText('crm-panel-email', patientData.email || 'Non renseigné');
     setText('crm-panel-motif', patientData.motif || 'Consultation');
@@ -3196,10 +3619,26 @@ let handoffNotes = [];
       tr.dataset.patientId = String(patient.id);
 
       const nameCell = document.createElement('td');
-      nameCell.textContent = patient.name || '';
+      const hasNotes = Boolean(String(patient.observations || '').trim());
+      if (hasNotes) {
+        nameCell.className = 'has-notes';
+        nameCell.textContent = patient.name || '';
+        const indicator = document.createElement('span');
+        indicator.className = 'notes-indicator';
+        indicator.setAttribute('aria-hidden', 'true');
+        indicator.dataset.tooltip = 'Notes internes disponibles';
+        nameCell.appendChild(indicator);
+      } else {
+        nameCell.textContent = patient.name || '';
+      }
+      if (patient.name) nameCell.dataset.tooltip = patient.name;
 
       const phoneCell = document.createElement('td');
-      phoneCell.textContent = patient.phone || 'Non renseigné';
+      if (patient.phone) {
+        phoneCell.appendChild(createCopyableSpan(patient.phone));
+      } else {
+        phoneCell.textContent = 'Non renseigné';
+      }
 
       const emailCell = document.createElement('td');
       emailCell.textContent = patient.email || '—';
@@ -3223,6 +3662,7 @@ let handoffNotes = [];
 
     const firstRow = tbody.querySelector('.crm-table-row');
     if (firstRow) firstRow.classList.add('active-row');
+    refreshInvisibleUIDecorations(tbody);
   }
 
   function readCrmRowData(row) {
@@ -3240,6 +3680,7 @@ let handoffNotes = [];
       status: dataset.statut ?? row.cells[4]?.textContent.trim() ?? 'Confirmé',
       lastVisit: dataset.lastVisit ?? 'Non renseigné',
       observations: dataset.observations ?? '',
+      insurance: dataset.insurance ?? '',
     };
   }
 
@@ -3477,8 +3918,10 @@ let handoffNotes = [];
     initStatusListener();
     initQuickActions();
     initBulkActionBar();
+    initInvisibleUI();
     initProgressiveDisclosure();
     renderOperationalPulse();
+    refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     loadHandoffNotes();
     initHandoffForm();
     initWaitlistForm();
@@ -3513,9 +3956,12 @@ let handoffNotes = [];
   window.queueAssistantOsBootSequence = queueOsBootSequence;
   window.revealAssistantOsBootFallback = revealOsBootFallback;
   window.initProgressiveDisclosure = initProgressiveDisclosure;
+  window.initInvisibleUI = initInvisibleUI;
+  window.refreshInvisibleUIDecorations = refreshInvisibleUIDecorations;
   window.DentaFlowRowUI = {
     createRowActionGroup,
     createWaitlistTableRow,
+    createCopyableSpan,
     createEmptyState,
     mountEmptyState,
     clearEmptyState,

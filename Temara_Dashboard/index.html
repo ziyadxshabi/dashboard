@@ -244,21 +244,21 @@
         <section class="kpi-row" aria-label="Indicateurs clés du jour">
 
           <article class="kpi-card" id="card-patients">
-            <div class="kpi-label">Patients Aujourd'hui</div>
+            <div class="kpi-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Patients Aujourd'hui</div>
             <div class="kpi-number" id="val-patients" data-target="0" aria-live="polite">—</div>
             <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
             <div class="kpi-trend" id="trend-patients"></div>
           </article>
 
           <article class="kpi-card" id="card-noshows">
-            <div class="kpi-label">Annulations / No-Shows</div>
+            <div class="kpi-label" data-tooltip="Créneaux libérés ou patients absents sans préavis">Annulations / No-Shows</div>
             <div class="kpi-number" id="val-noshows" data-target="0" aria-live="assertive">—</div>
             <div class="kpi-sub" id="sub-noshows">Créneaux à combler</div>
             <div class="kpi-trend" id="trend-noshows"></div>
           </article>
 
           <article class="kpi-card kpi-card--wide" id="card-production">
-            <div class="kpi-label">Production du Jour</div>
+            <div class="kpi-label" data-tooltip="Revenus facturés aujourd'hui par rapport à l'objectif journalier">Production du Jour</div>
             <div class="kpi-number-row">
               <span class="kpi-number kpi-number--sm" id="val-revenue" data-target="0">—</span>
               <span class="kpi-goal-label">/ <span id="val-goal">15 000</span> MAD</span>
@@ -271,7 +271,7 @@
           </article>
 
           <article class="kpi-card" id="card-new">
-            <div class="kpi-label">Nouveaux Patients</div>
+            <div class="kpi-label" data-tooltip="Premières visites nécessitant un formulaire d'entrée">Nouveaux Patients</div>
             <div class="kpi-number" id="val-new" data-target="0" aria-live="polite">—</div>
             <div class="kpi-sub" id="sub-new">Formulaires d'entrée requis</div>
             <div class="kpi-trend" id="trend-new"></div>
@@ -1001,11 +1001,11 @@
           <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field">
               <dt>Montant</dt>
-              <dd id="crm-panel-amount">—</dd>
+              <dd id="crm-panel-amount" data-tooltip="Montant facturé pour la dernière visite">—</dd>
             </div>
             <div class="crm-side-panel-field">
               <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance">—</dd>
+              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
             </div>
           </dl>
         </section>

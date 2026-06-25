@@ -253,6 +253,7 @@ function initializeDoctorDashboard() {
   renderWaitlistPanel();
   initTeamNotesSync();
   window.initProgressiveDisclosure?.();
+  window.initInvisibleUI?.();
 
   document.querySelectorAll('.dashboard-view').forEach(view => {
     view.setAttribute('aria-hidden', view.classList.contains('active') ? 'false' : 'true');
