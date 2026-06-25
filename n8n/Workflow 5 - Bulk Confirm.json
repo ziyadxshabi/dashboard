@@ -50,10 +50,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Fail-fast guard: Item Lists emits one scalar per item at body.rowIds (not root rowIds).\nconst raw = $json.body?.rowIds ?? $json.rowId;\n\nif (raw === undefined || raw === null || String(raw).trim() === '') {\n  throw new Error('VALIDATION_FAIL: Baserow rowId is missing, null, or empty after Split IDs');\n}\n\nreturn [{ json: { rowId: raw } }];"
+        "jsCode": "// Validate Row ID Presence — normalize Item Lists scalar output before Baserow.\n// Item Lists splits body.rowIds[] → each item keeps scalar at body.rowIds.\nconst raw = $json.body?.rowIds ?? $json.rowId;\n\nfunction isValidScalarId(value) {\n  if (value === null || value === undefined) return false;\n  if (Array.isArray(value)) return false;\n  if (typeof value === 'object') return false;\n  const s = String(value).trim();\n  return s.length > 0;\n}\n\nconst rowId = isValidScalarId(raw) ? String(raw).trim() : '';\n\nreturn [{\n  json: {\n    rowId,\n    isValidRowId: rowId.length > 0,\n  },\n}];"
       },
       "id": "c7f2a1b3-4d5e-6f78-9012-3456789abcde",
-      "name": "Validate Row ID",
+      "name": "Validate Row ID Presence",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -63,17 +63,50 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid-row-id",
+              "leftValue": "={{ $json.isValidRowId }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid-row-id-presence-01",
+      "name": "If Valid Row ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48,
+        -112
+      ]
+    },
+    {
+      "parameters": {
         "authentication": "databaseToken",
         "operation": "update",
         "tableId": 1017856,
-        "rowId": "={{ $json[\"rowId\"] }}"
+        "rowId": "={{ $json.rowId }}"
       },
       "id": "e5e3efbc-464a-409f-b2b1-3e0c8ac32c40",
       "name": "Baserow - Update Status",
       "type": "n8n-nodes-base.baserow",
       "typeVersion": 1.1,
       "position": [
-        48,
+        160,
         -112
       ],
       "credentials": {
@@ -82,6 +115,43 @@
           "name": "Baserow account 2"
         }
       }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"message\": \"Data integrity fault: Split loop produced an invalid or missing rowId.\" } }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "data-integrity-error-reply-01",
+      "name": "Data Integrity Error Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        32
+      ]
     },
     {
       "parameters": {
@@ -285,18 +355,36 @@
       "main": [
         [
           {
-            "node": "Validate Row ID",
+            "node": "Validate Row ID Presence",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Row ID": {
+    "Validate Row ID Presence": {
+      "main": [
+        [
+          {
+            "node": "If Valid Row ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Valid Row ID?": {
       "main": [
         [
           {
             "node": "Baserow - Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Data Integrity Error Reply",
             "type": "main",
             "index": 0
           }
