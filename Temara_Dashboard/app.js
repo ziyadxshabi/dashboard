@@ -965,7 +965,7 @@ let handoffNotes = [];
     const rowId = extractBaserowRowId(record);
     return {
       rowId,
-      calBookingId: String(record.calBookingId ?? row?.dataset?.calBookingId ?? '').trim(),
+      calBookingId: row?.dataset?.calBookingId || record.calBookingId || '',
       scheduleDate: String(row?.dataset?.scheduleDate ?? formatScheduleDate(record.rawDate)).trim(),
       startTime: String(row?.dataset?.startTime ?? record.time ?? '').trim(),
       practitioner: String(row?.dataset?.practitioner ?? record.practitioner ?? 'Dr. Tazi').trim(),
@@ -980,8 +980,11 @@ let handoffNotes = [];
 
     return {
       rowIds: appointments.map((entry) => entry.rowId),
-      calBookingIds: appointments.map((entry) => entry.calBookingId),
-      appointments,
+      calBookingIds: appointments.map((entry) => entry.calBookingId || ''),
+      appointments: appointments.map((entry) => ({
+        ...entry,
+        calBookingId: entry.calBookingId || '',
+      })),
     };
   }
 
@@ -1192,7 +1195,7 @@ let handoffNotes = [];
 
     try {
       console.log('Payload sending:', cancelPayload);
-      await Promise.all([
+      const [cancelResult] = await Promise.all([
         postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, cancelPayload),
         animateRowsVaporize(ids),
       ]);
@@ -1201,7 +1204,14 @@ let handoffNotes = [];
       updateRosterStats(rosterData);
 
       clearBulkSelection();
-      showToast('Rendez-vous annulés avec succès', 'success');
+      if (cancelResult?.status === 'partial_success') {
+        showToast(
+          cancelResult.message || 'Annulé en base uniquement (patient sans ID Calendrier).',
+          'warning'
+        );
+      } else {
+        showToast('Rendez-vous annulés avec succès', 'success');
+      }
     } catch (error) {
       console.error('[Bulk Cancel] Failed:', error);
       revertOptimisticBulkSnapshots(optimisticSnapshots);

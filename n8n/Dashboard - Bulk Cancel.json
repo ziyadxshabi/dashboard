@@ -143,6 +143,52 @@
     },
     {
       "parameters": {
+        "jsCode": "return [{\n  json: {\n    status: 'partial_success',\n    message: 'Cancelled in DB only (Walk-in patient, no Calendar ID).',\n    rowId: $json.rowId,\n    calBookingId: String($json.calBookingId ?? '').trim(),\n  },\n}];"
+      },
+      "id": "e5f6a7b8-c9d0-1234-ef01-partial-dbonly01",
+      "name": "DB-Only Cancel Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: $json.status, message: $json.message }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f6a7b8c9-d0e1-2345-f012-partial-resp01",
+      "name": "DB-Only Cancel Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        608,
+        32
+      ]
+    },
+    {
+      "parameters": {
         "mode": "combine",
         "combinationMode": "mergeByPosition",
         "options": {}
@@ -249,9 +295,20 @@
         ],
         [
           {
-            "node": "Merge Dual-Write Results",
+            "node": "DB-Only Cancel Payload",
             "type": "main",
-            "index": 1
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB-Only Cancel Payload": {
+      "main": [
+        [
+          {
+            "node": "DB-Only Cancel Response",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
