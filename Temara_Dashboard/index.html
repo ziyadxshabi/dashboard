@@ -170,17 +170,44 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span>Campagnes SMS</span>
         </a>
-        <a href="#" class="nav-link" data-nav="settings">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Paramètres</span>
-        </a>
       </nav>
 
-      <div class="sidebar-profile">
-        <div class="profile-avatar" id="profile-avatar" aria-hidden="true">DT</div>
-        <div class="profile-info">
-          <span class="profile-name" id="profile-name">Dr. Tazi</span>
-          <span class="profile-role" id="profile-role">Chirurgien-dentiste</span>
+      <div class="account-card" data-popover-root>
+        <div class="account-card__body">
+          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">DT</div>
+          <div class="account-card__info">
+            <span class="account-card__name kinetic-label" id="profile-name">Dr. Tazi</span>
+            <span class="account-card__role" id="profile-role">Chirurgien-dentiste</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn-account-menu"
+          id="account-menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="account-menu-popover"
+          aria-label="Menu compte"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.75"/>
+            <circle cx="12" cy="12" r="1.75"/>
+            <circle cx="12" cy="19" r="1.75"/>
+          </svg>
+        </button>
+        <div class="actions-popover account-menu-popover" id="account-menu-popover" role="menu" hidden>
+          <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Paramètres
+          </button>
+          <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Facturation
+          </button>
+          <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Déconnexion
+          </button>
         </div>
       </div>
     </aside>
@@ -224,11 +251,11 @@
     <!-- ── MAIN CONTENT ──────────────────────────────────────────────────── -->
     <main class="main">
 
-      <section id="view-overview" class="dashboard-view active" aria-label="Vue d'ensemble">
+      <section id="view-overview" class="dashboard-view active view-enter-ready" aria-label="Vue d'ensemble">
 
         <header class="hero-header">
           <div class="hero-text">
-            <h1 class="hero-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name">Dr. Tazi</span></h1>
+            <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name">Dr. Tazi</span></h1>
             <p class="hero-date" id="hero-date">—</p>
           </div>
           <div class="hero-sync">
@@ -240,7 +267,7 @@
         <section class="reclaimed-banner" aria-label="Revenu récupéré par DentaFlow">
           <div class="reclaimed-banner__glow" aria-hidden="true"></div>
           <div class="reclaimed-banner__content">
-            <h2 class="reclaimed-banner__title">REVENU RÉCUPÉRÉ PAR DENTAFLOW</h2>
+            <h2 class="reclaimed-banner__title kinetic-label">Revenu récupéré</h2>
             <div class="reclaimed-banner__amount">
               <span class="reclaimed-banner__value" id="val-reclaimed" data-target="0" aria-live="polite">—</span>
               <span class="reclaimed-banner__currency">MAD</span>
@@ -251,22 +278,29 @@
 
         <section class="kpi-row" aria-label="Indicateurs clés du jour">
 
-          <article class="kpi-card" id="card-patients">
-            <div class="kpi-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Patients Aujourd'hui</div>
-            <div class="kpi-number" id="val-patients" data-target="0" aria-live="polite">—</div>
+          <article class="kpi-card kpi-card--matte" id="card-patients">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Flux patients</div>
+              <div class="kpi-trend" id="trend-patients" aria-hidden="true"></div>
+            </div>
+            <div class="kpi-number kinetic-value" id="val-patients" data-target="0" aria-live="polite">—</div>
             <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
-            <div class="kpi-trend" id="trend-patients"></div>
           </article>
 
-          <article class="kpi-card" id="card-noshows">
-            <div class="kpi-label" data-tooltip="Créneaux libérés ou patients absents sans préavis">Annulations / No-Shows</div>
-            <div class="kpi-number" id="val-noshows" data-target="0" aria-live="assertive">—</div>
+          <article class="kpi-card kpi-card--matte" id="card-noshows">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Créneaux libérés ou patients absents sans préavis">Absences</div>
+              <div class="kpi-trend" id="trend-noshows" aria-hidden="true"></div>
+            </div>
+            <div class="kpi-number kinetic-value" id="val-noshows" data-target="0" aria-live="assertive">—</div>
             <div class="kpi-sub" id="sub-noshows">Créneaux à combler</div>
-            <div class="kpi-trend" id="trend-noshows"></div>
           </article>
 
-          <article class="kpi-card kpi-card--wide" id="card-production">
-            <div class="kpi-label" data-tooltip="Revenus facturés aujourd'hui par rapport à l'objectif journalier">Production du Jour</div>
+          <article class="kpi-card kpi-card--matte kpi-card--wide" id="card-production">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Revenus facturés aujourd'hui par rapport à l'objectif journalier">Production</div>
+              <div class="kpi-trend" id="trend-production" aria-hidden="true"></div>
+            </div>
             <div class="kpi-number-row">
               <span class="kpi-number kpi-number--sm" id="val-revenue" data-target="0">—</span>
               <span class="kpi-goal-label">/ <span id="val-goal">15 000</span> MAD</span>
@@ -278,11 +312,13 @@
             <div class="kpi-sub" id="sub-production">Revenus facturés aujourd'hui</div>
           </article>
 
-          <article class="kpi-card" id="card-new">
-            <div class="kpi-label" data-tooltip="Premières visites nécessitant un formulaire d'entrée">Nouveaux Patients</div>
-            <div class="kpi-number" id="val-new" data-target="0" aria-live="polite">—</div>
+          <article class="kpi-card kpi-card--matte" id="card-new">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Premières visites nécessitant un formulaire d'entrée">Nouveaux</div>
+              <div class="kpi-trend" id="trend-new" aria-hidden="true"></div>
+            </div>
+            <div class="kpi-number kinetic-value" id="val-new" data-target="0" aria-live="polite">—</div>
             <div class="kpi-sub" id="sub-new">Formulaires d'entrée requis</div>
-            <div class="kpi-trend" id="trend-new"></div>
           </article>
 
         </section>
@@ -353,29 +389,41 @@
       <section id="view-doctor-hub" class="dashboard-view" aria-label="Cabinet live" aria-hidden="true">
 
         <header class="view-page-header">
-          <h2 class="view-page-title">Cabinet Live</h2>
+          <h2 class="view-page-title kinetic-title">Cabinet Live</h2>
           <p class="view-page-sub">Vue opérationnelle — patients du jour et notes cliniques</p>
         </header>
 
         <div class="doctor-metrics" id="doctor-metrics">
-          <article class="doctor-metric-card" data-metric="patients">
-            <span class="doctor-metric-label">Patients Aujourd'hui</span>
-            <span class="doctor-metric-value" id="hub-val-patients">8</span>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="patients">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">Patients</span>
+              <span class="doctor-metric-chart" id="hub-chart-patients" aria-hidden="true"></span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-patients">8</span>
             <span class="doctor-metric-delta doctor-metric-delta--up">+2 vs hier</span>
           </article>
-          <article class="doctor-metric-card" data-metric="pending">
-            <span class="doctor-metric-label">En Attente</span>
-            <span class="doctor-metric-value" id="hub-val-pending">3</span>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="pending">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">En attente</span>
+              <span class="doctor-metric-chart" id="hub-chart-pending" aria-hidden="true"></span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-pending">3</span>
             <span class="doctor-metric-delta">Devis à valider</span>
           </article>
-          <article class="doctor-metric-card" data-metric="noshows">
-            <span class="doctor-metric-label">No-Shows</span>
-            <span class="doctor-metric-value" id="hub-val-noshows">2</span>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">No-shows</span>
+              <span class="doctor-metric-chart" id="hub-chart-noshows" aria-hidden="true"></span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">2</span>
             <span class="doctor-metric-delta doctor-metric-delta--warn">Créneaux libres</span>
           </article>
-          <article class="doctor-metric-card" data-metric="production">
-            <span class="doctor-metric-label">Production Jour</span>
-            <span class="doctor-metric-value" id="hub-val-production">9.4k</span>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="production">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">Production</span>
+              <span class="doctor-metric-chart" id="hub-chart-production" aria-hidden="true"></span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-production">9.4k</span>
             <span class="doctor-metric-delta">MAD facturés</span>
           </article>
         </div>
@@ -468,7 +516,7 @@
 
       <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
         <header class="view-page-header">
-          <h2 class="view-page-title">Gestion de la Liste d'Attente</h2>
+          <h2 class="view-page-title kinetic-title">Gestion de la Liste d'Attente</h2>
           <p class="view-page-sub">No-Show Recovery — inscrivez les patients pour le prochain créneau libéré</p>
         </header>
 
@@ -898,16 +946,18 @@
   </div>
 
   <!-- CRM — Dossier Patient slide-over panel -->
-  <div id="crm-side-panel" class="crm-side-panel-root" aria-hidden="true">
-    <div class="crm-side-panel-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
+  <div id="crm-side-panel" class="crm-side-panel-root crm-modal-root" aria-hidden="true">
+    <div class="crm-side-panel-overlay crm-modal-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
     <aside
-      class="crm-side-panel"
+      class="crm-side-panel crm-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="crm-panel-name"
       aria-describedby="crm-panel-subtitle"
     >
-      <button type="button" class="crm-side-panel-close" id="crm-side-panel-close" aria-label="Fermer le dossier">×</button>
+      <button type="button" class="crm-side-panel-close crm-modal-close" id="crm-side-panel-close" aria-label="Fermer le dossier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
 
       <header class="crm-side-panel-header">
         <p class="crm-side-panel-eyebrow">Dossier Patient</p>
@@ -953,7 +1003,7 @@
   </div>
 
   <div class="error-banner" id="error-banner" hidden>
-    ⚠️ Impossible de charger les données. Vérifiez la connexion n8n.
+    Impossible de charger les données. Vérifiez la connexion n8n.
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" referrerpolicy="no-referrer"></script>

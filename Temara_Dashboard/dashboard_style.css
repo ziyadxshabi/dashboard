@@ -4784,3 +4784,378 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr {
 html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   background: rgba(15, 23, 42, 0.02);
 }
+
+/* ── Premium Doctor Shell refresh ───────────────────────────────────────── */
+
+#doctor-shell .sidebar {
+  padding: 18px 10px 14px;
+}
+
+#doctor-shell .sidebar-brand {
+  padding: 4px 8px 18px;
+  gap: 10px;
+}
+
+#doctor-shell .sidebar-brand-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: var(--accent-gold);
+}
+
+#doctor-shell .nav-link {
+  padding: 10px 12px;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+#doctor-shell .nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.account-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 10px;
+  background: #121110;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.account-card__body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.account-card__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(201, 169, 98, 0.14);
+  color: var(--accent-gold);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-card__info {
+  min-width: 0;
+}
+
+.account-card__name {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-card__role {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-account-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-account-menu svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-account-menu:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.account-menu-popover {
+  min-width: 180px;
+}
+
+.account-menu-popover .actions-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-menu-popover .actions-popover__item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.kinetic-title {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  transition: letter-spacing 0.25s ease, opacity 0.25s ease;
+}
+
+.kinetic-title:hover {
+  letter-spacing: -0.02em;
+}
+
+.kinetic-label,
+.kinetic-value {
+  transition: letter-spacing 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.kinetic-label:hover {
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+}
+
+.kinetic-value:hover {
+  letter-spacing: -0.01em;
+}
+
+#doctor-shell .hero-title {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  font-weight: 400;
+}
+
+#doctor-shell .hero-date {
+  font-size: 12px;
+}
+
+#doctor-shell .view-page-title {
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  font-weight: 500;
+}
+
+#doctor-shell .view-page-sub,
+#doctor-shell .chart-sub {
+  font-size: 11.5px;
+}
+
+#doctor-shell .chart-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+#doctor-shell .reclaimed-banner__title {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+}
+
+.kpi-card--matte {
+  background: #121110;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  padding: 14px 16px 12px;
+}
+
+.kpi-card--matte::before {
+  display: none;
+}
+
+.kpi-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.kpi-card--matte .kpi-label {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  margin-bottom: 0;
+}
+
+.kpi-card--matte .kpi-trend {
+  flex-shrink: 0;
+  line-height: 0;
+  opacity: 0.85;
+}
+
+.kpi-card--matte .kpi-number {
+  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+  font-weight: 600;
+}
+
+.kpi-card--matte .kpi-number--sm {
+  font-size: 1.375rem;
+}
+
+.kpi-card--matte .kpi-sub {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.doctor-metric-card--matte {
+  background: #121110;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  padding: 14px 16px;
+}
+
+.doctor-metric-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.doctor-metric-card--matte .doctor-metric-label {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+}
+
+.doctor-metric-chart {
+  flex-shrink: 0;
+  line-height: 0;
+  opacity: 0.85;
+}
+
+.doctor-metric-card--matte .doctor-metric-value {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.doctor-metric-card--matte .doctor-metric-delta {
+  font-size: 10px;
+}
+
+.pulse-sparkline--gold { color: var(--accent-gold); }
+.pulse-sparkline--muted { color: rgba(255, 255, 255, 0.35); }
+.pulse-bars--danger { color: #f87171; fill: currentColor; }
+.pulse-bars--muted { color: rgba(255, 255, 255, 0.35); fill: currentColor; }
+.pulse-doughnut--success { color: #4ade80; }
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
+}
+
+.status-dot--confirmé,
+.status-dot--confirme { background: #4ade80; }
+.status-dot--attente,
+.status-dot--en-attente { background: #fbbf24; }
+.status-dot--urgence { background: #f87171; }
+.status-dot--annulé,
+.status-dot--annule { background: #94a3b8; }
+.status-dot--gold { background: var(--accent-gold); }
+
+.status-indicator__label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.brutalist-triage-table td:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.crm-modal-root .crm-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  right: auto;
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(82vh, 640px);
+  height: auto;
+  transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+  opacity: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.crm-modal-root.is-active .crm-modal {
+  right: auto;
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.crm-modal-close {
+  font-size: 0;
+}
+
+.crm-modal-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.crm-side-panel-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.crm-side-panel-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+#doctor-shell .waitlist-form-panel {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+#doctor-shell .waitlist-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+#doctor-shell .waitlist-input,
+#doctor-shell .waitlist-select {
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+#doctor-shell .waitlist-submit-btn {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 10px 16px;
+}
+
+@media (max-width: 900px) {
+  .kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}

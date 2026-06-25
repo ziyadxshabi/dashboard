@@ -247,10 +247,12 @@ function initializeDoctorDashboard() {
   initSettings();
   initThemeSwitcher();
   initUserProfile();
+  initAccountCardMenu();
   initCrmSearch();
   initCrmSidePanel();
   initSmsCampaign();
   initDoctorHub();
+  renderDoctorHubCharts();
   renderAppointmentsList();
   renderWaitlistPanel();
   initTeamNotesSync();
@@ -321,6 +323,25 @@ function createMatteChip(label) {
   chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
   chip.textContent = label || '—';
   return chip;
+}
+
+function createStatusDot(label) {
+  const dot = document.createElement('span');
+  dot.className = `status-dot status-dot--${getMatteChipModifier(label)}`;
+  dot.title = label;
+  dot.setAttribute('aria-label', label);
+  return dot;
+}
+
+function createStatusIndicator(label) {
+  const wrap = document.createElement('span');
+  wrap.className = 'status-indicator';
+  wrap.appendChild(createStatusDot(label));
+  const text = document.createElement('span');
+  text.className = 'status-indicator__label kinetic-label';
+  text.textContent = label;
+  wrap.appendChild(text);
+  return wrap;
 }
 
 function createPatientAvatar(name) {
@@ -640,7 +661,7 @@ function initWaitlistForm() {
       await submitWaitlistEntry(payload);
 
       setTimeout(() => {
-        btn.textContent = 'Patient Ajouté ✓';
+        btn.textContent = 'Patient ajouté';
         btn.classList.add('is-success');
         form.reset();
         priorityEl.value = 'Normale';
@@ -842,6 +863,15 @@ function initUserProfile() {
   specialtyEl?.addEventListener('input', persistProfile);
   nameEl?.addEventListener('change', persistProfile);
   specialtyEl?.addEventListener('change', persistProfile);
+}
+
+function initAccountCardMenu() {
+  document.getElementById('account-menu-settings')?.addEventListener('click', () => {
+    if (VIEW_MAP.settings) navigateToView('settings');
+  });
+  document.getElementById('account-menu-logout')?.addEventListener('click', () => {
+    window.DentaFlowAuth?.clearSession?.();
+  });
 }
 
 function initSettings() {
@@ -1393,12 +1423,86 @@ function getDemoData() {
 }
 
 /* ── KPI CARDS ───────────────────────────────────────────────────────────── */
+
+function buildSparklineSvg(values, { width = 52, height = 22, tone = 'gold' } = {}) {
+  const pts = Array.isArray(values) && values.length ? values : [0.3, 0.5, 0.4];
+  const max = Math.max(...pts, 1);
+  const min = Math.min(...pts, 0);
+  const range = max - min || 1;
+  const step = width / Math.max(pts.length - 1, 1);
+  const coords = pts.map((value, index) => {
+    const x = index * step;
+    const y = height - ((value - min) / range) * (height - 4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${coords}"/></svg>`;
+}
+
+function buildBarChartSvg(values, { width = 52, height = 22, tone = 'danger' } = {}) {
+  const pts = Array.isArray(values) && values.length ? values : [0.2, 0.5, 0.3];
+  const max = Math.max(...pts, 0.01);
+  const barW = Math.max(4, (width - (pts.length - 1) * 3) / pts.length);
+  const bars = pts.map((value, index) => {
+    const barH = Math.max(2, (value / max) * (height - 4));
+    const x = index * (barW + 3);
+    const y = height - barH - 2;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1"/>`;
+  }).join('');
+  return `<svg class="pulse-bars pulse-bars--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${bars}</svg>`;
+}
+
+function buildDoughnutSvg(percent, { size = 28, tone = 'success' } = {}) {
+  const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+  const radius = 10;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct / 100);
+  return `<svg class="pulse-doughnut pulse-doughnut--${tone}" viewBox="0 0 28 28" width="${size}" height="${size}" aria-hidden="true"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5"/><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>`;
+}
+
+function setKpiTrend(id, markup) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = markup;
+}
+
+function renderDoctorHubCharts(metrics = {}) {
+  const patients = asMetric(metrics.patients);
+  const pending = asMetric(metrics.pending);
+  const noshows = asMetric(metrics.noshows);
+  const productionPct = Math.min(100, asMetric(metrics.productionPct, 62));
+
+  const chartMap = {
+    'hub-chart-patients': buildSparklineSvg([0.3, 0.45, 0.5, patients / 12, 0.6], { tone: 'gold' }),
+    'hub-chart-pending': buildBarChartSvg([0.2, pending / 5, 0.15, 0.25], { tone: 'muted' }),
+    'hub-chart-noshows': buildBarChartSvg([0.1, noshows / 4, 0.08, 0.12], { tone: 'danger' }),
+    'hub-chart-production': buildDoughnutSvg(productionPct, { tone: 'success' }),
+  };
+
+  Object.entries(chartMap).forEach(([id, svg]) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = svg;
+  });
+}
+
 function renderKPICards(data) {
   const patients_today    = asMetric(data?.patients_today);
   const no_shows          = asMetric(data?.no_shows);
   const revenue_today     = asMetric(data?.revenue_today);
   const new_patients      = asMetric(data?.new_patients);
   const reclaimed_revenue = asMetric(data?.reclaimed_revenue);
+  const pct = Math.min(100, Math.round((revenue_today / CONFIG.DAILY_GOAL_MAD) * 100));
+  const patientsRatio = patients_today > 0 ? Math.min(1, patients_today / 24) : 0.15;
+
+  setKpiTrend('trend-patients', buildSparklineSvg([0.25, 0.4, patientsRatio, 0.55, patientsRatio + 0.1], { tone: 'gold' }));
+  setKpiTrend('trend-noshows', buildBarChartSvg([0.12, no_shows / 6, 0.08, no_shows / 8], { tone: 'danger' }));
+  setKpiTrend('trend-production', buildDoughnutSvg(pct, { tone: 'success' }));
+  setKpiTrend('trend-new', buildSparklineSvg([0.2, new_patients / 5, 0.35, 0.3], { tone: 'muted' }));
+
+  renderDoctorHubCharts({
+    patients: patients_today,
+    pending: asMetric(data?.pending_quotes),
+    noshows: no_shows,
+    productionPct: pct,
+  });
 
   // Reclaimed revenue banner (ROI counter)
   setKPINumber('val-reclaimed', reclaimed_revenue, true, formatMAD);
@@ -1425,7 +1529,7 @@ function renderKPICards(data) {
     } else {
       noshowCard.classList.remove('kpi-card--danger');
       setKPINumber('val-noshows', 0, true);
-      setText('sub-noshows', 'Aucune annulation ✓');
+      setText('sub-noshows', 'Aucune annulation');
     }
   }
 
@@ -1435,7 +1539,6 @@ function renderKPICards(data) {
   setText('val-revenue', revFormatted);
   setText('val-goal', formatMADShort(CONFIG.DAILY_GOAL_MAD));
 
-  const pct = Math.min(100, Math.round((revenue_today / CONFIG.DAILY_GOAL_MAD) * 100));
   const fill = document.getElementById('progress-fill');
   const pctLabel = document.getElementById('progress-pct');
   if (fill) {
@@ -2381,7 +2484,7 @@ function createDoctorTriageRow(record) {
   treatmentCell.textContent = record.treatment || '';
 
   const statusCell = document.createElement('td');
-  statusCell.textContent = record.status || '';
+  statusCell.appendChild(createStatusIndicator(record.status || 'Confirmé'));
 
   tr.append(timeCell, nameCell, treatmentCell, statusCell);
   return tr;
