@@ -1046,7 +1046,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Layer 1: RAM Idempotency Lock — 10-minute TTL synchronous Map lock\nconst TTL_MS = 10 * 60 * 1000;\nif (!global._bookingLocks) global._bookingLocks = new Map();\n\nconst items = $input.all();\nconst bookingUid = items[0]?.json?.body?.payload?.uid;\nconst now = Date.now();\n\nfor (const [key, ts] of global._bookingLocks.entries()) {\n  if (now - ts >= TTL_MS) global._bookingLocks.delete(key);\n}\n\nif (bookingUid) {\n  const existing = global._bookingLocks.get(bookingUid);\n  if (existing !== undefined && (now - existing) < TTL_MS) {\n    return [];\n  }\n  global._bookingLocks.set(bookingUid, now);\n}\n\nreturn items;"
+        "jsCode": "// Layer 1: Redis Idempotency Lock — SETNX 10-minute TTL (distributed)\nconst TTL_SEC = 600;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) throw new Error('CRITICAL: REDIS_CONNECTION_URL missing from environment');\n  const h = token ? { Authorization: `Bearer ${token}` } : {};\n  const encKey = encodeURIComponent(key);\n  const res = await fetch(`${base}/set/${encKey}/1?NX=true&EX=${ttlSec}`, { method: 'POST', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: setnx ${res.status}`);\n  return res.json();\n}\n\nreturn (async () => {\n  const items = $input.all();\n  const bookingUid = items[0]?.json?.body?.payload?.uid;\n  if (!bookingUid) return items;\n\n  const lockKey = `idem:booking:${bookingUid}`;\n  const lock = await redisSetNx(lockKey, TTL_SEC);\n  if (lock.result === null) {\n    return [];\n  }\n  return items;\n})();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1054,7 +1054,7 @@
         -1240,
         512
       ],
-      "name": "RAM Idempotency Lock",
+      "name": "Redis Idempotency Lock",
       "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890"
     },
     {
@@ -1155,7 +1155,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Proactive Chair-Filler: slice top 3 highest-priority waitlist patients\nconst rows = $input.all().map(i => i.json);\nconst cancelledSlot = $('Edit Fields').item.json.body.payload.startTime;\nconst bookingUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nrows.sort((a, b) => {\n  const pa = Number(a['Priorité'] ?? a['Priorite'] ?? a['Priority'] ?? 999);\n  const pb = Number(b['Priorité'] ?? b['Priorite'] ?? b['Priority'] ?? 999);\n  return pa - pb;\n});\n\nconst top3 = rows.slice(0, 3);\n\nif (!global._waitlistNotifications) global._waitlistNotifications = [];\nglobal._waitlistNotifications.push({\n  slot: cancelledSlot,\n  notified: top3.map(r => ({\n    nom: r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient',\n    phone: r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '',\n    bookingUrl\n  })),\n  bookedBy: null,\n  ts: Date.now()\n});\n\nreturn top3.map(r => ({\n  json: {\n    Nom: r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient',\n    Phone: r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '',\n    Booking_URL: bookingUrl,\n    cancelledSlot\n  }\n}));"
+        "jsCode": "// Proactive Chair-Filler: slice top 3 + persist to Baserow Active Waitlist Broadcasts\nconst rows = $input.all().map(i => i.json);\nconst cancelledSlot = $('Edit Fields').item.json.body.payload.startTime;\nconst bookingUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nrows.sort((a, b) => {\n  const pa = Number(a['Priorité'] ?? a['Priorite'] ?? a['Priority'] ?? 999);\n  const pb = Number(b['Priorité'] ?? b['Priorite'] ?? b['Priority'] ?? 999);\n  return pa - pb;\n});\n\nconst top3 = rows.slice(0, 3);\nconst batchId = `wl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;\n\nasync function baserowCreateBroadcastRow(payload) {\n  const base = String($env['BASEROW_API_URL'] ?? 'https://api.baserow.io').replace(/\\/+$/, '');\n  const token = String($env['BASEROW_API_TOKEN'] ?? '').trim();\n  const tableId = String($env['BASEROW_WAITLIST_BROADCAST_TABLE_ID'] ?? '').trim();\n  if (!token) throw new Error('CRITICAL: BASEROW_API_TOKEN missing from environment');\n  if (!tableId) throw new Error('CRITICAL: BASEROW_WAITLIST_BROADCAST_TABLE_ID missing from environment');\n\n  const res = await fetch(`${base}/api/database/rows/table/${tableId}/?user_field_names=true`, {\n    method: 'POST',\n    headers: {\n      Authorization: `Token ${token}`,\n      'Content-Type': 'application/json',\n    },\n    body: JSON.stringify(payload),\n  });\n  if (!res.ok) {\n    const body = await res.text();\n    throw new Error(`BASEROW_CREATE_FAIL: ${res.status} ${body.slice(0, 200)}`);\n  }\n  return res.json();\n}\n\nreturn (async () => {\n  for (const r of top3) {\n    const nom = r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient';\n    const phone = r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '';\n    await baserowCreateBroadcastRow({\n      Slot: cancelledSlot,\n      'Patient Name': nom,\n      Phone: phone,\n      Status: 'Notified',\n      'Broadcast Batch': batchId,\n      'Booked By Phone': '',\n    });\n  }\n\n  return top3.map(r => ({\n    json: {\n      Nom: r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient',\n      Phone: r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '',\n      Booking_URL: bookingUrl,\n      cancelledSlot,\n      broadcastBatch: batchId,\n    },\n  }));\n})();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1192,7 +1192,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Slot Filled Cleanup: match new booking against open cancellation windows\nconst startTime = $('Edit Fields').item.json.body.payload.startTime;\nconst bookerPhone = ($('Edit Fields').item.json.Clean_Phone ?? '').toString().trim();\nconst portalUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nif (!global._waitlistNotifications) return [];\n\nconst match = global._waitlistNotifications.find(n =>\n  n.slot === startTime && !n.bookedBy && (Date.now() - n.ts) < 24 * 60 * 60 * 1000\n);\nif (!match) return [];\n\nmatch.bookedBy = bookerPhone;\nconst remaining = match.notified\n  .filter(p => (p.phone ?? '').toString().trim() !== bookerPhone)\n  .slice(0, 2);\n\nreturn remaining.map(p => ({\n  json: {\n    Nom: p.nom ?? 'Patient',\n    Phone: p.phone,\n    Portal_URL: portalUrl\n  }\n}));"
+        "jsCode": "// Slot Filled Cleanup: Baserow-backed waitlist cascade (no in-memory state)\nconst startTime = $('Edit Fields').item.json.body.payload.startTime;\nconst bookerPhone = ($('Edit Fields').item.json.Clean_Phone ?? '').toString().trim();\nconst portalUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nfunction normPhone(p) {\n  return String(p ?? '').replace(/[\\s\\-\\(\\)\\.]/g, '').trim();\n}\n\nasync function baserowListNotifiedForSlot(slot) {\n  const base = String($env['BASEROW_API_URL'] ?? 'https://api.baserow.io').replace(/\\/+$/, '');\n  const token = String($env['BASEROW_API_TOKEN'] ?? '').trim();\n  const tableId = String($env['BASEROW_WAITLIST_BROADCAST_TABLE_ID'] ?? '').trim();\n  if (!token || !tableId) throw new Error('CRITICAL: Baserow waitlist broadcast env not configured');\n\n  const filters = encodeURIComponent(JSON.stringify({\n    filter_type: 'AND',\n    filters: [\n      { field: 'Slot', type: 'equal', value: slot },\n      { field: 'Status', type: 'equal', value: 'Notified' },\n    ],\n  }));\n\n  const res = await fetch(`${base}/api/database/rows/table/${tableId}/?user_field_names=true&filters=${filters}`, {\n    method: 'GET',\n    headers: { Authorization: `Token ${token}` },\n  });\n  if (!res.ok) throw new Error(`BASEROW_LIST_FAIL: ${res.status}`);\n  const data = await res.json();\n  return data.results ?? [];\n}\n\nasync function baserowUpdateRow(rowId, fields) {\n  const base = String($env['BASEROW_API_URL'] ?? 'https://api.baserow.io').replace(/\\/+$/, '');\n  const token = String($env['BASEROW_API_TOKEN'] ?? '').trim();\n  const tableId = String($env['BASEROW_WAITLIST_BROADCAST_TABLE_ID'] ?? '').trim();\n  const res = await fetch(`${base}/api/database/rows/table/${tableId}/${rowId}/?user_field_names=true`, {\n    method: 'PATCH',\n    headers: {\n      Authorization: `Token ${token}`,\n      'Content-Type': 'application/json',\n    },\n    body: JSON.stringify(fields),\n  });\n  if (!res.ok) throw new Error(`BASEROW_UPDATE_FAIL: ${res.status}`);\n  return res.json();\n}\n\nreturn (async () => {\n  const rows = await baserowListNotifiedForSlot(startTime);\n  if (!rows.length) return [];\n\n  const bookerNorm = normPhone(bookerPhone);\n  const bookerRow = rows.find((r) => normPhone(r.Phone) === bookerNorm);\n  if (!bookerRow) return [];\n\n  const batchId = bookerRow['Broadcast Batch'];\n  await baserowUpdateRow(bookerRow.id, {\n    Status: 'Booked',\n    'Booked By Phone': bookerPhone,\n  });\n\n  const remaining = rows\n    .filter((r) => r['Broadcast Batch'] === batchId)\n    .filter((r) => normPhone(r.Phone) !== bookerNorm)\n    .slice(0, 2);\n\n  return remaining.map((p) => ({\n    json: {\n      Nom: p['Patient Name'] ?? 'Patient',\n      Phone: p.Phone ?? '',\n      Portal_URL: portalUrl,\n    },\n  }));\n})();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1511,18 +1511,7 @@
       "main": [
         [
           {
-            "node": "RAM Idempotency Lock",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "RAM Idempotency Lock": {
-      "main": [
-        [
-          {
-            "node": "Edit Fields",
+            "node": "Redis Idempotency Lock",
             "type": "main",
             "index": 0
           }
@@ -1664,6 +1653,17 @@
     "Send an SMS/MMS/WhatsApp message1": {
       "main": [
         []
+      ]
+    },
+    "Redis Idempotency Lock": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

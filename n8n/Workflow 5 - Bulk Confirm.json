@@ -34,10 +34,23 @@
     },
     {
       "parameters": {
+        "jsCode": "// Fail-fast guard: Item Lists emits one scalar per item at body.rowIds (not root rowIds).\nconst raw = $json.body?.rowIds ?? $json.rowId;\n\nif (raw === undefined || raw === null || String(raw).trim() === '') {\n  throw new Error('VALIDATION_FAIL: Baserow rowId is missing, null, or empty after Split IDs');\n}\n\nreturn [{ json: { rowId: raw } }];"
+      },
+      "id": "c7f2a1b3-4d5e-6f78-9012-3456789abcde",
+      "name": "Validate Row ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -112
+      ]
+    },
+    {
+      "parameters": {
         "authentication": "databaseToken",
         "operation": "update",
         "tableId": 1017856,
-        "rowId": "={{ $json.rowIds }}"
+        "rowId": "={{ $json[\"rowId\"] }}"
       },
       "id": "e5e3efbc-464a-409f-b2b1-3e0c8ac32c40",
       "name": "Baserow - Update Status",
@@ -84,6 +97,17 @@
       ]
     },
     "Split IDs": {
+      "main": [
+        [
+          {
+            "node": "Validate Row ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Row ID": {
       "main": [
         [
           {
