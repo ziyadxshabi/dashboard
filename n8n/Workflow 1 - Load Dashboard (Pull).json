@@ -19,6 +19,58 @@
     },
     {
       "parameters": {
+        "jsCode": "// ── GATE: Roster API key (zero-trust, timing-safe) ─────────────────────────\nconst crypto = require('crypto');\n\nfunction timingSafeEqualStrings(a, b) {\n  const sa = String(a ?? '');\n  const sb = String(b ?? '');\n  const ba = Buffer.from(sa, 'utf8');\n  const bb = Buffer.from(sb, 'utf8');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction readAgencyAuthHeader(h) {\n  const bag = h ?? {};\n  for (const [key, value] of Object.entries(bag)) {\n    if (key && key.toLowerCase() === 'x-agency-auth') {\n      const v = String(value ?? '').trim();\n      if (v) return v;\n    }\n  }\n  return '';\n}\n\nconst headers = $input.first().json.headers ?? {};\nconst incoming = readAgencyAuthHeader(headers);\nconst expected = String($env['N8N_AUTH_KEY'] ?? $env['DASHBOARD_AUTH_KEY'] ?? '').trim();\n\nif (!expected) {\n  throw new Error('AUTH_FAIL: N8N_AUTH_KEY is not configured');\n}\n\nif (!incoming || !timingSafeEqualStrings(incoming, expected)) {\n  throw new Error('AUTH_FAIL: Invalid or missing x-agency-auth header');\n}\n\nreturn $input.all();"
+      },
+      "id": "auth-gate-roster-v2-zero-trust",
+      "name": "Auth + Rate Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const errMsg = ($input.first()?.json?.message ?? 'Unauthorized').toString();\nconst isAuth = errMsg.startsWith('AUTH_FAIL');\nreturn [{ json: { httpStatus: isAuth ? 401 : 503, body: { ok: false, error: isAuth ? 'Unauthorized' : 'Service Unavailable' } } }];"
+      },
+      "id": "auth-error-roster-v2-zero-trust",
+      "name": "Roster Auth Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "auth-reject-roster-v2-zero-trust",
+      "name": "Roster Auth Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        120
+      ]
+    },
+    {
+      "parameters": {
         "operation": "read",
         "documentId": {
           "__rl": true,
@@ -113,7 +165,36 @@
       "main": [
         [
           {
+            "node": "Auth + Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth + Rate Limit": {
+      "main": [
+        [
+          {
             "node": "Google Sheets - Read Feuille 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Roster Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Roster Auth Error": {
+      "main": [
+        [
+          {
+            "node": "Roster Auth Reject",
             "type": "main",
             "index": 0
           }

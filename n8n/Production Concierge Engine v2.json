@@ -1349,6 +1349,110 @@
           "name": "Baserow account 2"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── GATE: Cal.com webhook secret (timing-safe header check) ─────────────────\nconst crypto = require('crypto');\n\nfunction timingSafeEqualStrings(a, b) {\n  const sa = String(a ?? '');\n  const sb = String(b ?? '');\n  const ba = Buffer.from(sa, 'utf8');\n  const bb = Buffer.from(sb, 'utf8');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction readHeader(h, name) {\n  const target = name.toLowerCase();\n  for (const [key, value] of Object.entries(h ?? {})) {\n    if (key && key.toLowerCase() === target) return String(value ?? '').trim();\n  }\n  return '';\n}\n\nconst item = $input.first().json ?? {};\nconst headers = item.headers ?? {};\nconst expected = String($env['CAL_WEBHOOK_SECRET'] ?? '').trim();\n\nif (!expected) {\n  throw new Error('AUTH_FAIL: CAL_WEBHOOK_SECRET is not configured');\n}\n\nconst incoming = readHeader(headers, 'x-cal-secret-256')\n  || readHeader(headers, 'x-cal-signature-256')\n  || readHeader(headers, 'x-agency-auth');\n\nif (!incoming || !timingSafeEqualStrings(incoming, expected)) {\n  throw new Error('AUTH_FAIL: Invalid or missing Cal.com webhook secret');\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1290,
+        512
+      ],
+      "name": "Validate Cal Webhook Auth",
+      "id": "0875a6c1-b774-476c-a624-65893e1a474a",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Concierge auth rejection (401) ───────────────────────────────────────────\nconst err = $input.first()?.json ?? {};\nconst errMsg = (err.message ?? err.error ?? 'Unauthorized').toString();\nconst isAuth = errMsg.startsWith('AUTH_FAIL') || errMsg.startsWith('SIG_FAIL');\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : 503,\n    body: {\n      ok: false,\n      error: isAuth ? 'Unauthorized' : 'Service Unavailable',\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1290,
+        680
+      ],
+      "name": "Concierge Auth Error",
+      "id": "0fe008fa-9bf7-4d37-9b4d-c5ec30ab017e"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1070,
+        680
+      ],
+      "name": "Concierge Auth Reject",
+      "id": "266d76f6-a212-4246-8786-42e5fd7ef6b3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── GATE: Twilio SMS status callback signature validation ───────────────────\nconst crypto = require('crypto');\n\nfunction timingSafeEqualStrings(a, b) {\n  const sa = String(a ?? '');\n  const sb = String(b ?? '');\n  const ba = Buffer.from(sa, 'utf8');\n  const bb = Buffer.from(sb, 'utf8');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction readTwilioSignature(headers) {\n  for (const [key, value] of Object.entries(headers ?? {})) {\n    if (key && key.toLowerCase() === 'x-twilio-signature') {\n      return String(value ?? '').trim();\n    }\n  }\n  return '';\n}\n\nfunction buildTwilioValidationUrl(webhookBase, path, query) {\n  const base = String(webhookBase ?? '').replace(/\\/+$/, '');\n  const p = String(path ?? '').replace(/^\\//, '');\n  let url = `${base}/${p}`;\n  const q = String(query ?? '').trim();\n  if (q) url += (q.startsWith('?') ? q : `?${q}`);\n  return url;\n}\n\nfunction computeTwilioSignature(authToken, url, params) {\n  const sortedKeys = Object.keys(params ?? {}).sort();\n  let data = url;\n  for (const k of sortedKeys) {\n    data += k + String(params[k] ?? '');\n  }\n  return crypto.createHmac('sha1', authToken).update(data, 'utf8').digest('base64');\n}\n\nconst item = $input.first().json ?? {};\nconst headers = item.headers ?? {};\nconst body = item.body ?? {};\nconst query = item.query ?? {};\n\nconst authToken = String($env['N8N_TWILIO_AUTH_TOKEN'] ?? '').trim();\nif (!authToken) {\n  throw new Error('AUTH_FAIL: N8N_TWILIO_AUTH_TOKEN is not configured');\n}\n\nconst webhookBase = String($env['N8N_WEBHOOK_BASE_URL'] ?? '').trim();\nif (!webhookBase) {\n  throw new Error('AUTH_FAIL: N8N_WEBHOOK_BASE_URL is not configured');\n}\n\nconst twilioSig = readTwilioSignature(headers);\nif (!twilioSig) {\n  throw new Error('AUTH_FAIL: Missing X-Twilio-Signature header');\n}\n\nconst validationUrl = buildTwilioValidationUrl(webhookBase, 'webhook/twilio-sms-status', query);\nconst expectedSig = computeTwilioSignature(authToken, validationUrl, body);\n\nif (!timingSafeEqualStrings(twilioSig, expectedSig)) {\n  throw new Error('AUTH_FAIL: Invalid Twilio signature');\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1290,
+        1400
+      ],
+      "name": "Validate Twilio Status Auth",
+      "id": "c29a6ef4-863b-4300-a497-feab5c71b7aa",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Concierge auth rejection (401) ───────────────────────────────────────────\nconst err = $input.first()?.json ?? {};\nconst errMsg = (err.message ?? err.error ?? 'Unauthorized').toString();\nconst isAuth = errMsg.startsWith('AUTH_FAIL') || errMsg.startsWith('SIG_FAIL');\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : 503,\n    body: {\n      ok: false,\n      error: isAuth ? 'Unauthorized' : 'Service Unavailable',\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1290,
+        1568
+      ],
+      "name": "Twilio Status Auth Error",
+      "id": "7358c1aa-1b22-47cc-b4b7-18eb4082746c"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1070,
+        1568
+      ],
+      "name": "Twilio Status Auth Reject",
+      "id": "24a51252-5555-4d4a-acd0-576f392676f6"
     }
   ],
   "pinData": {},
@@ -1511,7 +1615,7 @@
       "main": [
         [
           {
-            "node": "Redis Idempotency Lock",
+            "node": "Validate Cal Webhook Auth",
             "type": "main",
             "index": 0
           }
@@ -1611,7 +1715,7 @@
       "main": [
         [
           {
-            "node": "Parse Twilio Status",
+            "node": "Validate Twilio Status Auth",
             "type": "main",
             "index": 0
           }
@@ -1660,6 +1764,64 @@
         [
           {
             "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Cal Webhook Auth": {
+      "main": [
+        [
+          {
+            "node": "Redis Idempotency Lock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Concierge Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concierge Auth Error": {
+      "main": [
+        [
+          {
+            "node": "Concierge Auth Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Twilio Status Auth": {
+      "main": [
+        [
+          {
+            "node": "Parse Twilio Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio Status Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio Status Auth Error": {
+      "main": [
+        [
+          {
+            "node": "Twilio Status Auth Reject",
             "type": "main",
             "index": 0
           }

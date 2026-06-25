@@ -22,6 +22,11 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD || DEFAULT_WEBHOOK_URL;
+  const authKey = String(process.env.DASHBOARD_AUTH_KEY ?? process.env.N8N_AUTH_KEY ?? '').trim();
+  if (!authKey) {
+    console.error('[dashboard-data] DASHBOARD_AUTH_KEY is not configured');
+    return res.status(500).json({ error: 'Server misconfiguration' });
+  }
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
@@ -34,7 +39,7 @@ module.exports = async function handler(req, res) {
         'content-type': 'application/json',
         'ngrok-skip-browser-warning': 'true',
         'user-agent': 'DentaFlow-Doctor-Proxy/1.0',
-        'x-agency-auth': process.env.DASHBOARD_AUTH_KEY || process.env.N8N_AUTH_KEY || '',
+        'x-agency-auth': authKey,
       },
       signal: abortController.signal,
       redirect: 'follow',

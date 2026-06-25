@@ -58,14 +58,18 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   const webhookUrl = process.env.N8N_WEBHOOK_ROSTER || DEFAULT_WEBHOOK_URL;
-  const authKey = process.env.N8N_AUTH_KEY;
+  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
+  if (!authKey) {
+    console.error('[roster] N8N_AUTH_KEY is not configured');
+    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
+  }
 
   const headers = {
     accept: 'application/json',
     'ngrok-skip-browser-warning': 'true',
     'user-agent': 'DentaFlow-Assistant-Proxy/1.0',
+    'x-agency-auth': authKey,
   };
-  if (authKey) headers['x-agency-auth'] = authKey;
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
