@@ -134,6 +134,7 @@ function persistThemePreference(theme) {
 const CONFIG = {
   API_BASE:             'https://glade-rigor-perennial.ngrok-free.dev',
   DATA_URL:             '/api/dashboard-data',
+  UPDATE_STATUS_PROXY:  '/api/update-status',
   DAILY_GOAL_MAD:       15000,
   REFRESH_INTERVAL_MS:  300_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
@@ -2179,6 +2180,72 @@ function sortDoctorAppointmentsByTime(a, b) {
   const timeA = new Date(a?.rawDate || 0).getTime();
   const timeB = new Date(b?.rawDate || 0).getTime();
   return timeA - timeB;
+}
+
+async function updateRosterStatus(selectEl, previousStatus) {
+  const bookingId = selectEl.dataset.bookingId || '';
+  const newStatus = selectEl.value;
+
+  selectEl.disabled = true;
+  selectEl.classList.add('status-updating');
+  selectEl.classList.remove('status-success', 'status-error');
+
+  try {
+    const token = window.DentaFlowAuth?.getToken?.();
+    if (!token) {
+      throw new Error('Session expirée — veuillez vous reconnecter.');
+    }
+
+    const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
+      method: 'POST',
+      headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ bookingId, newStatus }),
+    });
+
+    const responseText = await response.text();
+    let responsePayload = responseText;
+    try {
+      responsePayload = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      // keep raw text
+    }
+    console.log('[Roster Status] Response:', {
+      status: response.status,
+      ok: response.ok,
+      body: responsePayload,
+    });
+
+    if (response.status === 401) {
+      window.DentaFlowAuth?.clearSession?.();
+      sessionStorage.removeItem('dentaflow_role');
+      throw new Error('Session expirée — veuillez vous reconnecter.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
+    }
+
+    selectEl.classList.remove('status-updating');
+    selectEl.classList.add('status-success');
+
+    setTimeout(() => {
+      selectEl.classList.remove('status-success');
+      selectEl.disabled = false;
+    }, 2000);
+  } catch (error) {
+    console.error('[Roster Status] Update failed:', error);
+    selectEl.value = previousStatus;
+    selectEl.classList.remove('status-updating');
+    selectEl.classList.add('status-error');
+    selectEl.disabled = false;
+    const msg = String(error?.message || '');
+    if (msg.includes('Session expirée')) {
+      alert('Session expirée — veuillez vous reconnecter.');
+    } else {
+      alert('Échec de la mise à jour du statut — réessayez.');
+    }
+    setTimeout(() => selectEl.classList.remove('status-error'), 2000);
+  }
 }
 
 function createDoctorTriageRow(record) {

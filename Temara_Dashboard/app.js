@@ -3015,9 +3015,14 @@ let handoffNotes = [];
     selectEl.classList.remove('status-success', 'status-error');
 
     try {
+      const token = window.DentaFlowAuth?.getToken?.();
+      if (!token) {
+        throw new Error('Session expirée — veuillez vous reconnecter.');
+      }
+
       const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(),
         body: JSON.stringify({ bookingId, newStatus }),
       });
 
@@ -3033,6 +3038,11 @@ let handoffNotes = [];
         ok: response.ok,
         body: responsePayload,
       });
+
+      if (response.status === 401) {
+        window.DentaFlowAuth?.clearSession?.();
+        throw new Error('Session expirée — veuillez vous reconnecter.');
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
@@ -3075,7 +3085,12 @@ let handoffNotes = [];
       selectEl.classList.remove('status-updating');
       selectEl.classList.add('status-error');
       selectEl.disabled = false;
-      alert('Échec de la mise à jour du statut — réessayez.');
+      const msg = String(error?.message || '');
+      if (msg.includes('Session expirée')) {
+        alert('Session expirée — veuillez vous reconnecter.');
+      } else {
+        alert('Échec de la mise à jour du statut — réessayez.');
+      }
       setTimeout(() => selectEl.classList.remove('status-error'), 2000);
     }
   }
