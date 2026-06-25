@@ -3503,6 +3503,16 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   flex-shrink: 0;
 }
 
+.assistant-panel--roster .assistant-panel__head,
+.assistant-panel--roster {
+  overflow: visible;
+}
+
+.assistant-panel--roster:has(.actions-popover.is-open) {
+  position: relative;
+  z-index: 40;
+}
+
 .btn-icon-menu {
   display: inline-flex;
   align-items: center;
@@ -3510,22 +3520,22 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.55);
+  background: var(--input-bg);
+  color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-icon-menu:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--text-main);
+  background: var(--accent-dim);
+  border-color: var(--border-2);
 }
 
 .btn-icon-menu:focus-visible {
-  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline: 2px solid var(--accent-gold);
   outline-offset: 2px;
 }
 
@@ -3542,15 +3552,20 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   min-width: 220px;
   padding: 6px;
   border-radius: 10px;
-  background: #111827;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  background: var(--surface-2);
+  border: 1px solid var(--border-color);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
   transform-origin: top right;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.actions-popover.is-portaled {
+  position: fixed;
+  z-index: 1200;
 }
 
 .actions-popover.is-open {
@@ -3565,7 +3580,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-main);
   font-family: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -3574,24 +3589,30 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-.actions-popover__item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+.actions-popover__item:hover:not(:disabled) {
+  background: var(--accent-dim);
+  color: var(--text-main);
+}
+
+.actions-popover__item:disabled {
+  opacity: 0.42;
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 .actions-popover__item--danger {
-  color: #f87171;
+  color: var(--danger);
 }
 
-.actions-popover__item--danger:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #fca5a5;
+.actions-popover__item--danger:hover:not(:disabled) {
+  background: var(--danger-dim);
+  color: var(--danger);
 }
 
 .actions-popover__divider {
   height: 1px;
   margin: 4px 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .quick-actions--disclosed {

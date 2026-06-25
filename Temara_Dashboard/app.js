@@ -1674,7 +1674,68 @@ let handoffNotes = [];
 
   let progressiveDisclosureInitialized = false;
   const openPopovers = new Set();
+  const popoverDockParents = new WeakMap();
   let popoverClickBound = false;
+  let popoverRepositionBound = false;
+  let popoverRepositionRaf = null;
+
+  function getPopoverDock(popover) {
+    let dock = popoverDockParents.get(popover);
+    if (!dock && popover.parentElement && popover.parentElement !== document.body) {
+      dock = popover.parentElement;
+      popoverDockParents.set(popover, dock);
+    }
+    return dock;
+  }
+
+  function positionActionsPopover(popover, trigger) {
+    if (!popover || !trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const gap = 8;
+    popover.style.top = `${rect.bottom + gap}px`;
+    popover.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    popover.style.left = 'auto';
+    popover.style.bottom = 'auto';
+  }
+
+  function portalActionsPopover(popover) {
+    if (!popover || popover.parentElement === document.body) return;
+    getPopoverDock(popover);
+    document.body.appendChild(popover);
+    popover.classList.add('is-portaled');
+  }
+
+  function dockActionsPopover(popover) {
+    if (!popover) return;
+    const dock = popoverDockParents.get(popover);
+    if (dock && popover.parentElement === document.body) {
+      dock.appendChild(popover);
+    }
+    popover.classList.remove('is-portaled');
+    popover.style.top = '';
+    popover.style.right = '';
+    popover.style.left = '';
+    popover.style.bottom = '';
+  }
+
+  function schedulePopoverReposition() {
+    if (!openPopovers.size) return;
+    if (popoverRepositionRaf) return;
+    popoverRepositionRaf = requestAnimationFrame(() => {
+      popoverRepositionRaf = null;
+      openPopovers.forEach((popover) => {
+        const trigger = document.querySelector(`[aria-controls="${popover.id}"]`);
+        if (trigger) positionActionsPopover(popover, trigger);
+      });
+    });
+  }
+
+  function bindPopoverReposition() {
+    if (popoverRepositionBound) return;
+    popoverRepositionBound = true;
+    window.addEventListener('resize', schedulePopoverReposition, { passive: true });
+    window.addEventListener('scroll', schedulePopoverReposition, { passive: true, capture: true });
+  }
 
   function closeActionsPopover(popover, trigger) {
     if (!popover) return;
@@ -1683,6 +1744,7 @@ let handoffNotes = [];
       popover.classList.remove('is-open');
       popover.hidden = true;
       popover.style.pointerEvents = 'none';
+      dockActionsPopover(popover);
       if (trigger) trigger.setAttribute('aria-expanded', 'false');
       openPopovers.delete(popover);
     };
@@ -1712,6 +1774,9 @@ let handoffNotes = [];
       }
     });
 
+    bindPopoverReposition();
+    portalActionsPopover(popover);
+    positionActionsPopover(popover, trigger);
     popover.hidden = false;
     popover.classList.add('is-open');
     trigger.setAttribute('aria-expanded', 'true');
