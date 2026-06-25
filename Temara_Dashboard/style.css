@@ -3614,6 +3614,13 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   cursor: not-allowed;
 }
 
+.actions-popover__item.v-disabled,
+.actions-popover__item.v-disabled:disabled {
+  opacity: 0.48;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
 .actions-popover__item--danger {
   color: var(--danger);
 }

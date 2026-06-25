@@ -594,6 +594,38 @@ let handoffNotes = [];
     toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
   }
 
+  const DEPLOYING_FEATURE_NOTICES = {
+    dailyReport: {
+      toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
+      tooltip: 'Génération du rapport bientôt disponible',
+    },
+    forceReminders: {
+      toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
+      tooltip: 'Rappels automatiques bientôt disponibles',
+    },
+  };
+
+  function wireDeployingFeatureButton(button, notice) {
+    if (!button || button.dataset.deployingGuard === 'true') return;
+    button.dataset.deployingGuard = 'true';
+    button.disabled = true;
+    button.setAttribute('aria-disabled', 'true');
+    button.classList.add('v-disabled');
+    button.setAttribute('title', notice.tooltip);
+    button.dataset.tooltip = notice.tooltip;
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showToast(notice.toast, 'info');
+    });
+  }
+
+  function guardDeployingFeatureButtons() {
+    wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
+    wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
+    wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
+  }
+
   function setSyncIndicator(state) {
     const dot = document.querySelector('.sync-dot');
     const label = document.querySelector('.sync-label');
@@ -2044,34 +2076,7 @@ let handoffNotes = [];
 
     if (exportBtn && exportBtn.dataset.adminWired !== 'true') {
       exportBtn.dataset.adminWired = 'true';
-      exportBtn.addEventListener('click', async () => {
-      const rosterExport = $('btn-daily-report');
-      if (rosterExport) {
-        rosterExport.click();
-        return;
-      }
-
-      exportBtn.disabled = true;
-      try {
-        const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.EXPORT_DAILY}`,
-          { method: 'GET', headers: apiHeaders() }
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `rapport-journalier-${new Date().toISOString().slice(0, 10)}.xlsx`;
-        link.click();
-        URL.revokeObjectURL(url);
-        showToast('Rapport journalier généré.', 'success');
-      } catch {
-        showToast('Export indisponible.', 'error');
-      } finally {
-        exportBtn.disabled = false;
-      }
-      });
+      wireDeployingFeatureButton(exportBtn, DEPLOYING_FEATURE_NOTICES.dailyReport);
     }
   }
 
@@ -3937,39 +3942,10 @@ let handoffNotes = [];
   }
 
   function initQuickActions() {
-    const btnReport    = $('btn-daily-report');
+    guardDeployingFeatureButtons();
+
     const btnFillGap   = $('btn-fill-gap');
     const btnDelay     = $('btn-alerte-retard');
-    const btnReminders = $('btn-force-reminders');
-
-    btnReport?.addEventListener('click', async () => {
-      btnReport.classList.add('is-loading');
-      btnReport.disabled = true;
-      try {
-        const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.EXPORT_DAILY}`,
-          { method: 'GET', headers: apiHeaders() }
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `rapport-journalier-${new Date().toISOString().slice(0, 10)}.xlsx`;
-        link.click();
-        URL.revokeObjectURL(url);
-
-        btnReport.classList.add('is-success');
-        showToast('Rapport journalier généré — téléchargement lancé.', 'success');
-      } catch {
-        showToast('Export indisponible — vérifiez le workflow n8n.', 'error');
-      } finally {
-        btnReport.classList.remove('is-loading');
-        btnReport.disabled = false;
-        setTimeout(() => btnReport.classList.remove('is-success'), 2500);
-      }
-    });
 
     btnFillGap?.addEventListener('click', async () => {
       btnFillGap.classList.add('is-loading');
@@ -4046,27 +4022,6 @@ let handoffNotes = [];
         btnDelay.disabled = false;
         btnDelay.classList.remove('is-loading', 'is-success');
         showToast('Échec de l\'alerte retard — réessayez.', 'error');
-      }
-    });
-
-    btnReminders?.addEventListener('click', async () => {
-      btnReminders.classList.add('is-loading');
-      btnReminders.disabled = true;
-      try {
-        const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.FORCE_REMINDERS}`,
-          { method: 'POST', headers: apiHeaders() }
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        btnReminders.classList.add('is-success');
-        showToast('Rappels SMS envoyés avec succès.', 'success');
-      } catch {
-        showToast('Échec de l\'envoi des rappels — réessayez.', 'error');
-      } finally {
-        btnReminders.classList.remove('is-loading');
-        btnReminders.disabled = false;
-        setTimeout(() => btnReminders.classList.remove('is-success'), 2500);
       }
     });
   }
