@@ -195,7 +195,7 @@
             <circle cx="12" cy="19" r="1.75"/>
           </svg>
         </button>
-        <div class="actions-popover account-menu-popover" id="account-menu-popover" role="menu" hidden>
+        <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
           <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Paramètres
@@ -360,18 +360,7 @@
             </div>
           </article>
 
-          <article class="chart-card chart-card--side">
-            <div class="chart-header">
-              <div class="chart-title">Taux d'Acceptation</div>
-              <div class="chart-sub">Plans de traitement acceptés vs. en attente</div>
-            </div>
-            <div class="chart-body chart-body--pie">
-              <canvas id="chart-acceptance" role="img" aria-label="Graphique d'acceptation des traitements"></canvas>
-            </div>
-            <div class="pie-legend" id="pie-legend"></div>
-          </article>
-
-          <article class="schedule-widget" aria-label="Prochains rendez-vous">
+          <article class="schedule-widget schedule-widget--wide" aria-label="Prochains rendez-vous">
             <div class="schedule-header">
               <div class="chart-title">Prochains Rendez-vous</div>
               <div class="chart-sub">Aujourd'hui — ordre chronologique</div>

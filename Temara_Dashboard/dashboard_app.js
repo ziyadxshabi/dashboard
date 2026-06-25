@@ -390,7 +390,33 @@ function createWaitlistTableRow(appt) {
 }
 
 function createApptCardElement(appt) {
-  return createWaitlistTableRow(appt);
+  const card = document.createElement('div');
+  card.className = 'appt-card';
+
+  const timeEl = document.createElement('span');
+  timeEl.className = 'appt-time';
+  timeEl.textContent = appt.time || '';
+
+  const info = document.createElement('div');
+  info.className = 'appt-info';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'appt-name';
+  nameEl.textContent = appt.name || '';
+  if (appt.name) nameEl.title = appt.name;
+  info.appendChild(nameEl);
+
+  const phoneEl = document.createElement('span');
+  phoneEl.className = 'appt-phone col-numeric';
+  phoneEl.textContent = appt.phone || '—';
+  if (appt.phone) phoneEl.title = appt.phone;
+
+  const statusWrap = document.createElement('div');
+  statusWrap.className = 'appt-card__status';
+  statusWrap.innerHTML = buildStatusPill(appt.treatment, apptTagModifier(appt.tagClass));
+
+  card.append(timeEl, info, phoneEl, statusWrap);
+  return card;
 }
 
 function buildApptCardHTML(appt) {

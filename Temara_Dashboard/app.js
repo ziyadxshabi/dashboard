@@ -1945,10 +1945,21 @@ let handoffNotes = [];
     if (!popover || !trigger) return;
     const rect = trigger.getBoundingClientRect();
     const gap = 8;
-    popover.style.top = `${rect.bottom + gap}px`;
-    popover.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    const isDropUp = popover.classList.contains('account-menu-popover')
+      || popover.classList.contains('actions-popover--drop-up');
+
     popover.style.left = 'auto';
-    popover.style.bottom = 'auto';
+    popover.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+
+    if (isDropUp) {
+      popover.style.top = 'auto';
+      popover.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+      popover.style.transformOrigin = 'bottom right';
+    } else {
+      popover.style.bottom = 'auto';
+      popover.style.top = `${rect.bottom + gap}px`;
+      popover.style.transformOrigin = 'top right';
+    }
   }
 
   function portalActionsPopover(popover) {

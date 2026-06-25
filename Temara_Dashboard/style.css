@@ -632,7 +632,7 @@ body.mode-assistant {
 
 .assistant-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.95fr);
+  grid-template-columns: minmax(0, 1.75fr) minmax(240px, 0.72fr);
   grid-template-rows: auto auto;
   gap: 22px;
   align-items: start;
@@ -2219,7 +2219,9 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
 .appt-card {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 14px;
+  min-width: 0;
   padding: 14px 16px;
   background: var(--surface-2);
   border: 1px solid var(--border-color);
@@ -2232,12 +2234,38 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   color: var(--accent-gold);
   font-variant-numeric: tabular-nums;
   min-width: 48px;
+  flex-shrink: 0;
+}
+
+.appt-info {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .appt-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appt-phone {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.appt-card__status {
+  flex-shrink: 0;
+}
+
+.appt-card__status .status-pill {
+  white-space: nowrap;
 }
 
 .appt-tag {
@@ -3141,6 +3169,8 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .col-numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cell-truncate {
@@ -3293,9 +3323,10 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .timeline-item__card {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 12px;
-  flex-wrap: wrap;
   min-height: 64px;
+  min-width: 0;
   padding: 10px 16px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
@@ -3322,6 +3353,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .timeline-item__checkbox {
@@ -3332,6 +3364,8 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .timeline-item__status {
   position: relative;
   min-width: 120px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .timeline-item__status .status-select {
@@ -3441,6 +3475,11 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary, #94a3b8);
   font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.waitlist-table tbody td.col-numeric .copyable {
+  white-space: nowrap;
 }
 
 .waitlist-empty {
@@ -3696,6 +3735,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 .timeline-item__card[data-row-interactive] {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 12px;
   width: 100%;
   min-width: 0;
@@ -4011,8 +4051,23 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-.account-menu-popover {
+.account-menu-popover,
+.actions-popover--drop-up {
   min-width: 180px;
+}
+
+.account-card .account-menu-popover,
+.account-card .actions-popover--drop-up {
+  top: auto;
+  bottom: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+  transform-origin: bottom right;
+}
+
+.account-menu-popover.is-portaled,
+.actions-popover--drop-up.is-portaled {
+  transform-origin: bottom right;
 }
 
 .actions-popover__item svg {
