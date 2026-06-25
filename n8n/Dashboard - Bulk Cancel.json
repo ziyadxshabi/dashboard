@@ -174,7 +174,23 @@
         "respondWith": "json",
         "responseBody": "={{ $json }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              }
+            ]
+          }
         }
       },
       "id": "e909b979-0bd8-4d56-b945-3047059fd7e1",

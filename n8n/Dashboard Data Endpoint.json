@@ -141,7 +141,7 @@
               },
               {
                 "name": "Access-Control-Allow-Origin",
-                "value": "=*"
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
               },
               {
                 "name": "Cache-Control",
@@ -195,7 +195,7 @@
               },
               {
                 "name": "Access-Control-Allow-Origin",
-                "value": "=*"
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
               },
               {
                 "name": "X-Content-Type-Options",
@@ -240,15 +240,15 @@
             "entries": [
               {
                 "name": "Access-Control-Allow-Origin",
-                "value": "=*"
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
               },
               {
                 "name": "Access-Control-Allow-Methods",
-                "value": "GET, OPTIONS"
+                "value": "OPTIONS, GET"
               },
               {
                 "name": "Access-Control-Allow-Headers",
-                "value": "Content-Type, X-Dashboard-Key"
+                "value": "Content-Type, Authorization, x-agency-auth"
               },
               {
                 "name": "Access-Control-Max-Age",

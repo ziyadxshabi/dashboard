@@ -65,7 +65,23 @@
         "respondWith": "json",
         "responseBody": "={{ { \"success\": false, \"error\": \"Missing bookingId or newStatus in request\" } }}",
         "options": {
-          "responseCode": 400
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              }
+            ]
+          }
         }
       },
       "id": "38231352-60eb-4eec-80a0-8f7ecc695587",
@@ -186,7 +202,23 @@
         "respondWith": "json",
         "responseBody": "={{ { \"success\": true, \"updatedStatus\": $('Webhook Catch Status').item.json.body.newStatus } }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              }
+            ]
+          }
         }
       },
       "id": "7b0d6a38-6f63-4cf9-9ca1-641b44769b3e",
