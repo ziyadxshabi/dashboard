@@ -5,8 +5,10 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "bulk-confirm",
-        "responseMode": "lastNode",
-        "options": {}
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+        }
       },
       "id": "085403c8-3f7c-4aa5-b9f8-741ef3e0f401",
       "name": "Webhook - Bulk Confirm",
@@ -17,6 +19,20 @@
         -112
       ],
       "webhookId": "bulk-confirm"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── GATE: API key / PIN auth (SHA-256, timing-safe, brute-force protected) ──\nconst crypto = require('crypto');\n\nfunction timingSafeEqualStrings(a, b) {\n  const sa = String(a ?? '');\n  const sb = String(b ?? '');\n  const ba = Buffer.from(sa, 'utf8');\n  const bb = Buffer.from(sb, 'utf8');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction sha256Hex(value) {\n  return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');\n}\n\nfunction readAgencyAuthHeader(h) {\n  const bag = h ?? {};\n  for (const [key, value] of Object.entries(bag)) {\n    if (key && key.toLowerCase() === 'x-agency-auth') {\n      const v = String(value ?? '').trim();\n      if (v) return v;\n    }\n  }\n  return '';\n}\n\nfunction readCredential(item) {\n  const header = readAgencyAuthHeader(item.headers ?? {});\n  if (header) return header;\n  const body = item.body ?? {};\n  return String(body.pin ?? body.PIN ?? body.authKey ?? '').trim();\n}\n\nfunction stripSecrets(item) {\n  const clean = { ...item };\n  if (clean.body && typeof clean.body === 'object') {\n    const b = { ...clean.body };\n    delete b.pin;\n    delete b.PIN;\n    delete b.password;\n    delete b.authKey;\n    clean.body = b;\n  }\n  if (clean.headers && typeof clean.headers === 'object') {\n    const h = { ...clean.headers };\n    for (const key of Object.keys(h)) {\n      if (key && key.toLowerCase() === 'x-agency-auth') delete h[key];\n    }\n    clean.headers = h;\n  }\n  return clean;\n}\n\nasync function redisHeaders() {\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  const h = {};\n  if (token) h.Authorization = `Bearer ${token}`;\n  return h;\n}\n\nfunction redisBase() {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  if (!base) throw new Error('CRITICAL: REDIS_CONNECTION_URL missing from environment');\n  return base;\n}\n\nasync function redisGet(key) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const res = await fetch(`${base}/get/${encodeURIComponent(key)}`, { method: 'GET', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: get ${res.status}`);\n  const data = await res.json();\n  return data.result;\n}\n\nasync function redisDel(key) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const res = await fetch(`${base}/del/${encodeURIComponent(key)}`, { method: 'POST', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: del ${res.status}`);\n}\n\nasync function redisIncrFail(key, windowSec) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const enc = encodeURIComponent(key);\n  const incrRes = await fetch(`${base}/incr/${enc}`, { method: 'POST', headers: h });\n  if (!incrRes.ok) throw new Error(`REDIS_HTTP_FAIL: incr ${incrRes.status}`);\n  const incrData = await incrRes.json();\n  const count = Number(incrData.result ?? 0);\n  if (count === 1) {\n    await fetch(`${base}/expire/${enc}/${windowSec}`, { method: 'POST', headers: h });\n  }\n  return count;\n}\n\nasync function redisIncrWindow(key, windowSec, max) {\n  const count = await redisIncrFail(key, windowSec);\n  if (count > max) {\n    throw new Error(`RATE_LIMIT: ${count} requests in ${windowSec}s window (max ${max})`);\n  }\n  return count;\n}\n\nfunction resolveExpectedHash() {\n  const fromEnv = String($env['DASHBOARD_AUTH_KEY_SHA256'] ?? '').trim().toLowerCase();\n  if (fromEnv) return fromEnv;\n  const plain = String($env['DASHBOARD_AUTH_KEY'] ?? '').trim();\n  if (!plain) return '';\n  return sha256Hex(plain);\n}\n\nreturn (async () => {\n  const rawItem = $input.first().json ?? {};\n  const headers = rawItem.headers ?? {};\n  const fwd = headers['x-forwarded-for'] ?? headers['X-Forwarded-For'] ?? '';\n  const clientIp = String(fwd).split(',')[0].trim() || 'unknown';\n  const clinicId = String($env['CLINIC_ID'] ?? 'temara').trim();\n  const bruteKey = `authfail:dashboard:${clinicId}:${clientIp}`;\n\n  const failCount = Number(await redisGet(bruteKey) ?? 0);\n  if (failCount >= 5) {\n    throw new Error('RATE_LIMIT: Brute-force protection — maximum 5 failed attempts in 15 minutes');\n  }\n\n  const expectedHash = resolveExpectedHash();\n  if (!expectedHash) {\n    throw new Error('AUTH_FAIL: DASHBOARD_AUTH_KEY is not configured');\n  }\n\n  const credential = readCredential(rawItem);\n  if (!credential) {\n    await redisIncrFail(bruteKey, 900);\n    throw new Error('AUTH_FAIL: Invalid or missing credentials');\n  }\n\n  const incomingHash = sha256Hex(credential);\n  if (!timingSafeEqualStrings(incomingHash, expectedHash)) {\n    await redisIncrFail(bruteKey, 900);\n    throw new Error('AUTH_FAIL: Invalid or missing credentials');\n  }\n\n  await redisDel(bruteKey);\n  await redisIncrWindow(`ratelimit:dashboard:${clientIp}`, 300, 30);\n\n  return [{ json: stripSecrets(rawItem) }];\n})();"
+      },
+      "id": "auth-bulk-confirm-gate-01",
+      "name": "Auth + Rate Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        -112
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -71,7 +87,37 @@
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"success\": true, \"message\": \"Appointments confirmed\" } }}",
-        "options": {}
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
       },
       "id": "ab816842-b524-4e18-a20d-5e1aea18cd0e",
       "name": "Respond to Webhook",
@@ -81,6 +127,127 @@
         272,
         -112
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $input.first()?.json ?? {};\nconst errMsg = (err.message ?? err.error ?? 'Internal error').toString();\nconst isAuth = errMsg.startsWith('AUTH_FAIL');\nconst isRate = errMsg.startsWith('RATE_LIMIT');\n\nconsole.error('[BulkConfirm] Error:', errMsg);\n\nconst now = new Date().toLocaleString('fr-MA', {\n  timeZone: 'Africa/Casablanca',\n  year: 'numeric', month: '2-digit', day: '2-digit',\n  hour: '2-digit', minute: '2-digit', second: '2-digit',\n});\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : isRate ? 429 : 503,\n    body: {\n      ok: false,\n      error: isAuth ? 'Unauthorized' : isRate ? 'Too Many Requests' : 'Service temporarily unavailable',\n      message: isAuth ? 'Invalid or missing credentials'\n        : isRate ? 'Brute-force protection triggered. Retry in 15 minutes.'\n        : 'Bulk confirm failed. Retry shortly.',\n      timestamp: now,\n      trace_id: `err-${Date.now().toString(36)}`,\n    },\n  },\n}];"
+      },
+      "id": "auth-bulk-confirm-err-01",
+      "name": "Build Error Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "auth-bulk-confirm-send-01",
+      "name": "Send Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "bulk-confirm",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+        }
+      },
+      "id": "cors-bulk-confirm-opt-01",
+      "name": "CORS Preflight Handler",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        80
+      ],
+      "webhookId": "bulk-confirm"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "OPTIONS, POST"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization, x-agency-auth"
+              },
+              {
+                "name": "Access-Control-Max-Age",
+                "value": "86400"
+              }
+            ]
+          }
+        }
+      },
+      "id": "cors-bulk-confirm-rep-01",
+      "name": "CORS Preflight Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        80
+      ]
     }
   ],
   "pinData": {},
@@ -89,7 +256,25 @@
       "main": [
         [
           {
+            "node": "Auth + Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth + Rate Limit": {
+      "main": [
+        [
+          {
             "node": "Split IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Error Response",
             "type": "main",
             "index": 0
           }
@@ -123,6 +308,28 @@
         [
           {
             "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Response": {
+      "main": [
+        [
+          {
+            "node": "Send Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CORS Preflight Handler": {
+      "main": [
+        [
+          {
+            "node": "CORS Preflight Reply",
             "type": "main",
             "index": 0
           }

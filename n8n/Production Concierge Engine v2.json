@@ -639,7 +639,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "final-booking-engine-v2",
-        "options": {}
+        "options": {
+          "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+        }
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -1264,7 +1266,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "twilio-sms-status",
-        "options": {}
+        "options": {
+          "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+        }
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -1386,6 +1390,18 @@
           "responseHeaders": {
             "entries": [
               {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
                 "name": "Content-Type",
                 "value": "application/json; charset=utf-8"
               }
@@ -1437,6 +1453,18 @@
           "responseCode": "={{ $json.httpStatus }}",
           "responseHeaders": {
             "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
               {
                 "name": "Content-Type",
                 "value": "application/json; charset=utf-8"

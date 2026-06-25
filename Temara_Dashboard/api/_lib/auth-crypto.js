@@ -167,7 +167,12 @@ function getRoleCredentials(role) {
 }
 
 function applyCors(res, methods, allowHeaders = 'Content-Type, Accept, Authorization') {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = String(process.env.VERCEL_FRONTEND_URL || '').trim();
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.setHeader('Access-Control-Allow-Methods', methods);
   res.setHeader('Access-Control-Allow-Headers', allowHeaders);
 }

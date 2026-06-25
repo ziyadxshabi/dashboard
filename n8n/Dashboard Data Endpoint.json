@@ -5,7 +5,9 @@
       "parameters": {
         "path": "dashboard-data",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+        }
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -19,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ── GATE 1: API Key Authentication (zero-trust, timing-safe)\nconst crypto = require('crypto');\n\nfunction timingSafeEqualStrings(a, b) {\n  const sa = String(a ?? '');\n  const sb = String(b ?? '');\n  const ba = Buffer.from(sa, 'utf8');\n  const bb = Buffer.from(sb, 'utf8');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nconst headers = $input.first().json.headers ?? {};\n\nfunction readAgencyAuthHeader(h) {\n  const bag = h ?? {};\n  const direct = bag['x-agency-auth'] ?? bag['X-Agency-Auth'] ?? bag['X-AGENCY-AUTH'];\n  if (direct != null && String(direct).trim()) return String(direct).trim();\n  for (const [key, value] of Object.entries(bag)) {\n    if (key && key.toLowerCase() === 'x-agency-auth') {\n      const v = String(value ?? '').trim();\n      if (v) return v;\n    }\n  }\n  return '';\n}\n\nconst incoming = readAgencyAuthHeader(headers);\nconst expected = String($env['DASHBOARD_AUTH_KEY'] ?? '').trim();\n\nif (!expected) {\n  throw new Error('AUTH_FAIL: DASHBOARD_AUTH_KEY is not configured');\n}\n\nif (!incoming || !timingSafeEqualStrings(incoming, expected)) {\n  throw new Error('AUTH_FAIL: Invalid or missing x-agency-auth header');\n}\n\nasync function redisHeaders() {\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  const h = {};\n  if (token) h.Authorization = `Bearer ${token}`;\n  return h;\n}\n\nfunction redisBase() {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  if (!base) throw new Error('CRITICAL: REDIS_CONNECTION_URL missing from environment');\n  return base;\n}\n\nasync function redisIncrWindow(key, windowSec, max) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const enc = encodeURIComponent(key);\n  const incrRes = await fetch(`${base}/incr/${enc}`, { method: 'POST', headers: h });\n  if (!incrRes.ok) throw new Error(`REDIS_HTTP_FAIL: incr ${incrRes.status}`);\n  const incrData = await incrRes.json();\n  const count = Number(incrData.result ?? 0);\n  if (count === 1) {\n    await fetch(`${base}/expire/${enc}/${windowSec}`, { method: 'POST', headers: h });\n  }\n  if (count > max) {\n    throw new Error(`RATE_LIMIT: ${count} requests in ${windowSec}s window (max ${max})`);\n  }\n  return count;\n}\n\nasync function redisGet(key) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const res = await fetch(`${base}/get/${encodeURIComponent(key)}`, { method: 'GET', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: get ${res.status}`);\n  const data = await res.json();\n  return data.result;\n}\n\nreturn (async () => {\n  const fwd = headers['x-forwarded-for'] ?? headers['X-Forwarded-For'] ?? '';\n  const clientIp = String(fwd).split(',')[0].trim() || 'unknown';\n  const authSlice = incoming.slice(0, 12);\n  await redisIncrWindow(`ratelimit:dashboard:${clientIp}:${authSlice}`, 300, 30);\n\n  const CACHE_KEY = 'dashboard:kpi:payload';\n  const cachedRaw = await redisGet(CACHE_KEY);\n  if (cachedRaw) {\n    try {\n      const parsed = JSON.parse(cachedRaw);\n      return [{\n        json: {\n          _fromCache: true,\n          _cacheAgeMs: 0,\n          ...parsed,\n        },\n      }];\n    } catch {\n      // corrupt cache entry — fall through to fresh fetch\n    }\n  }\n\n  return [{ json: { _fromCache: false } }];\n})();\n"
+        "jsCode": "// ── GATE 1: API Key / PIN auth (SHA-256, timing-safe, brute-force protected) ──\nconst crypto = require('crypto');\n\nfunction timingSafeEqualStrings(a, b) {\n  const sa = String(a ?? '');\n  const sb = String(b ?? '');\n  const ba = Buffer.from(sa, 'utf8');\n  const bb = Buffer.from(sb, 'utf8');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction sha256Hex(value) {\n  return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');\n}\n\nconst headers = $input.first().json.headers ?? {};\n\nfunction readAgencyAuthHeader(h) {\n  const bag = h ?? {};\n  for (const [key, value] of Object.entries(bag)) {\n    if (key && key.toLowerCase() === 'x-agency-auth') {\n      const v = String(value ?? '').trim();\n      if (v) return v;\n    }\n  }\n  return '';\n}\n\nfunction readCredential(item) {\n  const header = readAgencyAuthHeader(item.headers ?? {});\n  if (header) return header;\n  const body = item.body ?? {};\n  return String(body.pin ?? body.PIN ?? body.authKey ?? '').trim();\n}\n\nfunction stripSecrets(item) {\n  const clean = { ...item };\n  if (clean.body && typeof clean.body === 'object') {\n    const b = { ...clean.body };\n    delete b.pin;\n    delete b.PIN;\n    delete b.password;\n    delete b.authKey;\n    clean.body = b;\n  }\n  if (clean.headers && typeof clean.headers === 'object') {\n    const h = { ...clean.headers };\n    for (const key of Object.keys(h)) {\n      if (key && key.toLowerCase() === 'x-agency-auth') delete h[key];\n    }\n    clean.headers = h;\n  }\n  return clean;\n}\n\nasync function redisHeaders() {\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  const h = {};\n  if (token) h.Authorization = `Bearer ${token}`;\n  return h;\n}\n\nfunction redisBase() {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  if (!base) throw new Error('CRITICAL: REDIS_CONNECTION_URL missing from environment');\n  return base;\n}\n\nasync function redisIncrFail(key, windowSec) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const enc = encodeURIComponent(key);\n  const incrRes = await fetch(`${base}/incr/${enc}`, { method: 'POST', headers: h });\n  if (!incrRes.ok) throw new Error(`REDIS_HTTP_FAIL: incr ${incrRes.status}`);\n  const incrData = await incrRes.json();\n  const count = Number(incrData.result ?? 0);\n  if (count === 1) {\n    await fetch(`${base}/expire/${enc}/${windowSec}`, { method: 'POST', headers: h });\n  }\n  return count;\n}\n\nasync function redisIncrWindow(key, windowSec, max) {\n  const count = await redisIncrFail(key, windowSec);\n  if (count > max) {\n    throw new Error(`RATE_LIMIT: ${count} requests in ${windowSec}s window (max ${max})`);\n  }\n  return count;\n}\n\nasync function redisGet(key) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const res = await fetch(`${base}/get/${encodeURIComponent(key)}`, { method: 'GET', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: get ${res.status}`);\n  const data = await res.json();\n  return data.result;\n}\n\nasync function redisDel(key) {\n  const base = redisBase();\n  const h = await redisHeaders();\n  const res = await fetch(`${base}/del/${encodeURIComponent(key)}`, { method: 'POST', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: del ${res.status}`);\n}\n\nfunction resolveExpectedHash() {\n  const fromEnv = String($env['DASHBOARD_AUTH_KEY_SHA256'] ?? '').trim().toLowerCase();\n  if (fromEnv) return fromEnv;\n  const plain = String($env['DASHBOARD_AUTH_KEY'] ?? '').trim();\n  if (!plain) return '';\n  return sha256Hex(plain);\n}\n\nreturn (async () => {\n  const rawItem = $input.first().json ?? {};\n  const hdrs = rawItem.headers ?? {};\n  const fwd = hdrs['x-forwarded-for'] ?? hdrs['X-Forwarded-For'] ?? '';\n  const clientIp = String(fwd).split(',')[0].trim() || 'unknown';\n  const clinicId = String($env['CLINIC_ID'] ?? 'temara').trim();\n  const bruteKey = `authfail:dashboard:${clinicId}:${clientIp}`;\n\n  const failCount = Number(await redisGet(bruteKey) ?? 0);\n  if (failCount >= 5) {\n    throw new Error('RATE_LIMIT: Brute-force protection — maximum 5 failed attempts in 15 minutes');\n  }\n\n  const expectedHash = resolveExpectedHash();\n  if (!expectedHash) {\n    throw new Error('AUTH_FAIL: DASHBOARD_AUTH_KEY is not configured');\n  }\n\n  const credential = readCredential(rawItem);\n  if (!credential) {\n    await redisIncrFail(bruteKey, 900);\n    throw new Error('AUTH_FAIL: Invalid or missing credentials');\n  }\n\n  const incomingHash = sha256Hex(credential);\n  if (!timingSafeEqualStrings(incomingHash, expectedHash)) {\n    await redisIncrFail(bruteKey, 900);\n    throw new Error('AUTH_FAIL: Invalid or missing credentials');\n  }\n\n  await redisDel(bruteKey);\n  await redisIncrWindow(`ratelimit:dashboard:${clientIp}`, 300, 30);\n  stripSecrets(rawItem);\n\n  const CACHE_KEY = 'dashboard:kpi:payload';\n  const cachedRaw = await redisGet(CACHE_KEY);\n  if (cachedRaw) {\n    try {\n      const parsed = JSON.parse(cachedRaw);\n      return [{\n        json: {\n          _fromCache: true,\n          _cacheAgeMs: 0,\n          ...parsed,\n        },\n      }];\n    } catch {\n      // corrupt cache entry — fall through to fresh fetch\n    }\n  }\n\n  return [{ json: { _fromCache: false } }];\n})();\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -137,6 +139,14 @@
                 "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
               },
               {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
                 "name": "Cache-Control",
                 "value": "no-store"
               },
@@ -163,7 +173,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ── Error Handler: build a structured error response ─────────────────────────\n// This node fires when Auth + Rate Limit throws (AUTH_FAIL / RATE_LIMIT)\n// OR when Get Dashboard KPIs / Transform nodes throw.\n// It NEVER exposes internal stack traces to the client.\n\nconst err      = $input.first()?.json ?? {};\nconst errMsg   = (err.message ?? err.error ?? 'Internal error').toString();\nconst isAuth   = errMsg.startsWith('AUTH_FAIL');\nconst isRate   = errMsg.startsWith('RATE_LIMIT');\n\n// Log full error internally\nconsole.error('[Dashboard] Error:', errMsg);\n\nconst now = new Date().toLocaleString('fr-MA', {\n  timeZone: 'Africa/Casablanca',\n  year: 'numeric', month: '2-digit', day: '2-digit',\n  hour: '2-digit', minute: '2-digit', second: '2-digit',\n});\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : isRate ? 429 : 503,\n    body: {\n      ok:          false,\n      error:       isAuth ? 'Unauthorized'\n                 : isRate ? 'Too Many Requests'\n                 : 'Service temporarily unavailable',\n      message:     isAuth ? 'Invalid or missing x-agency-auth header'\n                 : isRate ? 'Rate limit exceeded. Retry in 5 minutes.'\n                 : 'Could not read data from Google Sheets. Retry in 30 seconds.',\n      timestamp:   now,\n      trace_id:    `err-${Date.now().toString(36)}`,\n    }\n  }\n}];\n"
+        "jsCode": "// ── Error Handler: build a structured error response ─────────────────────────\n// This node fires when Auth + Rate Limit throws (AUTH_FAIL / RATE_LIMIT)\n// OR when Get Dashboard KPIs / Transform nodes throw.\n// It NEVER exposes internal stack traces to the client.\n\nconst err      = $input.first()?.json ?? {};\nconst errMsg   = (err.message ?? err.error ?? 'Internal error').toString();\nconst isAuth   = errMsg.startsWith('AUTH_FAIL');\nconst isRate   = errMsg.startsWith('RATE_LIMIT');\n\n// Log full error internally\nconsole.error('[Dashboard] Error:', errMsg);\n\nconst now = new Date().toLocaleString('fr-MA', {\n  timeZone: 'Africa/Casablanca',\n  year: 'numeric', month: '2-digit', day: '2-digit',\n  hour: '2-digit', minute: '2-digit', second: '2-digit',\n});\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : isRate ? 429 : 503,\n    body: {\n      ok:          false,\n      error:       isAuth ? 'Unauthorized'\n                 : isRate ? 'Too Many Requests'\n                 : 'Service temporarily unavailable',\n      message:     isAuth ? 'Invalid or missing credentials'\n                 : isRate ? 'Brute-force protection triggered. Retry in 15 minutes.'\n                 : 'Could not read data from Google Sheets. Retry in 30 seconds.',\n      timestamp:   now,\n      trace_id:    `err-${Date.now().toString(36)}`,\n    }\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -191,6 +201,14 @@
                 "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
               },
               {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
                 "name": "X-Content-Type-Options",
                 "value": "nosniff"
               }
@@ -212,7 +230,9 @@
         "httpMethod": "OPTIONS",
         "path": "dashboard-data",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+        }
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -228,12 +248,20 @@
       "parameters": {
         "respondWith": "text",
         "options": {
-          "responseCode": 204,
+          "responseCode": 200,
           "responseHeaders": {
             "entries": [
               {
                 "name": "Access-Control-Allow-Origin",
                 "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
               },
               {
                 "name": "Access-Control-Allow-Methods",
