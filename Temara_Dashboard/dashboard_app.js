@@ -252,6 +252,7 @@ function initializeDoctorDashboard() {
   renderAppointmentsList();
   renderWaitlistPanel();
   initTeamNotesSync();
+  window.initProgressiveDisclosure?.();
 
   document.querySelectorAll('.dashboard-view').forEach(view => {
     view.setAttribute('aria-hidden', view.classList.contains('active') ? 'false' : 'true');
@@ -343,19 +344,20 @@ function getWaitlistPriorityLabel(appt) {
 }
 
 function createWaitlistTableRow(appt) {
+  if (window.DentaFlowRowUI?.createWaitlistTableRow) {
+    return window.DentaFlowRowUI.createWaitlistTableRow(appt);
+  }
+
   const tr = document.createElement('tr');
   tr.className = 'waitlist-row';
-
+  tr.dataset.rowInteractive = 'true';
   const patientTd = document.createElement('td');
-  patientTd.appendChild(createPatientIdentity(appt.name));
-
+  patientTd.textContent = appt.name || '';
   const phoneTd = document.createElement('td');
   phoneTd.className = 'col-numeric';
-  phoneTd.textContent = appt.phone || appt.telephone || '—';
-
+  phoneTd.textContent = appt.phone || '—';
   const priorityTd = document.createElement('td');
-  priorityTd.appendChild(createMatteChip(getWaitlistPriorityLabel(appt)));
-
+  priorityTd.textContent = appt.treatment || '';
   tr.append(patientTd, phoneTd, priorityTd);
   return tr;
 }
@@ -573,16 +575,24 @@ function renderWaitlistPanel() {
       statusLabel: appt.tagClass === 'urgence' ? 'Urgence' : 'En attente',
     }));
   container.replaceChildren();
+
+  const table = container.closest('.waitlist-table');
+  const ui = window.DentaFlowRowUI;
+
   if (!waitlist.length) {
-    const emptyRow = document.createElement('tr');
-    emptyRow.className = 'waitlist-empty';
-    const cell = document.createElement('td');
-    cell.colSpan = 3;
-    cell.textContent = 'Aucun patient en liste d\'attente.';
-    emptyRow.appendChild(cell);
-    container.appendChild(emptyRow);
+    if (ui?.mountEmptyState) {
+      ui.mountEmptyState('waitlist-empty-state', {
+        message: ui.EMPTY_STATE_DEFAULT_MESSAGE,
+        iconSvg: ui.EMPTY_STATE_SVG_INBOX,
+      });
+    }
+    if (table) table.hidden = true;
     return;
   }
+
+  if (ui?.clearEmptyState) ui.clearEmptyState('waitlist-empty-state');
+  if (table) table.hidden = false;
+
   const fragment = document.createDocumentFragment();
   waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
   container.appendChild(fragment);

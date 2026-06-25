@@ -106,10 +106,49 @@
             </div>
             <div class="roster-panel-controls">
               <span class="assistant-panel__badge">Priorité</span>
+              <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="roster-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="roster-admin-popover"
+                  aria-label="Actions administratives du planning"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="1.75"/>
+                    <circle cx="12" cy="12" r="1.75"/>
+                    <circle cx="12" cy="19" r="1.75"/>
+                  </svg>
+                </button>
+                <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item" id="btn-daily-report" role="menuitem">
+                    Générer Rapport Journalier
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-fill-gap" role="menuitem">
+                    Remplir un Créneau Vide
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-alerte-retard" data-action="doctor-delayed" role="menuitem">
+                    Alerte Retard Praticien
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-force-reminders" role="menuitem">
+                    Forcer Rappels (Demain)
+                  </button>
+                  <div class="actions-popover__divider" role="separator"></div>
+                  <button type="button" class="actions-popover__item actions-popover__item--danger" id="btn-bulk-cancel" role="menuitem">
+                    Annuler la sélection
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-bulk-sms" role="menuitem">
+                    Envoyer SMS groupé
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="planning-timeline-wrap" data-lenis-prevent>
+            <div id="planning-empty-state" class="empty-state-host" hidden></div>
             <div class="planning-timeline" id="planning-timeline" aria-labelledby="roster-title" role="list">
               <!-- rendered by app.js — vertical chronological timeline -->
             </div>
@@ -128,75 +167,12 @@
             </div>
           </div>
 
-          <div class="quick-actions">
-            <button type="button" class="btn-super" id="btn-daily-report">
-              <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="8" y1="13" x2="16" y2="13"/>
-                  <line x1="8" y1="17" x2="16" y2="17"/>
-                  <polyline points="10 9 9 9 8 9"/>
-                </svg>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Générer Rapport Journalier</span>
-                <span class="btn-super__hint">Export automatique des rendez-vous et statuts du jour</span>
-              </span>
-            </button>
-
-            <button type="button" class="btn-super" id="btn-fill-gap">
-              <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  <path d="M8 10h8"/>
-                  <path d="M8 14h5"/>
-                </svg>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Remplir un Créneau Vide</span>
-                <span class="btn-super__hint">Blast SMS à la liste d'attente après une annulation</span>
-              </span>
-            </button>
-
-            <button type="button" class="btn-super" id="btn-alerte-retard" data-action="doctor-delayed">
-              <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="11" cy="14" r="7"/>
-                  <path d="M11 11v3.5"/>
-                  <path d="M11 16h.01"/>
-                  <path d="M18 4l1.5 1.5"/>
-                  <path d="M19.5 3.5v3"/>
-                  <path d="M18 5.5h3"/>
-                </svg>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Alerte Retard Praticien</span>
-                <span class="btn-super__hint">Envoi d'un SMS d'excuse automatique aux prochains patients si le cabinet accumule du retard</span>
-              </span>
-            </button>
-
-            <button type="button" class="btn-super" id="btn-force-reminders">
-              <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="4" width="13" height="14" rx="2"/>
-                  <line x1="3" y1="9" x2="16" y2="9"/>
-                  <line x1="7" y1="2" x2="7" y2="5"/>
-                  <line x1="12" y1="2" x2="12" y2="5"/>
-                  <path d="M14 18l7-3.5L14 11v7z"/>
-                  <path d="M21 14.5L14 18"/>
-                </svg>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Forcer Rappels (Demain)</span>
-                <span class="btn-super__hint">Déclencher manuellement l'envoi des SMS de rappel pour les rendez-vous de demain</span>
-              </span>
-            </button>
-
-            <p class="quick-actions__note">
-              Les actions déclenchent vos workflows n8n via Twilio (SMS) et Resend (e-mail). Planification et communication uniquement.
-            </p>
+          <div class="quick-actions quick-actions--disclosed" aria-hidden="true">
+            <!-- Actions déplacées vers le menu ⋮ du planning — IDs conservés pour les webhooks n8n -->
           </div>
+          <p class="quick-actions__note quick-actions__note--disclosed">
+            Actions rapides disponibles via le menu <span aria-hidden="true">⋮</span> du Planning du Jour.
+          </p>
         </section>
 
         <section class="assistant-panel assistant-panel--handoff" aria-labelledby="handoff-title">
@@ -227,7 +203,7 @@
               <input type="checkbox" id="handoff-pin" name="handoff-pin" />
               <span>Pin</span>
             </label>
-            <button type="submit" class="handoff-compose__submit">Publier</button>
+            <button type="submit" class="handoff-compose__submit btn-matte-primary">Publier</button>
           </form>
 
           <div class="handoff-feed" id="handoff-feed" role="feed" aria-labelledby="handoff-title">
@@ -316,18 +292,46 @@
                 </label>
               </div>
 
-              <button type="submit" class="waitlist-submit-btn" id="waitlist-submit-btn">
+              <button type="submit" class="waitlist-submit-btn btn-matte-primary" id="waitlist-submit-btn">
                 Ajouter à la liste
               </button>
             </form>
           </article>
 
           <article class="schedule-widget schedule-widget--full" aria-label="Liste d'attente complète">
-            <div class="schedule-header">
-              <div class="chart-title">Patients Prioritaires</div>
-              <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
+            <div class="schedule-header schedule-header--with-actions">
+              <div>
+                <div class="chart-title">Patients Prioritaires</div>
+                <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
+              </div>
+              <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="waitlist-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="waitlist-admin-popover"
+                  aria-label="Actions administratives de la liste d'attente"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="1.75"/>
+                    <circle cx="12" cy="12" r="1.75"/>
+                    <circle cx="12" cy="19" r="1.75"/>
+                  </svg>
+                </button>
+                <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
+                    Remplir un Créneau Vide
+                  </button>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-export" role="menuitem">
+                    Générer Rapport Journalier
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="waitlist-table-wrap" data-lenis-prevent>
+              <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
               <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
                 <thead>
                   <tr>
@@ -536,9 +540,5 @@
 
   <div id="bulk-action-bar" class="bulk-bar-hidden">
     <span id="bulk-selection-count" class="bulk-text"></span>
-    <div class="bulk-actions">
-      <button type="button" id="btn-bulk-confirm" class="btn-brutalist-primary">Confirmer</button>
-      <button type="button" id="btn-bulk-cancel" class="btn-brutalist-secondary">Annuler</button>
-      <button type="button" id="btn-bulk-sms" class="btn-brutalist-secondary">Envoyer SMS</button>
-    </div>
+    <button type="button" id="btn-bulk-confirm" class="btn-matte-primary">Confirmer</button>
   </div>

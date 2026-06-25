@@ -521,18 +521,46 @@
                 </label>
               </div>
 
-              <button type="submit" class="waitlist-submit-btn" id="waitlist-submit-btn">
+              <button type="submit" class="waitlist-submit-btn btn-matte-primary" id="waitlist-submit-btn">
                 Ajouter à la liste
               </button>
             </form>
           </article>
 
           <article class="schedule-widget schedule-widget--full" aria-label="Liste d'attente complète">
-            <div class="schedule-header">
-              <div class="chart-title">Patients Prioritaires</div>
-              <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
+            <div class="schedule-header schedule-header--with-actions">
+              <div>
+                <div class="chart-title">Patients Prioritaires</div>
+                <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
+              </div>
+              <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="waitlist-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="waitlist-admin-popover"
+                  aria-label="Actions administratives de la liste d'attente"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="1.75"/>
+                    <circle cx="12" cy="12" r="1.75"/>
+                    <circle cx="12" cy="19" r="1.75"/>
+                  </svg>
+                </button>
+                <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
+                    Remplir un Créneau Vide
+                  </button>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-export" role="menuitem">
+                    Générer Rapport Journalier
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="waitlist-table-wrap" data-lenis-prevent>
+              <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
               <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
                 <thead>
                   <tr>

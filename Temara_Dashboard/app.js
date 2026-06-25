@@ -1097,12 +1097,9 @@ let handoffNotes = [];
       });
 
       const timeline = $('planning-timeline');
-      if (timeline && !timeline.querySelector('.timeline-item:not(.timeline-empty):not(.timeline-loading):not(.timeline-error)')) {
+      if (timeline && !timeline.querySelector('.timeline-item')) {
         timeline.replaceChildren();
-        const empty = document.createElement('div');
-        empty.className = 'timeline-empty planning-timeline__message';
-        empty.textContent = 'Aucun rendez-vous prévu pour aujourd\'hui.';
-        timeline.appendChild(empty);
+        mountEmptyState('planning-empty-state', { message: EMPTY_STATE_DEFAULT_MESSAGE });
       }
 
       const tbody = $('roster-tbody');
@@ -1504,6 +1501,434 @@ let handoffNotes = [];
     return 'En attente';
   }
 
+  const ROW_ACTION_SVG = {
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    sms: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  };
+
+  const EMPTY_STATE_SVG_CALENDAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+
+  const EMPTY_STATE_SVG_INBOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>';
+
+  const EMPTY_STATE_DEFAULT_MESSAGE = 'Aucun rendez-vous. En attente de nouvelles réservations.';
+
+  const emptyStatePulseTweens = new WeakMap();
+
+  function createRowActionButton(action, label, svgMarkup, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'row-action-btn';
+    btn.dataset.action = action;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = svgMarkup;
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onClick(event);
+    });
+    return btn;
+  }
+
+  function copyTextToClipboard(text) {
+    const value = String(text || '').trim();
+    if (!value || value === '—') {
+      showToast('Aucun numéro à copier.', 'warning');
+      return;
+    }
+    navigator.clipboard?.writeText(value)
+      .then(() => showToast('Numéro copié dans le presse-papiers.', 'success'))
+      .catch(() => showToast('Copie impossible — sélectionnez le numéro manuellement.', 'error'));
+  }
+
+  async function sendQuickSmsToRow(rowId) {
+    const parsed = parseBaserowRowId(rowId);
+    if (parsed == null) {
+      showToast('SMS rapide indisponible pour cette ligne.', 'warning');
+      return;
+    }
+    try {
+      await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: [parsed] });
+      showToast('SMS envoyé.', 'success');
+    } catch (error) {
+      console.error('[Quick SMS] Failed:', error);
+      showToast('Échec de l\'envoi SMS.', 'error');
+    }
+  }
+
+  function prefillWaitlistFormFromRow(appt) {
+    const nameEl = $('waitlist-name');
+    const phoneEl = $('waitlist-phone');
+    const priorityEl = $('waitlist-priority');
+    if (nameEl) nameEl.value = appt.name || '';
+    if (phoneEl) phoneEl.value = appt.phone || appt.telephone || '';
+    if (priorityEl && appt.priorite) priorityEl.value = appt.priorite;
+  }
+
+  function createRowActionGroup(context) {
+    const group = document.createElement('div');
+    group.className = 'action-group';
+    group.setAttribute('aria-label', 'Actions secondaires');
+
+    const phone = context.phone || context.telephone || context.record?.phone || '';
+
+    if (context.kind === 'waitlist') {
+      group.append(
+        createRowActionButton('edit', 'Modifier le patient', ROW_ACTION_SVG.edit, () => {
+          prefillWaitlistFormFromRow(context.appt || context);
+          if (VIEW_MAP.waitlist) navigateToView('waitlist');
+          $('waitlist-name')?.focus();
+        }),
+        createRowActionButton('sms', 'Envoyer un SMS rapide', ROW_ACTION_SVG.sms, () => {
+          showToast('Notification SMS planifiée via n8n.', 'info');
+        }),
+        createRowActionButton('copy', 'Copier le numéro', ROW_ACTION_SVG.copy, () => {
+          copyTextToClipboard(phone);
+        })
+      );
+      return group;
+    }
+
+    const record = context.record || {};
+    const rowId = extractBaserowRowId(record);
+
+    group.append(
+      createRowActionButton('edit', 'Modifier le statut', ROW_ACTION_SVG.edit, () => {
+        const row = document.querySelector(`[data-patient-id="${String(record.id)}"] .status-select`);
+        row?.focus();
+      }),
+      createRowActionButton('sms', 'Envoyer un SMS rapide', ROW_ACTION_SVG.sms, () => {
+        if (rowId != null) sendQuickSmsToRow(rowId);
+        else showToast('SMS rapide indisponible pour ce rendez-vous.', 'warning');
+      }),
+      createRowActionButton('copy', 'Copier les informations', ROW_ACTION_SVG.copy, () => {
+        copyTextToClipboard(`${record.name || ''} — ${record.time || ''}`);
+      })
+    );
+    return group;
+  }
+
+  function createEmptyState(options = {}) {
+    const {
+      message = EMPTY_STATE_DEFAULT_MESSAGE,
+      iconSvg = EMPTY_STATE_SVG_CALENDAR,
+    } = options;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'empty-state';
+
+    const icon = document.createElement('div');
+    icon.className = 'empty-state__icon';
+    icon.innerHTML = iconSvg;
+
+    const text = document.createElement('p');
+    text.className = 'empty-state__text';
+    text.textContent = message;
+
+    wrap.append(icon, text);
+    return wrap;
+  }
+
+  function mountEmptyState(hostId, options = {}) {
+    const host = $(hostId);
+    if (!host) return null;
+
+    host.replaceChildren();
+    const state = createEmptyState(options);
+    host.appendChild(state);
+    host.hidden = false;
+    initEmptyStatePulse(state);
+    return state;
+  }
+
+  function clearEmptyState(hostId) {
+    const host = $(hostId);
+    if (!host) return;
+    const icon = host.querySelector('.empty-state__icon');
+    if (icon && typeof gsap !== 'undefined') {
+      gsap.killTweensOf(icon);
+    }
+    host.replaceChildren();
+    host.hidden = true;
+  }
+
+  function initEmptyStatePulse(emptyStateEl) {
+    if (!emptyStateEl || typeof gsap === 'undefined') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const icon = emptyStateEl.querySelector('.empty-state__icon');
+    if (!icon) return;
+
+    const existing = emptyStatePulseTweens.get(icon);
+    if (existing) existing.kill();
+
+    gsap.set(icon, { opacity: 0.1 });
+    const tween = gsap.to(icon, {
+      opacity: 0.3,
+      duration: 1.5,
+      ease: 'sine.inOut',
+      yoyo: true,
+      repeat: -1,
+    });
+    emptyStatePulseTweens.set(icon, tween);
+  }
+
+  let progressiveDisclosureInitialized = false;
+  const openPopovers = new Set();
+  let popoverClickBound = false;
+
+  function closeActionsPopover(popover, trigger) {
+    if (!popover) return;
+
+    const finish = () => {
+      popover.classList.remove('is-open');
+      popover.hidden = true;
+      popover.style.pointerEvents = 'none';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      openPopovers.delete(popover);
+    };
+
+    if (typeof gsap === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finish();
+      return;
+    }
+
+    gsap.killTweensOf(popover);
+    gsap.to(popover, {
+      opacity: 0,
+      scale: 0.95,
+      duration: 0.12,
+      ease: 'power2.in',
+      onComplete: finish,
+    });
+  }
+
+  function openActionsPopover(popover, trigger) {
+    if (!popover || !trigger) return;
+
+    openPopovers.forEach((open) => {
+      if (open !== popover) {
+        const otherTrigger = document.querySelector(`[aria-controls="${open.id}"]`);
+        closeActionsPopover(open, otherTrigger);
+      }
+    });
+
+    popover.hidden = false;
+    popover.classList.add('is-open');
+    trigger.setAttribute('aria-expanded', 'true');
+    openPopovers.add(popover);
+
+    if (typeof gsap === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      popover.style.opacity = '1';
+      popover.style.transform = 'scale(1)';
+      popover.style.pointerEvents = 'auto';
+      return;
+    }
+
+    gsap.killTweensOf(popover);
+    gsap.fromTo(
+      popover,
+      { opacity: 0, scale: 0.95, pointerEvents: 'none' },
+      { opacity: 1, scale: 1, duration: 0.15, ease: 'power2.out', pointerEvents: 'auto' }
+    );
+  }
+
+  function initActionsPopovers() {
+    if (!popoverClickBound) {
+      popoverClickBound = true;
+
+      document.addEventListener('click', (event) => {
+        const trigger = event.target.closest('.btn-icon-menu');
+        if (trigger) {
+          const root = trigger.closest('[data-popover-root]');
+          const popover = root?.querySelector('.actions-popover');
+          if (popover) {
+            event.stopPropagation();
+            const isOpen = popover.classList.contains('is-open');
+            if (isOpen) closeActionsPopover(popover, trigger);
+            else openActionsPopover(popover, trigger);
+            return;
+          }
+        }
+
+        if (event.target.closest('[data-popover-root]')) return;
+        openPopovers.forEach((popover) => {
+          const triggerEl = document.querySelector(`[aria-controls="${popover.id}"]`);
+          closeActionsPopover(popover, triggerEl);
+        });
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        openPopovers.forEach((popover) => {
+          const trigger = document.querySelector(`[aria-controls="${popover.id}"]`);
+          closeActionsPopover(popover, trigger);
+        });
+      });
+    }
+  }
+
+  function animateRowActionGroup(group, show) {
+    if (!group || typeof gsap === 'undefined') {
+      if (group) {
+        group.style.opacity = show ? '1' : '0';
+        group.style.transform = show ? 'translateY(0)' : 'translateY(4px)';
+        group.style.pointerEvents = show ? 'auto' : 'none';
+      }
+      return;
+    }
+
+    gsap.killTweensOf(group);
+    if (show) {
+      gsap.to(group, {
+        opacity: 1,
+        y: 0,
+        duration: 0.2,
+        ease: 'power2.out',
+        onStart: () => { group.style.pointerEvents = 'auto'; },
+      });
+    } else {
+      gsap.to(group, {
+        opacity: 0,
+        y: 4,
+        duration: 0.15,
+        ease: 'power2.in',
+        onComplete: () => { group.style.pointerEvents = 'none'; },
+      });
+    }
+  }
+
+  function initRowActionHover() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let activeRow = null;
+
+    document.addEventListener('mouseover', (event) => {
+      const row = event.target.closest('[data-row-interactive]');
+      if (!row || row === activeRow) return;
+      if (activeRow && !activeRow.contains(event.relatedTarget)) {
+        animateRowActionGroup(activeRow.querySelector('.action-group'), false);
+      }
+      activeRow = row;
+      animateRowActionGroup(row.querySelector('.action-group'), true);
+    });
+
+    document.addEventListener('mouseout', (event) => {
+      const row = event.target.closest('[data-row-interactive]');
+      if (!row || row.contains(event.relatedTarget)) return;
+      animateRowActionGroup(row.querySelector('.action-group'), false);
+      if (activeRow === row) activeRow = null;
+    });
+  }
+
+  function initMatteButtonPress() {
+    if (typeof gsap === 'undefined') return;
+
+    const resetScale = (btn) => {
+      gsap.to(btn, { scale: 1, duration: 0.12, ease: 'power2.out' });
+    };
+
+    document.addEventListener('mousedown', (event) => {
+      const btn = event.target.closest('.btn-matte-primary');
+      if (!btn || btn.disabled) return;
+      gsap.to(btn, { scale: 0.97, duration: 0.1, ease: 'power2.out' });
+    });
+
+    document.addEventListener('mouseup', (event) => {
+      const btn = event.target.closest('.btn-matte-primary');
+      if (btn) resetScale(btn);
+    });
+
+    document.addEventListener('mouseleave', (event) => {
+      const btn = event.target.closest?.('.btn-matte-primary');
+      if (btn) resetScale(btn);
+    }, true);
+  }
+
+  function wireWaitlistAdminPopover() {
+    const fillBtn = $('waitlist-popover-fill-gap');
+    const exportBtn = $('waitlist-popover-export');
+
+    if (fillBtn && fillBtn.dataset.adminWired !== 'true') {
+      fillBtn.dataset.adminWired = 'true';
+      fillBtn.addEventListener('click', async () => {
+      const rosterFill = $('btn-fill-gap');
+      if (rosterFill) {
+        rosterFill.click();
+        return;
+      }
+
+      fillBtn.disabled = true;
+      try {
+        const response = await fetch(CONFIG.FILL_GAP_PROXY, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({}),
+        });
+        const payload = await response.json();
+        if (!response.ok || payload?.ok === false) throw new Error(payload?.error || `HTTP ${response.status}`);
+        showToast('Blast SMS envoyé à la liste d\'attente.', 'success');
+      } catch {
+        showToast('Échec de l\'envoi SMS — réessayez.', 'error');
+      } finally {
+        fillBtn.disabled = false;
+      }
+      });
+    }
+
+    if (exportBtn && exportBtn.dataset.adminWired !== 'true') {
+      exportBtn.dataset.adminWired = 'true';
+      exportBtn.addEventListener('click', async () => {
+      const rosterExport = $('btn-daily-report');
+      if (rosterExport) {
+        rosterExport.click();
+        return;
+      }
+
+      exportBtn.disabled = true;
+      try {
+        const response = await fetch(
+          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.EXPORT_DAILY}`,
+          { method: 'GET', headers: apiHeaders() }
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `rapport-journalier-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+        showToast('Rapport journalier généré.', 'success');
+      } catch {
+        showToast('Export indisponible.', 'error');
+      } finally {
+        exportBtn.disabled = false;
+      }
+      });
+    }
+  }
+
+  function initProgressiveDisclosure() {
+    initActionsPopovers();
+    if (!progressiveDisclosureInitialized) {
+      progressiveDisclosureInitialized = true;
+      initRowActionHover();
+      initMatteButtonPress();
+    }
+    wireWaitlistAdminPopover();
+
+    document.querySelectorAll('[data-popover-root] .actions-popover__item').forEach((item) => {
+      if (item.dataset.popoverItemBound === 'true') return;
+      item.dataset.popoverItemBound = 'true';
+      item.addEventListener('click', () => {
+        const root = item.closest('[data-popover-root]');
+        const popover = root?.querySelector('.actions-popover');
+        const trigger = root?.querySelector('.btn-icon-menu');
+        closeActionsPopover(popover, trigger);
+      });
+    });
+  }
+
   function buildStatusSelect(record) {
     const currentStatus = STATUS_OPTIONS.includes(record.status) ? record.status : 'Confirmé';
     const options = STATUS_OPTIONS.map(opt =>
@@ -1561,6 +1986,7 @@ let handoffNotes = [];
 
     const card = document.createElement('div');
     card.className = 'timeline-item__card';
+    card.dataset.rowInteractive = 'true';
 
     const checkboxWrap = document.createElement('div');
     checkboxWrap.className = 'timeline-item__checkbox';
@@ -1588,6 +2014,8 @@ let handoffNotes = [];
 
     const meta = document.createElement('div');
     meta.className = 'timeline-item__meta';
+
+    meta.appendChild(createRowActionGroup({ kind: 'planning', record }));
 
     const statusWrap = document.createElement('div');
     statusWrap.className = 'timeline-item__status';
@@ -1687,9 +2115,28 @@ let handoffNotes = [];
   function createWaitlistTableRow(appt) {
     const tr = document.createElement('tr');
     tr.className = 'waitlist-row';
+    tr.dataset.rowInteractive = 'true';
 
     const patientTd = document.createElement('td');
-    patientTd.appendChild(createPatientIdentity(appt.name));
+    patientTd.colSpan = 1;
+
+    const rowInner = document.createElement('div');
+    rowInner.className = 'waitlist-row__inner';
+
+    const main = document.createElement('div');
+    main.className = 'waitlist-row__main';
+    main.appendChild(createPatientIdentity(appt.name));
+
+    rowInner.append(
+      main,
+      createRowActionGroup({
+        kind: 'waitlist',
+        appt,
+        phone: appt.phone || appt.telephone,
+        priorite: appt.priorite || appt.treatment,
+      })
+    );
+    patientTd.appendChild(rowInner);
 
     const phoneTd = document.createElement('td');
     phoneTd.className = 'col-numeric';
@@ -1710,17 +2157,16 @@ let handoffNotes = [];
 
     updateRosterStats(rosterData);
 
-    const emptyMessage = 'Aucun rendez-vous prévu pour aujourd\'hui.';
+    const emptyMessage = EMPTY_STATE_DEFAULT_MESSAGE;
 
     const timeline = $('planning-timeline');
     if (timeline) {
       timeline.replaceChildren();
       if (!rows.length) {
-        const empty = document.createElement('div');
-        empty.className = 'timeline-empty planning-timeline__message';
-        empty.textContent = emptyMessage;
-        timeline.appendChild(empty);
+        clearEmptyState('planning-empty-state');
+        mountEmptyState('planning-empty-state', { message: emptyMessage });
       } else {
+        clearEmptyState('planning-empty-state');
         const fragment = document.createDocumentFragment();
         rows.forEach((record) => fragment.appendChild(createPlanningTimelineItem(record)));
         timeline.appendChild(fragment);
@@ -1751,10 +2197,10 @@ let handoffNotes = [];
     if (cards) {
       cards.replaceChildren();
       if (!rows.length) {
-        const empty = document.createElement('p');
-        empty.className = 'roster-cards__empty';
-        empty.textContent = emptyMessage;
+        const empty = createEmptyState({ message: emptyMessage });
+        empty.classList.add('roster-cards__empty');
         cards.appendChild(empty);
+        initEmptyStatePulse(empty);
       } else {
         const fragment = document.createDocumentFragment();
         rows.forEach((record) => fragment.appendChild(createRosterCard(record)));
@@ -2351,16 +2797,20 @@ let handoffNotes = [];
     if (!container) return;
     const waitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
     container.replaceChildren();
+
+    const table = container.closest('.waitlist-table');
     if (!waitlist.length) {
-      const emptyRow = document.createElement('tr');
-      emptyRow.className = 'waitlist-empty';
-      const cell = document.createElement('td');
-      cell.colSpan = 3;
-      cell.textContent = 'Aucun patient en liste d\'attente.';
-      emptyRow.appendChild(cell);
-      container.appendChild(emptyRow);
+      mountEmptyState('waitlist-empty-state', {
+        message: EMPTY_STATE_DEFAULT_MESSAGE,
+        iconSvg: EMPTY_STATE_SVG_INBOX,
+      });
+      if (table) table.hidden = true;
       return;
     }
+
+    clearEmptyState('waitlist-empty-state');
+    if (table) table.hidden = false;
+
     const fragment = document.createDocumentFragment();
     waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
     container.appendChild(fragment);
@@ -2458,6 +2908,10 @@ let handoffNotes = [];
   function prependWaitlistEntry({ nom, telephone, priorite }) {
     const container = $('waitlist-panel-list');
     if (!container) return;
+
+    clearEmptyState('waitlist-empty-state');
+    const table = container.closest('.waitlist-table');
+    if (table) table.hidden = false;
 
     const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
     const row = createWaitlistTableRow({
@@ -2878,7 +3332,7 @@ let handoffNotes = [];
       console.log('Alerte Retard button clicked');
 
       const labelEl = btnDelay.querySelector('.btn-super__label');
-      const defaultLabel = labelEl?.textContent?.trim() || 'Alerte Retard Praticien';
+      const defaultLabel = labelEl?.textContent?.trim() || btnDelay.textContent?.trim() || 'Alerte Retard Praticien';
       const successLabel = 'Alerte Envoyée ✓';
       const feedbackMs = 3000;
 
@@ -2909,12 +3363,14 @@ let handoffNotes = [];
         }
 
         if (labelEl) labelEl.textContent = successLabel;
+        else btnDelay.textContent = successLabel;
         btnDelay.classList.remove('is-loading');
         btnDelay.classList.add('is-success');
         showToast('Alerte SMS envoyée avec succès.', 'success');
 
         setTimeout(() => {
           if (labelEl) labelEl.textContent = defaultLabel;
+          else btnDelay.textContent = defaultLabel;
           btnDelay.disabled = false;
           btnDelay.classList.remove('is-success');
         }, feedbackMs);
@@ -2956,6 +3412,7 @@ let handoffNotes = [];
     initStatusListener();
     initQuickActions();
     initBulkActionBar();
+    initProgressiveDisclosure();
     renderOperationalPulse();
     loadHandoffNotes();
     initHandoffForm();
@@ -2990,4 +3447,15 @@ let handoffNotes = [];
   window.bootAssistantApp = initializeAssistantDashboard;
   window.queueAssistantOsBootSequence = queueOsBootSequence;
   window.revealAssistantOsBootFallback = revealOsBootFallback;
+  window.initProgressiveDisclosure = initProgressiveDisclosure;
+  window.DentaFlowRowUI = {
+    createRowActionGroup,
+    createWaitlistTableRow,
+    createEmptyState,
+    mountEmptyState,
+    clearEmptyState,
+    initEmptyStatePulse,
+    EMPTY_STATE_DEFAULT_MESSAGE,
+    EMPTY_STATE_SVG_INBOX,
+  };
 })();
