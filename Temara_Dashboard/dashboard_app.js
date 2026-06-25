@@ -134,6 +134,7 @@ function persistThemePreference(theme) {
 const CONFIG = {
   API_BASE:             'https://glade-rigor-perennial.ngrok-free.dev',
   DATA_URL:             '/api/dashboard-data',
+  ROSTER_PROXY:         '/api/roster',
   UPDATE_STATUS_PROXY:  '/api/update-status',
   DAILY_GOAL_MAD:       15000,
   REFRESH_INTERVAL_MS:  300_000,
@@ -2445,18 +2446,25 @@ function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
 
 async function loadDoctorHubData() {
   try {
-    const response = await fetch(`${CONFIG.API_BASE}${CONFIG.ROSTER_ENDPOINT}`, {
+    const response = await fetch(CONFIG.ROSTER_PROXY, {
       method: 'GET',
-      headers: getApiAuthHeaders(),
+      headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     });
 
+    const payload = await response.json();
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const detail = payload?.details || payload?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(detail);
     }
 
-    const payload = await response.json();
+    if (payload && typeof payload === 'object' && payload.ok === false) {
+      const detail = payload.details || payload.error || 'Erreur proxy roster';
+      throw new Error(detail);
+    }
+
     const unwrapped = unwrapRosterPayload(payload);
     const records = parseRosterResponse(unwrapped)
       .map(normalizeDoctorAppointment)

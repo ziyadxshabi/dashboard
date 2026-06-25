@@ -54,7 +54,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
-  const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
+  const session = requireBearerSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
   if (!session) return;
 
   const webhookUrl = process.env.N8N_WEBHOOK_ROSTER || DEFAULT_WEBHOOK_URL;
