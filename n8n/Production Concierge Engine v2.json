@@ -641,7 +641,8 @@
         "path": "final-booking-engine-v2",
         "options": {
           "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
-        }
+        },
+        "responseMode": "responseNode"
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -1048,7 +1049,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Layer 1: Redis Idempotency Lock — SETNX 10-minute TTL (distributed)\nconst TTL_SEC = 600;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) throw new Error('CRITICAL: REDIS_CONNECTION_URL missing from environment');\n  const h = token ? { Authorization: `Bearer ${token}` } : {};\n  const encKey = encodeURIComponent(key);\n  const res = await fetch(`${base}/set/${encKey}/1?NX=true&EX=${ttlSec}`, { method: 'POST', headers: h });\n  if (!res.ok) throw new Error(`REDIS_HTTP_FAIL: setnx ${res.status}`);\n  return res.json();\n}\n\nreturn (async () => {\n  const items = $input.all();\n  const bookingUid = items[0]?.json?.body?.payload?.uid;\n  if (!bookingUid) return items;\n\n  const lockKey = `idem:booking:${bookingUid}`;\n  const lock = await redisSetNx(lockKey, TTL_SEC);\n  if (lock.result === null) {\n    return [];\n  }\n  return items;\n})();"
+        "jsCode": "// Shared Upstash Redis REST helpers for n8n Code nodes.\n// Env: REDIS_CONNECTION_URL, REDIS_REST_TOKEN\n\nconst REDIS_TIMEOUT_MS = 5000;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) {\n    return { ok: false, redisError: 'REDIS_CONNECTION_URL missing', acquired: false };\n  }\n  const headers = token ? { Authorization: `Bearer ${token}` } : {};\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);\n  try {\n    const res = await fetch(\n      `${base}/set/${encodeURIComponent(key)}/1?NX=true&EX=${ttlSec}`,\n      { method: 'POST', headers, signal: controller.signal },\n    );\n    clearTimeout(timer);\n    if (!res.ok) {\n      return { ok: false, redisError: `REDIS_HTTP_${res.status}`, acquired: false };\n    }\n    const data = await res.json();\n    return { ok: true, redisError: null, acquired: data.result === 'OK' };\n  } catch (e) {\n    clearTimeout(timer);\n    const msg = e?.name === 'AbortError' ? 'REDIS_TIMEOUT' : String(e?.message ?? e);\n    return { ok: false, redisError: msg, acquired: false };\n  }\n}\n\nconst TTL_SEC = 86400;\n\nreturn (async () => {\n  const items = $input.all();\n  const root = items[0]?.json ?? {};\n  const bookingUid = root?.body?.payload?.uid;\n  if (!bookingUid) {\n    return items.map((item) => ({\n      json: { ...item.json, _lockDuplicate: false, _lockRedisError: null },\n    }));\n  }\n\n  const lockKey = `lock:booking:${bookingUid}`;\n  const lock = await redisSetNx(lockKey, TTL_SEC);\n\n  if (!lock.ok) {\n    return [{\n      json: {\n        ...root,\n        _lockDuplicate: false,\n        _lockRedisError: lock.redisError,\n        _lockKey: lockKey,\n      },\n    }];\n  }\n  if (!lock.acquired) {\n    return [{\n      json: {\n        ...root,\n        _lockDuplicate: true,\n        _lockRedisError: null,\n        _lockKey: lockKey,\n      },\n    }];\n  }\n  return items.map((item) => ({\n    json: {\n      ...item.json,\n      _lockDuplicate: false,\n      _lockRedisError: null,\n      _lockKey: lockKey,\n    },\n  }));\n})();\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1057,7 +1058,8 @@
         512
       ],
       "name": "Redis Idempotency Lock",
-      "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890"
+      "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -1157,7 +1159,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Proactive Chair-Filler: slice top 3 + persist to Baserow Active Waitlist Broadcasts\nconst rows = $input.all().map(i => i.json);\nconst cancelledSlot = $('Edit Fields').item.json.body.payload.startTime;\nconst bookingUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nrows.sort((a, b) => {\n  const pa = Number(a['Priorité'] ?? a['Priorite'] ?? a['Priority'] ?? 999);\n  const pb = Number(b['Priorité'] ?? b['Priorite'] ?? b['Priority'] ?? 999);\n  return pa - pb;\n});\n\nconst top3 = rows.slice(0, 3);\nconst batchId = `wl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;\n\nasync function baserowCreateBroadcastRow(payload) {\n  const base = String($env['BASEROW_API_URL'] ?? 'https://api.baserow.io').replace(/\\/+$/, '');\n  const token = String($env['BASEROW_API_TOKEN'] ?? '').trim();\n  const tableId = String($env['BASEROW_WAITLIST_BROADCAST_TABLE_ID'] ?? '').trim();\n  if (!token) throw new Error('CRITICAL: BASEROW_API_TOKEN missing from environment');\n  if (!tableId) throw new Error('CRITICAL: BASEROW_WAITLIST_BROADCAST_TABLE_ID missing from environment');\n\n  const res = await fetch(`${base}/api/database/rows/table/${tableId}/?user_field_names=true`, {\n    method: 'POST',\n    headers: {\n      Authorization: `Token ${token}`,\n      'Content-Type': 'application/json',\n    },\n    body: JSON.stringify(payload),\n  });\n  if (!res.ok) {\n    const body = await res.text();\n    throw new Error(`BASEROW_CREATE_FAIL: ${res.status} ${body.slice(0, 200)}`);\n  }\n  return res.json();\n}\n\nreturn (async () => {\n  for (const r of top3) {\n    const nom = r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient';\n    const phone = r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '';\n    await baserowCreateBroadcastRow({\n      Slot: cancelledSlot,\n      'Patient Name': nom,\n      Phone: phone,\n      Status: 'Notified',\n      'Broadcast Batch': batchId,\n      'Booked By Phone': '',\n    });\n  }\n\n  return top3.map(r => ({\n    json: {\n      Nom: r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient',\n      Phone: r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '',\n      Booking_URL: bookingUrl,\n      cancelledSlot,\n      broadcastBatch: batchId,\n    },\n  }));\n})();"
+        "jsCode": "// Shared Upstash Redis REST helpers for n8n Code nodes.\n// Env: REDIS_CONNECTION_URL, REDIS_REST_TOKEN\n\nconst REDIS_TIMEOUT_MS = 5000;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) {\n    return { ok: false, redisError: 'REDIS_CONNECTION_URL missing', acquired: false };\n  }\n  const headers = token ? { Authorization: `Bearer ${token}` } : {};\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);\n  try {\n    const res = await fetch(\n      `${base}/set/${encodeURIComponent(key)}/1?NX=true&EX=${ttlSec}`,\n      { method: 'POST', headers, signal: controller.signal },\n    );\n    clearTimeout(timer);\n    if (!res.ok) {\n      return { ok: false, redisError: `REDIS_HTTP_${res.status}`, acquired: false };\n    }\n    const data = await res.json();\n    return { ok: true, redisError: null, acquired: data.result === 'OK' };\n  } catch (e) {\n    clearTimeout(timer);\n    const msg = e?.name === 'AbortError' ? 'REDIS_TIMEOUT' : String(e?.message ?? e);\n    return { ok: false, redisError: msg, acquired: false };\n  }\n}\n\nconst TTL_SEC = 86400;\nconst rows = $input.all().map((i) => i.json);\nconst cancelledSlot = $('Edit Fields').item.json.body.payload.startTime;\nconst bookingUrl = 'https://sites.google.com/view/portail-temara-mall/accueil';\n\nfunction normPhone(p) {\n  return String(p ?? '').replace(/[\\s\\-\\(\\)\\.]/g, '').trim();\n}\n\nrows.sort((a, b) => {\n  const pa = Number(a['Priorité'] ?? a['Priorite'] ?? a['Priority'] ?? 999);\n  const pb = Number(b['Priorité'] ?? b['Priorite'] ?? b['Priority'] ?? 999);\n  return pa - pb;\n});\n\nconst top3 = rows.slice(0, 3);\nconst batchId = `wl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;\n\nasync function baserowCreateBroadcastRow(payload) {\n  const base = String($env['BASEROW_API_URL'] ?? 'https://api.baserow.io').replace(/\\/+$/, '');\n  const token = String($env['BASEROW_API_TOKEN'] ?? '').trim();\n  const tableId = String($env['BASEROW_WAITLIST_BROADCAST_TABLE_ID'] ?? '').trim();\n  if (!token) throw new Error('CRITICAL: BASEROW_API_TOKEN missing from environment');\n  if (!tableId) throw new Error('CRITICAL: BASEROW_WAITLIST_BROADCAST_TABLE_ID missing from environment');\n\n  const res = await fetch(`${base}/api/database/rows/table/${tableId}/?user_field_names=true`, {\n    method: 'POST',\n    headers: {\n      Authorization: `Token ${token}`,\n      'Content-Type': 'application/json',\n    },\n    body: JSON.stringify(payload),\n  });\n  if (!res.ok) {\n    const body = await res.text();\n    throw new Error(`BASEROW_CREATE_FAIL: ${res.status} ${body.slice(0, 200)}`);\n  }\n  return res.json();\n}\n\nreturn (async () => {\n  const out = [];\n  for (const r of top3) {\n    const nom = r['Nom'] ?? r['Patient (Nom Complet)'] ?? 'Patient';\n    const phone = r['Téléphone (WhatsApp)'] ?? r['Telephone'] ?? r['Phone'] ?? '';\n    const phoneNorm = normPhone(phone);\n    if (!phoneNorm) continue;\n\n    const dedupKey = `waitlist:notified:${phoneNorm}`;\n    const lock = await redisSetNx(dedupKey, TTL_SEC);\n    if (!lock.ok) {\n      throw new Error(`REDIS_FAIL: ${lock.redisError}`);\n    }\n    if (!lock.acquired) {\n      continue;\n    }\n\n    await baserowCreateBroadcastRow({\n      Slot: cancelledSlot,\n      'Patient Name': nom,\n      Phone: phone,\n      Status: 'Notified',\n      'Broadcast Batch': batchId,\n      'Booked By Phone': '',\n    });\n\n    out.push({\n      json: {\n        Nom: nom,\n        Phone: phone,\n        Booking_URL: bookingUrl,\n        cancelledSlot,\n        broadcastBatch: batchId,\n      },\n    });\n  }\n  return out;\n})();\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1166,7 +1168,8 @@
         624
       ],
       "name": "Slice Top 3 Waitlist",
-      "id": "d5e6f7a8-9012-3456-ef01-345678901234"
+      "id": "d5e6f7a8-9012-3456-ef01-345678901234",
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -1268,7 +1271,8 @@
         "path": "twilio-sms-status",
         "options": {
           "allowedOrigins": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
-        }
+        },
+        "responseMode": "responseNode"
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -1481,6 +1485,300 @@
       ],
       "name": "Twilio Status Auth Reject",
       "id": "24a51252-5555-4d4a-acd0-576f392676f6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ac9e134c-a728-418a-8cd2-05d7f2fd815f",
+              "leftValue": "={{ $json._lockRedisError }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1080,
+        512
+      ],
+      "name": "If Redis Lock Error",
+      "id": "e1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b5d6069f-1710-4f32-8a45-c099b8aeebfe",
+              "leftValue": "={{ $json._lockDuplicate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -920,
+        512
+      ],
+      "name": "If Lock Duplicate",
+      "id": "e2222222-2222-4222-8222-222222222222"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, duplicate: true, lockKey: $json._lockKey }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -760,
+        400
+      ],
+      "name": "Duplicate Booking Ack",
+      "id": "e3333333-3333-4333-8333-333333333333"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"Redis lock unavailable\", detail: $json._lockRedisError }) }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -760,
+        624
+      ],
+      "name": "Redis Lock Failure Reply",
+      "id": "e4444444-4444-4444-8444-444444444444"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared Upstash Redis REST helpers for n8n Code nodes.\n// Env: REDIS_CONNECTION_URL, REDIS_REST_TOKEN\n\nconst REDIS_TIMEOUT_MS = 5000;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) {\n    return { ok: false, redisError: 'REDIS_CONNECTION_URL missing', acquired: false };\n  }\n  const headers = token ? { Authorization: `Bearer ${token}` } : {};\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);\n  try {\n    const res = await fetch(\n      `${base}/set/${encodeURIComponent(key)}/1?NX=true&EX=${ttlSec}`,\n      { method: 'POST', headers, signal: controller.signal },\n    );\n    clearTimeout(timer);\n    if (!res.ok) {\n      return { ok: false, redisError: `REDIS_HTTP_${res.status}`, acquired: false };\n    }\n    const data = await res.json();\n    return { ok: true, redisError: null, acquired: data.result === 'OK' };\n  } catch (e) {\n    clearTimeout(timer);\n    const msg = e?.name === 'AbortError' ? 'REDIS_TIMEOUT' : String(e?.message ?? e);\n    return { ok: false, redisError: msg, acquired: false };\n  }\n}\n\nconst TTL_SEC = 86400;\n\nreturn (async () => {\n  const items = $input.all();\n  const root = items[0]?.json ?? {};\n  const body = root.body ?? root;\n  const messageSid = String(body.MessageSid ?? body.messageSid ?? '').trim();\n  if (!messageSid) {\n    return [{ json: { ...root, _lockDuplicate: false, _lockRedisError: null } }];\n  }\n\n  const lockKey = `lock:twilio-sms:${messageSid}`;\n  const lock = await redisSetNx(lockKey, TTL_SEC);\n\n  if (!lock.ok) {\n    return [{\n      json: {\n        ...root,\n        _lockDuplicate: false,\n        _lockRedisError: lock.redisError,\n        _lockKey: lockKey,\n      },\n    }];\n  }\n  if (!lock.acquired) {\n    return [{\n      json: {\n        ...root,\n        _lockDuplicate: true,\n        _lockRedisError: null,\n        _lockKey: lockKey,\n      },\n    }];\n  }\n  return [{ json: { ...root, _lockDuplicate: false, _lockRedisError: null, _lockKey: lockKey } }];\n})();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        1400
+      ],
+      "name": "Redis Twilio Status Dedup",
+      "id": "e5555555-5555-4555-8555-555555555555",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "35a0599f-3627-4ccf-ae0b-1dae5c565bd3",
+              "leftValue": "={{ $json._lockRedisError }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -960,
+        1400
+      ],
+      "name": "If Twilio Status Redis Error",
+      "id": "e6666666-6666-4666-8666-666666666666"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3a4adcbb-6ff8-4365-b681-98fadbf16b51",
+              "leftValue": "={{ $json._lockDuplicate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        1400
+      ],
+      "name": "If Twilio Status Duplicate",
+      "id": "e7777777-7777-4777-8777-777777777777"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, duplicate: true }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        1280
+      ],
+      "name": "Twilio Status Duplicate Ack",
+      "id": "e8888888-8888-4888-8888-888888888888"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"Redis lock unavailable\", detail: $json._lockRedisError }) }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        1520
+      ],
+      "name": "Twilio Status Redis Failure",
+      "id": "e9999999-9999-4999-8999-999999999999"
     }
   ],
   "pinData": {},
@@ -1791,7 +2089,7 @@
       "main": [
         [
           {
-            "node": "Edit Fields",
+            "node": "If Redis Lock Error",
             "type": "main",
             "index": 0
           }
@@ -1831,7 +2129,7 @@
       "main": [
         [
           {
-            "node": "Parse Twilio Status",
+            "node": "Redis Twilio Status Dedup",
             "type": "main",
             "index": 0
           }
@@ -1850,6 +2148,89 @@
         [
           {
             "node": "Twilio Status Auth Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Redis Lock Error": {
+      "main": [
+        [
+          {
+            "node": "Redis Lock Failure Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Lock Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Lock Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Booking Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Twilio Status Dedup": {
+      "main": [
+        [
+          {
+            "node": "If Twilio Status Redis Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Twilio Status Redis Error": {
+      "main": [
+        [
+          {
+            "node": "Twilio Status Redis Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Twilio Status Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Twilio Status Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Twilio Status Duplicate Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Twilio Status",
             "type": "main",
             "index": 0
           }

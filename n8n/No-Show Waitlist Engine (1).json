@@ -99,7 +99,8 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "calcom-cancellation",
-        "options": {}
+        "options": {},
+        "responseMode": "responseNode"
       },
       "name": "Webhook - Cal.com Cancellation",
       "type": "n8n-nodes-base.webhook",
@@ -178,6 +179,160 @@
           "name": "Twilio account"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared Upstash Redis REST helpers for n8n Code nodes.\n// Env: REDIS_CONNECTION_URL, REDIS_REST_TOKEN\n\nconst REDIS_TIMEOUT_MS = 5000;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) {\n    return { ok: false, redisError: 'REDIS_CONNECTION_URL missing', acquired: false };\n  }\n  const headers = token ? { Authorization: `Bearer ${token}` } : {};\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);\n  try {\n    const res = await fetch(\n      `${base}/set/${encodeURIComponent(key)}/1?NX=true&EX=${ttlSec}`,\n      { method: 'POST', headers, signal: controller.signal },\n    );\n    clearTimeout(timer);\n    if (!res.ok) {\n      return { ok: false, redisError: `REDIS_HTTP_${res.status}`, acquired: false };\n    }\n    const data = await res.json();\n    return { ok: true, redisError: null, acquired: data.result === 'OK' };\n  } catch (e) {\n    clearTimeout(timer);\n    const msg = e?.name === 'AbortError' ? 'REDIS_TIMEOUT' : String(e?.message ?? e);\n    return { ok: false, redisError: msg, acquired: false };\n  }\n}\n\nconst TTL_SEC = 86400;\n\nfunction normPhone(p) {\n  return String(p ?? '').replace(/[\\s\\-\\(\\)\\.]/g, '').trim();\n}\n\nreturn (async () => {\n  const items = $input.all();\n  const root = items[0]?.json ?? {};\n  const phone = root['Téléphone (WhatsApp)'] ?? root.Telephone ?? root.Phone ?? '';\n  const phoneNorm = normPhone(phone);\n  const patientId = String(root.id ?? root.patient_id ?? root.Nom ?? phoneNorm).trim();\n\n  if (!phoneNorm && !patientId) {\n    return [{ json: { ...root, _waitlistSkip: true, _waitlistRedisError: 'MISSING_CONTACT' } }];\n  }\n\n  const dedupKey = phoneNorm\n    ? `waitlist:notified:${phoneNorm}`\n    : `waitlist:notified:patient:${patientId}`;\n  const lock = await redisSetNx(dedupKey, TTL_SEC);\n\n  if (!lock.ok) {\n    return [{\n      json: {\n        ...root,\n        _waitlistSkip: false,\n        _waitlistRedisError: lock.redisError,\n        _waitlistDedupKey: dedupKey,\n      },\n    }];\n  }\n  if (!lock.acquired) {\n    return [{\n      json: {\n        ...root,\n        _waitlistSkip: true,\n        _waitlistRedisError: null,\n        _waitlistDedupKey: dedupKey,\n      },\n    }];\n  }\n\n  return [{\n    json: {\n      ...root,\n      _waitlistSkip: false,\n      _waitlistRedisError: null,\n      _waitlistDedupKey: dedupKey,\n    },\n  }];\n})();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        296,
+        368
+      ],
+      "name": "Redis Waitlist Notify Dedup",
+      "id": "w1111111-1111-4111-8111-111111111111",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "47abad5a-f36c-4a0a-968c-24696acb347b",
+              "leftValue": "={{ $json._waitlistRedisError }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        368
+      ],
+      "name": "If Waitlist Redis Error",
+      "id": "w2222222-2222-4222-8222-222222222222"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "22e0d5f8-8033-4509-9752-daa921fcc692",
+              "leftValue": "={{ $json._waitlistSkip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        536,
+        368
+      ],
+      "name": "If Waitlist Skip Notify",
+      "id": "w3333333-3333-4333-8333-333333333333"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, duplicate: true, message: \"Patient already notified within 24h\" }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        280
+      ],
+      "name": "Waitlist Duplicate Ack",
+      "id": "w4444444-4444-4444-8444-444444444444"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"Redis unavailable\", detail: $json._waitlistRedisError }) }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        456
+      ],
+      "name": "Waitlist Redis Failure",
+      "id": "w5555555-5555-4555-8555-555555555555"
     }
   ],
   "pinData": {},
@@ -217,6 +372,53 @@
     },
     "Format Phone E.164": {
       "main": [
+        [
+          {
+            "node": "Redis Waitlist Notify Dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Waitlist Notify Dedup": {
+      "main": [
+        [
+          {
+            "node": "If Waitlist Redis Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Waitlist Redis Error": {
+      "main": [
+        [
+          {
+            "node": "Waitlist Redis Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Waitlist Skip Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Waitlist Skip Notify": {
+      "main": [
+        [
+          {
+            "node": "Waitlist Duplicate Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Twilio - Send SMS",
