@@ -3376,6 +3376,15 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-size: 0.875rem;
 }
 
+.patient-identity__name:has(.patient-new-badge) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  overflow: visible;
+  white-space: normal;
+}
+
 .matte-chip {
   display: inline-flex;
   align-items: center;
@@ -4569,4 +4578,198 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
 .timeline-item:hover .timeline-item__card {
   background-color: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
+}
+
+/* ── CRM billing filter, status pills, nouveau badge, waitlist toggle ─── */
+
+.crm-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-hierarchy-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.filter-chip:hover {
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.04));
+  color: var(--text-hierarchy-primary);
+}
+
+.filter-chip:focus-visible {
+  outline: 2px solid var(--accent, #60a5fa);
+  outline-offset: 2px;
+}
+
+.filter-chip.is-active {
+  border-color: rgba(251, 146, 60, 0.45);
+  background: rgba(251, 146, 60, 0.12);
+  color: #fdba74;
+}
+
+.status-pill--billing-paid {
+  color: var(--text-hierarchy-secondary) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.status-pill--billing-paid .status-pill__dot {
+  background: var(--text-hierarchy-tertiary) !important;
+}
+
+.status-pill--billing-unpaid {
+  color: #fdba74 !important;
+  background: rgba(251, 146, 60, 0.1) !important;
+  border-color: rgba(251, 146, 60, 0.35) !important;
+}
+
+.status-pill--billing-unpaid .status-pill__dot {
+  background: #fb923c !important;
+}
+
+.crm-side-panel-field--coverage dt {
+  color: var(--text-hierarchy-secondary);
+}
+
+.crm-side-panel-field--coverage dd {
+  color: var(--text-hierarchy-primary);
+  font-weight: 600;
+}
+
+.patient-new-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.patient-new-badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #60a5fa;
+  flex-shrink: 0;
+}
+
+.patient-new-badge__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #93c5fd;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.waitlist-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-hierarchy-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.filter-toggle:hover {
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.04));
+  color: var(--text-hierarchy-primary);
+}
+
+.filter-toggle:focus-visible {
+  outline: 2px solid var(--accent, #60a5fa);
+  outline-offset: 2px;
+}
+
+.filter-toggle.is-active {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
+}
+
+.filter-toggle__track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.filter-toggle.is-active .filter-toggle__track {
+  background: rgba(248, 113, 113, 0.35);
+}
+
+.filter-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-hierarchy-primary);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.filter-toggle.is-active .filter-toggle__thumb {
+  transform: translateX(16px);
+  background: #fca5a5;
+}
+
+.filter-toggle__label {
+  white-space: nowrap;
+}
+
+.waitlist-table.is-filtering tbody,
+#waitlist-panel-list.is-filtering {
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.waitlist-table tbody,
+#waitlist-panel-list {
+  transition: opacity 0.2s ease;
+}
+
+@media (max-width: 768px) {
+  .waitlist-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .filter-toggle__label {
+    font-size: 0.75rem;
+  }
 }

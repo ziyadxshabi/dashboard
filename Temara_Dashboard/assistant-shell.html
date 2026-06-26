@@ -372,7 +372,20 @@
                 <div class="chart-title">Patients Prioritaires</div>
                 <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
               </div>
-              <div class="panel-actions" data-popover-root>
+              <div class="waitlist-header-actions">
+                <button
+                  type="button"
+                  class="filter-toggle"
+                  id="waitlist-urgent-toggle"
+                  aria-pressed="false"
+                  aria-label="Afficher uniquement les patients urgents"
+                >
+                  <span class="filter-toggle__track" aria-hidden="true">
+                    <span class="filter-toggle__thumb"></span>
+                  </span>
+                  <span class="filter-toggle__label">Urgence uniquement</span>
+                </button>
+                <div class="panel-actions" data-popover-root>
                 <button
                   type="button"
                   class="btn-icon-menu"
@@ -397,6 +410,7 @@
                   </button>
                 </div>
               </div>
+            </div>
             </div>
             <div class="waitlist-table-wrap" data-lenis-prevent>
               <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
@@ -436,6 +450,16 @@
         </header>
 
         <article class="crm-table-panel" aria-label="Liste des patients">
+          <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
+            <button
+              type="button"
+              class="filter-chip"
+              id="crm-filter-unpaid"
+              aria-pressed="false"
+            >
+              Non payé
+            </button>
+          </div>
           <div class="crm-table-scroll">
             <table class="crm-table" id="crm-patient-table">
               <thead>
@@ -444,6 +468,7 @@
                   <th scope="col">Téléphone</th>
                   <th scope="col">Email</th>
                   <th scope="col">Motif</th>
+                  <th scope="col">Facturation</th>
                   <th scope="col">Statut</th>
                 </tr>
               </thead>
@@ -583,6 +608,16 @@
             <div class="crm-side-panel-field">
               <dt>Email</dt>
               <dd id="crm-panel-email">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Couverture médicale">
+          <h3 class="crm-side-panel-section-title">Couverture</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field crm-side-panel-field--coverage">
+              <dt>Couverture Médicale</dt>
+              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
             </div>
           </dl>
         </section>

@@ -138,6 +138,8 @@ let handoffNotes = [];
   let rosterData = [];
   let allRosterRecords = [];
   let crmPatientsById = {};
+  let crmUnpaidOnly = false;
+  let waitlistUrgentOnly = false;
   let selectedPatientIds = [];
   let activeView = 'overview';
   let osBootSequencePlayed = false;
@@ -1661,12 +1663,28 @@ let handoffNotes = [];
       ''
     ).trim();
 
-    const insurance = String(
-      item['N° d\'Assurance'] ??
+    const coverage = String(
       item['Couverture Médicale'] ??
+      item.coverage ??
       item.insurance ??
       ''
     ).trim();
+
+    const billingStatusRaw =
+      item['Statut Facturation'] ??
+      item.billingStatus ??
+      item.statutFacturation ??
+      '';
+    const billingStatus = String(
+      extractBaserowFieldValue(billingStatusRaw) || billingStatusRaw || ''
+    ).trim();
+
+    const isNewPatient = parseNewPatientFlag(
+      item['Nouveau Patient ?'] ??
+      item['Nouveau Patient'] ??
+      item.isNewPatient ??
+      item.newPatient
+    );
 
     const practitioner = String(
       item['Praticien Assigné'] ??
@@ -1691,7 +1709,10 @@ let handoffNotes = [];
       phone,
       email,
       observations,
-      insurance,
+      coverage,
+      insurance: coverage,
+      billingStatus,
+      isNewPatient,
       practitioner,
       time: formatAppointmentTime(rawDate),
       rawDate,
@@ -1778,8 +1799,48 @@ let handoffNotes = [];
     return avatar;
   }
 
+  function parseNewPatientFlag(raw) {
+    if (raw === true || raw === 1) return true;
+    const value = extractBaserowFieldValue(raw) ?? raw;
+    const normalized = String(value ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+    if (!normalized) return false;
+    return normalized === 'oui'
+      || normalized === 'yes'
+      || normalized === 'true'
+      || normalized === '1'
+      || normalized === 'nouveau';
+  }
+
+  function isUnpaidBillingStatus(status) {
+    const normalized = String(status ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+    return normalized.includes('non') && normalized.includes('paye');
+  }
+
+  function getBillingStatusPillClass(status) {
+    const normalized = String(status ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+    if (normalized.includes('non') && normalized.includes('paye')) {
+      return 'status-pill--billing-unpaid';
+    }
+    if (normalized.includes('paye') && !normalized.includes('non')) {
+      return 'status-pill--billing-paid';
+    }
+    return 'status-pill--neutral';
+  }
+
   function createPatientIdentity(name, options = {}) {
-    const { showNoShow = false, hasNotes = false } = options;
+    const { showNoShow = false, hasNotes = false, isNewPatient = false } = options;
     const wrap = document.createElement('div');
     wrap.className = 'patient-identity';
 
@@ -1805,6 +1866,20 @@ let handoffNotes = [];
       nameText.dataset.tooltip = name;
     }
     labelWrap.appendChild(nameText);
+
+    if (isNewPatient) {
+      const badge = document.createElement('span');
+      badge.className = 'patient-new-badge';
+      badge.setAttribute('aria-label', 'Nouveau patient');
+      const dot = document.createElement('span');
+      dot.className = 'patient-new-badge__dot';
+      dot.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'patient-new-badge__label';
+      label.textContent = 'Nouveau Patient';
+      badge.append(dot, label);
+      labelWrap.appendChild(badge);
+    }
 
     if (hasNotes) {
       labelWrap.classList.add('has-notes');
@@ -2888,6 +2963,7 @@ let handoffNotes = [];
     main.appendChild(createPatientIdentity(record.name, {
       showNoShow: record.noShow,
       hasNotes: Boolean(String(record.observations || '').trim()),
+      isNewPatient: Boolean(record.isNewPatient),
     }));
 
     const treatment = document.createElement('div');
@@ -2958,6 +3034,19 @@ let handoffNotes = [];
     nameSpan.className = 'roster-patient__name';
     nameSpan.textContent = record.name || '';
     patientWrap.appendChild(nameSpan);
+    if (record.isNewPatient) {
+      const badge = document.createElement('span');
+      badge.className = 'patient-new-badge';
+      badge.setAttribute('aria-label', 'Nouveau patient');
+      const dot = document.createElement('span');
+      dot.className = 'patient-new-badge__dot';
+      dot.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'patient-new-badge__label';
+      label.textContent = 'Nouveau Patient';
+      badge.append(dot, label);
+      patientWrap.appendChild(badge);
+    }
     patientCell.appendChild(patientWrap);
 
     const treatmentCell = document.createElement('td');
@@ -2983,7 +3072,10 @@ let handoffNotes = [];
 
     const main = document.createElement('div');
     main.className = 'roster-card__main';
-    main.appendChild(createPatientIdentity(record.name, { showNoShow: record.noShow }));
+    main.appendChild(createPatientIdentity(record.name, {
+      showNoShow: record.noShow,
+      isNewPatient: Boolean(record.isNewPatient),
+    }));
 
     const meta = document.createElement('div');
     meta.className = 'roster-card__meta cell-truncate';
@@ -2995,10 +3087,23 @@ let handoffNotes = [];
     return article;
   }
 
+  function isWaitlistUrgent(appt) {
+    if (appt.priority === 1) return true;
+    if (appt.tagClass === 'urgence') return true;
+    const treatment = String(appt.treatment ?? appt.priorite ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+    return treatment === 'haute' || treatment.includes('urgence');
+  }
+
   function createWaitlistTableRow(appt) {
     const tr = document.createElement('tr');
     tr.className = 'waitlist-row';
     tr.dataset.rowInteractive = 'true';
+    tr.dataset.priority = String(appt.priority ?? (isWaitlistUrgent(appt) ? 1 : 2));
+    if (isWaitlistUrgent(appt)) tr.dataset.urgent = 'true';
 
     const patientTd = document.createElement('td');
     patientTd.colSpan = 1;
@@ -3716,7 +3821,10 @@ let handoffNotes = [];
     return safeRender('renderWaitlistPanel', () => {
     const container = $('waitlist-panel-list');
     if (!container) return;
-    const waitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
+    const allWaitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
+    const waitlist = waitlistUrgentOnly
+      ? allWaitlist.filter(isWaitlistUrgent)
+      : allWaitlist;
     container.replaceChildren();
 
     const table = container.closest('.waitlist-table');
@@ -3966,6 +4074,8 @@ let handoffNotes = [];
 
   function toCrmPatient(record) {
     if (!record) return null;
+    const coverage = record.coverage ?? record.insurance ?? '';
+    const billingStatus = String(record.billingStatus || '').trim();
     return {
       id: record.id,
       name: record.name || 'Non spécifié',
@@ -3974,7 +4084,9 @@ let handoffNotes = [];
       motif: record.treatment || 'Consultation',
       status: record.status || 'Confirmé',
       observations: record.observations || '',
-      insurance: record.insurance || '',
+      coverage,
+      insurance: coverage,
+      billingStatus,
       lastVisit: formatCrmLastVisit(record.rawDate),
     };
   }
@@ -4037,7 +4149,7 @@ let handoffNotes = [];
       const emptyRow = document.createElement('tr');
       emptyRow.className = 'crm-table-empty';
       const cell = document.createElement('td');
-      cell.colSpan = 5;
+      cell.colSpan = 6;
       cell.textContent = 'Aucun patient pour aujourd\'hui.';
       emptyRow.appendChild(cell);
       tbody.appendChild(emptyRow);
@@ -4087,19 +4199,33 @@ let handoffNotes = [];
         'status-pill--neutral'
       ));
 
+      const billingCell = document.createElement('td');
+      const billingLabel = patient.billingStatus || '—';
+      if (billingLabel && billingLabel !== '—') {
+        billingCell.appendChild(createStatusPillElement(
+          billingLabel,
+          getBillingStatusPillClass(billingLabel)
+        ));
+      } else {
+        billingCell.textContent = '—';
+      }
+
       const statusCell = document.createElement('td');
       statusCell.appendChild(createStatusPillElement(
         patient.status || 'Confirmé',
         getCrmStatutTagClass(patient.status)
       ));
 
-      tr.append(nameCell, phoneCell, emailCell, motifCell, statusCell);
+      tr.dataset.billingStatus = patient.billingStatus || '';
+
+      tr.append(nameCell, phoneCell, emailCell, motifCell, billingCell, statusCell);
       tbody.appendChild(tr);
     });
 
     const firstRow = tbody.querySelector('.crm-table-row');
     if (firstRow) firstRow.classList.add('active-row');
     refreshInvisibleUIDecorations(tbody);
+    applyCrmRowVisibility();
     });
   }
 
@@ -4115,11 +4241,28 @@ let handoffNotes = [];
       phone: dataset.phone ?? row.cells[1]?.textContent.trim() ?? '',
       email: dataset.email ?? row.cells[2]?.textContent.trim() ?? '',
       motif: dataset.motif ?? row.cells[3]?.textContent.trim() ?? 'Consultation',
-      status: dataset.statut ?? row.cells[4]?.textContent.trim() ?? 'Confirmé',
+      status: dataset.statut ?? row.cells[5]?.textContent.trim() ?? 'Confirmé',
+      billingStatus: dataset.billingStatus ?? row.cells[4]?.textContent.trim() ?? '',
       lastVisit: dataset.lastVisit ?? 'Non renseigné',
       observations: dataset.observations ?? '',
-      insurance: dataset.insurance ?? '',
+      insurance: dataset.insurance ?? dataset.coverage ?? '',
+      coverage: dataset.coverage ?? dataset.insurance ?? '',
     };
+  }
+
+  function applyCrmRowVisibility() {
+    const searchEl = $('crm-search');
+    const tbody = $('crm-table-body');
+    if (!tbody) return;
+
+    const query = (searchEl?.value || '').trim().toLowerCase();
+    tbody.querySelectorAll('tr.crm-table-row').forEach((row) => {
+      const text = row.textContent.toLowerCase();
+      const matchesSearch = !query || text.includes(query);
+      const billingStatus = row.dataset.billingStatus || '';
+      const matchesBilling = !crmUnpaidOnly || isUnpaidBillingStatus(billingStatus);
+      row.classList.toggle('is-hidden', !(matchesSearch && matchesBilling));
+    });
   }
 
   function activateCrmRow(row) {
@@ -4170,16 +4313,48 @@ let handoffNotes = [];
     });
   }
 
+  function initCrmBillingFilter() {
+    const chip = $('crm-filter-unpaid');
+    if (!chip || chip.dataset.bound === 'true') return;
+    chip.dataset.bound = 'true';
+
+    chip.addEventListener('click', () => {
+      crmUnpaidOnly = !crmUnpaidOnly;
+      chip.classList.toggle('is-active', crmUnpaidOnly);
+      chip.setAttribute('aria-pressed', String(crmUnpaidOnly));
+      applyCrmRowVisibility();
+    });
+  }
+
   function initCrmSearch() {
     const searchEl = $('crm-search');
     const tbody = $('crm-table-body');
     if (!searchEl || !tbody) return;
 
-    searchEl?.addEventListener('input', () => {
-      const query = searchEl.value.trim().toLowerCase();
-      tbody.querySelectorAll('tr').forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.classList.toggle('is-hidden', query.length > 0 && !text.includes(query));
+    searchEl?.addEventListener('input', applyCrmRowVisibility);
+    initCrmBillingFilter();
+  }
+
+  function initWaitlistUrgentToggle() {
+    const toggle = $('waitlist-urgent-toggle');
+    if (!toggle || toggle.dataset.bound === 'true') return;
+    toggle.dataset.bound = 'true';
+
+    toggle.addEventListener('click', () => {
+      waitlistUrgentOnly = !waitlistUrgentOnly;
+      toggle.classList.toggle('is-active', waitlistUrgentOnly);
+      toggle.setAttribute('aria-pressed', String(waitlistUrgentOnly));
+
+      const tbody = $('waitlist-panel-list');
+      const table = tbody?.closest('.waitlist-table');
+      if (tbody) tbody.classList.add('is-filtering');
+      if (table) table.classList.add('is-filtering');
+
+      renderWaitlistPanel();
+
+      requestAnimationFrame(() => {
+        tbody?.classList.remove('is-filtering');
+        table?.classList.remove('is-filtering');
       });
     });
   }
@@ -4337,6 +4512,7 @@ let handoffNotes = [];
     });
     runInitStep('waitlist', () => {
       initWaitlistForm();
+      initWaitlistUrgentToggle();
       renderWaitlistPanel();
     });
     runInitStep('settingsUI', () => initSettings());
