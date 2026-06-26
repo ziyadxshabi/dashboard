@@ -4542,6 +4542,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-weight: 400;
 }
 
+.pulse-sparkline path,
 .pulse-sparkline polyline,
 .pulse-doughnut circle[stroke-dasharray] {
   stroke-dasharray: var(--pulse-path-len, 120);
@@ -4554,6 +4555,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pulse-sparkline path,
   .pulse-sparkline polyline,
   .pulse-doughnut circle[stroke-dasharray] {
     stroke-dashoffset: 0;

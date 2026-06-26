@@ -452,28 +452,33 @@ let handoffNotes = [];
 
   function renderOperationalPulse(pulseData = createEmptyOperationalPulse()) {
     return safeRender('renderOperationalPulse', () => {
+    const charts = window.DentaFlowPulseCharts || {};
+    const {
+      buildSparklineSvg = () => '',
+      buildBarChartSvg = () => '',
+      buildDoughnutSvg = () => '',
+      updateSparkline = () => {},
+      updateBarChart = () => {},
+      updateDoughnutChart = () => {},
+      animatePulseCharts = () => {},
+    } = charts;
+
     const grid = $('assistant-pulse-grid');
     if (!grid) return;
 
     const data = pulseData ?? createEmptyOperationalPulse();
     const punctualityLabel = data.punctuality != null ? `${data.punctuality}%` : '--';
     const turnoverLabel = data.turnoverMinutes != null ? `${data.turnoverMinutes} min` : '--';
-    const seenRatio = data.patientsPlanned > 0
-      ? data.patientsSeen / data.patientsPlanned
-      : 0;
-    const cancelRatio = data.patientsPlanned > 0
-      ? data.cancellations / data.patientsPlanned
-      : 0;
-    const seenSeries = [0.25, 0.4, 0.55, seenRatio || 0.15, Math.min(1, seenRatio + 0.1)];
-    const cancelBars = [0.15, cancelRatio, 0.08, cancelRatio * 0.6, 0.12];
-    const punctualityPct = data.punctuality ?? (Math.round(seenRatio * 100) || 0);
-    const turnoverSeries = [0.35, 0.42, 0.38, 0.5, 0.45];
+    const punctualityValue = data.punctuality != null
+      ? data.punctuality
+      : (data.patientsPlanned > 0 ? Math.round((data.patientsSeen / data.patientsPlanned) * 100) : 0);
+    const turnoverMaxMinutes = 45;
 
     grid.innerHTML = `
       <article class="pulse-card pulse-card--matte">
         <div class="pulse-card__head">
           <p class="pulse-card__label kinetic-label" data-tooltip="Patients déjà reçus sur le total prévu aujourd'hui">Flux patients</p>
-          <div class="pulse-card__chart">${buildSparklineSvg(seenSeries, { tone: 'gold' })}</div>
+          <div class="pulse-card__chart">${buildSparklineSvg(null, { tone: 'gold' })}</div>
         </div>
         <p class="pulse-card__value pulse-card__value--split kinetic-value">
           ${data.patientsSeen} <span>/ ${data.patientsPlanned}</span>
@@ -484,7 +489,7 @@ let handoffNotes = [];
       <article class="pulse-card pulse-card--matte">
         <div class="pulse-card__head">
           <p class="pulse-card__label kinetic-label" data-tooltip="Annulations et absences non signalées du jour">Absences</p>
-          <div class="pulse-card__chart">${buildBarChartSvg(cancelBars, { tone: 'danger' })}</div>
+          <div class="pulse-card__chart">${buildBarChartSvg(null, { tone: 'danger' })}</div>
         </div>
         <p class="pulse-card__value kinetic-value">${data.cancellations}</p>
         <p class="pulse-card__meta">annulations · no-shows</p>
@@ -493,7 +498,7 @@ let handoffNotes = [];
       <article class="pulse-card pulse-card--matte">
         <div class="pulse-card__head">
           <p class="pulse-card__label kinetic-label" data-tooltip="Pourcentage de patients arrivés à l'heure">Ponctualité</p>
-          <div class="pulse-card__chart">${buildDoughnutSvg(punctualityPct, { tone: 'success' })}</div>
+          <div class="pulse-card__chart">${buildDoughnutSvg(null, { tone: 'success' })}</div>
         </div>
         <p class="pulse-card__value kinetic-value">${punctualityLabel}</p>
         <p class="pulse-card__meta">taux d'arrivée</p>
@@ -502,97 +507,25 @@ let handoffNotes = [];
       <article class="pulse-card pulse-card--matte">
         <div class="pulse-card__head">
           <p class="pulse-card__label kinetic-label" data-tooltip="Durée moyenne entre l'arrivée et le début du soin">Rotation</p>
-          <div class="pulse-card__chart">${buildSparklineSvg(turnoverSeries, { tone: 'muted' })}</div>
+          <div class="pulse-card__chart">${buildSparklineSvg(null, { tone: 'muted' })}</div>
         </div>
         <p class="pulse-card__value kinetic-value">${turnoverLabel}</p>
         <p class="pulse-card__meta">temps moyen salle</p>
       </article>`;
 
+    const cards = grid.querySelectorAll('.pulse-card');
+    const fluxStroke = cards[0]?.querySelector('.pulse-sparkline path, .pulse-sparkline polyline');
+    const absencesSvg = cards[1]?.querySelector('.pulse-bars');
+    const punctualitySvg = cards[2]?.querySelector('.pulse-doughnut');
+    const rotationStroke = cards[3]?.querySelector('.pulse-sparkline path, .pulse-sparkline polyline');
+
+    updateSparkline(fluxStroke, data.patientsSeen, data.patientsPlanned);
+    updateBarChart(absencesSvg, data.cancellations);
+    updateDoughnutChart(punctualitySvg, punctualityValue, 100);
+    updateSparkline(rotationStroke, data.turnoverMinutes ?? 0, turnoverMaxMinutes);
+
     animatePulseCharts(grid);
     });
-  }
-
-  function animatePulseCharts(scope) {
-    if (!scope || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const gsap = window.gsap;
-    if (!gsap) return;
-
-    scope.querySelectorAll('.pulse-sparkline polyline').forEach((polyline, index) => {
-      const length = typeof polyline.getTotalLength === 'function'
-        ? polyline.getTotalLength()
-        : 120;
-      polyline.style.strokeDasharray = String(length);
-      polyline.style.strokeDashoffset = String(length);
-      gsap.to(polyline, {
-        strokeDashoffset: 0,
-        duration: 1.2,
-        delay: index * 0.12,
-        ease: 'power2.out',
-      });
-    });
-
-    scope.querySelectorAll('.pulse-bars rect').forEach((rect, index) => {
-      gsap.fromTo(
-        rect,
-        { scaleY: 0, transformOrigin: 'center bottom' },
-        {
-          scaleY: 1,
-          duration: 0.85,
-          delay: 0.15 + index * 0.07,
-          ease: 'power2.out',
-        }
-      );
-    });
-
-    scope.querySelectorAll('.pulse-doughnut circle').forEach((circle, circleIndex, circles) => {
-      if (circleIndex === 0) return;
-      const dashArray = parseFloat(circle.getAttribute('stroke-dasharray') || '0');
-      const targetOffset = parseFloat(circle.getAttribute('stroke-dashoffset') || '0');
-      if (!dashArray) return;
-      circle.style.strokeDasharray = String(dashArray);
-      circle.style.strokeDashoffset = String(dashArray);
-      gsap.to(circle, {
-        strokeDashoffset: targetOffset,
-        duration: 1.3,
-        delay: 0.2,
-        ease: 'power2.out',
-      });
-    });
-  }
-
-  function buildSparklineSvg(values, { width = 52, height = 22, tone = 'gold' } = {}) {
-    const pts = Array.isArray(values) && values.length ? values : [0.3, 0.5, 0.4];
-    const max = Math.max(...pts, 1);
-    const min = Math.min(...pts, 0);
-    const range = max - min || 1;
-    const step = width / Math.max(pts.length - 1, 1);
-    const coords = pts.map((value, index) => {
-      const x = index * step;
-      const y = height - ((value - min) / range) * (height - 4) - 2;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-    return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${coords}"/></svg>`;
-  }
-
-  function buildBarChartSvg(values, { width = 52, height = 22, tone = 'danger' } = {}) {
-    const pts = Array.isArray(values) && values.length ? values : [0.2, 0.5, 0.3];
-    const max = Math.max(...pts, 0.01);
-    const barW = Math.max(4, (width - (pts.length - 1) * 3) / pts.length);
-    const bars = pts.map((value, index) => {
-      const barH = Math.max(2, (value / max) * (height - 4));
-      const x = index * (barW + 3);
-      const y = height - barH - 2;
-      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1"/>`;
-    }).join('');
-    return `<svg class="pulse-bars pulse-bars--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${bars}</svg>`;
-  }
-
-  function buildDoughnutSvg(percent, { size = 28, tone = 'success' } = {}) {
-    const pct = Math.max(0, Math.min(100, Number(percent) || 0));
-    const radius = 10;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference * (1 - pct / 100);
-    return `<svg class="pulse-doughnut pulse-doughnut--${tone}" viewBox="0 0 28 28" width="${size}" height="${size}" aria-hidden="true"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5"/><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>`;
   }
 
   let resetHandoffCategorySelect = null;

@@ -226,6 +226,7 @@ function lockSubmitButton(btn, processingLabel = 'Traitement...') {
 let hoursChart      = null;
 let acceptanceChart = null;
 let lastChartData   = null;
+let lastKpiPayload  = null;
 let osBootSequencePlayed = false;
 let pendingDigestKinetics = null;
 let digestKineticsStarted = false;
@@ -254,6 +255,7 @@ function initializeDoctorDashboard() {
   initSmsCampaign();
   initDoctorHub();
   renderDoctorHubCharts();
+  bindKpiMicroCharts({});
   renderAppointmentsList();
   renderWaitlistPanel();
   initTeamNotesSync();
@@ -923,6 +925,7 @@ function applyDoctorDailyGoal(value) {
   saveSettings({ dailyGoal: val });
   persistDailyGoal(val);
   setText('val-goal', formatMADShort(CONFIG.DAILY_GOAL_MAD));
+  if (lastKpiPayload) bindKpiMicroCharts(lastKpiPayload);
 }
 
 window.applyDoctorDailyGoal = applyDoctorDailyGoal;
@@ -1437,59 +1440,242 @@ function getDemoData() {
   };
 }
 
-/* ── KPI CARDS ───────────────────────────────────────────────────────────── */
+/* ── KPI MICRO-CHARTS (data-driven SVG helpers) ─────────────────────────── */
 
-function buildSparklineSvg(values, { width = 52, height = 22, tone = 'gold' } = {}) {
-  const pts = Array.isArray(values) && values.length ? values : [0.3, 0.5, 0.4];
-  const max = Math.max(...pts, 1);
-  const min = Math.min(...pts, 0);
-  const range = max - min || 1;
-  const step = width / Math.max(pts.length - 1, 1);
-  const coords = pts.map((value, index) => {
-    const x = index * step;
-    const y = height - ((value - min) / range) * (height - 4) - 2;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${coords}"/></svg>`;
+const PULSE_BAR_COUNT = 4;
+
+function pulseChartRatio(current, target) {
+  const value = Number(current);
+  const goal = Number(target);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  if (!Number.isFinite(goal) || goal <= 0) return 0;
+  return Math.min(value / goal, 1);
 }
 
-function buildBarChartSvg(values, { width = 52, height = 22, tone = 'danger' } = {}) {
-  const pts = Array.isArray(values) && values.length ? values : [0.2, 0.5, 0.3];
-  const max = Math.max(...pts, 0.01);
-  const barW = Math.max(4, (width - (pts.length - 1) * 3) / pts.length);
-  const bars = pts.map((value, index) => {
-    const barH = Math.max(2, (value / max) * (height - 4));
-    const x = index * (barW + 3);
+function updateDoughnutChart(svgElement, current, target) {
+  if (!svgElement) return;
+  const circles = svgElement.querySelectorAll('circle');
+  const progressCircle = circles[1];
+  if (!progressCircle) return;
+
+  const pct = pulseChartRatio(current, target);
+  const radius = parseFloat(progressCircle.getAttribute('r') || '10');
+  if (!Number.isFinite(radius) || radius <= 0) return;
+
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct * circumference);
+
+  progressCircle.setAttribute('stroke-dasharray', circumference.toFixed(2));
+  progressCircle.setAttribute('stroke-dashoffset', offset.toFixed(2));
+}
+
+function updateBarChart(svgContainer, totalAbsences) {
+  if (!svgContainer) return;
+  const rects = Array.from(svgContainer.querySelectorAll('rect'));
+  if (!rects.length) return;
+
+  const viewBox = svgContainer.viewBox?.baseVal;
+  const height = viewBox?.height || 22;
+  const minH = 2;
+  const maxH = height - 4;
+  const total = Math.max(0, Math.floor(Number(totalAbsences) || 0));
+
+  rects.forEach((rect, index) => {
+    let barH = minH;
+    let scaleY = 0.1;
+
+    if (total > 0) {
+      const isTall = index < Math.min(total, rects.length);
+      if (isTall) {
+        const intensity = Math.min(1, total / Math.max(rects.length, 1));
+        barH = Math.max(minH, intensity * maxH * (0.55 + 0.45 * ((index % Math.max(total, 1)) + 1) / Math.max(total, 1)));
+        scaleY = 1;
+      } else {
+        barH = minH;
+        scaleY = 0.15;
+      }
+    }
+
     const y = height - barH - 2;
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1"/>`;
+    rect.setAttribute('height', barH.toFixed(1));
+    rect.setAttribute('y', y.toFixed(1));
+    rect.dataset.pulseScaleY = String(scaleY);
+  });
+}
+
+function setSparklineGeometry(pathElement, d, points) {
+  if (!pathElement) return;
+  const tag = pathElement.tagName.toLowerCase();
+  if (tag === 'path') {
+    pathElement.setAttribute('d', d);
+    return;
+  }
+  if (tag === 'polyline' && points) {
+    pathElement.setAttribute('points', points);
+  }
+}
+
+function updateSparkline(pathElement, value, maxValue) {
+  if (!pathElement) return;
+
+  const svg = pathElement.ownerSVGElement;
+  const viewBox = svg?.viewBox?.baseVal;
+  const width = viewBox?.width || 52;
+  const height = viewBox?.height || 22;
+
+  const safeValue = Number(value);
+  const safeMax = Number(maxValue);
+  const hasValue = Number.isFinite(safeValue) && safeValue > 0;
+  const max = Number.isFinite(safeMax) && safeMax > 0 ? safeMax : 1;
+  const ratio = hasValue ? Math.min(safeValue / max, 1) : 0;
+
+  const flatY = 10;
+  const midY = 15;
+  const midX = width / 2;
+  const qX = width * 0.35;
+
+  if (ratio === 0) {
+    const flatD = `M 0 ${flatY} L ${midX.toFixed(1)} ${flatY} L ${width} ${flatY}`;
+    const flatPoints = `0,${flatY} ${midX.toFixed(1)},${flatY} ${width},${flatY}`;
+    setSparklineGeometry(pathElement, flatD, flatPoints);
+    return;
+  }
+
+  const peakY = Math.max(2, height - 2 - ratio * (height - 6));
+  const dynamicD = `M 0 ${midY} Q ${qX.toFixed(1)} ${peakY.toFixed(1)} ${midX.toFixed(1)} ${midY} T ${width} ${flatY}`;
+  setSparklineGeometry(pathElement, dynamicD, `0,${midY} ${qX.toFixed(1)},${peakY.toFixed(1)} ${midX.toFixed(1)},${midY} ${width},${flatY}`);
+}
+
+function buildSparklineSvg(_values, { width = 52, height = 22, tone = 'gold' } = {}) {
+  return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M 0 10 L ${(width / 2).toFixed(1)} 10 L ${width} 10"/></svg>`;
+}
+
+function buildBarChartSvg(_values, { width = 52, height = 22, tone = 'danger', barCount = PULSE_BAR_COUNT } = {}) {
+  const count = Math.max(1, barCount);
+  const barW = Math.max(4, (width - (count - 1) * 3) / count);
+  const minH = 2;
+  const bars = Array.from({ length: count }, (_, index) => {
+    const x = index * (barW + 3);
+    const y = height - minH - 2;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${minH.toFixed(1)}" rx="1" data-pulse-scale-y="0.1"/>`;
   }).join('');
   return `<svg class="pulse-bars pulse-bars--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${bars}</svg>`;
 }
 
-function buildDoughnutSvg(percent, { size = 28, tone = 'success' } = {}) {
-  const pct = Math.max(0, Math.min(100, Number(percent) || 0));
-  const radius = 10;
+function buildDoughnutSvg(_percent, { size = 28, tone = 'success', radius = 10 } = {}) {
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - pct / 100);
-  return `<svg class="pulse-doughnut pulse-doughnut--${tone}" viewBox="0 0 28 28" width="${size}" height="${size}" aria-hidden="true"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5"/><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>`;
+  return `<svg class="pulse-doughnut pulse-doughnut--${tone}" viewBox="0 0 28 28" width="${size}" height="${size}" aria-hidden="true"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5"/><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${circumference.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>`;
 }
+
+function animatePulseCharts(scope) {
+  if (!scope || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const gsap = window.gsap;
+  if (!gsap) return;
+
+  scope.querySelectorAll('.pulse-sparkline path, .pulse-sparkline polyline').forEach((strokeEl, index) => {
+    const length = typeof strokeEl.getTotalLength === 'function'
+      ? strokeEl.getTotalLength()
+      : 120;
+    strokeEl.style.strokeDasharray = String(length);
+    strokeEl.style.strokeDashoffset = String(length);
+    gsap.to(strokeEl, {
+      strokeDashoffset: 0,
+      duration: 1.2,
+      delay: index * 0.12,
+      ease: 'power2.out',
+    });
+  });
+
+  scope.querySelectorAll('.pulse-bars rect').forEach((rect, index) => {
+    const targetScaleY = parseFloat(rect.dataset.pulseScaleY || '1');
+    gsap.fromTo(
+      rect,
+      { scaleY: 0, transformOrigin: 'center bottom' },
+      {
+        scaleY: targetScaleY,
+        duration: 0.85,
+        delay: 0.15 + index * 0.07,
+        ease: 'power2.out',
+      }
+    );
+  });
+
+  scope.querySelectorAll('.pulse-doughnut circle').forEach((circle, circleIndex) => {
+    if (circleIndex === 0) return;
+    const dashArray = parseFloat(circle.getAttribute('stroke-dasharray') || '0');
+    const targetOffset = parseFloat(circle.getAttribute('stroke-dashoffset') || '0');
+    if (!dashArray) return;
+    circle.style.strokeDasharray = String(dashArray);
+    circle.style.strokeDashoffset = String(dashArray);
+    gsap.to(circle, {
+      strokeDashoffset: targetOffset,
+      duration: 1.3,
+      delay: 0.2,
+      ease: 'power2.out',
+    });
+  });
+}
+
+function bindKpiMicroCharts(data = {}) {
+  const patientsToday = asMetric(data.patients_today);
+  const noShows = asMetric(data.no_shows);
+  const revenueToday = asMetric(data.revenue_today);
+  const newPatients = asMetric(data.new_patients);
+  const pendingQuotes = asMetric(data.pending_plans ?? data.pending_quotes);
+  const dailyGoal = Number(CONFIG.DAILY_GOAL_MAD) > 0 ? CONFIG.DAILY_GOAL_MAD : 1;
+
+  const trendPatientsSvg = document.querySelector('#trend-patients svg');
+  updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
+
+  const trendNoshowsSvg = document.querySelector('#trend-noshows svg');
+  updateBarChart(trendNoshowsSvg, noShows);
+
+  const trendProductionSvg = document.querySelector('#trend-production svg');
+  updateDoughnutChart(trendProductionSvg, revenueToday, dailyGoal);
+
+  const trendNewSvg = document.querySelector('#trend-new svg');
+  updateSparkline(trendNewSvg?.querySelector('path, polyline'), newPatients, 10);
+
+  const hubPatientsSvg = document.querySelector('#hub-chart-patients svg');
+  updateSparkline(hubPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
+
+  const hubPendingSvg = document.querySelector('#hub-chart-pending svg');
+  updateBarChart(hubPendingSvg, pendingQuotes);
+
+  const hubNoshowsSvg = document.querySelector('#hub-chart-noshows svg');
+  updateBarChart(hubNoshowsSvg, noShows);
+
+  const hubProductionSvg = document.querySelector('#hub-chart-production svg');
+  updateDoughnutChart(hubProductionSvg, revenueToday, dailyGoal);
+
+  const kpiScope = document.querySelector('.kpi-row');
+  const hubScope = document.getElementById('doctor-metrics');
+  if (kpiScope) animatePulseCharts(kpiScope);
+  if (hubScope) animatePulseCharts(hubScope);
+}
+
+window.DentaFlowPulseCharts = {
+  updateDoughnutChart,
+  updateBarChart,
+  updateSparkline,
+  animatePulseCharts,
+  buildSparklineSvg,
+  buildBarChartSvg,
+  buildDoughnutSvg,
+  bindKpiMicroCharts,
+};
 
 function setKpiTrend(id, markup) {
   const el = document.getElementById(id);
   if (el) el.innerHTML = markup;
 }
 
-function renderDoctorHubCharts(metrics = {}) {
-  const patients = asMetric(metrics.patients);
-  const pending = asMetric(metrics.pending);
-  const noshows = asMetric(metrics.noshows);
-  const productionPct = Math.min(100, asMetric(metrics.productionPct, 62));
-
+function renderDoctorHubCharts() {
   const chartMap = {
-    'hub-chart-patients': buildSparklineSvg([0.3, 0.45, 0.5, patients / 12, 0.6], { tone: 'gold' }),
-    'hub-chart-pending': buildBarChartSvg([0.2, pending / 5, 0.15, 0.25], { tone: 'muted' }),
-    'hub-chart-noshows': buildBarChartSvg([0.1, noshows / 4, 0.08, 0.12], { tone: 'danger' }),
-    'hub-chart-production': buildDoughnutSvg(productionPct, { tone: 'success' }),
+    'hub-chart-patients': buildSparklineSvg(null, { tone: 'gold' }),
+    'hub-chart-pending': buildBarChartSvg(null, { tone: 'muted' }),
+    'hub-chart-noshows': buildBarChartSvg(null, { tone: 'danger' }),
+    'hub-chart-production': buildDoughnutSvg(null, { tone: 'success' }),
   };
 
   Object.entries(chartMap).forEach(([id, svg]) => {
@@ -1499,25 +1685,23 @@ function renderDoctorHubCharts(metrics = {}) {
 }
 
 function renderKPICards(data) {
+  lastKpiPayload = data;
   const patients_today    = asMetric(data?.patients_today);
   const no_shows          = asMetric(data?.no_shows);
   const revenue_today     = asMetric(data?.revenue_today);
   const new_patients      = asMetric(data?.new_patients);
   const reclaimed_revenue = asMetric(data?.reclaimed_revenue);
-  const pct = Math.min(100, Math.round((revenue_today / CONFIG.DAILY_GOAL_MAD) * 100));
-  const patientsRatio = patients_today > 0 ? Math.min(1, patients_today / 24) : 0.15;
+  const pct = CONFIG.DAILY_GOAL_MAD > 0
+    ? Math.min(100, Math.round((revenue_today / CONFIG.DAILY_GOAL_MAD) * 100))
+    : 0;
 
-  setKpiTrend('trend-patients', buildSparklineSvg([0.25, 0.4, patientsRatio, 0.55, patientsRatio + 0.1], { tone: 'gold' }));
-  setKpiTrend('trend-noshows', buildBarChartSvg([0.12, no_shows / 6, 0.08, no_shows / 8], { tone: 'danger' }));
-  setKpiTrend('trend-production', buildDoughnutSvg(pct, { tone: 'success' }));
-  setKpiTrend('trend-new', buildSparklineSvg([0.2, new_patients / 5, 0.35, 0.3], { tone: 'muted' }));
+  setKpiTrend('trend-patients', buildSparklineSvg(null, { tone: 'gold' }));
+  setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
+  setKpiTrend('trend-production', buildDoughnutSvg(null, { tone: 'success' }));
+  setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
 
-  renderDoctorHubCharts({
-    patients: patients_today,
-    pending: asMetric(data?.pending_quotes),
-    noshows: no_shows,
-    productionPct: pct,
-  });
+  renderDoctorHubCharts();
+  bindKpiMicroCharts(data);
 
   // Reclaimed revenue banner (ROI counter)
   setKPINumber('val-reclaimed', reclaimed_revenue, true, formatMAD);
