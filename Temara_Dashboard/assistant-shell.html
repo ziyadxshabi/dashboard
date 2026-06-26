@@ -188,12 +188,44 @@
             </div>
           </div>
 
-          <div class="quick-actions quick-actions--disclosed" aria-hidden="true">
-            <!-- Actions déplacées vers le menu ⋮ du planning — IDs conservés pour les webhooks n8n -->
+          <div class="superpowers-grid" id="superpowers-grid">
+            <button type="button" class="btn-super btn-super--compact" id="super-btn-daily-report">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Générer Rapport Journalier</span>
+                <span class="btn-super__hint">Synthèse PDF de la journée</span>
+              </span>
+            </button>
+            <button type="button" class="btn-super btn-super--compact" id="super-btn-force-reminders">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Forcer Rappels</span>
+                <span class="btn-super__hint">SMS patients de demain</span>
+              </span>
+            </button>
+            <button type="button" class="btn-super btn-super--compact" id="super-btn-block-slot">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Bloquer Créneau Urgence</span>
+                <span class="btn-super__hint">Réserver un slot prioritaire</span>
+              </span>
+            </button>
+            <button type="button" class="btn-super btn-super--compact" id="super-btn-fill-gap">
+              <span class="btn-super__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Remplir un Créneau Vide</span>
+                <span class="btn-super__hint">Notifier la liste d'attente</span>
+              </span>
+            </button>
           </div>
-          <p class="quick-actions__note quick-actions__note--disclosed">
-            Actions rapides disponibles via le menu <span aria-hidden="true">⋮</span> du Planning du Jour.
-          </p>
         </section>
 
         <section class="assistant-panel assistant-panel--handoff" aria-labelledby="handoff-title">
@@ -215,11 +247,26 @@
               maxlength="280"
               required
             />
-            <select class="handoff-compose__select" id="handoff-category" name="handoff-category" aria-label="Catégorie">
-              <option value="Info">Info</option>
-              <option value="Urgent">Urgent</option>
-              <option value="Planning">Planning</option>
-            </select>
+            <div class="ghost-select" id="handoff-category-root" data-ghost-select>
+              <input type="hidden" id="handoff-category" name="handoff-category" value="Info" />
+              <button
+                type="button"
+                class="ghost-select__trigger"
+                id="handoff-category-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="handoff-category-list"
+                aria-label="Catégorie de la note"
+              >
+                <span class="ghost-select__value" id="handoff-category-label">Info</span>
+                <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <ul class="ghost-select__list" id="handoff-category-list" role="listbox" aria-label="Catégories" hidden>
+                <li class="ghost-select__option is-selected" role="option" data-value="Info" aria-selected="true" tabindex="-1">Info</li>
+                <li class="ghost-select__option" role="option" data-value="Urgent" aria-selected="false" tabindex="-1">Urgent</li>
+                <li class="ghost-select__option" role="option" data-value="Planning" aria-selected="false" tabindex="-1">Planning</li>
+              </ul>
+            </div>
             <label class="handoff-compose__pin">
               <input type="checkbox" id="handoff-pin" name="handoff-pin" />
               <span>Pin</span>

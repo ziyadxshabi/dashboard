@@ -5,9 +5,10 @@
 
 :root {
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --radius:      4px;
-  --radius-sm:   4px;
-  --radius-lg:   6px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius:      var(--radius-md);
   --radius-pill: 9999px;
   --transition:  all 0.2s ease;
   --sidebar-w:   260px;
@@ -774,8 +775,7 @@ body.mode-assistant {
   align-items: center;
 }
 
-.handoff-compose__input,
-.handoff-compose__select {
+.handoff-compose__input {
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--border-color);
@@ -791,16 +791,106 @@ body.mode-assistant {
   color: var(--text-muted);
 }
 
-.handoff-compose__input:focus,
-.handoff-compose__select:focus {
+.handoff-compose__input:focus {
   outline: none;
   border-color: rgba(227, 193, 143, 0.45);
   box-shadow: 0 0 0 2px rgba(227, 193, 143, 0.12);
 }
 
-.handoff-compose__select {
+/* Custom ghost select — dark themed dropdown */
+.ghost-select {
+  position: relative;
   min-width: 108px;
+}
+
+.ghost-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 108px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: #111111;
+  color: var(--text-main);
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.ghost-select__trigger:hover {
+  border-color: rgba(227, 193, 143, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ghost-select__trigger:focus-visible {
+  outline: none;
+  border-color: rgba(227, 193, 143, 0.45);
+  box-shadow: 0 0 0 2px rgba(227, 193, 143, 0.12);
+}
+
+.ghost-select__trigger[aria-expanded="true"] {
+  border-color: rgba(227, 193, 143, 0.45);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ghost-select__chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.ghost-select__trigger[aria-expanded="true"] .ghost-select__chevron {
+  transform: rotate(180deg);
+}
+
+.ghost-select__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  overscroll-behavior: contain;
+}
+
+.ghost-select__option {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ghost-select__option:hover,
+.ghost-select__option.is-focused {
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.06));
+}
+
+.ghost-select__option.is-selected {
+  color: var(--accent-gold);
+  background: rgba(227, 193, 143, 0.08);
+}
+
+.ghost-select__option:active {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .handoff-compose__pin {
@@ -1501,6 +1591,42 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   gap: 12px;
 }
 
+.superpowers-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.superpowers-grid .btn-super--compact {
+  padding: 14px 14px 12px;
+  gap: 12px;
+  border-radius: var(--radius-md);
+}
+
+.superpowers-grid .btn-super--compact .btn-super__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+}
+
+.superpowers-grid .btn-super--compact .btn-super__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.superpowers-grid .btn-super--compact .btn-super__label {
+  font-size: 13px;
+}
+
+.superpowers-grid .btn-super--compact .btn-super__hint {
+  font-size: 11px;
+}
+
+.btn-super.v-disabled,
+.btn-super[aria-disabled="true"].v-disabled {
+  opacity: 0.72;
+}
+
 .quick-actions .btn-super {
   flex-shrink: 0;
   min-height: 44px;
@@ -1517,7 +1643,7 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   color: var(--text-main);
   background: transparent;
   border: 1px solid rgba(227, 193, 143, 0.35);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition);
   -webkit-tap-highlight-color: transparent;
@@ -1545,7 +1671,7 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: rgba(227, 193, 143, 0.08);
   color: var(--accent-gold);
 }
@@ -1888,8 +2014,15 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
     grid-template-columns: 1fr;
   }
 
-  .handoff-compose__select,
   .handoff-compose__submit {
+    width: 100%;
+  }
+
+  .ghost-select {
+    width: 100%;
+  }
+
+  .ghost-select__trigger {
     width: 100%;
   }
 
@@ -3752,7 +3885,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   justify-content: center;
   gap: 8px;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
   color: #ffffff;
@@ -4259,6 +4392,28 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
   text-transform: lowercase;
   font-weight: 400;
+}
+
+.pulse-sparkline polyline,
+.pulse-doughnut circle[stroke-dasharray] {
+  stroke-dasharray: var(--pulse-path-len, 120);
+  stroke-dashoffset: var(--pulse-path-len, 120);
+}
+
+.pulse-bars rect {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-sparkline polyline,
+  .pulse-doughnut circle[stroke-dasharray] {
+    stroke-dashoffset: 0;
+  }
+
+  .pulse-bars rect {
+    transform: none;
+  }
 }
 
 .pulse-sparkline--gold { color: var(--accent-gold); }

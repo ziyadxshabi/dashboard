@@ -505,6 +505,56 @@ let handoffNotes = [];
         <p class="pulse-card__value kinetic-value">${turnoverLabel}</p>
         <p class="pulse-card__meta">temps moyen salle</p>
       </article>`;
+
+    animatePulseCharts(grid);
+    });
+  }
+
+  function animatePulseCharts(scope) {
+    if (!scope || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const gsap = window.gsap;
+    if (!gsap) return;
+
+    scope.querySelectorAll('.pulse-sparkline polyline').forEach((polyline, index) => {
+      const length = typeof polyline.getTotalLength === 'function'
+        ? polyline.getTotalLength()
+        : 120;
+      polyline.style.strokeDasharray = String(length);
+      polyline.style.strokeDashoffset = String(length);
+      gsap.to(polyline, {
+        strokeDashoffset: 0,
+        duration: 1.2,
+        delay: index * 0.12,
+        ease: 'power2.out',
+      });
+    });
+
+    scope.querySelectorAll('.pulse-bars rect').forEach((rect, index) => {
+      gsap.fromTo(
+        rect,
+        { scaleY: 0, transformOrigin: 'center bottom' },
+        {
+          scaleY: 1,
+          duration: 0.85,
+          delay: 0.15 + index * 0.07,
+          ease: 'power2.out',
+        }
+      );
+    });
+
+    scope.querySelectorAll('.pulse-doughnut circle').forEach((circle, circleIndex, circles) => {
+      if (circleIndex === 0) return;
+      const dashArray = parseFloat(circle.getAttribute('stroke-dasharray') || '0');
+      const targetOffset = parseFloat(circle.getAttribute('stroke-dashoffset') || '0');
+      if (!dashArray) return;
+      circle.style.strokeDasharray = String(dashArray);
+      circle.style.strokeDashoffset = String(dashArray);
+      gsap.to(circle, {
+        strokeDashoffset: targetOffset,
+        duration: 1.3,
+        delay: 0.2,
+        ease: 'power2.out',
+      });
     });
   }
 
@@ -541,6 +591,85 @@ let handoffNotes = [];
     const circumference = 2 * Math.PI * radius;
     const offset = circumference * (1 - pct / 100);
     return `<svg class="pulse-doughnut pulse-doughnut--${tone}" viewBox="0 0 28 28" width="${size}" height="${size}" aria-hidden="true"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5"/><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>`;
+  }
+
+  let resetHandoffCategorySelect = null;
+
+  function initHandoffCategorySelect() {
+    const root = $('handoff-category-root');
+    const hidden = $('handoff-category');
+    const trigger = $('handoff-category-trigger');
+    const list = $('handoff-category-list');
+    const label = $('handoff-category-label');
+    if (!root || !hidden || !trigger || !list) return;
+
+    const options = Array.from(list.querySelectorAll('.ghost-select__option'));
+
+    function setValue(value) {
+      hidden.value = value;
+      if (label) label.textContent = value;
+      options.forEach((option) => {
+        const selected = option.dataset.value === value;
+        option.classList.toggle('is-selected', selected);
+        option.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+    }
+
+    function closeList() {
+      list.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      options.forEach((option) => option.classList.remove('is-focused'));
+    }
+
+    function openList() {
+      list.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+
+    resetHandoffCategorySelect = () => setValue('Info');
+
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (list.hidden) openList();
+      else closeList();
+    });
+
+    options.forEach((option) => {
+      option.addEventListener('click', () => {
+        setValue(option.dataset.value || 'Info');
+        closeList();
+        trigger.focus();
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!root.contains(event.target)) closeList();
+    });
+
+    trigger.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeList();
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (list.hidden) openList();
+        const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = (currentIndex + delta + options.length) % options.length;
+        options.forEach((option) => option.classList.remove('is-focused'));
+        options[nextIndex]?.classList.add('is-focused');
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        const focused = options.find((option) => option.classList.contains('is-focused'));
+        if (focused && !list.hidden) {
+          event.preventDefault();
+          setValue(focused.dataset.value || 'Info');
+          closeList();
+        }
+      }
+    });
   }
 
   function initHandoffForm() {
@@ -586,6 +715,7 @@ let handoffNotes = [];
 
       handoffNotes.unshift(newNote);
       form.reset();
+      resetHandoffCategorySelect?.();
       renderHandoffBoard({ animate: true, highlightId: newNote.id });
 
       try {
@@ -656,12 +786,16 @@ let handoffNotes = [];
       toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
       tooltip: 'Rappels automatiques bientôt disponibles',
     },
+    blockSlot: {
+      toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
+      tooltip: 'Blocage de créneau bientôt disponible',
+    },
   };
 
   function wireDeployingFeatureButton(button, notice) {
     if (!button || button.dataset.deployingGuard === 'true') return;
     button.dataset.deployingGuard = 'true';
-    button.disabled = true;
+    button.disabled = false;
     button.setAttribute('aria-disabled', 'true');
     button.classList.add('v-disabled');
     button.setAttribute('title', notice.tooltip);
@@ -677,6 +811,9 @@ let handoffNotes = [];
     wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
     wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
     wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
+    wireDeployingFeatureButton($('super-btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
+    wireDeployingFeatureButton($('super-btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
+    wireDeployingFeatureButton($('super-btn-block-slot'), DEPLOYING_FEATURE_NOTICES.blockSlot);
   }
 
   function setSyncIndicator(state) {
@@ -4076,15 +4213,13 @@ let handoffNotes = [];
     });
   }
 
-  function initQuickActions() {
-    guardDeployingFeatureButtons();
+  function wireFillGapButton(button) {
+    if (!button || button.dataset.fillGapWired === 'true') return;
+    button.dataset.fillGapWired = 'true';
 
-    const btnFillGap   = $('btn-fill-gap');
-    const btnDelay     = $('btn-alerte-retard');
-
-    btnFillGap?.addEventListener('click', async () => {
-      btnFillGap.classList.add('is-loading');
-      btnFillGap.disabled = true;
+    button.addEventListener('click', async () => {
+      button.classList.add('is-loading');
+      button.disabled = true;
       try {
         const response = await fetch(
           CONFIG.FILL_GAP_PROXY,
@@ -4095,16 +4230,24 @@ let handoffNotes = [];
           throw new Error(payload?.error || `HTTP ${response.status}`);
         }
 
-        btnFillGap.classList.add('is-success');
+        button.classList.add('is-success');
         showToast('Blast SMS envoyé à la liste d\'attente.', 'success');
       } catch {
         showToast('Échec de l\'envoi SMS — réessayez.', 'error');
       } finally {
-        btnFillGap.classList.remove('is-loading');
-        btnFillGap.disabled = false;
-        setTimeout(() => btnFillGap.classList.remove('is-success'), 2500);
+        button.classList.remove('is-loading');
+        button.disabled = false;
+        setTimeout(() => button.classList.remove('is-success'), 2500);
       }
     });
+  }
+
+  function initQuickActions() {
+    guardDeployingFeatureButtons();
+
+    [$('btn-fill-gap'), $('super-btn-fill-gap')].forEach(wireFillGapButton);
+
+    const btnDelay = $('btn-alerte-retard');
 
     btnDelay?.addEventListener('click', async () => {
       console.log('Alerte Retard button clicked');
@@ -4188,6 +4331,7 @@ let handoffNotes = [];
       refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     });
     runInitStep('handoff', () => {
+      initHandoffCategorySelect();
       loadHandoffNotes();
       initHandoffForm();
     });
