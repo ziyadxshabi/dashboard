@@ -779,6 +779,303 @@ let handoffNotes = [];
     toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
   }
 
+  let preferencesToastTimer = null;
+
+  function schedulePreferencesSavedToast() {
+    clearTimeout(preferencesToastTimer);
+    preferencesToastTimer = window.setTimeout(() => {
+      showToast('Préférences enregistrées', 'success');
+    }, 500);
+  }
+
+  function demoStorageGet(key, fallback = '') {
+    try {
+      const value = localStorage.getItem(key);
+      return value !== null ? value : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function demoStorageSet(key, value) {
+    try {
+      localStorage.setItem(key, String(value));
+    } catch (error) {
+      console.warn('[Settings] localStorage write failed:', error);
+    }
+  }
+
+  function parseDemoBool(value, fallback = true) {
+    if (value === '' || value == null) return fallback;
+    return value === 'true' || value === '1';
+  }
+
+  function bindDemoField(el, storageKey, { onPersist } = {}) {
+    if (!el || el.dataset.demoBound === 'true') return;
+    el.dataset.demoBound = 'true';
+
+    const persist = () => {
+      const value = el.type === 'checkbox' ? el.checked : el.value;
+      demoStorageSet(storageKey, el.type === 'checkbox' ? String(value) : value);
+      onPersist?.(value, el);
+      schedulePreferencesSavedToast();
+    };
+
+    el.addEventListener('change', persist);
+    if (el.type !== 'checkbox') {
+      el.addEventListener('input', persist);
+    }
+  }
+
+  function initGhostSelectPersist({
+    rootId,
+    hiddenId,
+    triggerId,
+    listId,
+    labelId,
+    storageKey,
+    defaultValue,
+    onPersist,
+  }) {
+    const root = $(rootId);
+    const hidden = $(hiddenId);
+    const trigger = $(triggerId);
+    const list = $(listId);
+    const label = $(labelId);
+    if (!root || !hidden || !trigger || !list || root.dataset.demoBound === 'true') return;
+    root.dataset.demoBound = 'true';
+
+    const options = Array.from(list.querySelectorAll('.ghost-select__option'));
+
+    function setValue(value, labelText) {
+      const resolved = value || defaultValue;
+      hidden.value = resolved;
+      if (label) {
+        label.textContent = labelText
+          || options.find((option) => option.dataset.value === resolved)?.dataset.label
+          || resolved;
+      }
+      options.forEach((option) => {
+        const selected = option.dataset.value === resolved;
+        option.classList.toggle('is-selected', selected);
+        option.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+    }
+
+    function closeList() {
+      list.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      options.forEach((option) => option.classList.remove('is-focused'));
+    }
+
+    function openList() {
+      list.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+
+    const stored = demoStorageGet(storageKey, defaultValue);
+    setValue(stored);
+
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (list.hidden) openList();
+      else closeList();
+    });
+
+    options.forEach((option) => {
+      option.addEventListener('click', () => {
+        const value = option.dataset.value || defaultValue;
+        setValue(value, option.dataset.label || option.textContent.trim());
+        closeList();
+        demoStorageSet(storageKey, value);
+        onPersist?.(value);
+        schedulePreferencesSavedToast();
+        trigger.focus();
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!root.contains(event.target)) closeList();
+    });
+
+    trigger.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeList();
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (list.hidden) openList();
+        const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = (currentIndex + delta + options.length) % options.length;
+        options.forEach((option) => option.classList.remove('is-focused'));
+        options[nextIndex]?.classList.add('is-focused');
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        const focused = options.find((option) => option.classList.contains('is-focused'));
+        if (focused && !list.hidden) {
+          event.preventDefault();
+          focused.click();
+        }
+      }
+    });
+  }
+
+  function applyProfileForCurrentShell(name, specialty) {
+    if (document.body.classList.contains('mode-assistant')) {
+      applyUserProfile(name, specialty);
+      return;
+    }
+    if (typeof globalThis.applyUserProfile === 'function') {
+      globalThis.applyUserProfile(name, specialty);
+    }
+  }
+
+  function initSettingsDemoState() {
+    const isAssistant = document.body.classList.contains('mode-assistant');
+    const nameKey = isAssistant ? 'df_asst_name' : 'df_doc_name';
+    const roleKey = isAssistant ? 'df_asst_role' : 'df_doc_role';
+
+    const nameEl = $('settings-profile-name');
+    const roleEl = $('settings-profile-specialty');
+    const defaults = isAssistant ? DEFAULT_SETTINGS : {
+      profileName: 'Dr. Tazi',
+      profileSpecialty: 'Chirurgien-dentiste',
+    };
+
+    if (nameEl) {
+      const storedName = demoStorageGet(nameKey, '');
+      if (storedName) nameEl.value = storedName;
+      else if (!nameEl.value) nameEl.value = defaults.profileName;
+    }
+    if (roleEl) {
+      const storedRole = demoStorageGet(roleKey, '');
+      if (storedRole) roleEl.value = storedRole;
+      else if (!roleEl.value) roleEl.value = defaults.profileSpecialty;
+    }
+
+    if (nameEl || roleEl) {
+      applyProfileForCurrentShell(
+        nameEl?.value || defaults.profileName,
+        roleEl?.value || defaults.profileSpecialty
+      );
+    }
+
+    bindDemoField(nameEl, nameKey, {
+      onPersist: () => {
+        const name = nameEl?.value.trim() || defaults.profileName;
+        const role = roleEl?.value.trim() || defaults.profileSpecialty;
+        saveSettings({ profileName: name, profileSpecialty: role });
+        applyProfileForCurrentShell(name, role);
+      },
+    });
+
+    bindDemoField(roleEl, roleKey, {
+      onPersist: () => {
+        const name = nameEl?.value.trim() || defaults.profileName;
+        const role = roleEl?.value.trim() || defaults.profileSpecialty;
+        saveSettings({ profileName: name, profileSpecialty: role });
+        applyProfileForCurrentShell(name, role);
+      },
+    });
+
+    const smsToggle = $('settings-sms-toggle');
+    const emailToggle = $('settings-email-toggle');
+    const smsKey = isAssistant ? 'df_asst_sms_reminders' : 'df_doc_sms_reminders';
+    const emailKey = isAssistant ? 'df_asst_email_reminders' : 'df_doc_email_reminders';
+
+    if (smsToggle) {
+      smsToggle.checked = parseDemoBool(demoStorageGet(smsKey, ''), smsToggle.checked);
+      bindDemoField(smsToggle, smsKey, {
+        onPersist: (value) => saveSettings({ smsReminders: value }),
+      });
+    }
+    if (emailToggle) {
+      emailToggle.checked = parseDemoBool(demoStorageGet(emailKey, ''), emailToggle.checked);
+      bindDemoField(emailToggle, emailKey, {
+        onPersist: (value) => saveSettings({ emailReminders: value }),
+      });
+    }
+
+    const goalEl = $('settings-daily-goal');
+    if (goalEl) {
+      const storedGoal = demoStorageGet('df_doc_daily_goal', goalEl.value || '');
+      if (storedGoal) goalEl.value = storedGoal;
+      bindDemoField(goalEl, 'df_doc_daily_goal', {
+        onPersist: (value) => {
+          const val = parseInt(String(value), 10);
+          if (Number.isFinite(val) && val >= 1000 && typeof globalThis.applyDoctorDailyGoal === 'function') {
+            globalThis.applyDoctorDailyGoal(val);
+          }
+        },
+      });
+      const initialGoal = parseInt(goalEl.value, 10);
+      if (Number.isFinite(initialGoal) && initialGoal >= 1000 && typeof globalThis.applyDoctorDailyGoal === 'function') {
+        globalThis.applyDoctorDailyGoal(initialGoal);
+      }
+    }
+
+    const dayStartEl = $('settings-day-start');
+    const dayEndEl = $('settings-day-end');
+    if (dayStartEl) {
+      const stored = demoStorageGet('df_doc_day_start', dayStartEl.value || '09:00');
+      dayStartEl.value = stored;
+      bindDemoField(dayStartEl, 'df_doc_day_start');
+    }
+    if (dayEndEl) {
+      const stored = demoStorageGet('df_doc_day_end', dayEndEl.value || '18:00');
+      dayEndEl.value = stored;
+      bindDemoField(dayEndEl, 'df_doc_day_end');
+    }
+
+    const emergencyToggle = $('settings-emergency-buffer-toggle');
+    const emergencySlotsEl = $('settings-emergency-slots');
+    const syncEmergencySlotsState = (enabled) => {
+      if (!emergencySlotsEl) return;
+      emergencySlotsEl.disabled = !enabled;
+      emergencySlotsEl.classList.toggle('is-disabled', !enabled);
+    };
+
+    if (emergencyToggle) {
+      emergencyToggle.checked = parseDemoBool(demoStorageGet('df_doc_emergency_buffer', 'true'), true);
+      syncEmergencySlotsState(emergencyToggle.checked);
+      bindDemoField(emergencyToggle, 'df_doc_emergency_buffer', {
+        onPersist: (value) => syncEmergencySlotsState(value),
+      });
+    }
+    if (emergencySlotsEl) {
+      const storedSlots = demoStorageGet('df_doc_emergency_slots', emergencySlotsEl.value || '2');
+      emergencySlotsEl.value = storedSlots;
+      syncEmergencySlotsState(emergencyToggle ? emergencyToggle.checked : true);
+      bindDemoField(emergencySlotsEl, 'df_doc_emergency_slots');
+    }
+
+    initGhostSelectPersist({
+      rootId: 'settings-planning-view-root',
+      hiddenId: 'settings-planning-view',
+      triggerId: 'settings-planning-view-trigger',
+      listId: 'settings-planning-view-list',
+      labelId: 'settings-planning-view-label-value',
+      storageKey: 'df_asst_planning_view',
+      defaultValue: 'chronologique',
+    });
+
+    const soundTeamToggle = $('settings-sound-team-toggle');
+    const soundArrivalToggle = $('settings-sound-arrival-toggle');
+    if (soundTeamToggle) {
+      soundTeamToggle.checked = parseDemoBool(demoStorageGet('df_asst_sound_team', 'true'), true);
+      bindDemoField(soundTeamToggle, 'df_asst_sound_team');
+    }
+    if (soundArrivalToggle) {
+      soundArrivalToggle.checked = parseDemoBool(demoStorageGet('df_asst_sound_arrival', 'true'), true);
+      bindDemoField(soundArrivalToggle, 'df_asst_sound_arrival');
+    }
+  }
+
+  window.initSettingsDemoState = initSettingsDemoState;
+
   const DEPLOYING_FEATURE_NOTICES = {
     dailyReport: {
       toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
@@ -4024,18 +4321,6 @@ let handoffNotes = [];
     if (specialtyEl) specialtyEl.value = profileSpecialty;
 
     applyUserProfile(profileName, profileSpecialty);
-
-    function persistProfile() {
-      const name = nameEl?.value.trim() || DEFAULT_SETTINGS.profileName;
-      const specialty = specialtyEl?.value.trim() || DEFAULT_SETTINGS.profileSpecialty;
-      saveSettings({ profileName: name, profileSpecialty: specialty });
-      applyUserProfile(name, specialty);
-    }
-
-    nameEl?.addEventListener('input', persistProfile);
-    specialtyEl?.addEventListener('input', persistProfile);
-    nameEl?.addEventListener('change', persistProfile);
-    specialtyEl?.addEventListener('change', persistProfile);
   }
 
   function initSettings() {
@@ -4043,11 +4328,12 @@ let handoffNotes = [];
     const smsToggle = $('settings-sms-toggle');
     const emailToggle = $('settings-email-toggle');
 
-    if (smsToggle) smsToggle.checked = saved.smsReminders !== false;
-    if (emailToggle) emailToggle.checked = saved.emailReminders !== false;
-
-    smsToggle?.addEventListener('change', () => saveSettings({ smsReminders: smsToggle.checked }));
-    emailToggle?.addEventListener('change', () => saveSettings({ emailReminders: emailToggle.checked }));
+    if (smsToggle && smsToggle.dataset.demoBound !== 'true') {
+      smsToggle.checked = saved.smsReminders !== false;
+    }
+    if (emailToggle && emailToggle.dataset.demoBound !== 'true') {
+      emailToggle.checked = saved.emailReminders !== false;
+    }
   }
 
   function getCrmStatutTagClass(statut) {
@@ -4515,12 +4801,15 @@ let handoffNotes = [];
       initWaitlistUrgentToggle();
       renderWaitlistPanel();
     });
-    runInitStep('settingsUI', () => initSettings());
-    runInitStep('theme', () => initThemeSwitcher());
     runInitStep('profile', () => {
       initUserProfile();
       initAccountCardMenu();
     });
+    runInitStep('settingsUI', () => {
+      initSettings();
+      initSettingsDemoState();
+    });
+    runInitStep('theme', () => initThemeSwitcher());
     runInitStep('crm', () => {
       initCrmSearch();
       initCrmSidePanel();

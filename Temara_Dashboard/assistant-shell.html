@@ -477,7 +477,7 @@
       <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
         <header class="view-page-header">
           <h2 class="view-page-title">Paramètres</h2>
-          <p class="view-page-sub">Préférences assistante, notifications SMS et modèles Resend</p>
+          <p class="view-page-sub">Préférences assistante, ergonomie du poste et alertes locales</p>
         </header>
 
         <div class="settings-grid">
@@ -539,12 +539,12 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via n8n.</p>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
 
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels SMS</span>
-                <span class="settings-toggle-hint">Twilio — rappels 24h avant le RDV</span>
+                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-sms-toggle" checked />
@@ -555,13 +555,87 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Resend — confirmations et relances</span>
+                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-email-toggle" checked />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
             </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+            </div>
+            <h3 class="settings-card-title">Ergonomie du Planning</h3>
+            <p class="settings-card-desc">Vue par défaut du planning du jour à l'ouverture du command center.</p>
+            <div class="settings-field">
+              <span class="settings-label" id="settings-planning-view-label">Vue par défaut</span>
+              <div class="ghost-select" id="settings-planning-view-root" data-ghost-select>
+                <input type="hidden" id="settings-planning-view" name="planning_view" value="chronologique" />
+                <button
+                  type="button"
+                  class="ghost-select__trigger"
+                  id="settings-planning-view-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="settings-planning-view-list"
+                  aria-labelledby="settings-planning-view-label"
+                >
+                  <span class="ghost-select__value" id="settings-planning-view-label-value">Chronologique</span>
+                  <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <ul class="ghost-select__list" id="settings-planning-view-list" role="listbox" aria-label="Vue du planning" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="chronologique" data-label="Chronologique" aria-selected="true" tabindex="-1">Vue par défaut : Chronologique</li>
+                  <li class="ghost-select__option" role="option" data-value="priorite" data-label="Priorité" aria-selected="false" tabindex="-1">Vue par défaut : Priorité</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </div>
+            <h3 class="settings-card-title">Alertes Sonores</h3>
+            <p class="settings-card-desc">Signaux discrets sur le poste assistante — sans notification patient.</p>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Nouveau message d'équipe</span>
+                <span class="settings-toggle-hint">Tableau de transmission</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sound-team-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Arrivée d'un patient</span>
+                <span class="settings-toggle-hint">Passage en salle d'attente</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sound-arrival-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M6 16h12"/></svg>
+            </div>
+            <h3 class="settings-card-title">Raccourcis Clavier</h3>
+            <p class="settings-card-desc">Commandes rapides du command center — lecture seule.</p>
+            <ul class="settings-shortcuts" aria-label="Raccourcis clavier">
+              <li><span>Rechercher un patient</span><kbd>Espace</kbd></li>
+              <li><span>Aller au planning</span><kbd>G</kbd></li>
+              <li><span>Publier une note d'équipe</span><kbd>Ctrl</kbd><span class="settings-shortcuts__plus">+</span><kbd>Entrée</kbd></li>
+              <li><span>Ouvrir les dossiers patients</span><kbd>Ctrl</kbd><span class="settings-shortcuts__plus">+</span><kbd>K</kbd></li>
+            </ul>
           </article>
         </div>
       </section>

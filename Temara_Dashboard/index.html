@@ -764,7 +764,7 @@
       <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
         <header class="view-page-header">
           <h2 class="view-page-title">Paramètres du Système</h2>
-          <p class="view-page-sub">Configuration de la clinique, des notifications et des intégrations n8n</p>
+          <p class="view-page-sub">Configuration de la clinique, notifications et règles opérationnelles</p>
         </header>
 
         <div class="settings-grid">
@@ -852,12 +852,12 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via n8n.</p>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
 
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels SMS</span>
-                <span class="settings-toggle-hint">Twilio — rappels 24h avant le RDV</span>
+                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-sms-toggle" checked />
@@ -868,12 +868,76 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Resend — confirmations et relances</span>
+                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-email-toggle" checked />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
+            </div>
+          </article>
+
+          <!-- Card: Horaires d'Ouverture -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            </div>
+            <h3 class="settings-card-title">Horaires d'Ouverture</h3>
+            <p class="settings-card-desc">Plage horaire affichée sur le planning et les créneaux réservables.</p>
+            <div class="settings-time-fields">
+              <div class="settings-field">
+                <label class="settings-label" for="settings-day-start">Début de journée</label>
+                <input
+                  class="waitlist-input settings-input"
+                  type="time"
+                  id="settings-day-start"
+                  name="day_start"
+                  value="09:00"
+                />
+              </div>
+              <div class="settings-field">
+                <label class="settings-label" for="settings-day-end">Fin de journée</label>
+                <input
+                  class="waitlist-input settings-input"
+                  type="time"
+                  id="settings-day-end"
+                  name="day_end"
+                  value="18:00"
+                />
+              </div>
+            </div>
+          </article>
+
+          <!-- Card: Gestion des Urgences -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h3 class="settings-card-title">Gestion des Urgences</h3>
+            <p class="settings-card-desc">Réservez une capacité tampon pour les cas urgents du jour.</p>
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Garder des créneaux d'urgence</span>
+                <span class="settings-toggle-hint">Slots protégés non réservables en ligne</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-emergency-buffer-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-emergency-slots">Nombre de slots par jour</label>
+              <input
+                class="waitlist-input settings-input"
+                type="number"
+                id="settings-emergency-slots"
+                name="emergency_slots"
+                value="2"
+                min="0"
+                max="10"
+                step="1"
+                inputmode="numeric"
+              />
             </div>
           </article>
 
@@ -886,56 +950,19 @@
             <p class="settings-card-desc">Les identifiants sont gérés côté serveur (hachage scrypt + JWT). Contactez l'administrateur pour toute rotation de mot de passe.</p>
           </article>
 
-          <!-- Card 4: Système (n8n) -->
+          <!-- Card: Sauvegarde & Synchronisation -->
           <article class="settings-card settings-card--wide">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
             </div>
-            <h3 class="settings-card-title">Système (n8n)</h3>
-            <p class="settings-card-desc">Points de terminaison webhook actifs — lecture seule.</p>
-
-            <div class="settings-field">
-              <label class="settings-label" for="settings-webhook-dashboard">Dashboard Data (Proxy)</label>
-              <input
-                class="waitlist-input settings-input settings-input--readonly"
-                type="text"
-                id="settings-webhook-dashboard"
-                readonly
-                value="/api/n8n-proxy"
-              />
-            </div>
-
-            <div class="settings-field">
-              <label class="settings-label" for="settings-webhook-waitlist">Liste d'Attente — Ajout Patient</label>
-              <input
-                class="waitlist-input settings-input settings-input--readonly"
-                type="text"
-                id="settings-webhook-waitlist"
-                readonly
-                value="/api/waitlist"
-              />
-            </div>
-
-            <div class="settings-field">
-              <label class="settings-label" for="settings-webhook-booking">Moteur de Réservation (Cal.com)</label>
-              <input
-                class="waitlist-input settings-input settings-input--readonly"
-                type="text"
-                id="settings-webhook-booking"
-                readonly
-                value="https://glade-rigor-perennial.ngrok-free.dev/webhook/final-booking-engine-v2"
-              />
-            </div>
-
-            <div class="settings-field">
-              <label class="settings-label" for="settings-webhook-sms">Twilio — Statut SMS</label>
-              <input
-                class="waitlist-input settings-input settings-input--readonly"
-                type="text"
-                id="settings-webhook-sms"
-                readonly
-                value="https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
-              />
+            <h3 class="settings-card-title">Sauvegarde &amp; Synchronisation</h3>
+            <p class="settings-card-desc">État de la connexion entre le cabinet et l'infrastructure DentaFlow Cloud.</p>
+            <div class="settings-sync-status" role="status" aria-live="polite">
+              <span class="sync-dot ok settings-sync-status__dot" aria-hidden="true"></span>
+              <div class="settings-sync-status__text">
+                <span class="settings-sync-status__label">Statut de la base de données</span>
+                <span class="settings-sync-status__value">Connecté au Cloud</span>
+              </div>
             </div>
           </article>
 
@@ -1001,6 +1028,8 @@
   <div id="assistant-shell" style="display: none;">
     <div id="assistant-mount"></div>
   </div>
+
+  <div class="assistant-toast" id="assistant-toast" role="status" aria-live="polite"></div>
 
   <div class="error-banner" id="error-banner" hidden>
     Impossible de charger les données. Vérifiez la connexion n8n.

@@ -244,10 +244,11 @@ function initializeDoctorDashboard() {
   initNavigation();
   initChartToggles();
   initWaitlistForm();
+  initUserProfile();
   initSettings();
   initThemeSwitcher();
-  initUserProfile();
   initAccountCardMenu();
+  window.initSettingsDemoState?.();
   initCrmSearch();
   initCrmSidePanel();
   initSmsCampaign();
@@ -877,18 +878,6 @@ function initUserProfile() {
   if (specialtyEl) specialtyEl.value = profileSpecialty;
 
   applyUserProfile(profileName, profileSpecialty);
-
-  function persistProfile() {
-    const name      = nameEl?.value.trim()      || PROFILE_DEFAULTS.profileName;
-    const specialty = specialtyEl?.value.trim() || PROFILE_DEFAULTS.profileSpecialty;
-    saveSettings({ profileName: name, profileSpecialty: specialty });
-    applyUserProfile(name, specialty);
-  }
-
-  nameEl?.addEventListener('input', persistProfile);
-  specialtyEl?.addEventListener('input', persistProfile);
-  nameEl?.addEventListener('change', persistProfile);
-  specialtyEl?.addEventListener('change', persistProfile);
 }
 
 function initAccountCardMenu() {
@@ -901,9 +890,6 @@ function initAccountCardMenu() {
 }
 
 function initSettings() {
-  const waitlistWebhookEl = document.getElementById('settings-webhook-waitlist');
-  if (waitlistWebhookEl) waitlistWebhookEl.value = '/api/waitlist';
-
   const persistedGoal = loadPersistedDailyGoal();
   if (persistedGoal != null) {
     CONFIG.DAILY_GOAL_MAD = persistedGoal;
@@ -922,21 +908,24 @@ function initSettings() {
 
   const smsToggle = document.getElementById('settings-sms-toggle');
   const emailToggle = document.getElementById('settings-email-toggle');
-  if (smsToggle)   smsToggle.checked   = saved.smsReminders !== false;
-  if (emailToggle) emailToggle.checked = saved.emailReminders !== false;
-
-  goalEl?.addEventListener('change', () => {
-    const val = parseInt(goalEl.value, 10);
-    if (val >= 1000) {
-      CONFIG.DAILY_GOAL_MAD = val;
-      saveSettings({ dailyGoal: val });
-      persistDailyGoal(val);
-    }
-  });
-
-  smsToggle?.addEventListener('change', () => saveSettings({ smsReminders: smsToggle.checked }));
-  emailToggle?.addEventListener('change', () => saveSettings({ emailReminders: emailToggle.checked }));
+  if (smsToggle && smsToggle.dataset.demoBound !== 'true') {
+    smsToggle.checked = saved.smsReminders !== false;
+  }
+  if (emailToggle && emailToggle.dataset.demoBound !== 'true') {
+    emailToggle.checked = saved.emailReminders !== false;
+  }
 }
+
+function applyDoctorDailyGoal(value) {
+  const val = Number(value);
+  if (!Number.isFinite(val) || val < 1000) return;
+  CONFIG.DAILY_GOAL_MAD = val;
+  saveSettings({ dailyGoal: val });
+  persistDailyGoal(val);
+  setText('val-goal', formatMADShort(CONFIG.DAILY_GOAL_MAD));
+}
+
+window.applyDoctorDailyGoal = applyDoctorDailyGoal;
 
 function loadSettings() {
   return { ...volatileSettings };
