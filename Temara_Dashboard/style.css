@@ -2115,7 +2115,7 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   margin-top: 4px;
 }
 
-/* Calendar */
+/* Calendar — FullCalendar DentaFlow matte skin */
 .calendar-embed-panel {
   background: var(--bg-card);
   backdrop-filter: var(--glass-blur);
@@ -2134,81 +2134,252 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
 #dashboard-cal-inline {
   width: 100%;
   min-height: 700px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   overflow: hidden;
+  background: var(--bg-main, #0a0a0a);
 }
 
 #dashboard-cal-inline .fc {
   font-family: var(--font-primary);
-  --fc-border-color: var(--border-2);
+  --fc-border-color: rgba(255, 255, 255, 0.05);
   --fc-page-bg-color: transparent;
-  --fc-neutral-bg-color: var(--surface);
-  --fc-list-event-hover-bg-color: var(--accent-dim);
-  --fc-today-bg-color: rgba(227, 193, 143, 0.08);
-  --fc-now-indicator-color: var(--accent-gold);
+  --fc-neutral-bg-color: var(--bg-main, #0a0a0a);
+  --fc-list-event-hover-bg-color: rgba(255, 255, 255, 0.04);
+  --fc-today-bg-color: rgba(255, 255, 255, 0.02);
+  --fc-now-indicator-color: rgba(255, 255, 255, 0.22);
 }
 
 #dashboard-cal-inline .fc-theme-standard td,
-#dashboard-cal-inline .fc-theme-standard th {
-  border-color: var(--border-2);
+#dashboard-cal-inline .fc-theme-standard th,
+#dashboard-cal-inline .fc-scrollgrid,
+#dashboard-cal-inline .fc-theme-standard .fc-scrollgrid,
+#dashboard-cal-inline .fc-scrollgrid-section > *,
+#dashboard-cal-inline .fc-scrollgrid-sync-table,
+#dashboard-cal-inline .fc-list-table td,
+#dashboard-cal-inline .fc-list-table th {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+#dashboard-cal-inline .fc-scrollgrid {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+#dashboard-cal-inline .fc-col-header-cell,
+#dashboard-cal-inline .fc-timegrid-axis,
+#dashboard-cal-inline .fc-timegrid-axis-frame,
+#dashboard-cal-inline .fc-timegrid-slot-label,
+#dashboard-cal-inline .fc-scrollgrid-shrink-frame {
+  background: var(--bg-main, #0a0a0a) !important;
 }
 
 #dashboard-cal-inline .fc-col-header-cell {
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  padding: 10px 0;
 }
 
-#dashboard-cal-inline .fc-col-header-cell-cushion,
-#dashboard-cal-inline .fc-daygrid-day-number,
-#dashboard-cal-inline .fc-list-day-text,
-#dashboard-cal-inline .fc-list-day-side-text {
-  color: var(--text-muted);
+#dashboard-cal-inline .fc-col-header-cell-cushion {
+  color: var(--text-hierarchy-secondary, #9CA3AF) !important;
+  text-decoration: none;
+  padding: 4px 8px;
+}
+
+#dashboard-cal-inline .fc-timegrid-slot-label-cushion,
+#dashboard-cal-inline .fc-timegrid-axis-cushion {
+  color: var(--text-hierarchy-secondary, #9CA3AF) !important;
+  font-size: 0.75rem;
+  font-weight: 500;
   text-decoration: none;
 }
 
+#dashboard-cal-inline .fc-daygrid-day-number,
+#dashboard-cal-inline .fc-list-day-text,
+#dashboard-cal-inline .fc-list-day-side-text {
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+#dashboard-cal-inline .fc-daygrid-day,
+#dashboard-cal-inline .fc-timegrid-slot,
+#dashboard-cal-inline .fc-timegrid-col,
+#dashboard-cal-inline .fc-daygrid-day-frame,
+#dashboard-cal-inline .fc-list-day-cushion {
+  background: transparent !important;
+}
+
+#dashboard-cal-inline .fc-day-today,
+#dashboard-cal-inline .fc-day-today .fc-daygrid-day-frame,
+#dashboard-cal-inline .fc-timegrid-col.fc-day-today {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
 #dashboard-cal-inline .fc-toolbar-title {
-  font-size: 1.125rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--text-main);
+  color: var(--text-hierarchy-primary, #F3F4F6);
 }
 
 #dashboard-cal-inline .fc-button {
   font-family: var(--font-primary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
   padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-color);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  transition: all 0.25s ease;
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  color: var(--text-hierarchy-secondary, #9CA3AF) !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
 }
 
 #dashboard-cal-inline .fc-button:hover:not(:disabled) {
-  color: var(--text-main);
-  border-color: rgba(227, 193, 143, 0.3);
-  background: rgba(227, 193, 143, 0.08);
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: var(--text-hierarchy-primary, #F3F4F6) !important;
+}
+
+#dashboard-cal-inline .fc-button:focus,
+#dashboard-cal-inline .fc-button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08) !important;
+  outline: none;
 }
 
 #dashboard-cal-inline .fc-button-primary:not(:disabled).fc-button-active,
 #dashboard-cal-inline .fc-button-primary:not(:disabled):active {
-  background: var(--accent-dim);
-  border-color: rgba(227, 193, 143, 0.45);
-  color: var(--accent-gold);
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: var(--text-hierarchy-primary, #F3F4F6) !important;
+  box-shadow: none !important;
 }
 
-#dashboard-cal-inline .fc-event {
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-primary);
-  color: var(--text-main);
-  border-radius: 8px;
+#dashboard-cal-inline .fc-button-group > .fc-button {
+  border-radius: 0 !important;
+}
+
+#dashboard-cal-inline .fc-button-group > .fc-button:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm) !important;
+}
+
+#dashboard-cal-inline .fc-button-group > .fc-button:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+}
+
+#dashboard-cal-inline .fc-event,
+#dashboard-cal-inline .fc-timegrid-event,
+#dashboard-cal-inline .fc-daygrid-event,
+#dashboard-cal-inline .fc-h-event,
+#dashboard-cal-inline .fc-v-event {
+  background-color: #161616 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.12) !important;
+  transition: all 0.2s ease;
+  padding: 2px 6px;
+}
+
+#dashboard-cal-inline .fc-event:hover,
+#dashboard-cal-inline .fc-timegrid-event:hover,
+#dashboard-cal-inline .fc-daygrid-event:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+#dashboard-cal-inline .fc-event-title,
+#dashboard-cal-inline .fc-event-time,
+#dashboard-cal-inline .fc-list-event-title a,
+#dashboard-cal-inline .fc-event-main,
+#dashboard-cal-inline .fc-h-event .fc-event-main,
+#dashboard-cal-inline .fc-v-event .fc-event-main {
+  color: var(--text-hierarchy-primary, #F3F4F6) !important;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+}
+
+#dashboard-cal-inline .fc-list-event:hover td {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+#dashboard-cal-inline .fc-list-event-dot {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dashboard-cal-inline .fc-button,
+  #dashboard-cal-inline .fc-event,
+  #dashboard-cal-inline .fc-timegrid-event {
+    transition: none;
+  }
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline {
+  background: var(--bg-main);
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc {
+  --fc-border-color: rgba(0, 0, 0, 0.06);
+  --fc-neutral-bg-color: var(--bg-main);
+  --fc-today-bg-color: rgba(0, 0, 0, 0.03);
+  --fc-list-event-hover-bg-color: rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-theme-standard td,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-theme-standard th,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-scrollgrid,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-theme-standard .fc-scrollgrid,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-scrollgrid-section > *,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-scrollgrid-sync-table {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-col-header-cell,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-timegrid-axis,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-timegrid-slot-label {
+  background: var(--bg-main) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-day-today,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-day-today .fc-daygrid-day-frame,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-timegrid-col.fc-day-today {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-button {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-button:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-button-primary:not(:disabled).fc-button-active,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-button-primary:not(:disabled):active {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-event,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-timegrid-event,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-daygrid-event {
+  background-color: #f3f4f6 !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+}
+
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-event:hover,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-timegrid-event:hover,
+html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-daygrid-event:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
 }
 
 /* Waitlist */
@@ -3041,6 +3212,13 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   #dashboard-cal-inline .fc-toolbar {
     flex-direction: column;
     gap: 12px;
+  }
+
+  #dashboard-cal-inline .fc-toolbar-chunk {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
   }
 
   .crm-side-panel {
