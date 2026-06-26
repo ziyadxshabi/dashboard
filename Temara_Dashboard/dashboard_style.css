@@ -687,6 +687,84 @@ h1, h2, h3,
   }
 }
 
+/* Assistant waitlist — vertical stack + horizontal form strip */
+body.mode-assistant #view-waitlist .waitlist-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form-panel,
+body.mode-assistant #view-waitlist .schedule-widget--full {
+  width: 100%;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form-panel {
+  padding: 1rem 1.5rem;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form-header {
+  margin-bottom: 1rem;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form {
+  flex-direction: column;
+  gap: 1rem;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form__strip {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form__strip .waitlist-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form__strip .waitlist-field--priority .ghost-select {
+  width: 100%;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form__strip .ghost-select__trigger {
+  min-height: 48px;
+  padding: 14px 16px;
+  font-size: 15px;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form__strip .waitlist-submit-btn {
+  flex: 0 0 auto;
+  width: auto;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+body.mode-assistant #view-waitlist .form-consent-row {
+  margin-top: 0;
+}
+
+body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__trigger {
+  transition: opacity 0.2s ease;
+}
+
+@media (max-width: 768px) {
+  body.mode-assistant #view-waitlist .waitlist-form__strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.mode-assistant #view-waitlist .waitlist-form__strip .waitlist-field {
+    min-width: 0;
+  }
+
+  body.mode-assistant #view-waitlist .waitlist-form__strip .waitlist-submit-btn {
+    width: 100%;
+  }
+}
+
 /* ── SETTINGS PANEL (macOS / SaaS) ─────────────────────────── */
 .settings-grid {
   display: grid;
@@ -4820,9 +4898,62 @@ body.mode-assistant .assistant-panel--handoff {
   grid-column: 1;
 }
 
-body.mode-assistant .assistant-sidebar .sidebar-superpouvoirs__title {
+body.mode-assistant .assistant-sidebar .sidebar-superpouvoirs__title,
+body.mode-assistant .assistant-sidebar .nav-accordion-header__label {
   font-size: 9px !important;
   letter-spacing: 0.1em !important;
+}
+
+/* Superpouvoirs accordion — nav-matched header + grid expand */
+body.mode-assistant .nav-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+  line-height: 1.3;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition);
+}
+
+body.mode-assistant .nav-accordion-header:hover {
+  color: var(--text-hierarchy-secondary, #9CA3AF);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.mode-assistant .nav-accordion-header:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
+body.mode-assistant .nav-accordion-header__chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: transform 0.3s ease;
+}
+
+body.mode-assistant #superpouvoirs-panel:has(.superpouvoirs-accordion.is-open) .nav-accordion-header__chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.mode-assistant .superpouvoirs-accordion {
+    transition: none;
+  }
+
+  body.mode-assistant .nav-accordion-header__chevron {
+    transition: none;
+  }
 }
 
 .main {

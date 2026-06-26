@@ -49,9 +49,23 @@
           <span>Dossiers Patients</span>
         </a>
 
-        <div class="sidebar-superpouvoirs" id="superpouvoirs-panel" aria-labelledby="actions-title">
-          <h2 class="sidebar-superpouvoirs__title" id="actions-title">Superpouvoirs</h2>
-          <div class="superpowers-grid" id="superpowers-grid">
+        <div class="sidebar-superpouvoirs" id="superpouvoirs-panel">
+          <div
+            id="superpouvoirs-header"
+            class="nav-accordion-header"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            aria-controls="superpouvoirs-accordion"
+          >
+            <span class="nav-accordion-header__label" id="actions-title">Superpouvoirs</span>
+            <svg class="nav-accordion-header__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="superpouvoirs-accordion" id="superpouvoirs-accordion">
+            <div class="superpouvoirs-content">
+              <div class="superpowers-grid" id="superpowers-grid">
             <button type="button" class="btn-super btn-super--compact" id="super-btn-daily-report">
               <span class="btn-super__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -88,6 +102,8 @@
                 <span class="btn-super__hint">Notifier la liste d'attente</span>
               </span>
             </button>
+              </div>
+            </div>
           </div>
         </div>
       </nav>
@@ -306,39 +322,61 @@
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
-              <div class="waitlist-field">
-                <label class="waitlist-label" for="waitlist-name">Nom du patient</label>
-                <input
-                  class="waitlist-input"
-                  type="text"
-                  id="waitlist-name"
-                  name="nom"
-                  placeholder="ex. Fatima Zahra"
-                  autocomplete="name"
-                  required
-                />
-              </div>
+              <div class="waitlist-form__strip">
+                <div class="waitlist-field">
+                  <label class="waitlist-label" for="waitlist-name">Nom du patient</label>
+                  <input
+                    class="waitlist-input"
+                    type="text"
+                    id="waitlist-name"
+                    name="nom"
+                    placeholder="ex. Fatima Zahra"
+                    autocomplete="name"
+                    required
+                  />
+                </div>
 
-              <div class="waitlist-field">
-                <label class="waitlist-label" for="waitlist-phone">Numéro de téléphone</label>
-                <input
-                  class="waitlist-input"
-                  type="tel"
-                  id="waitlist-phone"
-                  name="telephone"
-                  placeholder="+212 6XX XXX XXX"
-                  autocomplete="tel"
-                  inputmode="tel"
-                  required
-                />
-              </div>
+                <div class="waitlist-field">
+                  <label class="waitlist-label" for="waitlist-phone">Numéro de téléphone</label>
+                  <input
+                    class="waitlist-input"
+                    type="tel"
+                    id="waitlist-phone"
+                    name="telephone"
+                    placeholder="+212 6XX XXX XXX"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    required
+                  />
+                </div>
 
-              <div class="waitlist-field">
-                <label class="waitlist-label" for="waitlist-priority">Priorité</label>
-                <select class="waitlist-select" id="waitlist-priority" name="priorite" required>
-                  <option value="Haute">Haute</option>
-                  <option value="Normale" selected>Normale</option>
-                </select>
+                <div class="waitlist-field waitlist-field--priority">
+                  <span class="waitlist-label" id="waitlist-priority-label">Priorité</span>
+                  <div class="ghost-select" id="waitlist-priority-root" data-ghost-select>
+                    <input type="hidden" id="waitlist-priority-input" name="priorite" value="Normale" />
+                    <button
+                      type="button"
+                      class="ghost-select__trigger"
+                      id="waitlist-priority-trigger"
+                      aria-haspopup="listbox"
+                      aria-expanded="false"
+                      aria-controls="waitlist-priority-list"
+                      aria-labelledby="waitlist-priority-label waitlist-priority-value"
+                    >
+                      <span class="ghost-select__value" id="waitlist-priority-value">Normale</span>
+                      <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <ul class="ghost-select__list" id="waitlist-priority-list" role="listbox" aria-labelledby="waitlist-priority-label" hidden>
+                      <li class="ghost-select__option is-selected" role="option" data-value="Normale" aria-selected="true" tabindex="-1">Normale</li>
+                      <li class="ghost-select__option" role="option" data-value="Haute" aria-selected="false" tabindex="-1">Haute</li>
+                      <li class="ghost-select__option" role="option" data-value="Urgence" aria-selected="false" tabindex="-1">Urgence</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <button type="submit" class="waitlist-submit-btn btn-matte-primary" id="waitlist-submit-btn">
+                  Ajouter à la liste
+                </button>
               </div>
 
               <div class="form-consent-row">
@@ -353,10 +391,6 @@
                   <span class="form-consent-text">J'accepte de recevoir des notifications par SMS concernant mon rendez-vous (Loi 09-08).</span>
                 </label>
               </div>
-
-              <button type="submit" class="waitlist-submit-btn btn-matte-primary" id="waitlist-submit-btn">
-                Ajouter à la liste
-              </button>
             </form>
           </article>
 

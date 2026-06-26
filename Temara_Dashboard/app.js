@@ -529,6 +529,7 @@ let handoffNotes = [];
   }
 
   let resetHandoffCategorySelect = null;
+  let setWaitlistPriorityValue = null;
 
   function initHandoffCategorySelect() {
     const root = $('handoff-category-root');
@@ -601,6 +602,88 @@ let handoffNotes = [];
         if (focused && !list.hidden) {
           event.preventDefault();
           setValue(focused.dataset.value || 'Info');
+          closeList();
+        }
+      }
+    });
+  }
+
+  function getWaitlistPriorityInput() {
+    return $('waitlist-priority-input') || $('waitlist-priority');
+  }
+
+  function initWaitlistPrioritySelect() {
+    const root = $('waitlist-priority-root');
+    const hidden = $('waitlist-priority-input');
+    const trigger = $('waitlist-priority-trigger');
+    const list = $('waitlist-priority-list');
+    const label = $('waitlist-priority-value');
+    if (!root || !hidden || !trigger || !list) return;
+
+    const options = Array.from(list.querySelectorAll('.ghost-select__option'));
+
+    function setValue(value) {
+      const resolved = value || 'Normale';
+      hidden.value = resolved;
+      if (label) label.textContent = resolved;
+      options.forEach((option) => {
+        const selected = option.dataset.value === resolved;
+        option.classList.toggle('is-selected', selected);
+        option.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+    }
+
+    function closeList() {
+      list.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      options.forEach((option) => option.classList.remove('is-focused'));
+    }
+
+    function openList() {
+      list.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+
+    setWaitlistPriorityValue = setValue;
+
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (list.hidden) openList();
+      else closeList();
+    });
+
+    options.forEach((option) => {
+      option.addEventListener('click', () => {
+        setValue(option.dataset.value || 'Normale');
+        closeList();
+        trigger.focus();
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!root.contains(event.target)) closeList();
+    });
+
+    trigger.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeList();
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (list.hidden) openList();
+        const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = (currentIndex + delta + options.length) % options.length;
+        options.forEach((option) => option.classList.remove('is-focused'));
+        options[nextIndex]?.classList.add('is-focused');
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        const focused = options.find((option) => option.classList.contains('is-focused'));
+        if (focused && !list.hidden) {
+          event.preventDefault();
+          setValue(focused.dataset.value || 'Normale');
           closeList();
         }
       }
@@ -2207,10 +2290,13 @@ let handoffNotes = [];
   function prefillWaitlistFormFromRow(appt) {
     const nameEl = $('waitlist-name');
     const phoneEl = $('waitlist-phone');
-    const priorityEl = $('waitlist-priority');
+    const priorityEl = getWaitlistPriorityInput();
     if (nameEl) nameEl.value = appt.name || '';
     if (phoneEl) phoneEl.value = appt.phone || appt.telephone || '';
-    if (priorityEl && appt.priorite) priorityEl.value = appt.priorite;
+    if (appt.priorite) {
+      if (setWaitlistPriorityValue) setWaitlistPriorityValue(appt.priorite);
+      else if (priorityEl) priorityEl.value = appt.priorite;
+    }
   }
 
   function createPopoverMenuItem(label, iconSvg, onClick, options = {}) {
@@ -4078,7 +4164,7 @@ let handoffNotes = [];
   }
 
   function setWaitlistFormProcessing(form, isProcessing) {
-    form.querySelectorAll('.waitlist-input, .waitlist-select').forEach((field) => {
+    form.querySelectorAll('.waitlist-input, .waitlist-select, .ghost-select__trigger').forEach((field) => {
       field.style.opacity = isProcessing ? '0.7' : '1';
     });
     form.classList.toggle('is-processing', isProcessing);
@@ -4094,7 +4180,7 @@ let handoffNotes = [];
       const btn = $('waitlist-submit-btn');
       const nameEl = $('waitlist-name');
       const phoneEl = $('waitlist-phone');
-      const priorityEl = $('waitlist-priority');
+      const priorityEl = getWaitlistPriorityInput();
       const consentEl = $('waitlist-sms-consent');
 
       if (!btn || !nameEl || !phoneEl || !priorityEl) return;
@@ -4148,7 +4234,8 @@ let handoffNotes = [];
         }
 
         form.reset();
-        priorityEl.value = 'Normale';
+        if (setWaitlistPriorityValue) setWaitlistPriorityValue('Normale');
+        else priorityEl.value = 'Normale';
         prependWaitlistEntry({
           nom: patientName,
           telephone: patientPhone,
@@ -4174,7 +4261,7 @@ let handoffNotes = [];
     const table = container.closest('.waitlist-table');
     if (table) table.hidden = false;
 
-    const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
+    const tagClass = priorite === 'Haute' || priorite === 'Urgence' ? 'urgence' : 'consultation';
     const row = createWaitlistTableRow({
       name: nom,
       phone: telephone || '—',
@@ -4698,6 +4785,89 @@ let handoffNotes = [];
     });
   }
 
+  function isTypingField(element) {
+    if (!element || !(element instanceof Element)) return false;
+    const tag = element.tagName.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (element.isContentEditable) return true;
+    return false;
+  }
+
+  function clickAssistantNav(viewKey) {
+    const link = document.querySelector(`.nav-link[data-nav="${viewKey}"]`);
+    link?.click();
+  }
+
+  function initSuperpouvoirsAccordion() {
+    const header = $('superpouvoirs-header');
+    const accordion = $('superpouvoirs-accordion');
+    if (!header || !accordion) return;
+
+    const setOpen = (open) => {
+      accordion.classList.toggle('is-open', open);
+      header.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    const toggle = () => setOpen(!accordion.classList.contains('is-open'));
+
+    header.addEventListener('click', toggle);
+    header.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      toggle();
+    });
+  }
+
+  function initKeyboardShortcuts() {
+    if (!document.body.classList.contains('mode-assistant')) return;
+
+    document.addEventListener('keydown', (event) => {
+      const active = document.activeElement;
+      const typing = isTypingField(active);
+      const key = event.key.toLowerCase();
+      const modKey = event.metaKey || event.ctrlKey;
+
+      if (modKey && event.key === 'Enter' && active?.id === 'handoff-input') {
+        event.preventDefault();
+        document.querySelector('.handoff-compose__submit')?.click();
+        return;
+      }
+
+      if (active?.closest('#superpouvoirs-header, [data-ghost-select], .ghost-select__list')) {
+        return;
+      }
+
+      if (modKey && key === 'k') {
+        if (typing) return;
+        event.preventDefault();
+        clickAssistantNav('crm');
+        return;
+      }
+
+      if (typing) return;
+
+      if (key === 'g' && !modKey && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        clickAssistantNav('overview');
+        return;
+      }
+
+      if (event.code === 'Space' && !modKey && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        const search = $('crm-search');
+        if (search) {
+          if (activeView !== 'crm') clickAssistantNav('crm');
+          requestAnimationFrame(() => {
+            search.focus({ preventScroll: true });
+          });
+        } else {
+          showToast('Recherche rapide…', 'info');
+        }
+      }
+    });
+  }
+
   function init() {
     bindCoreDelegation();
 
@@ -4715,6 +4885,8 @@ let handoffNotes = [];
     });
     runInitStep('header', () => setHeaderDate());
     runInitStep('navigation', () => initNavigation());
+    runInitStep('superpouvoirs', () => initSuperpouvoirsAccordion());
+    runInitStep('keyboardShortcuts', () => initKeyboardShortcuts());
     runInitStep('status', () => initStatusListener());
     runInitStep('quickActions', () => initQuickActions());
     runInitStep('bulkBar', () => initBulkActionBar());
@@ -4730,6 +4902,7 @@ let handoffNotes = [];
       initHandoffForm();
     });
     runInitStep('waitlist', () => {
+      initWaitlistPrioritySelect();
       initWaitlistForm();
       initWaitlistUrgentToggle();
       renderWaitlistPanel();
