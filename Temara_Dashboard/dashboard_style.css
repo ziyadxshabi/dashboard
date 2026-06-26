@@ -4624,6 +4624,21 @@ body {
   border-radius: 0 !important;
 }
 
+/* Assistant overview — full-width roster + handoff after Superpouvoirs sidebar move */
+body.mode-assistant #view-overview .assistant-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.mode-assistant .assistant-panel--roster,
+body.mode-assistant .assistant-panel--handoff {
+  grid-column: 1;
+}
+
+body.mode-assistant .assistant-sidebar .sidebar-superpouvoirs__title {
+  font-size: 9px !important;
+  letter-spacing: 0.1em !important;
+}
+
 .main {
   border-left: none;
 }

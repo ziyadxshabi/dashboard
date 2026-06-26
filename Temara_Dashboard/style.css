@@ -646,7 +646,7 @@ body.mode-assistant {
 
 .assistant-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.75fr) minmax(240px, 0.72fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto;
   gap: 22px;
   align-items: start;
@@ -665,17 +665,6 @@ body.mode-assistant {
 .assistant-panel--roster {
   grid-column: 1;
   grid-row: 1;
-}
-
-.assistant-panel--actions {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  position: sticky;
-  top: max(20px, var(--safe-top));
-  max-height: calc(100dvh - max(40px, var(--safe-top)) - 48px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
 }
 
 .assistant-panel--handoff {
@@ -1597,6 +1586,69 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   gap: 10px;
 }
 
+/* Sidebar Superpouvoirs — vertical stack inside assistant nav */
+.assistant-sidebar .sidebar-nav {
+  gap: 0;
+}
+
+.sidebar-superpouvoirs {
+  margin-top: auto;
+  padding: 14px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.sidebar-superpouvoirs__title {
+  margin: 0 0 10px;
+  padding: 0 8px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+  line-height: 1.3;
+}
+
+.sidebar-superpouvoirs .superpowers-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-superpouvoirs .btn-super--compact {
+  padding: 9px 10px 8px;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+}
+
+.sidebar-superpouvoirs .btn-super--compact .btn-super__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+.sidebar-superpouvoirs .btn-super--compact .btn-super__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar-superpouvoirs .btn-super--compact .btn-super__label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.sidebar-superpouvoirs .btn-super--compact .btn-super__hint {
+  font-size: 9.5px;
+  line-height: 1.3;
+  opacity: 0.85;
+}
+
+html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
+  border-top-color: rgba(17, 24, 39, 0.08);
+}
+
 .superpowers-grid .btn-super--compact {
   padding: 14px 14px 12px;
   gap: 12px;
@@ -1928,16 +1980,9 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   }
 
   .assistant-panel--roster,
-  .assistant-panel--actions,
   .assistant-panel--handoff {
     grid-column: 1;
     grid-row: auto;
-  }
-
-  .assistant-panel--actions {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
   }
 
   .assistant-pulse-grid {
@@ -2946,11 +2991,11 @@ body {
 }
 
 .assistant-panel__title,
+.sidebar-superpouvoirs__title,
 .view-page-title,
 .chart-title,
 .assistant-header__title,
 #roster-title,
-#actions-title,
 #handoff-title {
   font-size: 11px !important;
   font-weight: 600 !important;
