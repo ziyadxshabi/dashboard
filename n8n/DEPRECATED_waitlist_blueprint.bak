@@ -1,3 +1,4 @@
+// WARNING: DEPRECATED BLUEPRINT. DO NOT IMPORT. Contains duplicate node ID collisions and placeholder sheet IDs. Use canonical "No-Show Waitlist Engine" instead.
 {
   "name": "No-Show Waitlist Engine",
   "nodes": [

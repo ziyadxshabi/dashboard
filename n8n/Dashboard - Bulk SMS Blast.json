@@ -34,7 +34,7 @@
       "parameters": {
         "authentication": "databaseToken",
         "operation": "get",
-        "tableId": "YOUR_TABLE_ID",
+        "tableId": 1017856,
         "rowId": "={{ $json.rowId }}"
       },
       "id": "0ebf4a58-d8ce-4be7-b0af-0ef56ca694d4",

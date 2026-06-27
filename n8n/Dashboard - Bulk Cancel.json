@@ -139,6 +139,7 @@
           "name": "Google Sheets account 2"
         }
       },
+      "onError": "continueErrorOutput",
       "notes": "Dual-write: mirror Baserow cancel into Feuille 1 via Cal Booking ID."
     },
     {
@@ -318,6 +319,13 @@
         [
           {
             "node": "Merge Dual-Write Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DB-Only Cancel Payload",
             "type": "main",
             "index": 0
           }
