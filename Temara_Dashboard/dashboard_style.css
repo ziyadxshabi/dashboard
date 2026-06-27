@@ -1185,16 +1185,6 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   color: var(--danger);
 }
 
-@media (max-width: 768px) {
-  .settings-card {
-    padding: 22px 20px;
-  }
-
-  .settings-card--wide {
-    grid-column: auto;
-  }
-}
-
 /* ── FULLCALENDAR — DentaFlow matte dark skin ─────────────── */
 .calendar-embed-panel {
   background: var(--surface);
@@ -5932,4 +5922,135 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 .row-action-btn:focus-visible {
   outline: 2px solid rgba(227, 193, 143, 0.4);
   outline-offset: 1px;
+}
+
+/* ── Settings view — mobile compact (Doctor dashboard only) ─────────── */
+@media (max-width: 768px) {
+  #doctor-shell #view-settings {
+    padding-bottom: 6rem;
+  }
+
+  #doctor-shell #view-settings .view-page-header {
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  #doctor-shell #view-settings .view-page-sub {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  #doctor-shell #view-settings .settings-grid {
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+
+  #doctor-shell #view-settings .settings-card {
+    padding: 1rem 1.125rem;
+    gap: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  #doctor-shell #view-settings .settings-card--wide {
+    grid-column: auto;
+  }
+
+  #doctor-shell #view-settings .settings-card-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  #doctor-shell #view-settings .settings-card-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  #doctor-shell #view-settings .settings-card-title {
+    font-size: 14px;
+    margin-top: 0;
+    margin-bottom: 2px;
+  }
+
+  #doctor-shell #view-settings .settings-card-desc {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    margin-top: 0;
+    margin-bottom: 2px;
+  }
+
+  #doctor-shell #view-settings .settings-field {
+    gap: 6px;
+  }
+
+  #doctor-shell #view-settings .settings-label {
+    font-size: 10px;
+  }
+
+  #doctor-shell #view-settings .settings-input,
+  #doctor-shell #view-settings .waitlist-input.settings-input {
+    min-height: 0;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.875rem;
+  }
+
+  #doctor-shell #view-settings .security-form {
+    gap: 0.75rem;
+    margin-top: 0;
+  }
+
+  #doctor-shell #view-settings .security-form .ghost-select__trigger,
+  #doctor-shell #view-settings .security-form .settings-input[type="password"] {
+    min-height: 0;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.875rem;
+  }
+
+  #doctor-shell #view-settings .security-form__submit {
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+    font-size: 12px;
+  }
+
+  #doctor-shell #view-settings .settings-toggle-row {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  #doctor-shell #view-settings .settings-toggle-label {
+    font-size: 13px;
+  }
+
+  #doctor-shell #view-settings .settings-toggle-hint {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  #doctor-shell #view-settings .settings-time-fields {
+    gap: 0.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #doctor-shell #view-settings .theme-switcher {
+    max-width: none;
+    padding: 3px;
+    gap: 3px;
+  }
+
+  #doctor-shell #view-settings .theme-switch-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  #doctor-shell #view-settings .settings-sync-status {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  #doctor-shell #view-settings .settings-sync-status__label {
+    font-size: 10px;
+  }
+
+  #doctor-shell #view-settings .settings-sync-status__value {
+    font-size: 13px;
+  }
 }
