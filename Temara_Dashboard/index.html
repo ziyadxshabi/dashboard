@@ -275,15 +275,21 @@
           </div>
         </header>
 
-        <section class="reclaimed-banner" aria-label="Revenu récupéré par DentaFlow">
+        <section class="reclaimed-banner" aria-label="Impact DentaFlow — patients récupérés et revenu estimé">
           <div class="reclaimed-banner__glow" aria-hidden="true"></div>
           <div class="reclaimed-banner__content">
-            <h2 class="reclaimed-banner__title kinetic-label">Revenu récupéré</h2>
-            <div class="reclaimed-banner__amount">
-              <span class="reclaimed-banner__value" id="val-reclaimed" data-target="0" aria-live="polite">—</span>
-              <span class="reclaimed-banner__currency">MAD</span>
+            <div class="hero-split-layout">
+              <div class="hero-split-block hero-split-block--primary">
+                <p class="hero-split-subtitle kinetic-label">PATIENTS RÉCUPÉRÉS PAR DENTAFLOW</p>
+                <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
+                <p class="hero-split-helper">Rattrapage automatique des annulations et liste d'attente</p>
+              </div>
+              <div class="hero-split-block hero-split-block--secondary">
+                <p class="hero-split-subtitle kinetic-label">REVENU ESTIMÉ GÉNÉRÉ</p>
+                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">0 MAD</div>
+                <p class="hero-split-helper">Basé sur un panier moyen de 800 à 1 500 MAD par patient</p>
+              </div>
             </div>
-            <p class="reclaimed-banner__subtitle">Généré par le rattrapage des annulations et la conversion automatique des devis</p>
           </div>
         </section>
 

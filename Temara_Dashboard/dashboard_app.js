@@ -1353,14 +1353,14 @@ function initSmsCampaign() {
 /* ── SKELETON LOADING STATE ──────────────────────────────────────────────── */
 function applySkeletonState() {
   setSyncState('loading', 'Actualisation…');
-  ['val-patients','val-noshows','val-revenue','val-new','val-reclaimed'].forEach(id => {
+  ['val-patients','val-noshows','val-revenue','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('skeleton');
   });
 }
 
 function clearSkeletonState() {
-  ['val-patients','val-noshows','val-revenue','val-new','val-reclaimed'].forEach(id => {
+  ['val-patients','val-noshows','val-revenue','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('skeleton');
   });
@@ -1426,6 +1426,7 @@ function getEmptyDashboardData() {
     hour_08: 0, hour_09: 0, hour_10: 0, hour_11: 0,
     hour_12: 0, hour_13: 0, hour_14: 0, hour_15: 0,
     hour_16: 0, hour_17: 0, hour_18: 0,
+    patients_recovered: 0,
     reclaimed_revenue: 0,
   };
 }
@@ -1437,13 +1438,15 @@ function renderDashboardFallback() {
   const noshowCard = document.getElementById('card-noshows');
   noshowCard?.classList.remove('kpi-card--danger');
 
-  ['val-reclaimed', 'val-patients', 'val-noshows', 'val-revenue', 'val-new'].forEach((id) => {
+  ['patients-recovered-count', 'estimated-revenue-range', 'val-patients', 'val-noshows', 'val-revenue', 'val-new'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
       el.textContent = '—';
       el.classList.remove('skeleton', 'kpi-metric--error');
     }
   });
+
+  updateRecoveryMetrics(0);
 
   setText('sub-patients', 'En attente de connexion');
   setText('sub-noshows', '—');
@@ -1598,6 +1601,7 @@ function getDemoData() {
     hour_08: 1, hour_09: 2, hour_10: 3, hour_11: 2,
     hour_12: 1, hour_13: 0, hour_14: 2, hour_15: 3,
     hour_16: 2, hour_17: 1, hour_18: 0,
+    patients_recovered: 14,
     reclaimed_revenue: 18500,
   };
 }
@@ -1850,9 +1854,9 @@ function renderKPICards(data) {
   lastKpiPayload = data;
   const patients_today    = asMetric(data?.patients_today);
   const no_shows          = asMetric(data?.no_shows);
+  const patients_recovered = asMetric(data?.patients_recovered ?? data?.reclaimed_patients);
   const revenue_today     = asMetric(data?.revenue_today);
   const new_patients      = asMetric(data?.new_patients);
-  const reclaimed_revenue = asMetric(data?.reclaimed_revenue);
   const pct = CONFIG.DAILY_GOAL_MAD > 0
     ? Math.min(100, Math.round((revenue_today / CONFIG.DAILY_GOAL_MAD) * 100))
     : 0;
@@ -1865,8 +1869,8 @@ function renderKPICards(data) {
   renderDoctorHubCharts();
   bindKpiMicroCharts(data);
 
-  // Reclaimed revenue banner (ROI counter)
-  setKPINumber('val-reclaimed', reclaimed_revenue, true, formatMAD);
+  // Recovery hero banner — patients recovered + estimated revenue range
+  updateRecoveryMetrics(patients_recovered);
 
   // Card 1: Patients today
   setKPINumber('val-patients', patients_today, true);
@@ -2178,6 +2182,36 @@ function formatMAD(amount) {
   return new Intl.NumberFormat('fr-MA', {
     style: 'decimal', maximumFractionDigits: 0
   }).format(amount);
+}
+
+function formatThousandsFR(value) {
+  return String(Math.round(asMetric(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+/**
+ * Updates the hero recovery banner: patient count + estimated MAD revenue range.
+ * @param {number} patientCount
+ */
+function updateRecoveryMetrics(patientCount) {
+  const count = asMetric(patientCount);
+  const patientsEl = document.getElementById('patients-recovered-count');
+  const revenueEl = document.getElementById('estimated-revenue-range');
+
+  if (patientsEl) {
+    patientsEl.textContent = formatThousandsFR(count);
+    patientsEl.classList.remove('skeleton', 'kpi-metric--error');
+  }
+
+  if (!revenueEl) return;
+
+  if (count === 0) {
+    revenueEl.textContent = '0 MAD';
+  } else {
+    const minRevenue = count * 800;
+    const maxRevenue = count * 1500;
+    revenueEl.textContent = `${formatThousandsFR(minRevenue)} - ${formatThousandsFR(maxRevenue)} MAD`;
+  }
+  revenueEl.classList.remove('skeleton', 'kpi-metric--error');
 }
 
 function formatMADShort(amount) {
