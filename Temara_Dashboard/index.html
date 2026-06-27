@@ -34,6 +34,7 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="dashboard_style.css" />
   <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.23/dist/lenis.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="https://unpkg.com/lenis@1.3.23/dist/lenis.min.js"></script>
@@ -162,9 +163,9 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
           <span>Dossiers Patients</span>
         </a>
-        <a href="#" class="nav-link" data-nav="pipeline" hidden>
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="8" width="7" height="13" rx="2"/></svg>
-          <span>Devis &amp; Finances</span>
+        <a href="#" class="nav-link" data-nav="analytics">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+          <span>Performances</span>
         </a>
         <a href="#" class="nav-link" data-nav="sms">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -245,9 +246,9 @@
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
         <span>Dossiers Patients</span>
       </a>
-      <a href="#" class="tab-link" data-nav="pipeline" aria-label="Devis et Finances" hidden>
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="8" width="7" height="13" rx="2"/></svg>
-        <span>Devis &amp; Finances</span>
+      <a href="#" class="tab-link" data-nav="analytics" aria-label="Performances">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+        <span>Performances</span>
       </a>
       <a href="#" class="tab-link" data-nav="sms" aria-label="Campagnes SMS">
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -311,22 +312,6 @@
             </div>
             <div class="kpi-number kinetic-value" id="val-noshows" data-target="0" aria-live="assertive">—</div>
             <div class="kpi-sub" id="sub-noshows">Créneaux à combler</div>
-          </article>
-
-          <article class="kpi-card kpi-card--matte kpi-card--wide" id="card-production">
-            <div class="kpi-card__head">
-              <div class="kpi-label kinetic-label" data-tooltip="Revenus facturés aujourd'hui par rapport à l'objectif journalier">Production</div>
-              <div class="kpi-trend" id="trend-production" aria-hidden="true"></div>
-            </div>
-            <div class="kpi-number-row">
-              <span class="kpi-number kpi-number--sm" id="val-revenue" data-target="0">—</span>
-              <span class="kpi-goal-label">/ <span id="val-goal">15 000</span> MAD</span>
-            </div>
-            <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Objectif de production">
-              <div class="progress-fill" id="progress-fill"></div>
-              <div class="progress-pct" id="progress-pct">0%</div>
-            </div>
-            <div class="kpi-sub" id="sub-production">Revenus facturés aujourd'hui</div>
           </article>
 
           <article class="kpi-card kpi-card--matte" id="card-new">
@@ -680,55 +665,28 @@
         </article>
       </section>
 
-      <section id="view-pipeline" class="dashboard-view" aria-label="Devis et finances" aria-hidden="true">
+      <section id="view-analytics" class="dashboard-view" aria-label="Performances opérationnelles" aria-hidden="true">
         <header class="view-page-header">
-          <h2 class="view-page-title">Devis &amp; Finances</h2>
-          <p class="view-page-sub">Pipeline des plans de traitement — suivi des devis en MAD</p>
+          <h2 class="view-page-title">Intelligence Opérationnelle</h2>
+          <p class="view-page-sub">Analyse des flux patients et efficacité du moteur DentaFlow.</p>
         </header>
 
-        <div class="pipeline-board">
-          <div class="pipeline-column">
-            <div class="pipeline-column-header">
-              <span class="pipeline-column-title">En attente</span>
-              <span class="pipeline-column-count">3</span>
+        <div class="charts-grid">
+          <article class="chart-card chart-card--analytics chart-card--wide">
+            <h3 class="chart-title">Efficacité du Rattrapage (30 Jours)</h3>
+            <p class="chart-sub">Annulations vs créneaux récupérés — tendance hebdomadaire</p>
+            <div class="chart-canvas-wrap chart-canvas-wrap--tall">
+              <canvas id="recoveryChart" role="img" aria-label="Graphique d'efficacité du rattrapage sur 30 jours"></canvas>
             </div>
-            <div class="pipeline-cards">
-              <article class="pipeline-card">
-                <span class="pipeline-card-name">Youssef Benali</span>
-                <span class="pipeline-card-amount">12 500 MAD</span>
-                <span class="pipeline-card-meta">Couronnes céramiques</span>
-              </article>
-              <article class="pipeline-card">
-                <span class="pipeline-card-name">Amina El Fassi</span>
-                <span class="pipeline-card-amount">8 900 MAD</span>
-                <span class="pipeline-card-meta">Blanchiment professionnel</span>
-              </article>
-              <article class="pipeline-card">
-                <span class="pipeline-card-name">Karim Alami</span>
-                <span class="pipeline-card-amount">24 000 MAD</span>
-                <span class="pipeline-card-meta">Implant + couronne</span>
-              </article>
-            </div>
-          </div>
+          </article>
 
-          <div class="pipeline-column pipeline-column--closed">
-            <div class="pipeline-column-header">
-              <span class="pipeline-column-title">Confirmé</span>
-              <span class="pipeline-column-count">2</span>
+          <article class="chart-card chart-card--analytics chart-card--square">
+            <h3 class="chart-title">Répartition des Flux</h3>
+            <p class="chart-sub">Typologie des patients — récurrents, nouveaux, urgences</p>
+            <div class="chart-canvas-wrap chart-canvas-wrap--ring">
+              <canvas id="flowChart" role="img" aria-label="Graphique en anneau de répartition des flux patients"></canvas>
             </div>
-            <div class="pipeline-cards">
-              <article class="pipeline-card pipeline-card--closed">
-                <span class="pipeline-card-name">Fatima Zahra</span>
-                <span class="pipeline-card-amount">6 200 MAD</span>
-                <span class="pipeline-card-meta">Détartrage + polissage</span>
-              </article>
-              <article class="pipeline-card pipeline-card--closed">
-                <span class="pipeline-card-name">Salma Berrada</span>
-                <span class="pipeline-card-amount">15 750 MAD</span>
-                <span class="pipeline-card-meta">Orthodontie — phase 1</span>
-              </article>
-            </div>
-          </div>
+          </article>
         </div>
       </section>
 
@@ -1094,7 +1052,6 @@
     Impossible de charger les données. Vérifiez la connexion n8n.
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" referrerpolicy="no-referrer"></script>
   <script src="dom-safe.js"></script>
   <script src="auth.js"></script>
   <script src="dashboard_app.js"></script>

@@ -1667,7 +1667,7 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
 /* ── 8. KPI ROW ─────────────────────────────────────────────── */
 .kpi-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.6fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
@@ -2356,10 +2356,7 @@ body.dashboard-offline .sync-label {
 
 @media (max-width: 1100px) {
   .kpi-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .kpi-card--wide {
-    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -5986,6 +5983,70 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   .kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+  }
+
+  #card-new {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Operational analytics (Performances view) ───────────────── */
+#view-analytics .charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+#view-analytics .chart-card--analytics {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+#view-analytics .chart-card--analytics .chart-title {
+  margin: 0;
+}
+
+#view-analytics .chart-card--analytics .chart-sub {
+  margin: 0 0 0.75rem;
+}
+
+#view-analytics .chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+#view-analytics .chart-canvas-wrap--tall {
+  min-height: 300px;
+  flex: 1;
+}
+
+#view-analytics .chart-canvas-wrap--ring {
+  min-height: 260px;
+  max-width: 280px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  #view-analytics .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #view-analytics .chart-canvas-wrap--tall {
+    min-height: 240px;
+  }
+
+  #view-analytics .chart-canvas-wrap--ring {
+    max-width: 100%;
+    min-height: 220px;
   }
 }
 
