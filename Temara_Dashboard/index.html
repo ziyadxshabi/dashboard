@@ -942,12 +942,65 @@
           </article>
 
           <!-- Card 3: Sécurité -->
-          <article class="settings-card">
+          <article class="settings-card settings-card--security">
             <div class="settings-card-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
             <h3 class="settings-card-title">Sécurité</h3>
-            <p class="settings-card-desc">Les identifiants sont gérés côté serveur (hachage scrypt + JWT). Contactez l'administrateur pour toute rotation de mot de passe.</p>
+            <p class="settings-card-desc">Contrôle d'accès — rotation des identifiants Docteur et Assistante.</p>
+
+            <form id="security-access-form" class="security-form" novalidate>
+              <div class="settings-field">
+                <span class="settings-label" id="security-account-label">Compte à modifier</span>
+                <div class="ghost-select" id="security-account-root" data-ghost-select>
+                  <input type="hidden" id="security-account-input" name="account" value="doc" />
+                  <button
+                    type="button"
+                    class="ghost-select__trigger"
+                    id="security-account-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="security-account-list"
+                    aria-labelledby="security-account-label security-account-value"
+                  >
+                    <span class="ghost-select__value" id="security-account-value">Compte Docteur (Admin)</span>
+                    <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <ul class="ghost-select__list" id="security-account-list" role="listbox" aria-labelledby="security-account-label" hidden>
+                    <li class="ghost-select__option is-selected" role="option" data-value="doc" aria-selected="true" tabindex="-1">Compte Docteur (Admin)</li>
+                    <li class="ghost-select__option" role="option" data-value="asst" aria-selected="false" tabindex="-1">Compte Assistante (Staff)</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label" for="security-password-new">Nouveau mot de passe</label>
+                <input
+                  type="password"
+                  class="waitlist-input settings-input"
+                  id="security-password-new"
+                  name="password-new"
+                  autocomplete="new-password"
+                  required
+                />
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label" for="security-password-confirm">Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  class="waitlist-input settings-input"
+                  id="security-password-confirm"
+                  name="password-confirm"
+                  autocomplete="new-password"
+                  required
+                />
+              </div>
+
+              <button type="submit" class="security-form__submit btn-matte-primary" id="security-submit-btn">
+                Mettre à jour l'accès
+              </button>
+            </form>
           </article>
 
           <!-- Card: Sauvegarde & Synchronisation -->

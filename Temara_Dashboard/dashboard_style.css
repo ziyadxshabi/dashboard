@@ -844,6 +844,66 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   width: 100%;
 }
 
+/* Doctor security — access control form */
+.settings-card--security {
+  min-height: 0;
+}
+
+.security-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+  margin-top: 4px;
+}
+
+.security-form .ghost-select {
+  width: 100%;
+}
+
+.security-form .ghost-select__trigger {
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 16px;
+  font-size: 15px;
+  border-radius: var(--radius-md);
+}
+
+.security-form .settings-input[type="password"] {
+  min-height: 48px;
+  padding: 14px 16px;
+  font-size: 15px;
+  border-radius: var(--radius-md);
+}
+
+.security-form__submit {
+  margin-top: auto;
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 24px;
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: opacity 0.25s ease, transform 0.2s ease;
+}
+
+.security-form__submit:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.security-form__submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.security-form__submit:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .settings-input--readonly {
   cursor: default;
   color: var(--text-dim);

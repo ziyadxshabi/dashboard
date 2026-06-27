@@ -247,6 +247,7 @@ function initializeDoctorDashboard() {
   initWaitlistForm();
   initUserProfile();
   initSettings();
+  initSecurityManagement();
   initThemeSwitcher();
   initAccountCardMenu();
   window.initSettingsDemoState?.();
@@ -936,6 +937,167 @@ function loadSettings() {
 
 function saveSettings(partial) {
   Object.assign(volatileSettings, partial);
+}
+
+const SECURITY_PWD_KEYS = {
+  doc: 'df_pwd_doc',
+  asst: 'df_pwd_asst',
+};
+
+const SECURITY_ACCOUNT_LABELS = {
+  doc: 'Compte Docteur (Admin)',
+  asst: 'Compte Assistante (Staff)',
+};
+
+const SECURITY_TOAST_NAMES = {
+  doc: 'Docteur',
+  asst: 'Assistante',
+};
+
+let securityToastTimer = null;
+
+function showDashboardToast(message, type = 'info') {
+  const toast = document.getElementById('assistant-toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.remove('is-error', 'is-success', 'is-warning');
+  if (type === 'error') toast.classList.add('is-error');
+  if (type === 'success') toast.classList.add('is-success');
+  if (type === 'warning') toast.classList.add('is-warning');
+  toast.classList.add('is-visible');
+  clearTimeout(securityToastTimer);
+  securityToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
+}
+
+function initSecurityAccountSelect() {
+  const root = document.getElementById('security-account-root');
+  const hidden = document.getElementById('security-account-input');
+  const trigger = document.getElementById('security-account-trigger');
+  const list = document.getElementById('security-account-list');
+  const label = document.getElementById('security-account-value');
+  if (!root || !hidden || !trigger || !list) return null;
+
+  const options = Array.from(list.querySelectorAll('.ghost-select__option'));
+
+  function setValue(value) {
+    const resolved = value === 'asst' ? 'asst' : 'doc';
+    hidden.value = resolved;
+    if (label) label.textContent = SECURITY_ACCOUNT_LABELS[resolved];
+    options.forEach((option) => {
+      const selected = option.dataset.value === resolved;
+      option.classList.toggle('is-selected', selected);
+      option.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+  }
+
+  function closeList() {
+    list.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    options.forEach((option) => option.classList.remove('is-focused'));
+  }
+
+  function openList() {
+    list.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+
+  trigger.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (list.hidden) openList();
+    else closeList();
+  });
+
+  options.forEach((option) => {
+    option.addEventListener('click', () => {
+      setValue(option.dataset.value || 'doc');
+      closeList();
+      trigger.focus();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!root.contains(event.target)) closeList();
+  });
+
+  trigger.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeList();
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (list.hidden) openList();
+      const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = (currentIndex + delta + options.length) % options.length;
+      options.forEach((option) => option.classList.remove('is-focused'));
+      options[nextIndex]?.classList.add('is-focused');
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      const focused = options.find((option) => option.classList.contains('is-focused'));
+      if (focused && !list.hidden) {
+        event.preventDefault();
+        setValue(focused.dataset.value || 'doc');
+        closeList();
+      }
+    }
+  });
+
+  return setValue;
+}
+
+function initSecurityManagement() {
+  const form = document.getElementById('security-access-form');
+  if (!form || form.dataset.securityBound === 'true') return;
+  form.dataset.securityBound = 'true';
+
+  initSecurityAccountSelect();
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const accountInput = document.getElementById('security-account-input');
+    const passwordNew = document.getElementById('security-password-new');
+    const passwordConfirm = document.getElementById('security-password-confirm');
+    const submitBtn = document.getElementById('security-submit-btn');
+
+    if (!accountInput || !passwordNew || !passwordConfirm) return;
+
+    const newPassword = passwordNew.value;
+    const confirmPassword = passwordConfirm.value;
+
+    if (!newPassword || !confirmPassword) {
+      showDashboardToast('Veuillez renseigner les deux champs de mot de passe.', 'warning');
+      if (!newPassword) passwordNew.focus();
+      else passwordConfirm.focus();
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showDashboardToast('Les mots de passe ne correspondent pas.', 'error');
+      passwordConfirm.focus();
+      return;
+    }
+
+    const accountKey = accountInput.value === 'asst' ? 'asst' : 'doc';
+    const storageKey = SECURITY_PWD_KEYS[accountKey];
+    const roleName = SECURITY_TOAST_NAMES[accountKey];
+
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      localStorage.setItem(storageKey, newPassword);
+      passwordNew.value = '';
+      passwordConfirm.value = '';
+      showDashboardToast(`Mot de passe ${roleName} mis à jour avec succès.`, 'success');
+    } catch (error) {
+      console.error('[Security] Password save failed:', error);
+      showDashboardToast('Impossible d\'enregistrer le mot de passe — réessayez.', 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
 }
 
 /* ── CRM PATIENT SEARCH ──────────────────────────────────────────────────── */
