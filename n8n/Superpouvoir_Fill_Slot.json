@@ -1,0 +1,61 @@
+{
+  "name": "Superpouvoir - Fill Empty Slot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fill-empty-slot",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-4345-a678-9abcdef01234",
+      "name": "Webhook - Fill Empty Slot",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        0
+      ],
+      "webhookId": "fill-empty-slot"
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "YOUR_WAITLIST_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4456-b789-abcdef012345",
+      "name": "Execute Workflow - Waitlist Engine",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        0
+      ],
+      "notes": "Replace YOUR_WAITLIST_WORKFLOW_ID with the n8n ID of \"No-Show Waitlist Engine\" (or your active waitlist cascade workflow). Incoming webhook payload is passed through automatically."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Fill Empty Slot": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow - Waitlist Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Casablanca"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

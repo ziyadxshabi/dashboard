@@ -5,7 +5,12 @@
 
 /* ── 1. SHARED STRUCTURAL TOKENS ───────────────────────────── */
 :root {
-  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-primary: 'Inter', sans-serif;
+  --font-icon: 'Phosphor', sans-serif;
+  --font-icon-bold: 'Phosphor-Bold', sans-serif;
+  --font-icon-duotone: 'Phosphor-Duotone', sans-serif;
+  --font-icon-fill: 'Phosphor-Fill', sans-serif;
+  --font-icon-light: 'Phosphor-Light', sans-serif;
   --radius-sm:   8px;
   --radius-md:   12px;
   --radius-lg:   16px;
@@ -57,6 +62,40 @@
 
   /* Architectural accent — light theme contrast */
   --accent-charcoal: #333333;
+}
+
+/* ── 1a. PHOSPHOR ICON TYPOGRAPHY (local Fonts/) ───────────── */
+.ph,
+.ph-bold,
+.ph-duotone,
+.ph-fill,
+.ph-light {
+  vertical-align: middle;
+  display: inline-block;
+  font-style: normal;
+  line-height: 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ph { font-family: var(--font-icon) !important; }
+.ph-bold { font-family: var(--font-icon-bold) !important; }
+.ph-duotone { font-family: var(--font-icon-duotone) !important; }
+.ph-fill { font-family: var(--font-icon-fill) !important; }
+.ph-light { font-family: var(--font-icon-light) !important; }
+
+.nav-icon.ph,
+.nav-icon.ph-bold,
+.nav-icon.ph-duotone,
+.nav-icon.ph-fill,
+.nav-icon.ph-light,
+.sidebar-brand-icon .ph,
+.sidebar-brand-icon .ph-light {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
 }
 
 /* ── 1b. THEME: OAK LOUNGE (Premium Dark Architectural) ────── */

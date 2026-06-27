@@ -1,4 +1,11 @@
-﻿  <div class="app-shell">
+﻿  <!-- Phosphor icon packs (local) — also linked in index.html <head> when embedded -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./Fonts/bold/style.css" />
+  <link rel="stylesheet" href="./Fonts/duotone/style.css" />
+  <link rel="stylesheet" href="./Fonts/fill/style.css" />
+  <link rel="stylesheet" href="./Fonts/light/style.css" />
+
+  <div class="app-shell">
 
     <aside class="sidebar assistant-sidebar" aria-label="Navigation assistante">
       <div class="sidebar-brand">
@@ -66,16 +73,16 @@
           <div class="superpouvoirs-accordion" id="superpouvoirs-accordion">
             <div class="superpouvoirs-content">
               <div class="superpowers-grid" id="superpowers-grid">
-            <button type="button" class="btn-super btn-super--compact" id="super-btn-daily-report">
+            <button type="button" class="btn-super btn-super--compact" id="btn-export-excel">
               <span class="btn-super__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
               </span>
               <span class="btn-super__text">
                 <span class="btn-super__label">Générer Rapport Journalier</span>
-                <span class="btn-super__hint">Synthèse PDF de la journée</span>
+                <span class="btn-super__hint">Export Excel de la journée</span>
               </span>
             </button>
-            <button type="button" class="btn-super btn-super--compact" id="super-btn-force-reminders">
+            <button type="button" class="btn-super btn-super--compact" id="btn-force-sms">
               <span class="btn-super__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               </span>
@@ -84,7 +91,7 @@
                 <span class="btn-super__hint">SMS patients de demain</span>
               </span>
             </button>
-            <button type="button" class="btn-super btn-super--compact" id="super-btn-block-slot">
+            <button type="button" class="btn-super btn-super--compact" id="btn-block-slot">
               <span class="btn-super__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
               </span>
@@ -93,7 +100,7 @@
                 <span class="btn-super__hint">Réserver un slot prioritaire</span>
               </span>
             </button>
-            <button type="button" class="btn-super btn-super--compact" id="super-btn-fill-gap">
+            <button type="button" class="btn-super btn-super--compact" id="btn-fill-slot">
               <span class="btn-super__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </span>

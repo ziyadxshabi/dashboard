@@ -4,7 +4,12 @@
    ============================================================ */
 
 :root {
-  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-primary: 'Inter', sans-serif;
+  --font-icon: 'Phosphor', sans-serif;
+  --font-icon-bold: 'Phosphor-Bold', sans-serif;
+  --font-icon-duotone: 'Phosphor-Duotone', sans-serif;
+  --font-icon-fill: 'Phosphor-Fill', sans-serif;
+  --font-icon-light: 'Phosphor-Light', sans-serif;
   --radius-sm:   8px;
   --radius-md:   12px;
   --radius-lg:   16px;

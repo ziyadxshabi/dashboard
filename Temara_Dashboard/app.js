@@ -1126,9 +1126,179 @@ let handoffNotes = [];
     wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
     wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
     wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
-    wireDeployingFeatureButton($('super-btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
-    wireDeployingFeatureButton($('super-btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
-    wireDeployingFeatureButton($('super-btn-block-slot'), DEPLOYING_FEATURE_NOTICES.blockSlot);
+  }
+
+  function escapeCsvCell(value) {
+    const text = String(value ?? '');
+    if (/[;"\n\r]/.test(text)) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  }
+
+  function isCalendarEventToday(event) {
+    const start = event?.start;
+    if (!start) return false;
+    const date = start instanceof Date ? start : new Date(start);
+    if (Number.isNaN(date.getTime())) return false;
+    return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' }) === getTodayDateKey();
+  }
+
+  function mapCalendarEventToReportRow(event) {
+    const start = event.start instanceof Date ? event.start : new Date(event.start);
+    const time = Number.isNaN(start.getTime())
+      ? '--:--'
+      : start.toLocaleTimeString('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'Africa/Casablanca',
+        });
+    const title = String(event.title ?? '').trim();
+    const dashIdx = title.indexOf('—');
+    const patient = dashIdx >= 0 ? title.slice(dashIdx + 1).trim() : title || 'Non spécifié';
+    const type = event.extendedProps?.type
+      ?? event.extendedProps?.treatment
+      ?? (dashIdx >= 0 ? title.slice(0, dashIdx).trim() : 'Consultation');
+    const statut = event.extendedProps?.status
+      ?? event.extendedProps?.statut
+      ?? 'Confirmé';
+    return [time, patient, type, statut];
+  }
+
+  function mapRosterRecordToReportRow(record) {
+    return [
+      record.time || formatAppointmentTime(record.rawDate),
+      record.name || 'Non spécifié',
+      record.treatment || 'Consultation',
+      record.status || 'Confirmé',
+    ];
+  }
+
+  function getAssistantCalendarInstance() {
+    if (window.calendar) return window.calendar;
+    if (dashboardCalendar) return dashboardCalendar;
+    initDashboardCalendar();
+    return window.calendar || dashboardCalendar;
+  }
+
+  function generateDailyReport() {
+    const calendar = getAssistantCalendarInstance();
+    let rows = [];
+
+    if (calendar && typeof calendar.getEvents === 'function') {
+      rows = calendar.getEvents()
+        .filter(isCalendarEventToday)
+        .sort((a, b) => (a.start?.getTime?.() ?? 0) - (b.start?.getTime?.() ?? 0))
+        .map(mapCalendarEventToReportRow);
+    }
+
+    if (!rows.length && allRosterRecords.length) {
+      rows = sortRosterByTime(filterTodayRosterRecords(allRosterRecords))
+        .map(mapRosterRecordToReportRow);
+    }
+
+    const header = ['Heure', 'Patient', 'Type', 'Statut'];
+    const csvLines = [header, ...rows].map((line) => line.map(escapeCsvCell).join(';'));
+    const csvContent = `\uFEFF${csvLines.join('\r\n')}`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const dateKey = getTodayDateKey();
+    const filename = `Rapport_Dentaflow_${dateKey}.csv`;
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    const countLabel = rows.length === 1 ? '1 rendez-vous' : `${rows.length} rendez-vous`;
+    showToast(
+      rows.length
+        ? `Rapport exporté — ${countLabel}.`
+        : 'Rapport exporté — aucun rendez-vous pour aujourd\'hui.',
+      'success'
+    );
+  }
+
+  async function simulateWebhookAction(buttonId, originalText, loadingText, toastMessage) {
+    const selector = String(buttonId).startsWith('#') ? buttonId : `#${buttonId}`;
+    const btn = document.querySelector(selector);
+    if (!btn || btn.dataset.superBusy === 'true') return;
+
+    const labelEl = btn.querySelector('.btn-super__label');
+    btn.dataset.superBusy = 'true';
+    const prevOpacity = btn.style.opacity;
+    const prevPointerEvents = btn.style.pointerEvents;
+
+    btn.style.opacity = '0.7';
+    btn.style.pointerEvents = 'none';
+    if (labelEl) labelEl.textContent = loadingText;
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    if (labelEl) labelEl.textContent = originalText;
+    btn.style.opacity = prevOpacity;
+    btn.style.pointerEvents = prevPointerEvents;
+    delete btn.dataset.superBusy;
+
+    showToast(toastMessage, 'success');
+  }
+
+  function initSuperpouvoirs() {
+    const exportBtn = $('btn-export-excel');
+    const forceSmsBtn = $('btn-force-sms');
+    const blockSlotBtn = $('btn-block-slot');
+    const fillSlotBtn = $('btn-fill-slot');
+
+    if (exportBtn && exportBtn.dataset.superWired !== 'true') {
+      exportBtn.dataset.superWired = 'true';
+      exportBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        generateDailyReport();
+      });
+    }
+
+    if (forceSmsBtn && forceSmsBtn.dataset.superWired !== 'true') {
+      forceSmsBtn.dataset.superWired = 'true';
+      forceSmsBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        simulateWebhookAction(
+          '#btn-force-sms',
+          'Forcer Rappels',
+          'Envoi en cours...',
+          'Rappels SMS envoyés avec succès.'
+        );
+      });
+    }
+
+    if (blockSlotBtn && blockSlotBtn.dataset.superWired !== 'true') {
+      blockSlotBtn.dataset.superWired = 'true';
+      blockSlotBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        simulateWebhookAction(
+          '#btn-block-slot',
+          'Bloquer Créneau Urgence',
+          'Verrouillage...',
+          'Créneau d\'urgence bloqué sur Cal.com.'
+        );
+      });
+    }
+
+    if (fillSlotBtn && fillSlotBtn.dataset.superWired !== 'true') {
+      fillSlotBtn.dataset.superWired = 'true';
+      fillSlotBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        simulateWebhookAction(
+          '#btn-fill-slot',
+          'Remplir un Créneau Vide',
+          'Recherche...',
+          'Notification envoyée aux patients prioritaires.'
+        );
+      });
+    }
   }
 
   function setSyncIndicator(state) {
@@ -4118,6 +4288,7 @@ let handoffNotes = [];
     });
 
     dashboardCalendar.render();
+    window.calendar = dashboardCalendar;
   }
 
   function getDemoWaitlistPatients() {
@@ -4726,7 +4897,7 @@ let handoffNotes = [];
   function initQuickActions() {
     guardDeployingFeatureButtons();
 
-    [$('btn-fill-gap'), $('super-btn-fill-gap')].forEach(wireFillGapButton);
+    wireFillGapButton($('btn-fill-gap'));
 
     const btnDelay = $('btn-alerte-retard');
 
@@ -4885,7 +5056,10 @@ let handoffNotes = [];
     });
     runInitStep('header', () => setHeaderDate());
     runInitStep('navigation', () => initNavigation());
-    runInitStep('superpouvoirs', () => initSuperpouvoirsAccordion());
+    runInitStep('superpouvoirs', () => {
+      initSuperpouvoirsAccordion();
+      initSuperpouvoirs();
+    });
     runInitStep('keyboardShortcuts', () => initKeyboardShortcuts());
     runInitStep('status', () => initStatusListener());
     runInitStep('quickActions', () => initQuickActions());

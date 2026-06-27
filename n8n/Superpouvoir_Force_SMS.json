@@ -1,0 +1,134 @@
+{
+  "name": "Superpouvoir - Force SMS Blast",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "force-sms-blast",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1f2e3d4-b5c6-4789-a012-3456789abc01",
+      "name": "Webhook - Force SMS Blast",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        0
+      ],
+      "webhookId": "force-sms-blast"
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "getAll",
+        "tableId": "YOUR_BASEROW_TABLE_ID",
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "b2e3f4a5-c6d7-4890-b123-456789abcdef",
+      "name": "Baserow - List Tomorrow Patients",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        0
+      ],
+      "notes": "Replace YOUR_BASEROW_TABLE_ID with the appointments/roster table. Add Baserow credentials after import."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Moroccan phone numbers to E.164 for Twilio.\n// Optionally filters rows to tomorrow's appointments when a date column is present.\nfunction toE164MA(raw) {\n  if (raw == null || raw === '') return '';\n  let phone = String(raw).replace(/[\\s\\-\\(\\)\\.]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('+')) return phone;\n  if (phone.startsWith('00')) return '+' + phone.slice(2);\n  if (phone.startsWith('212')) return '+' + phone;\n  if (phone.startsWith('0')) return '+212' + phone.slice(1);\n  return '+212' + phone;\n}\n\nfunction getTomorrowDateKey() {\n  const tomorrow = new Date();\n  tomorrow.setDate(tomorrow.getDate() + 1);\n  return tomorrow.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });\n}\n\nfunction rowAppointmentDateKey(row) {\n  const raw = row['Date & Heure du RDV'] ?? row.startTime ?? row.datetime ?? row.date;\n  if (!raw) return '';\n  const parsed = new Date(raw);\n  if (Number.isNaN(parsed.getTime())) return '';\n  return parsed.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });\n}\n\nconst tomorrowKey = getTomorrowDateKey();\n\nreturn $input.all()\n  .map((item) => item.json)\n  .filter((row) => {\n    const key = rowAppointmentDateKey(row);\n    return !key || key === tomorrowKey;\n  })\n  .map((row) => {\n    const nom = row['Patient (Nom Complet)'] ?? row.Clean_Name ?? row.Nom ?? 'Patient';\n    const phone = toE164MA(row['Téléphone (WhatsApp)'] ?? row.Clean_Phone ?? row.telephone ?? '');\n    return {\n      json: {\n        id: row.id,\n        Nom: nom,\n        Phone: phone,\n        appointmentDate: rowAppointmentDateKey(row) || tomorrowKey\n      }\n    };\n  })\n  .filter((item) => item.json.Phone);"
+      },
+      "id": "c3f4a5b6-d7e8-4901-c234-56789abcdef0",
+      "name": "Format Phone E.164",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/YOUR_TWILIO_ACCOUNT_SID/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "To",
+              "value": "={{ $json.Phone }}"
+            },
+            {
+              "name": "From",
+              "value": "YOUR_TWILIO_FROM_NUMBER"
+            },
+            {
+              "name": "Body",
+              "value": "=Bonjour {{ $json.Nom }}, rappel de votre rendez-vous demain à la Clinique Dentaire Témara Mall. Merci de confirmer votre présence."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4a5b6c7-e8f9-4012-d345-6789abcdef01",
+      "name": "HTTP Request - Twilio SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        32,
+        0
+      ],
+      "notes": "Configure HTTP Basic Auth after import: Username = YOUR_TWILIO_ACCOUNT_SID, Password = YOUR_TWILIO_AUTH_TOKEN"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Force SMS Blast": {
+      "main": [
+        [
+          {
+            "node": "Baserow - List Tomorrow Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - List Tomorrow Patients": {
+      "main": [
+        [
+          {
+            "node": "Format Phone E.164",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Phone E.164": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Twilio SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Casablanca"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

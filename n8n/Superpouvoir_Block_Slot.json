@@ -1,0 +1,64 @@
+{
+  "name": "Superpouvoir - Block Urgency Slot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "block-urgency-slot",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "e5b6c7d8-f9a0-4123-e456-789abcdef012",
+      "name": "Webhook - Block Urgency Slot",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        0
+      ],
+      "webhookId": "block-urgency-slot"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cal.com/v1/bookings?apiKey=YOUR_CALCOM_API_KEY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventTypeId\": YOUR_CALCOM_EVENT_TYPE_ID,\n  \"start\": \"{{ $now.plus(1, 'hour').toISO() }}\",\n  \"end\": \"{{ $now.plus(1, 'hour').plus(30, 'minute').toISO() }}\",\n  \"responses\": {\n    \"name\": \"Urgence DentaFlow\",\n    \"email\": \"urgence@YOUR_CLINIC_DOMAIN.com\",\n    \"notes\": \"Créneau bloqué automatiquement via DentaFlow OS — Superpouvoir\"\n  },\n  \"metadata\": {\n    \"source\": \"dentaflow-superpouvoir-block-slot\"\n  }\n}",
+        "options": {}
+      },
+      "id": "f6c7d8e9-a0b1-4234-f567-89abcdef0123",
+      "name": "HTTP Request - Cal.com Block Slot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -96,
+        0
+      ],
+      "notes": "Replace YOUR_CALCOM_API_KEY and YOUR_CALCOM_EVENT_TYPE_ID. Blocks the next 30-minute urgency window on Cal.com."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Block Urgency Slot": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Cal.com Block Slot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Casablanca"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
