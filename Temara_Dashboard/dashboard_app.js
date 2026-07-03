@@ -2968,6 +2968,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
   try {
     const token = window.DentaFlowAuth?.getToken?.();
     if (!token) {
+      showDashboardToast('Session expirée — veuillez vous reconnecter.', 'error');
       throw new Error('Session expirée — veuillez vous reconnecter.');
     }
 
@@ -2993,6 +2994,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
     if (response.status === 401) {
       window.DentaFlowAuth?.clearSession?.();
       sessionStorage.removeItem('dentaflow_role');
+      showDashboardToast('Session expirée — veuillez vous reconnecter.', 'error');
       throw new Error('Session expirée — veuillez vous reconnecter.');
     }
 
@@ -3000,8 +3002,14 @@ async function updateRosterStatus(selectEl, previousStatus) {
       throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
     }
 
+    if (responsePayload && typeof responsePayload === 'object' && responsePayload.ok === false) {
+      const detail = responsePayload.error || responsePayload.details || 'Réponse proxy invalide';
+      throw new Error(String(detail));
+    }
+
     selectEl.classList.remove('status-updating');
     selectEl.classList.add('status-success');
+    showDashboardToast('Statut mis à jour avec succès.', 'success');
 
     setTimeout(() => {
       selectEl.classList.remove('status-success');
@@ -3014,10 +3022,8 @@ async function updateRosterStatus(selectEl, previousStatus) {
     selectEl.classList.add('status-error');
     selectEl.disabled = false;
     const msg = String(error?.message || '');
-    if (msg.includes('Session expirée')) {
-      alert('Session expirée — veuillez vous reconnecter.');
-    } else {
-      alert('Échec de la mise à jour du statut — réessayez.');
+    if (!msg.includes('Session expirée')) {
+      showDashboardToast('Erreur: Impossible de mettre à jour le statut.', 'error');
     }
     setTimeout(() => selectEl.classList.remove('status-error'), 2000);
   }

@@ -18,8 +18,12 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
-  const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
+  const session = requireBearerSession(req, res);
   if (!session) return;
+
+  if (!['assistant', 'doctor'].includes(session.role)) {
+    return res.status(403).json({ error: 'Accès refusé: Rôle non autorisé.' });
+  }
 
   const webhookUrl = process.env.N8N_WEBHOOK_UPDATE_STATUS || DEFAULT_WEBHOOK_URL;
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
