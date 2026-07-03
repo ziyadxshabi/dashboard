@@ -1908,11 +1908,14 @@ let handoffNotes = [];
 
     const ids = [...selectedPatientIds];
     const records = getRecordsForSelectedIds(ids);
-    const targetRowIds = getSelectedRowIdsForApi(ids);
+    const confirmPayload = getSelectedBulkCancelPayload(ids);
     const optimisticSnapshots = applyOptimisticBulkConfirm(records);
 
     try {
-      await postBulkAction(CONFIG.ENDPOINTS.BULK_CONFIRM, targetRowIds);
+      await postBulkAction(CONFIG.ENDPOINTS.BULK_CONFIRM, {
+        rowIds: confirmPayload.rowIds,
+        calBookingIds: confirmPayload.calBookingIds,
+      });
 
       selectedPatientIds = [];
       document.querySelectorAll('#planning-timeline .row-checkbox, #roster-tbody .row-checkbox').forEach((checkbox) => {

@@ -118,6 +118,54 @@
     },
     {
       "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
+          "mode": "list",
+          "cachedResultName": "gestion des patients"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cal Booking ID": "={{ $json.calBookingId || $json['Cal Booking ID'] || '' }}",
+            "Statut du RDV": "Confirmé"
+          },
+          "matchingColumns": [
+            "Cal Booking ID"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f8a9b0c1-d2e3-4f56-a789-bulkconfirm01",
+      "name": "Google Sheets - Update to Confirmé",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        360,
+        -112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dR6JX2LbhtOkSffu",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "Dual-write: mirror Baserow confirm into Feuille 1 via Cal Booking ID."
+    },
+    {
+      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"status\": \"error\", \"message\": \"Data integrity fault: Split loop produced an invalid or missing rowId.\" } }}",
         "options": {
@@ -194,7 +242,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        272,
+        584,
         -112
       ]
     },
@@ -393,6 +441,24 @@
     },
     "Baserow - Update Status": {
       "main": [
+        [
+          {
+            "node": "Google Sheets - Update to Confirmé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Update to Confirmé": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Respond to Webhook",
