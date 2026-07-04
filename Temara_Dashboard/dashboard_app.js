@@ -1948,8 +1948,17 @@ function buildOperationalChartPayload(data = {}) {
   };
 }
 
-function getOperationalAccentColor() {
-  return isPearlTheme() ? '#B8965A' : 'rgba(232, 201, 122, 0.95)';
+function createRecoveryAreaGradient(canvas) {
+  const ctx = canvas.getContext('2d');
+  const height = canvas.parentElement?.clientHeight || 300;
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, 'rgba(184, 150, 90, 0.4)');
+  gradient.addColorStop(1, 'rgba(184, 150, 90, 0)');
+  return gradient;
+}
+
+function getFlowBarColors() {
+  return ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.16)', '#e8c97a'];
 }
 
 function initOperationalCharts(data = {}) {
@@ -1957,7 +1966,6 @@ function initOperationalCharts(data = {}) {
 
   applyChartJsDefaults();
   const payload = buildOperationalChartPayload(data);
-  const accent = getOperationalAccentColor();
   const chartTheme = getChartThemeColors();
 
   const recoveryCtx = document.getElementById('recoveryChart');
@@ -1966,6 +1974,8 @@ function initOperationalCharts(data = {}) {
       recoveryOpChart.destroy();
       recoveryOpChart = null;
     }
+
+    const recoveryGradient = createRecoveryAreaGradient(recoveryCtx);
 
     recoveryOpChart = new Chart(recoveryCtx, {
       type: 'bar',
@@ -1976,7 +1986,7 @@ function initOperationalCharts(data = {}) {
             type: 'bar',
             label: 'Annulations',
             data: payload.recovery.cancellations,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
             borderWidth: 0,
             borderRadius: 8,
             order: 2,
@@ -1985,14 +1995,16 @@ function initOperationalCharts(data = {}) {
             type: 'line',
             label: 'Créneaux Récupérés',
             data: payload.recovery.recovered,
-            borderColor: accent,
+            borderColor: '#e8c97a',
+            backgroundColor: recoveryGradient,
             borderWidth: 2.5,
-            pointRadius: 4,
-            pointBackgroundColor: accent,
-            pointBorderColor: '#161616',
-            pointBorderWidth: 2,
-            tension: 0.35,
-            fill: false,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#e8c97a',
+            pointHoverBorderColor: '#111118',
+            pointHoverBorderWidth: 2,
+            tension: 0.4,
+            fill: true,
             order: 1,
           },
         ],
@@ -2016,12 +2028,16 @@ function initOperationalCharts(data = {}) {
           },
         },
         scales: {
-          x: { grid: { display: false }, border: { display: false } },
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { color: 'rgba(255, 255, 255, 0.35)', font: { size: 11 } },
+          },
           y: {
             beginAtZero: true,
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            grid: { display: false },
             border: { display: false },
-            ticks: { precision: 0 },
+            ticks: { precision: 0, color: 'rgba(255, 255, 255, 0.35)', font: { size: 11 } },
           },
         },
       },
@@ -2036,26 +2052,24 @@ function initOperationalCharts(data = {}) {
     }
 
     flowOpChart = new Chart(flowCtx, {
-      type: 'doughnut',
+      type: 'bar',
       data: {
         labels: payload.flow.labels,
         datasets: [{
           data: payload.flow.values,
-          backgroundColor: ['#262626', '#404040', accent],
-          borderColor: '#161616',
-          borderWidth: 4,
-          hoverOffset: 6,
+          backgroundColor: getFlowBarColors(),
+          borderWidth: 0,
+          borderRadius: 9999,
+          borderSkipped: false,
+          barThickness: 14,
         }],
       },
       options: {
+        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '75%',
         plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { boxWidth: 10, boxHeight: 10, padding: 14, usePointStyle: true },
-          },
+          legend: { display: false },
           tooltip: {
             backgroundColor: chartTheme.tooltipBg,
             borderColor: chartTheme.tooltipBorder,
@@ -2063,7 +2077,28 @@ function initOperationalCharts(data = {}) {
             titleColor: chartTheme.tooltipTitle,
             bodyColor: chartTheme.tooltipBody,
             callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${ctx.parsed}%`,
+              label: (ctx) => ` ${ctx.label}: ${ctx.parsed.x}%`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: 100,
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.35)',
+              font: { size: 11 },
+              callback: (value) => `${value}%`,
+            },
+          },
+          y: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.55)',
+              font: { size: 11 },
             },
           },
         },
@@ -2090,6 +2125,7 @@ function refreshOperationalCharts(data = {}) {
   if (flowOpChart) {
     flowOpChart.data.labels = payload.flow.labels;
     flowOpChart.data.datasets[0].data = payload.flow.values;
+    flowOpChart.data.datasets[0].backgroundColor = getFlowBarColors();
     flowOpChart.update('none');
   }
 }

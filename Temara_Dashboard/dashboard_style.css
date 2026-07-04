@@ -6076,10 +6076,10 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 }
 
 #view-analytics .chart-card--analytics {
-  background: #161616;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
+  background-color: #111118;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -6100,15 +6100,18 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   min-width: 0;
 }
 
+#view-analytics .chart-canvas-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 #view-analytics .chart-canvas-wrap--tall {
   min-height: 300px;
   flex: 1;
 }
 
-#view-analytics .chart-canvas-wrap--ring {
+#view-analytics .chart-canvas-wrap--flow-bars {
   min-height: 260px;
-  max-width: 280px;
-  margin-inline: auto;
   width: 100%;
 }
 
@@ -6121,8 +6124,7 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
     min-height: 240px;
   }
 
-  #view-analytics .chart-canvas-wrap--ring {
-    max-width: 100%;
+  #view-analytics .chart-canvas-wrap--flow-bars {
     min-height: 220px;
   }
 }
