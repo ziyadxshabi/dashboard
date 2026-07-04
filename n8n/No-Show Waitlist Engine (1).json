@@ -114,6 +114,70 @@
     },
     {
       "parameters": {
+        "jsCode": "// ── GATE: Cal.com webhook signature (HMAC-SHA256, timing-safe) ───────────────\nconst crypto = require('crypto');\n\nfunction timingSafeEqualHex(a, b) {\n  const sa = String(a ?? '').trim().toLowerCase();\n  const sb = String(b ?? '').trim().toLowerCase();\n  if (!/^[0-9a-f]+$/.test(sa) || !/^[0-9a-f]+$/.test(sb)) return false;\n  const ba = Buffer.from(sa, 'hex');\n  const bb = Buffer.from(sb, 'hex');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction readHeader(h, name) {\n  const target = name.toLowerCase();\n  for (const [key, value] of Object.entries(h ?? {})) {\n    if (key && key.toLowerCase() === target) return String(value ?? '').trim();\n  }\n  return '';\n}\n\nfunction resolveRawBody(item) {\n  if (typeof item.rawBody === 'string' && item.rawBody.length) return item.rawBody;\n  if (typeof item.bodyRaw === 'string' && item.bodyRaw.length) return item.bodyRaw;\n  if (item.body !== undefined && item.body !== null) {\n    return typeof item.body === 'string' ? item.body : JSON.stringify(item.body);\n  }\n  return '';\n}\n\nconst item = $input.first().json ?? {};\nconst headers = item.headers ?? {};\nconst CAL_SECRET = String($env['CAL_WEBHOOK_SECRET'] ?? '').trim();\n\nif (!CAL_SECRET) {\n  throw new Error('AUTH_FAIL: CAL_WEBHOOK_SECRET is not configured');\n}\n\nconst signature = readHeader(headers, 'x-cal-signature-256');\nif (!signature) {\n  throw new Error('AUTH_FAIL: Missing x-cal-signature-256 header');\n}\n\nconst rawBody = resolveRawBody(item);\nconst expected = crypto.createHmac('sha256', CAL_SECRET).update(rawBody, 'utf8').digest('hex');\n\nif (!timingSafeEqualHex(signature, expected)) {\n  throw new Error('AUTH_FAIL: Invalid Cal.com webhook signature');\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8,
+        368
+      ],
+      "name": "Validate Cal Webhook Signature",
+      "id": "f8a3c2d1-4b5e-6f70-8a9b-0c1d2e3f4a5b",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Waitlist auth rejection (401) ────────────────────────────────────────────\nconst err = $input.first()?.json ?? {};\nconst errMsg = (err.message ?? err.error ?? 'Unauthorized').toString();\nconst isAuth = errMsg.startsWith('AUTH_FAIL') || errMsg.startsWith('SIG_FAIL');\n\nreturn [{\n  json: {\n    httpStatus: isAuth ? 401 : 503,\n    body: {\n      ok: false,\n      error: isAuth ? 'Unauthorized' : 'Service Unavailable',\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8,
+        520
+      ],
+      "name": "Waitlist Auth Error",
+      "id": "a9b8c7d6-e5f4-4321-ba09-876543210fed"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              },
+              {
+                "name": "Vary",
+                "value": "Origin"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        520
+      ],
+      "name": "Waitlist Auth Reject",
+      "id": "b1c2d3e4-f5a6-4789-bc0d-ef1234567890"
+    },
+    {
+      "parameters": {
         "documentId": {
           "__rl": true,
           "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
@@ -352,7 +416,36 @@
       "main": [
         [
           {
+            "node": "Validate Cal Webhook Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Cal Webhook Signature": {
+      "main": [
+        [
+          {
             "node": "Google Sheets - Find Top Patient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Waitlist Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waitlist Auth Error": {
+      "main": [
+        [
+          {
+            "node": "Waitlist Auth Reject",
             "type": "main",
             "index": 0
           }
