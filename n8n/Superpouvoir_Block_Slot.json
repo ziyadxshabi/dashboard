@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "block-urgency-slot",
+        "authentication": "headerAuth",
         "responseMode": "onReceived",
         "options": {}
       },
@@ -21,10 +22,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.cal.com/v1/bookings?apiKey=YOUR_CALCOM_API_KEY",
+        "url": "=https://api.cal.com/v1/bookings?apiKey={{ $vars.CALCOM_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"eventTypeId\": YOUR_CALCOM_EVENT_TYPE_ID,\n  \"start\": \"{{ $now.plus(1, 'hour').toISO() }}\",\n  \"end\": \"{{ $now.plus(1, 'hour').plus(30, 'minute').toISO() }}\",\n  \"responses\": {\n    \"name\": \"Urgence DentaFlow\",\n    \"email\": \"urgence@YOUR_CLINIC_DOMAIN.com\",\n    \"notes\": \"Créneau bloqué automatiquement via DentaFlow OS — Superpouvoir\"\n  },\n  \"metadata\": {\n    \"source\": \"dentaflow-superpouvoir-block-slot\"\n  }\n}",
+        "jsonBody": "={\n  \"eventTypeId\": {{ $vars.CALCOM_EVENT_TYPE_ID }},\n  \"start\": \"{{ $now.plus(1, 'hour').toISO() }}\",\n  \"end\": \"{{ $now.plus(1, 'hour').plus(30, 'minute').toISO() }}\",\n  \"responses\": {\n    \"name\": \"Urgence DentaFlow\",\n    \"email\": \"urgence@YOUR_CLINIC_DOMAIN.com\",\n    \"notes\": \"Créneau bloqué automatiquement via DentaFlow OS — Superpouvoir\"\n  },\n  \"metadata\": {\n    \"source\": \"dentaflow-superpouvoir-block-slot\"\n  }\n}",
         "options": {}
       },
       "id": "f6c7d8e9-a0b1-4234-f567-89abcdef0123",

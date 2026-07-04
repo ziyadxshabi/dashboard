@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "fill-empty-slot",
+        "authentication": "headerAuth",
         "responseMode": "onReceived",
         "options": {}
       },
@@ -21,7 +22,7 @@
     {
       "parameters": {
         "source": "database",
-        "workflowId": "YOUR_WAITLIST_WORKFLOW_ID",
+        "workflowId": "={{ $vars.WAITLIST_WORKFLOW_ID }}",
         "options": {}
       },
       "id": "b8c9d0e1-f2a3-4456-b789-abcdef012345",

@@ -184,6 +184,7 @@
       ],
       "name": "Send SMS Link",
       "id": "a88b64c4-64ad-4322-846d-37e6ee4a4387",
+      "onError": "continueErrorOutput",
       "credentials": {
         "twilioApi": {
           "id": "sBZ1f7hTyGe4YGVj",
@@ -404,11 +405,6 @@
             "node": "Send SMS Link",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Alert: SMS Send Failed",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -420,7 +416,9 @@
             "node": "Prepare Status Update",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Alert: SMS Send Failed",
             "type": "main",

@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "force-sms-blast",
+        "authentication": "headerAuth",
         "responseMode": "onReceived",
         "options": {}
       },
@@ -22,7 +23,7 @@
       "parameters": {
         "authentication": "databaseToken",
         "operation": "getAll",
-        "tableId": "YOUR_BASEROW_TABLE_ID",
+        "tableId": "={{ $vars.BASEROW_TABLE_ID }}",
         "returnAll": true,
         "options": {}
       },
@@ -52,7 +53,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.twilio.com/2010-04-01/Accounts/YOUR_TWILIO_ACCOUNT_SID/Messages.json",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendBody": true,
@@ -65,7 +66,7 @@
             },
             {
               "name": "From",
-              "value": "YOUR_TWILIO_FROM_NUMBER"
+              "value": "={{ $vars.TWILIO_FROM_NUMBER }}"
             },
             {
               "name": "Body",
