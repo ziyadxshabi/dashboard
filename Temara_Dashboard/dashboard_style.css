@@ -1470,6 +1470,31 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   flex-wrap: wrap;
 }
 
+.hero-header__primary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 16px;
+}
+
+.dentaflow-os-watermark {
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.25);
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1.15;
+  padding-top: 0.15em;
+}
+
+html[data-theme="pearl-clinic"] .dentaflow-os-watermark {
+  color: rgba(15, 23, 42, 0.22);
+}
+
 .hero-title {
   font-size: clamp(1.75rem, 3vw, 2.25rem);
   font-weight: 300;
@@ -3323,9 +3348,22 @@ body.auth-gate-active #assistant-shell {
   /* Hero header */
   .hero-header {
     flex-direction: column !important;
-    align-items: flex-start !important;
+    align-items: stretch !important;
     gap: 14px;
     width: 100%;
+  }
+
+  .hero-header__primary {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .dentaflow-os-watermark {
+    padding-top: 0.2em;
   }
 
   .hero-sync {
