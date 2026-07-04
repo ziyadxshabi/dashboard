@@ -25,7 +25,7 @@
         "url": "=https://api.cal.com/v1/bookings?apiKey={{ $vars.CALCOM_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"eventTypeId\": {{ $vars.CALCOM_EVENT_TYPE_ID }},\n  \"start\": \"{{ $now.plus(1, 'hour').toISO() }}\",\n  \"end\": \"{{ $now.plus(1, 'hour').plus(30, 'minute').toISO() }}\",\n  \"responses\": {\n    \"name\": \"Urgence DentaFlow\",\n    \"email\": \"urgence@YOUR_CLINIC_DOMAIN.com\",\n    \"notes\": \"Créneau bloqué automatiquement via DentaFlow OS — Superpouvoir\"\n  },\n  \"metadata\": {\n    \"source\": \"dentaflow-superpouvoir-block-slot\"\n  }\n}",
+        "jsonBody": "={\n  \"eventTypeId\": {{ $vars.CALCOM_EVENT_TYPE_ID }},\n  \"start\": \"{{ $now.plus(1, 'hour').toISO() }}\",\n  \"end\": \"{{ $now.plus(1, 'hour').plus(30, 'minute').toISO() }}\",\n  \"responses\": {\n    \"name\": \"Urgence DentaFlow\",\n    \"email\": \"{{ $vars.CLINIC_URGENCY_EMAIL }}\",\n    \"notes\": \"Créneau bloqué automatiquement via DentaFlow OS — Superpouvoir\"\n  },\n  \"metadata\": {\n    \"source\": \"dentaflow-superpouvoir-block-slot\"\n  }\n}",
         "options": {}
       },
       "id": "f6c7d8e9-a0b1-4234-f567-89abcdef0123",
@@ -36,7 +36,7 @@
         -96,
         0
       ],
-      "notes": "Replace YOUR_CALCOM_API_KEY and YOUR_CALCOM_EVENT_TYPE_ID. Blocks the next 30-minute urgency window on Cal.com."
+      "notes": "Requires n8n variables: CALCOM_API_KEY, CALCOM_EVENT_TYPE_ID, CLINIC_URGENCY_EMAIL. Blocks the next 30-minute urgency window on Cal.com."
     }
   ],
   "pinData": {},

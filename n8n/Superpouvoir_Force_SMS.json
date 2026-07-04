@@ -35,7 +35,7 @@
         -416,
         0
       ],
-      "notes": "Replace YOUR_BASEROW_TABLE_ID with the appointments/roster table. Add Baserow credentials after import."
+      "notes": "Requires n8n variables: BASEROW_TABLE_ID, TWILIO_ACCOUNT_SID, TWILIO_FROM_NUMBER. Add Baserow and Twilio credentials after import."
     },
     {
       "parameters": {
@@ -84,7 +84,7 @@
         32,
         0
       ],
-      "notes": "Configure HTTP Basic Auth after import: Username = YOUR_TWILIO_ACCOUNT_SID, Password = YOUR_TWILIO_AUTH_TOKEN"
+      "notes": "Configure HTTP Basic Auth after import. Username = $vars.TWILIO_ACCOUNT_SID, Password = Twilio Auth Token credential."
     }
   ],
   "pinData": {},

@@ -114,7 +114,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ── GATE: Cal.com webhook signature (HMAC-SHA256, timing-safe) ───────────────\nconst crypto = require('crypto');\n\nfunction timingSafeEqualHex(a, b) {\n  const sa = String(a ?? '').trim().toLowerCase();\n  const sb = String(b ?? '').trim().toLowerCase();\n  if (!/^[0-9a-f]+$/.test(sa) || !/^[0-9a-f]+$/.test(sb)) return false;\n  const ba = Buffer.from(sa, 'hex');\n  const bb = Buffer.from(sb, 'hex');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction readHeader(h, name) {\n  const target = name.toLowerCase();\n  for (const [key, value] of Object.entries(h ?? {})) {\n    if (key && key.toLowerCase() === target) return String(value ?? '').trim();\n  }\n  return '';\n}\n\nfunction resolveRawBody(item) {\n  if (typeof item.rawBody === 'string' && item.rawBody.length) return item.rawBody;\n  if (typeof item.bodyRaw === 'string' && item.bodyRaw.length) return item.bodyRaw;\n  if (item.body !== undefined && item.body !== null) {\n    return typeof item.body === 'string' ? item.body : JSON.stringify(item.body);\n  }\n  return '';\n}\n\nconst item = $input.first().json ?? {};\nconst headers = item.headers ?? {};\nconst CAL_SECRET = String($env['CAL_WEBHOOK_SECRET'] ?? '').trim();\n\nif (!CAL_SECRET) {\n  throw new Error('AUTH_FAIL: CAL_WEBHOOK_SECRET is not configured');\n}\n\nconst signature = readHeader(headers, 'x-cal-signature-256');\nif (!signature) {\n  throw new Error('AUTH_FAIL: Missing x-cal-signature-256 header');\n}\n\nconst rawBody = resolveRawBody(item);\nconst expected = crypto.createHmac('sha256', CAL_SECRET).update(rawBody, 'utf8').digest('hex');\n\nif (!timingSafeEqualHex(signature, expected)) {\n  throw new Error('AUTH_FAIL: Invalid Cal.com webhook signature');\n}\n\nreturn $input.all();"
+        "jsCode": "// ── GATE: Cal.com webhook signature (HMAC-SHA256, timing-safe) ───────────────\nconst crypto = require('crypto');\n\nfunction timingSafeEqualHex(a, b) {\n  const sa = String(a ?? '').trim().toLowerCase();\n  const sb = String(b ?? '').trim().toLowerCase();\n  if (!/^[0-9a-f]+$/.test(sa) || !/^[0-9a-f]+$/.test(sb)) return false;\n  const ba = Buffer.from(sa, 'hex');\n  const bb = Buffer.from(sb, 'hex');\n  if (ba.length !== bb.length) return false;\n  return crypto.timingSafeEqual(ba, bb);\n}\n\nfunction readHeader(h, name) {\n  const target = name.toLowerCase();\n  for (const [key, value] of Object.entries(h ?? {})) {\n    if (key && key.toLowerCase() === target) return String(value ?? '').trim();\n  }\n  return '';\n}\n\nfunction resolveRawBody(item) {\n  if (typeof item.rawBody === 'string' && item.rawBody.length) return item.rawBody;\n  if (typeof item.bodyRaw === 'string' && item.bodyRaw.length) return item.bodyRaw;\n  if (item.body !== undefined && item.body !== null) {\n    return typeof item.body === 'string' ? item.body : JSON.stringify(item.body);\n  }\n  return '';\n}\n\nconst item = $input.first().json ?? {};\nconst headers = item.headers ?? {};\nconst CAL_SECRET = String($vars.CAL_WEBHOOK_SECRET ?? '').trim();\n\nif (!CAL_SECRET) {\n  throw new Error('AUTH_FAIL: CAL_WEBHOOK_SECRET is not configured');\n}\n\nconst signature = readHeader(headers, 'x-cal-signature-256');\nif (!signature) {\n  throw new Error('AUTH_FAIL: Missing x-cal-signature-256 header');\n}\n\nconst rawBody = resolveRawBody(item);\nconst expected = crypto.createHmac('sha256', CAL_SECRET).update(rawBody, 'utf8').digest('hex');\n\nif (!timingSafeEqualHex(signature, expected)) {\n  throw new Error('AUTH_FAIL: Invalid Cal.com webhook signature');\n}\n\nreturn $input.all();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -149,7 +149,7 @@
             "entries": [
               {
                 "name": "Access-Control-Allow-Origin",
-                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+                "value": "={{ $vars.VERCEL_FRONTEND_URL }}"
               },
               {
                 "name": "Access-Control-Allow-Credentials",
@@ -178,34 +178,39 @@
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": 175191827,
-          "mode": "list",
-          "cachedResultName": "Liste_Attente",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=175191827"
-        },
+        "authentication": "databaseToken",
+        "operation": "getAll",
+        "tableId": "={{ $vars.BASEROW_WAITLIST_TABLE_ID }}",
+        "returnAll": true,
         "options": {}
       },
-      "name": "Google Sheets - Find Top Patient",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "name": "Baserow - Find Top Waitlist Patient",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
       "position": [
         112,
         368
       ],
       "id": "a65a3295-fbea-428a-a69c-28fe7ec86630",
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "dR6JX2LbhtOkSffu",
-          "name": "Google Sheets account 2"
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Select highest-priority waitlist row (Baserow source of truth)\nconst PRIORITY_RANK = { Urgent: 0, Haute: 1, Normale: 2, Basse: 3 };\nconst rows = $input.all().map((item) => item.json);\nif (!rows.length) return [];\n\nconst sorted = [...rows].sort((a, b) => {\n  const pa = PRIORITY_RANK[String(a.Priorité ?? a.priorite ?? 'Normale').trim()] ?? 9;\n  const pb = PRIORITY_RANK[String(b.Priorité ?? b.priorite ?? 'Normale').trim()] ?? 9;\n  if (pa !== pb) return pa - pb;\n  return Number(a.id ?? 0) - Number(b.id ?? 0);\n});\n\nreturn [{ json: sorted[0] }];"
+      },
+      "name": "Select Top Waitlist Patient",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        368
+      ],
+      "id": "c8d9e0f1-a2b3-4c5d-8e9f-0a1b2c3d4e5f"
     },
     {
       "parameters": {
@@ -246,7 +251,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Shared Upstash Redis REST helpers for n8n Code nodes.\n// Env: REDIS_CONNECTION_URL, REDIS_REST_TOKEN\n\nconst REDIS_TIMEOUT_MS = 5000;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($env['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($env['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) {\n    return { ok: false, redisError: 'REDIS_CONNECTION_URL missing', acquired: false };\n  }\n  const headers = token ? { Authorization: `Bearer ${token}` } : {};\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);\n  try {\n    const res = await fetch(\n      `${base}/set/${encodeURIComponent(key)}/1?NX=true&EX=${ttlSec}`,\n      { method: 'POST', headers, signal: controller.signal },\n    );\n    clearTimeout(timer);\n    if (!res.ok) {\n      return { ok: false, redisError: `REDIS_HTTP_${res.status}`, acquired: false };\n    }\n    const data = await res.json();\n    return { ok: true, redisError: null, acquired: data.result === 'OK' };\n  } catch (e) {\n    clearTimeout(timer);\n    const msg = e?.name === 'AbortError' ? 'REDIS_TIMEOUT' : String(e?.message ?? e);\n    return { ok: false, redisError: msg, acquired: false };\n  }\n}\n\nconst TTL_SEC = 86400;\n\nfunction normPhone(p) {\n  return String(p ?? '').replace(/[\\s\\-\\(\\)\\.]/g, '').trim();\n}\n\nreturn (async () => {\n  const items = $input.all();\n  const root = items[0]?.json ?? {};\n  const phone = root['Téléphone (WhatsApp)'] ?? root.Telephone ?? root.Phone ?? '';\n  const phoneNorm = normPhone(phone);\n  const patientId = String(root.id ?? root.patient_id ?? root.Nom ?? phoneNorm).trim();\n\n  if (!phoneNorm && !patientId) {\n    return [{ json: { ...root, _waitlistSkip: true, _waitlistRedisError: 'MISSING_CONTACT' } }];\n  }\n\n  const dedupKey = phoneNorm\n    ? `waitlist:notified:${phoneNorm}`\n    : `waitlist:notified:patient:${patientId}`;\n  const lock = await redisSetNx(dedupKey, TTL_SEC);\n\n  if (!lock.ok) {\n    return [{\n      json: {\n        ...root,\n        _waitlistSkip: false,\n        _waitlistRedisError: lock.redisError,\n        _waitlistDedupKey: dedupKey,\n      },\n    }];\n  }\n  if (!lock.acquired) {\n    return [{\n      json: {\n        ...root,\n        _waitlistSkip: true,\n        _waitlistRedisError: null,\n        _waitlistDedupKey: dedupKey,\n      },\n    }];\n  }\n\n  return [{\n    json: {\n      ...root,\n      _waitlistSkip: false,\n      _waitlistRedisError: null,\n      _waitlistDedupKey: dedupKey,\n    },\n  }];\n})();\n"
+        "jsCode": "// Shared Upstash Redis REST helpers for n8n Code nodes.\n// Vars: REDIS_CONNECTION_URL, REDIS_REST_TOKEN\n\nconst REDIS_TIMEOUT_MS = 5000;\n\nasync function redisSetNx(key, ttlSec) {\n  const base = String($vars['REDIS_CONNECTION_URL'] ?? '').replace(/\\/+$/, '');\n  const token = String($vars['REDIS_REST_TOKEN'] ?? '').trim();\n  if (!base) {\n    return { ok: false, redisError: 'REDIS_CONNECTION_URL missing', acquired: false };\n  }\n  const headers = token ? { Authorization: `Bearer ${token}` } : {};\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);\n  try {\n    const res = await fetch(\n      `${base}/set/${encodeURIComponent(key)}/1?NX=true&EX=${ttlSec}`,\n      { method: 'POST', headers, signal: controller.signal },\n    );\n    clearTimeout(timer);\n    if (!res.ok) {\n      return { ok: false, redisError: `REDIS_HTTP_${res.status}`, acquired: false };\n    }\n    const data = await res.json();\n    return { ok: true, redisError: null, acquired: data.result === 'OK' };\n  } catch (e) {\n    clearTimeout(timer);\n    const msg = e?.name === 'AbortError' ? 'REDIS_TIMEOUT' : String(e?.message ?? e);\n    return { ok: false, redisError: msg, acquired: false };\n  }\n}\n\nconst TTL_SEC = 86400;\n\nfunction normPhone(p) {\n  return String(p ?? '').replace(/[\\s\\-\\(\\)\\.]/g, '').trim();\n}\n\nreturn (async () => {\n  const items = $input.all();\n  const root = items[0]?.json ?? {};\n  const phone = root['Téléphone (WhatsApp)'] ?? root.Telephone ?? root.Phone ?? '';\n  const phoneNorm = normPhone(phone);\n  const patientId = String(root.id ?? root.patient_id ?? root.Nom ?? phoneNorm).trim();\n\n  if (!phoneNorm && !patientId) {\n    return [{ json: { ...root, _waitlistSkip: true, _waitlistRedisError: 'MISSING_CONTACT' } }];\n  }\n\n  const dedupKey = phoneNorm\n    ? `waitlist:notified:${phoneNorm}`\n    : `waitlist:notified:patient:${patientId}`;\n  const lock = await redisSetNx(dedupKey, TTL_SEC);\n\n  if (!lock.ok) {\n    return [{\n      json: {\n        ...root,\n        _waitlistSkip: false,\n        _waitlistRedisError: lock.redisError,\n        _waitlistDedupKey: dedupKey,\n      },\n    }];\n  }\n  if (!lock.acquired) {\n    return [{\n      json: {\n        ...root,\n        _waitlistSkip: true,\n        _waitlistRedisError: null,\n        _waitlistDedupKey: dedupKey,\n      },\n    }];\n  }\n\n  return [{\n    json: {\n      ...root,\n      _waitlistSkip: false,\n      _waitlistRedisError: null,\n      _waitlistDedupKey: dedupKey,\n    },\n  }];\n})();\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -334,7 +339,7 @@
             "entries": [
               {
                 "name": "Access-Control-Allow-Origin",
-                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+                "value": "={{ $vars.VERCEL_FRONTEND_URL }}"
               },
               {
                 "name": "Access-Control-Allow-Credentials",
@@ -364,14 +369,14 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ ok: false, error: \"Redis unavailable\", detail: $json._waitlistRedisError }) }}",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"Redis unavailable\", detail: $json._waitlistRedisError ?? $json.message ?? $json.error }) }}",
         "options": {
           "responseCode": 500,
           "responseHeaders": {
             "entries": [
               {
                 "name": "Access-Control-Allow-Origin",
-                "value": "={{ $env[\"VERCEL_FRONTEND_URL\"] }}"
+                "value": "={{ $vars.VERCEL_FRONTEND_URL }}"
               },
               {
                 "name": "Access-Control-Allow-Credentials",
@@ -427,7 +432,7 @@
       "main": [
         [
           {
-            "node": "Google Sheets - Find Top Patient",
+            "node": "Baserow - Find Top Waitlist Patient",
             "type": "main",
             "index": 0
           }
@@ -452,7 +457,18 @@
         ]
       ]
     },
-    "Google Sheets - Find Top Patient": {
+    "Baserow - Find Top Waitlist Patient": {
+      "main": [
+        [
+          {
+            "node": "Select Top Waitlist Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Top Waitlist Patient": {
       "main": [
         [
           {
@@ -479,6 +495,13 @@
         [
           {
             "node": "If Waitlist Redis Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Waitlist Redis Failure",
             "type": "main",
             "index": 0
           }

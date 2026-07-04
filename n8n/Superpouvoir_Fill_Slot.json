@@ -33,7 +33,7 @@
         -96,
         0
       ],
-      "notes": "Replace YOUR_WAITLIST_WORKFLOW_ID with the n8n ID of \"No-Show Waitlist Engine\" (or your active waitlist cascade workflow). Incoming webhook payload is passed through automatically."
+      "notes": "Requires n8n variable WAITLIST_WORKFLOW_ID (No-Show Waitlist Engine workflow ID)."
     }
   ],
   "pinData": {},

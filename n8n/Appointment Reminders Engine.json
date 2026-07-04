@@ -23,25 +23,14 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "value": "1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU",
-          "mode": "list",
-          "cachedResultName": "gestion des patients ",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit?usp=drivesdk"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Feuille 1",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UE-OacJhqgZJcLPJYRvHOnJzg4PXn256X9iKtNaXSJU/edit#gid=0"
-        },
+        "authentication": "databaseToken",
+        "operation": "getAll",
+        "tableId": "={{ $vars.BASEROW_TABLE_ID }}",
+        "returnAll": true,
         "options": {}
       },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
       "position": [
         -560,
         320
@@ -49,9 +38,9 @@
       "id": "a1rem002-0002-4000-8000-000000000002",
       "name": "Get Confirmed Appointments",
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "dR6JX2LbhtOkSffu",
-          "name": "Google Sheets account 2"
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
         }
       }
     },
