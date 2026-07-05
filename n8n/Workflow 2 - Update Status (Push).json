@@ -4,7 +4,8 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "update-status",
+        "path": "deprecated-update-status-do-not-use",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },

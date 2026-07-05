@@ -4,6 +4,7 @@
     {
       "parameters": {
         "path": "get-notes",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -58,6 +59,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "post-note",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
