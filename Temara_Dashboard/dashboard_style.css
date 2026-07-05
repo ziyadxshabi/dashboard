@@ -16,7 +16,8 @@
   --radius-lg:   16px;
   --radius:      var(--radius-md);
   --radius-pill: 9999px;
-  --transition:  all 0.2s ease;
+  --ease: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition: background-color 0.4s var(--ease), border-color 0.4s var(--ease), color 0.4s var(--ease), transform 0.4s var(--ease), opacity 0.4s var(--ease), box-shadow 0.4s var(--ease);
   --sidebar-w:   260px;
   --glass-blur:  blur(16px) saturate(110%);
   --text-table:  12px;
@@ -38,10 +39,10 @@
   --tabbar-float-offset: calc(88px + var(--safe-bottom));
 
   /* Executive status colors */
-  --danger:      #A63A2B;
-  --danger-dim:  rgba(166, 58, 43, 0.10);
-  --success:     #5E7359;
-  --success-dim: rgba(94, 115, 89, 0.12);
+  --danger:      #FF4D4D;
+  --danger-dim:  rgba(255, 77, 77, 0.12);
+  --success:     #D5FF00;
+  --success-dim: rgba(213, 255, 0, 0.12);
 
   /* Premium medical theme (Client Portal — unchanged) */
   --med-blue:        #1e6fd9;
@@ -98,47 +99,57 @@
   flex-shrink: 0;
 }
 
-/* ── 1b. THEME: OAK LOUNGE (Premium Dark Architectural) ────── */
+/* ── 1b. THEME: OAK LOUNGE → Ultra Dark Glass (reference overhaul) ─ */
+/* Accent: Neon Lime #D5FF00 applied by default. To restore DentaFlow Gold, set
+   --accent-primary / --accent-gold to #E3C18F and --accent-primary to #D96B27. */
 html[data-theme="oak-lounge"] {
-  --bg-main:       #141211;
-  --bg-sidebar:    #1C1917;
-  --bg-card:       rgba(34, 30, 28, 0.65);
-  --border-color:  rgba(227, 193, 143, 0.15);
-  --accent-primary:#D96B27;
-  --accent-gold:   #E3C18F;
-  --text-main:     #F4F1EE;
-  --text-muted:    #9E948C;
+  --bg-main:       #0A0A0F;
+  --bg-sidebar:    transparent;
+  --bg-card:       #141419;
+  --bg-button:     #1E1E24;
+  --bg-table-header: #111116;
+  --border-color:  rgba(255, 255, 255, 0.04);
+  --border-divider: rgba(255, 255, 255, 0.08);
+  --accent-primary:#D5FF00;
+  --accent-gold:   #D5FF00;
+  --text-main:     #FFFFFF;
+  --text-muted:    #8C8C9A;
+  --text-tertiary: #5C5C6A;
 
-  --text-hierarchy-primary:   #F3F4F6;
-  --text-hierarchy-secondary: #9CA3AF;
-  --text-hierarchy-tertiary:  rgba(255, 255, 255, 0.5);
-  --divider-subtle:           rgba(255, 255, 255, 0.06);
+  --text-hierarchy-primary:   #FFFFFF;
+  --text-hierarchy-secondary: #8C8C9A;
+  --text-hierarchy-tertiary:  #5C5C6A;
+  --divider-subtle:           rgba(255, 255, 255, 0.04);
   --surface-row-hover:        rgba(255, 255, 255, 0.03);
-  --card-padding:             1.5rem;
+  --card-padding:             20px 24px;
+  --section-gap:              24px;
+  --chart-inactive:           #2A2A35;
 
-  --tabbar-float-bg:     rgba(34, 30, 28, 0.9);
-  --tabbar-float-border: rgba(227, 193, 143, 0.15);
-  --tabbar-float-shadow: none;
+  --tabbar-float-bg:     rgba(20, 20, 25, 0.92);
+  --tabbar-float-border: rgba(255, 255, 255, 0.08);
+  --tabbar-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 
-  --shadow-card:   none;
-  --shadow-hover:  none;
-  --border-hairline: 1px solid rgba(255, 255, 255, 0.08);
-  --glass-blur:    blur(16px) saturate(110%);
-  --input-bg:      rgba(20, 18, 17, 0.55);
+  --shadow-card:   0 8px 24px rgba(0, 0, 0, 0.2);
+  --shadow-hover:  0 8px 28px rgba(0, 0, 0, 0.28);
+  --border-hairline: 1px solid rgba(255, 255, 255, 0.04);
+  --glass-blur:    blur(24px);
+  --input-bg:      #1E1E24;
+  --neon-glow:     0 0 12px rgba(213, 255, 0, 0.15);
 
-  /* Legacy aliases consumed by components */
   --void:          var(--bg-main);
   --surface:       var(--bg-card);
-  --surface-2:     rgba(28, 25, 23, 0.80);
+  --surface-2:     #1E1E24;
   --border:        var(--border-color);
-  --border-2:      rgba(227, 193, 143, 0.22);
+  --border-2:      var(--border-divider);
   --accent:        var(--accent-primary);
   --accent-2:      var(--accent-gold);
-  --accent-dim:    rgba(217, 107, 39, 0.10);
-  --accent-glow:   transparent;
+  --accent-dim:    rgba(213, 255, 0, 0.12);
+  --accent-glow:   var(--neon-glow);
   --danger-glow:   transparent;
   --text:          var(--text-main);
   --text-dim:      var(--text-muted);
+
+  color-scheme: dark;
 }
 
 html[data-theme="oak-lounge"],
@@ -209,8 +220,8 @@ html[data-theme="pearl-clinic"] body {
 
 html {
   font-size: 16px;
-  background: var(--bg-main, #141211);
-  color: var(--text-main, #F4F1EE);
+  background: var(--bg-main, #0A0A0F);
+  color: var(--text-main, #FFFFFF);
   min-height: 100%;
   min-height: 100dvh;
   overscroll-behavior-y: none;
@@ -224,8 +235,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg-main, #141211);
-  color: var(--text-main, #F4F1EE);
+  background: var(--bg-main, #0A0A0F);
+  color: var(--text-main, #FFFFFF);
   overscroll-behavior-y: none;
 }
 
@@ -252,8 +263,9 @@ h1, h2, h3,
 .reclaimed-banner__value,
 .hero-value,
 .doctor-metric-value {
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
+  color: var(--text-hierarchy-primary, #FFFFFF);
 }
 
 .kpi-label,
@@ -268,25 +280,30 @@ h1, h2, h3,
 .chart-sub {
   letter-spacing: 0.01em;
   font-weight: 500;
+  font-size: 13px;
+  color: var(--text-hierarchy-secondary, #8C8C9A);
 }
 
-/* ── 2c. APPLE GLASS PANELS ─────────────────────────────────── */
+/* ── 2c. GLASS — sidebar only; cards stay flat matte ─────────── */
 .sidebar,
+.doctor-account-dock .account-card {
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
 .reclaimed-banner,
 .kpi-card,
 .chart-card,
 .schedule-widget,
 .settings-card,
-.sidebar-profile,
 .view-placeholder-card,
 .waitlist-form-panel,
 .calendar-embed-panel,
 .crm-table-panel,
 .pipeline-column,
 .sms-campaign-panel,
-.hero-sync {
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+.hero-sync,
+.team-messages-panel {
   box-shadow: var(--shadow-card);
 }
 
@@ -305,8 +322,9 @@ h1, h2, h3,
   left: 0;
   bottom: 0;
   width: var(--sidebar-w);
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-color);
+  background: linear-gradient(165deg, rgba(32, 32, 38, 0.4) 0%, rgba(15, 15, 20, 0.6) 100%);
+  border-right: none;
+  border-radius: 0 24px 24px 0;
   display: flex;
   flex-direction: column;
   padding: 28px 16px 24px;
@@ -368,26 +386,26 @@ h1, h2, h3,
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 18px;
-  border-radius: var(--radius);
+  padding: 12px 16px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-dim);
+  color: var(--text-hierarchy-secondary, var(--text-dim));
   text-decoration: none;
   transition: var(--transition);
   position: relative;
 }
 
 .nav-link:hover {
-  color: var(--text);
+  color: var(--text-main);
   background: rgba(255, 255, 255, 0.04);
-  transform: translateX(2px);
+  transform: none;
 }
 
 .nav-link.is-active {
-  color: var(--accent-gold);
-  background: var(--accent-dim);
-  box-shadow: inset 0 0 0 1px var(--border-color);
+  color: #FFFFFF;
+  background: var(--bg-button, #1E1E24);
+  box-shadow: none;
 }
 
 .nav-icon {
@@ -1181,24 +1199,26 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   justify-content: center;
   width: 100%;
   margin-top: 4px;
-  padding: 14px 24px;
+  padding: 12px 20px;
   font-family: var(--font-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--text-main);
-  background: var(--accent-primary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  background: var(--bg-button, #1E1E24);
+  border: 1px solid var(--border-divider, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
   cursor: pointer;
   box-shadow: none;
-  transition: opacity 0.25s ease, transform 0.2s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .btn-gold:hover {
-  opacity: 0.92;
+  background: #25252c;
+  border-color: rgba(255, 255, 255, 0.12);
+  opacity: 1;
 }
 
 .btn-gold:active {
@@ -1738,14 +1758,16 @@ html[data-theme="pearl-clinic"] .dentaflow-os-watermark {
 .kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--card-padding, 1.5rem);
+  border-radius: 16px;
+  padding: var(--card-padding, 20px 24px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   position: relative;
   overflow: hidden;
   transition: var(--transition);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .kpi-card:hover {
@@ -1766,19 +1788,19 @@ html[data-theme="pearl-clinic"] .dentaflow-os-watermark {
 .kpi-card:hover::before { opacity: 1; }
 
 .kpi-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--text-hierarchy-secondary, var(--text-muted));
 }
 
 .kpi-number {
-  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-size: 24px;
   font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  color: var(--text-hierarchy-primary, var(--text-main));
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-hierarchy-primary, #FFFFFF);
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1898,12 +1920,14 @@ html[data-theme="pearl-clinic"] .dentaflow-os-watermark {
 .schedule-widget {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--card-padding, 1.5rem);
+  border-radius: 16px;
+  padding: var(--card-padding, 20px 24px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   transition: var(--transition);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* ── Team Messages (Assistant handoff feed) ─────────────────────────────── */
@@ -5258,8 +5282,11 @@ body.mode-assistant #superpouvoirs-panel:has(.superpouvoirs-accordion.is-open) .
 .metric-card,
 .doctor-metric-card,
 .settings-card {
-  border-radius: 6px !important;
-  border: var(--border-hairline) !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  background: var(--bg-card, #141419) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .status-pill,
@@ -6076,28 +6103,23 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 }
 
 #view-analytics .chart-card--analytics {
-  background-color: #111118;
+  background-color: var(--bg-card, #141419);
   border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 16px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   min-width: 0;
-}
-
-#view-analytics .chart-card--analytics .chart-title {
-  margin: 0;
-}
-
-#view-analytics .chart-card--analytics .chart-sub {
-  margin: 0 0 0.75rem;
+  box-shadow: var(--shadow-card);
 }
 
 #view-analytics .chart-canvas-wrap {
   position: relative;
   width: 100%;
   min-width: 0;
+  background: var(--bg-card, #141419);
+  border-radius: 12px;
 }
 
 #view-analytics .chart-canvas-wrap canvas {
@@ -6296,4 +6318,151 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   #doctor-shell #view-settings .settings-sync-status__value {
     font-size: 13px;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ULTRA DARK GLASS — component overrides (oak-lounge)
+   Reference: ultra_dark_glass design system
+   ══════════════════════════════════════════════════════════════ */
+
+html[data-theme="oak-lounge"] .chart-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-hierarchy-secondary, #8C8C9A);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme="oak-lounge"] .chart-sub {
+  font-size: 12px;
+  color: var(--text-tertiary, #5C5C6A);
+}
+
+html[data-theme="oak-lounge"] #view-analytics .chart-card--analytics .chart-title {
+  margin: 0;
+}
+
+html[data-theme="oak-lounge"] #view-analytics .chart-card--analytics .chart-sub {
+  margin: 0 0 0.75rem;
+}
+
+html[data-theme="oak-lounge"] .chart-toggle {
+  background: var(--bg-button, #1E1E24);
+  border: 1px solid var(--border-divider, rgba(255, 255, 255, 0.08));
+}
+
+html[data-theme="oak-lounge"] .chart-toggle-slider {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+html[data-theme="oak-lounge"] .chart-toggle-btn.is-active {
+  color: var(--accent-primary, #D5FF00);
+}
+
+html[data-theme="oak-lounge"] .tab-link {
+  color: var(--text-hierarchy-secondary, #8C8C9A);
+  border-radius: 8px;
+}
+
+html[data-theme="oak-lounge"] .tab-link.is-active {
+  color: #FFFFFF;
+  background: var(--bg-button, #1E1E24);
+}
+
+html[data-theme="oak-lounge"] .reclaimed-banner {
+  background: var(--bg-card, #141419);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow-card);
+}
+
+html[data-theme="oak-lounge"] .hero-value--revenue {
+  color: var(--accent-primary, #D5FF00);
+}
+
+html[data-theme="oak-lounge"] .crm-table thead th,
+html[data-theme="oak-lounge"] .waitlist-table thead th,
+html[data-theme="oak-lounge"] .data-table thead th,
+html[data-theme="oak-lounge"] .roster-table thead th,
+html[data-theme="oak-lounge"] .schedule-table thead th {
+  background: var(--bg-table-header, #111116);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-hierarchy-secondary, #8C8C9A);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-left: none;
+  border-right: none;
+}
+
+html[data-theme="oak-lounge"] .crm-table tbody td,
+html[data-theme="oak-lounge"] .waitlist-table tbody td,
+html[data-theme="oak-lounge"] .data-table tbody td,
+html[data-theme="oak-lounge"] .roster-table tbody td,
+html[data-theme="oak-lounge"] .schedule-table tbody td {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-main, #FFFFFF);
+}
+
+html[data-theme="oak-lounge"] .crm-table tbody tr:hover td {
+  background: var(--surface-row-hover, rgba(255, 255, 255, 0.03));
+}
+
+html[data-theme="oak-lounge"] .row-action-btn,
+html[data-theme="oak-lounge"] .btn-account-menu,
+html[data-theme="oak-lounge"] .waitlist-submit-btn,
+html[data-theme="oak-lounge"] .settings-input,
+html[data-theme="oak-lounge"] .waitlist-input,
+html[data-theme="oak-lounge"] .waitlist-select {
+  background: var(--bg-button, #1E1E24);
+  border: 1px solid var(--border-divider, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+}
+
+html[data-theme="oak-lounge"] .row-action-btn:focus-visible,
+html[data-theme="oak-lounge"] .btn-account-menu:focus-visible {
+  outline: 2px solid rgba(213, 255, 0, 0.45);
+  outline-offset: 1px;
+}
+
+html[data-theme="oak-lounge"] .btn-gold.btn-gold--accent,
+html[data-theme="oak-lounge"] .waitlist-submit-btn.btn-gold {
+  background: var(--accent-primary, #D5FF00);
+  color: #0A0A0F;
+  border-color: transparent;
+  box-shadow: var(--neon-glow);
+}
+
+html[data-theme="oak-lounge"] .chart-canvas-wrap,
+html[data-theme="oak-lounge"] .chart-body {
+  --chart-inactive-bar: var(--chart-inactive, #2A2A35);
+}
+
+html[data-theme="oak-lounge"] .status-indicator__dot--live,
+html[data-theme="oak-lounge"] .kpi-trend.up {
+  color: var(--accent-primary, #D5FF00);
+}
+
+html[data-theme="oak-lounge"] .sidebar-brand-sub {
+  color: var(--text-hierarchy-secondary, #8C8C9A);
+}
+
+html[data-theme="oak-lounge"] .profile-avatar {
+  background: var(--bg-button, #1E1E24);
+  border: 1px solid var(--border-divider, rgba(255, 255, 255, 0.08));
+  color: var(--accent-primary, #D5FF00);
+}
+
+/* Hook class on <html> — enables future scoped overrides */
+html.theme-ultra-glass[data-theme="oak-lounge"] body {
+  background-color: #0A0A0F;
 }
