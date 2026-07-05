@@ -12,6 +12,7 @@ const CONFIG = {
   DELAY_ALERT_PROXY: '/api/n8n-delay-alert',
   UPDATE_STATUS_PROXY: '/api/update-status',
   FILL_GAP_PROXY: '/api/fill-gap',
+  TEAM_NOTES_PROXY: '/api/team-notes',
   ENDPOINTS: {
     GET_ROSTER: '/webhook/assistant-data',
     UPDATE_STATUS: '/webhook/update-status',
@@ -422,7 +423,7 @@ let handoffNotes = [];
 
     try {
       const response = await fetch(
-        `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.GET_NOTES}`,
+        CONFIG.TEAM_NOTES_PROXY,
         { method: 'GET', headers: rosterFetchHeaders() }
       );
 
@@ -738,7 +739,7 @@ let handoffNotes = [];
 
       try {
         const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.POST_NOTE}`,
+          CONFIG.TEAM_NOTES_PROXY,
           {
             method: 'POST',
             headers: apiHeaders(),

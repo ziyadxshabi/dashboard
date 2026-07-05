@@ -136,6 +136,7 @@ const CONFIG = {
   DATA_URL:             '/api/dashboard-data',
   ROSTER_PROXY:         '/api/roster',
   UPDATE_STATUS_PROXY:  '/api/update-status',
+  TEAM_NOTES_PROXY:     '/api/team-notes',
   DAILY_GOAL_MAD:       15000,
   REFRESH_INTERVAL_MS:  300_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
@@ -544,25 +545,25 @@ const VIEW_MAP = {
   settings:   'view-settings',
 };
 
+const DEFAULT_VIEW_HASH = '#overview';
+
 let activeView = 'overview';
 
-function initNavigation() {
-  const links = document.querySelectorAll('.nav-link, .tab-link');
-  links.forEach(link => {
-    link?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const nav = link.dataset.nav;
-      if (nav && VIEW_MAP[nav]) navigateToView(nav);
-    });
-  });
+function viewKeyFromHash(hash = window.location.hash) {
+  if (!hash) return null;
+  const key = hash.replace(/^#/, '');
+  return VIEW_MAP[key] ? key : null;
 }
 
-function navigateToView(viewKey) {
+function switchTab(hashId) {
+  const viewKey = viewKeyFromHash(hashId);
+  if (!viewKey) return;
+
   const targetId = VIEW_MAP[viewKey];
   if (!targetId || viewKey === activeView) return;
 
   const views = document.querySelectorAll('.dashboard-view');
-  const target  = document.getElementById(targetId);
+  const target = document.getElementById(targetId);
 
   views.forEach(view => {
     const isTarget = view.id === targetId;
@@ -603,6 +604,40 @@ function navigateToView(viewKey) {
       if (osBootSequencePlayed) animateDoctorHubMetrics();
     });
   }
+}
+
+function syncTabFromHash() {
+  if (!document.body.classList.contains('mode-doctor')) return;
+
+  const hash = window.location.hash;
+  const viewKey = viewKeyFromHash(hash);
+
+  if (viewKey) {
+    switchTab(hash);
+    return;
+  }
+
+  const base = window.location.pathname + window.location.search;
+  if (hash !== DEFAULT_VIEW_HASH) {
+    history.replaceState(null, '', `${base}${DEFAULT_VIEW_HASH}`);
+  }
+  switchTab(DEFAULT_VIEW_HASH);
+}
+
+function initNavigation() {
+  syncTabFromHash();
+}
+
+function navigateToView(viewKey) {
+  if (!VIEW_MAP[viewKey]) return;
+
+  const targetHash = `#${viewKey}`;
+  if (window.location.hash === targetHash) {
+    switchTab(targetHash);
+    return;
+  }
+
+  window.location.hash = targetHash;
 }
 
 /* ── CHART PERIOD TOGGLE ─────────────────────────────────────────────────── */
@@ -2470,13 +2505,16 @@ function enterClientPortal(replaceHash = true) {
 
 function enterDoctorApp() {
   setAppMode('doctor');
-  history.replaceState(null, '', window.location.pathname + window.location.search);
+  const base = window.location.pathname + window.location.search;
+  const hash = viewKeyFromHash(window.location.hash) ? window.location.hash : DEFAULT_VIEW_HASH;
+  history.replaceState(null, '', `${base}${hash}`);
 
   if (!document.body.classList.contains('auth-gate-active')) {
     initializeDoctorDashboard();
     if (sessionStorage.getItem('dentaflow_session')) {
       unlockDashboard();
     }
+    syncTabFromHash();
   }
 }
 
@@ -2498,6 +2536,8 @@ function initAppMode() {
       enterClientPortal(false);
     } else if (document.body.classList.contains('mode-client')) {
       enterDoctorApp();
+    } else if (document.body.classList.contains('mode-doctor')) {
+      syncTabFromHash();
     }
   });
 }
@@ -3518,7 +3558,7 @@ async function loadTeamNotes() {
   }
 
   try {
-    const response = await fetch(`${CONFIG.API_BASE}/webhook/get-notes`, {
+    const response = await fetch(CONFIG.TEAM_NOTES_PROXY, {
       method: 'GET',
       headers: getApiAuthHeaders(),
       cache: 'no-store',

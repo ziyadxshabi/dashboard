@@ -1,0 +1,174 @@
+{
+  "name": "Lead Capture Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f8a3c1d2-4e5b-6a7c-8d9e-0f1a2b3c4d5e",
+      "name": "Webhook - Lead Capture",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        0
+      ],
+      "webhookId": "lead-capture"
+    },
+    {
+      "parameters": {
+        "jsCode": "function toE164MA(raw) {\n  if (raw == null || raw === '') return '';\n  let phone = String(raw).replace(/[\\s\\-\\(\\)\\.]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('+')) return phone;\n  if (phone.startsWith('00')) return '+' + phone.slice(2);\n  if (phone.startsWith('212')) return '+' + phone;\n  if (phone.startsWith('0')) return '+212' + phone.slice(1);\n  return '+212' + phone;\n}\n\nconst body = $input.first().json.body ?? $input.first().json;\nconst nom = String(body.nom ?? '').trim();\nconst telephone = toE164MA(body.telephone);\n\nif (!nom || !telephone) {\n  throw new Error('nom and telephone are required');\n}\n\nreturn [{\n  json: {\n    Nom: nom,\n    Phone: telephone\n  }\n}];"
+      },
+      "id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+      "name": "Normalize Phone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "databaseToken",
+        "operation": "create",
+        "tableId": "={{ $vars.BASEROW_LEADS_TABLE_ID }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Nom",
+              "fieldValue": "={{ $json.Nom }}"
+            },
+            {
+              "fieldId": "Phone",
+              "fieldValue": "={{ $json.Phone }}"
+            }
+          ]
+        }
+      },
+      "id": "b2c3d4e5-f6a7-4890-b123-456789abcdef0",
+      "name": "Baserow - Add Lead",
+      "type": "n8n-nodes-base.baserow",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        0
+      ],
+      "credentials": {
+        "baserowTokenApi": {
+          "id": "6hVb8zYN7G3EQPmh",
+          "name": "Baserow account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "new-channel",
+          "mode": "name"
+        },
+        "text": "=🚨 *Nouveau Lead (Abandon Réservation)* 🚨\nNom: {{ $('Normalize Phone').item.json.Nom }}\nTéléphone: {{ $('Normalize Phone').item.json.Phone }}\n_Ce patient a quitté le calendrier sans réserver. À rappeler en urgence._",
+        "otherOptions": {}
+      },
+      "id": "c3d4e5f6-a7b8-4901-c234-56789abcdef1",
+      "name": "Slack - Abandon Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        192,
+        0
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "gouAlYz1B29dwrh8",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, message: 'Lead captured' }) }}",
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-4012-d345-6789abcdef12",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Lead Capture": {
+      "main": [
+        [
+          {
+            "node": "Normalize Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Phone": {
+      "main": [
+        [
+          {
+            "node": "Baserow - Add Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow - Add Lead": {
+      "main": [
+        [
+          {
+            "node": "Slack - Abandon Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Abandon Alert": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Bn61UktJ39ZsSg1g",
+    "timezone": "Africa/Casablanca",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "e5f6a7b8-c9d0-4123-e456-789abcdef123",
+  "meta": {
+    "instanceId": "9357593be750802b974f1c2e261cc9bbc733ef5e1adb7e70c10db5e380968ebc"
+  },
+  "nodeGroups": [],
+  "id": "Lc9pTuR3Wa1tCh4r",
+  "tags": []
+}
