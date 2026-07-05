@@ -15,8 +15,7 @@
   --radius-lg:   16px;
   --radius:      var(--radius-md);
   --radius-pill: 9999px;
-  --ease: cubic-bezier(0.25, 0.8, 0.25, 1);
-  --transition: background-color 0.4s var(--ease), border-color 0.4s var(--ease), color 0.4s var(--ease), transform 0.4s var(--ease), opacity 0.4s var(--ease), box-shadow 0.4s var(--ease);
+  --transition:  all 0.2s ease;
   --sidebar-w:   260px;
   --glass-blur:  blur(16px) saturate(110%);
   --text-table:  12px;
@@ -31,53 +30,45 @@
   --safe-top:        max(16px, env(safe-area-inset-top));
   --safe-bottom:     max(24px, env(safe-area-inset-bottom));
 
-  --danger:      #FF4D4D;
-  --danger-dim:  rgba(255, 77, 77, 0.12);
-  --success:     #D5FF00;
-  --success-dim: rgba(213, 255, 0, 0.12);
+  --danger:      #A63A2B;
+  --danger-dim:  rgba(166, 58, 43, 0.10);
+  --success:     #5E7359;
+  --success-dim: rgba(94, 115, 89, 0.12);
 }
 
 html[data-theme="oak-lounge"] {
-  --bg-main:       #0A0A0F;
-  --bg-sidebar:    transparent;
-  --bg-card:       #141419;
-  --bg-button:     #1E1E24;
-  --bg-table-header: #111116;
-  --border-color:  rgba(255, 255, 255, 0.04);
-  --border-divider: rgba(255, 255, 255, 0.08);
-  --accent-primary:#D5FF00;
-  --accent-gold:   #D5FF00;
-  --text-main:     #FFFFFF;
-  --text-muted:    #8C8C9A;
-  --text-tertiary: #5C5C6A;
+  --bg-main:       #141211;
+  --bg-sidebar:    #1C1917;
+  --bg-card:       rgba(34, 30, 28, 0.65);
+  --border-color:  rgba(227, 193, 143, 0.15);
+  --accent-primary:#D96B27;
+  --accent-gold:   #E3C18F;
+  --text-main:     #F4F1EE;
+  --text-muted:    #9E948C;
 
-  --text-hierarchy-primary:   #FFFFFF;
-  --text-hierarchy-secondary: #8C8C9A;
-  --text-hierarchy-tertiary:  #5C5C6A;
-  --divider-subtle:           rgba(255, 255, 255, 0.04);
+  /* Visual hierarchy — contrast over scale */
+  --text-hierarchy-primary:   #F3F4F6;
+  --text-hierarchy-secondary: #9CA3AF;
+  --text-hierarchy-tertiary:  rgba(255, 255, 255, 0.5);
+  --divider-subtle:           rgba(255, 255, 255, 0.06);
   --surface-row-hover:        rgba(255, 255, 255, 0.03);
-  --card-padding:             20px 24px;
-  --chart-inactive:           #2A2A35;
-
-  --shadow-card:   0 8px 24px rgba(0, 0, 0, 0.2);
-  --border-hairline: 1px solid rgba(255, 255, 255, 0.04);
-  --glass-blur:    blur(24px);
-  --input-bg:      #1E1E24;
-  --neon-glow:     0 0 12px rgba(213, 255, 0, 0.15);
+  --card-padding:             1.5rem;
+  --shadow-hover:  none;
+  --border-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-blur:    blur(16px) saturate(110%);
 
   --void:          var(--bg-main);
   --surface:       var(--bg-card);
-  --surface-2:     #1E1E24;
+  --surface-2:     rgba(28, 25, 23, 0.80);
   --border:        var(--border-color);
-  --border-2:      var(--border-divider);
+  --border-2:      rgba(227, 193, 143, 0.22);
   --accent:        var(--accent-primary);
   --accent-2:      var(--accent-gold);
-  --accent-dim:    rgba(213, 255, 0, 0.12);
+  --accent-dim:    rgba(217, 107, 39, 0.10);
   --text:          var(--text-main);
   --text-dim:      var(--text-muted);
-  --accent-glow:   var(--neon-glow);
-
-  color-scheme: dark;
+  --input-bg:      rgba(255, 255, 255, 0.03);
+  --accent-glow:   rgba(227, 193, 143, 0.15);
 }
 
 html[data-theme="oak-lounge"],
@@ -263,11 +254,8 @@ body {
   left: 0;
   bottom: 0;
   width: var(--sidebar-w);
-  background: linear-gradient(165deg, rgba(32, 32, 38, 0.4) 0%, rgba(15, 15, 20, 0.6) 100%);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-right: none;
-  border-radius: 0 24px 24px 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   padding: 28px 16px 24px;
@@ -329,26 +317,26 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-hierarchy-secondary, var(--text-dim));
+  color: var(--text-dim);
   text-decoration: none;
   transition: var(--transition);
   position: relative;
 }
 
 .nav-link:hover {
-  color: var(--text-main);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.04);
-  transform: none;
+  transform: translateX(2px);
 }
 
 .nav-link.is-active {
-  color: #FFFFFF;
-  background: var(--bg-button, #1E1E24);
-  box-shadow: none;
+  color: var(--accent-gold);
+  background: var(--accent-dim);
+  box-shadow: inset 0 0 0 1px var(--border-color);
 }
 
 .nav-icon {
@@ -5194,59 +5182,4 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   .filter-toggle__label {
     font-size: 0.75rem;
   }
-}
-
-/* ══ Ultra Dark Glass — assistant shell overrides (oak-lounge) ══ */
-html[data-theme="oak-lounge"] .assistant-panel,
-html[data-theme="oak-lounge"] .pulse-card,
-html[data-theme="oak-lounge"] .roster-card,
-html[data-theme="oak-lounge"] .settings-card,
-html[data-theme="oak-lounge"] .handoff-board {
-  background: var(--bg-card, #141419);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 16px;
-  box-shadow: var(--shadow-card);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-html[data-theme="oak-lounge"] .pulse-card__label,
-html[data-theme="oak-lounge"] .roster-card__meta {
-  font-size: 13px;
-  color: var(--text-hierarchy-secondary, #8C8C9A);
-}
-
-html[data-theme="oak-lounge"] .pulse-card__value,
-html[data-theme="oak-lounge"] .roster-card__title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #FFFFFF;
-}
-
-html[data-theme="oak-lounge"] .btn-gold {
-  background: var(--bg-button, #1E1E24);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  text-transform: none;
-  font-size: 13px;
-}
-
-html[data-theme="oak-lounge"] .roster-table thead th,
-html[data-theme="oak-lounge"] .waitlist-table thead th {
-  background: var(--bg-table-header, #111116);
-  font-size: 12px;
-  text-transform: uppercase;
-  color: var(--text-hierarchy-secondary, #8C8C9A);
-  border-left: none;
-  border-right: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-html[data-theme="oak-lounge"] .roster-table tbody td,
-html[data-theme="oak-lounge"] .waitlist-table tbody td {
-  border-left: none !important;
-  border-right: none !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  font-size: 13px;
-  color: #FFFFFF;
 }
