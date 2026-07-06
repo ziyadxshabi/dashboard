@@ -443,7 +443,7 @@ let handoffNotes = [];
       handoffNotes = rawRows.map(normalizeHandoffRecord).filter(Boolean);
       renderHandoffBoard();
     } catch (error) {
-      console.error('[Handoff] Load failed:', error);
+      console.error('[Handoff] Load failed:', error?.message || error);
       handoffNotes = [];
       renderHandoffBoard({
         errorMessage: 'Impossible de charger les transmissions — vérifiez la connexion n8n.',
@@ -773,7 +773,7 @@ let handoffNotes = [];
 
         showToast('Note d\'équipe publiée.', 'success');
       } catch (error) {
-        console.error('[Handoff] POST failed:', error);
+        console.error('[Handoff] POST failed:', error?.message || error);
         handoffNotes = handoffNotes.filter(note => note.id !== tempId);
         renderHandoffBoard();
         showToast('Échec de la publication — réessayez.', 'error');
@@ -1926,7 +1926,7 @@ let handoffNotes = [];
       animateInlineConfirmSuccess(ids);
       showToast(`${ids.length} rendez-vous confirmés avec succès`, 'success');
     } catch (error) {
-      console.error('[Bulk Confirm] Failed:', error);
+      console.error('[Bulk Confirm] Failed:', error?.message || error);
       revertOptimisticBulkSnapshots(optimisticSnapshots);
       showToast('Erreur de synchronisation. Annulation des changements.', 'error');
     }
@@ -1941,7 +1941,7 @@ let handoffNotes = [];
     const optimisticSnapshots = applyOptimisticBulkCancel(records);
 
     try {
-      console.log('Payload sending:', cancelPayload);
+      console.log('[Bulk Cancel] Dispatch | RowIDs: ' + (cancelPayload.rowIds?.length || 0));
       const [cancelResult] = await Promise.all([
         postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, cancelPayload),
         animateRowsVaporize(ids),
@@ -1953,14 +1953,14 @@ let handoffNotes = [];
       clearBulkSelection();
       if (cancelResult?.status === 'partial_success') {
         showToast(
-          cancelResult.message || 'Annulé en base uniquement (patient sans ID Calendrier).',
+          'Annulation Partielle : La base de données a été mise à jour, mais la synchronisation avec Google Sheets a échoué. Veuillez vérifier le fichier.',
           'warning'
         );
       } else {
         showToast('Rendez-vous annulés avec succès', 'success');
       }
     } catch (error) {
-      console.error('[Bulk Cancel] Failed:', error);
+      console.error('[Bulk Cancel] Failed:', error?.message || error);
       revertOptimisticBulkSnapshots(optimisticSnapshots);
       loadPlanning();
       showToast('Erreur: Annulation échouée.', 'error');
@@ -1981,12 +1981,12 @@ let handoffNotes = [];
     if (btnBulkSms) btnBulkSms.disabled = true;
 
     try {
-      console.log('Payload sending:', { rowIds: targetRowIds });
+      console.log('[Bulk SMS] Dispatch | RowIDs: ' + (targetRowIds?.length || 0));
       const result = await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: targetRowIds });
       const message = result?.message || 'SMS groupés envoyés avec succès.';
       showToast(message, 'success');
     } catch (error) {
-      console.error('[Bulk SMS] Failed:', error);
+      console.error('[Bulk SMS] Failed:', error?.message || error);
       restoreBulkSelection(ids);
       showToast('Erreur: envoi SMS échoué.', 'error');
     } finally {
@@ -2022,10 +2022,9 @@ let handoffNotes = [];
     return parsed.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' }) === getTodayDateKey();
   }
 
-  /** Planning du Jour — keep only today's appointments when dates are present. */
+  /** Planning du Jour — only today's appointments; undated rows are excluded. */
   function filterTodayRosterRecords(records) {
-    const dated = records.filter(record => record.rawDate != null && record.rawDate !== '');
-    if (!dated.length) return records;
+    if (!Array.isArray(records) || records.length === 0) return [];
     return records.filter(record => isAppointmentToday(record.rawDate));
   }
 
@@ -2456,7 +2455,7 @@ let handoffNotes = [];
       await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: [parsed] });
       showToast('SMS envoyé.', 'success');
     } catch (error) {
-      console.error('[Quick SMS] Failed:', error);
+      console.error('[Quick SMS] Failed:', error?.message || error);
       showToast('Échec de l\'envoi SMS.', 'error');
     }
   }
@@ -3113,7 +3112,7 @@ let handoffNotes = [];
     try {
       return fn();
     } catch (error) {
-      console.warn(`[DentaFlow] ${label} failed:`, error);
+      console.warn(`[DentaFlow] ${label} failed:`, error?.message || error);
       return null;
     }
   }
@@ -3806,10 +3805,6 @@ let handoffNotes = [];
     const contentType = response.headers.get('content-type') || '';
     const rawText = await response.text();
 
-    console.log('[Roster] HTTP', response.status, response.statusText, '|', url);
-    console.log('[Roster] Content-Type:', contentType);
-    console.log('[Roster] Raw body:', rawText);
-
     let payload;
     try {
       payload = rawText.trim() ? JSON.parse(rawText) : [];
@@ -3817,14 +3812,14 @@ let handoffNotes = [];
       throw new Error(`Réponse non-JSON (${contentType || 'unknown'}): ${parseError.message}`);
     }
 
-    console.log('[Roster] Parsed JSON payload:', payload);
-
     if (!response.ok) {
       const n8nFromBody = getN8nWebhookErrorMessage(payload);
       throw new Error(n8nFromBody || `HTTP ${response.status}: ${rawText.slice(0, 200)}`);
     }
 
     const pipeline = buildRosterPipeline(payload);
+    const rowCount = Array.isArray(pipeline?.rawRows) ? pipeline.rawRows.length : 0;
+    console.log('[Roster Sync] Success | Rows: ' + rowCount + ' | Status: ' + response.status + ' OK');
 
     return { response, contentType, rawText, url, payload, pipeline };
   }
@@ -3834,7 +3829,7 @@ let handoffNotes = [];
     setSyncIndicator('loading');
 
     const primaryUrl = CONFIG.ROSTER_PROXY;
-    console.log('[Roster] GET', primaryUrl);
+    console.log('[Roster] Fetch started | endpoint: roster proxy');
 
     try {
       const result = await fetchRosterPayload(primaryUrl);
@@ -3842,14 +3837,13 @@ let handoffNotes = [];
       const { rawRows, normalized, todayRecords } = result.pipeline;
 
       console.log('[Roster] Parsed rows:', rawRows.length, '| Normalized:', normalized.length, '| Today:', todayRecords.length);
-      console.log('[Roster] Today records:', todayRecords);
 
       allRosterRecords = normalized;
       renderPlanning(todayRecords);
       setSyncIndicator('ok');
       queueOsBootSequence();
     } catch (error) {
-      console.error('[Roster] Fetch failed:', error);
+      console.error('[Roster] Fetch failed:', error?.message || error);
 
       showTableError(formatRosterErrorMessage(error));
       queueOsBootSequence();
@@ -3990,11 +3984,7 @@ let handoffNotes = [];
       } catch {
         // keep raw text
       }
-      console.log('[Roster Status] Response:', {
-        status: response.status,
-        ok: response.ok,
-        body: responsePayload,
-      });
+      console.log('[Roster Status] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
       if (response.status === 401) {
         window.DentaFlowAuth?.clearSession?.();
@@ -4036,7 +4026,7 @@ let handoffNotes = [];
         selectEl.disabled = false;
       }, 2000);
     } catch (error) {
-      console.error('[Roster Status] Update failed:', error);
+      console.error('[Roster Status] Update failed:', error?.message || error);
       selectEl.value = previousStatus;
       applyMatteSelectSkin(selectEl, previousStatus);
       selectEl.classList.remove('status-updating');
@@ -4418,7 +4408,7 @@ let handoffNotes = [];
         });
         showToast('Patient ajouté à la liste d\'attente avec succès', 'success');
       } catch (error) {
-        console.error('[Waitlist] Submission failed:', error);
+        console.error('[Waitlist] Submission failed:', error?.message || error);
         showToast('Échec de la connexion au serveur. Veuillez réessayer.', 'error');
       } finally {
         btn.innerHTML = defaultBtnHtml;
@@ -4929,11 +4919,7 @@ let handoffNotes = [];
         } catch {
           // keep raw text for logging
         }
-        console.log('[Delay Alert] Response:', {
-          status: response.status,
-          ok: response.ok,
-          body: responsePayload,
-        });
+        console.log('[Delay Alert] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
@@ -4952,7 +4938,7 @@ let handoffNotes = [];
           btnDelay.classList.remove('is-success');
         }, feedbackMs);
       } catch (error) {
-        console.error('[Delay Alert] Request failed:', error);
+        console.error('[Delay Alert] Request failed:', error?.message || error);
         btnDelay.disabled = false;
         btnDelay.classList.remove('is-loading', 'is-success');
         showToast('Échec de l\'alerte retard — réessayez.', 'error');
@@ -5050,7 +5036,7 @@ let handoffNotes = [];
       try {
         fn();
       } catch (error) {
-        console.warn(`[DentaFlow] init step "${label}" failed:`, error);
+        console.warn(`[DentaFlow] init step "${label}" failed:`, error?.message || error);
       }
     };
 

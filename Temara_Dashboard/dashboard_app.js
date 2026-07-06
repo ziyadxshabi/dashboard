@@ -139,6 +139,8 @@ const CONFIG = {
   TEAM_NOTES_PROXY:     '/api/team-notes',
   DAILY_GOAL_MAD:       15000,
   REFRESH_INTERVAL_MS:  300_000,
+  SMART_SYNC_INTERVAL_MS: 180_000,
+  SMART_SYNC_DEBOUNCE_MS: 15_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
   ROSTER_ENDPOINT:      '/webhook/assistant-data',
   DIGEST_DAILY_GOAL_MAD: 6000,
@@ -264,6 +266,7 @@ function initializeDoctorDashboard() {
   renderAppointmentsList();
   renderWaitlistPanel();
   initTeamNotesSync();
+  initSmartSync();
   window.initProgressiveDisclosure?.();
   window.initInvisibleUI?.();
 
@@ -749,7 +752,7 @@ function initWaitlistForm() {
         }, 2500);
       }, lock.minRemaining());
     } catch (err) {
-      console.error('[Waitlist] Submission failed:', err);
+      console.error('[Waitlist] Submission failed:', err?.message || err);
       setTimeout(() => {
         btn.textContent = 'Erreur — Réessayer';
         btn.classList.add('is-error');
@@ -1140,7 +1143,7 @@ function initSecurityManagement() {
       passwordConfirm.value = '';
       showDashboardToast(`Mot de passe ${roleName} mis à jour avec succès.`, 'success');
     } catch (error) {
-      console.error('[Security] Password save failed:', error);
+      console.error('[Security] Password save failed:', error?.message || error);
       showDashboardToast('Impossible d\'enregistrer le mot de passe — réessayez.', 'error');
     } finally {
       if (submitBtn) submitBtn.disabled = false;
@@ -1505,7 +1508,7 @@ function renderDashboardFallback() {
 }
 
 function handleDashboardLoadError(err, errorBanner) {
-  console.error('[Dashboard] Load failed:', err);
+  console.error('[Dashboard] Load failed:', err?.message || err);
 
   document.body.classList.add('dashboard-offline');
   setSyncState('error', 'Mode hors-ligne');
@@ -1528,11 +1531,13 @@ async function parseDashboardJson(response) {
 }
 
 /* ── MAIN DATA FETCH ─────────────────────────────────────────────────────── */
-async function loadDashboard() {
+async function loadDashboard(isSilentSync = false) {
   const errorBanner = document.getElementById('error-banner');
 
   try {
-    applySkeletonState();
+    if (!isSilentSync) {
+      applySkeletonState();
+    }
 
     const response = await fetch(CONFIG.DATA_URL, {
       method:  'GET',
@@ -1591,6 +1596,10 @@ async function loadDashboard() {
     setSyncState('ok', `Mis à jour à ${now}`);
 
   } catch (err) {
+    if (isSilentSync) {
+      console.warn('[Dashboard] Silent sync failed:', err?.message || err);
+      return;
+    }
     handleDashboardLoadError(err, errorBanner);
   }
 }
@@ -3061,11 +3070,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
     } catch {
       // keep raw text
     }
-    console.log('[Roster Status] Response:', {
-      status: response.status,
-      ok: response.ok,
-      body: responsePayload,
-    });
+    console.log('[Roster Status] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
     if (response.status === 401) {
       window.DentaFlowAuth?.clearSession?.();
@@ -3092,7 +3097,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
       selectEl.disabled = false;
     }, 2000);
   } catch (error) {
-    console.error('[Roster Status] Update failed:', error);
+    console.error('[Roster Status] Update failed:', error?.message || error);
     selectEl.value = previousStatus;
     selectEl.classList.remove('status-updating');
     selectEl.classList.add('status-error');
@@ -3185,7 +3190,11 @@ function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
   if (progEl) progEl.style.width = '0%';
 }
 
-async function loadDoctorHubData() {
+async function loadDoctorHubData(isSilentSync = false) {
+  const crmPanel = document.getElementById('crm-side-panel');
+  const panelWasOpen = Boolean(crmPanel?.classList.contains('is-active'));
+  const selectedPatientId = document.querySelector('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
+
   try {
     const response = await fetch(CONFIG.ROSTER_PROXY, {
       method: 'GET',
@@ -3211,12 +3220,34 @@ async function loadDoctorHubData() {
       .map(normalizeDoctorAppointment)
       .filter(Boolean);
 
-    renderEndOfDayDigest(computeEndOfDayDigest(records));
+    const digest = computeEndOfDayDigest(records);
+    if (isSilentSync) {
+      const progressPercent = Math.min(100, (digest.totalRevenue / CONFIG.DIGEST_DAILY_GOAL_MAD) * 100);
+      setDigestFinalValues({ ...digest, progressPercent });
+    } else {
+      renderEndOfDayDigest(digest);
+    }
+
     renderDoctorTriageRoster(records);
     renderCRMTable(records);
-    queueOsBootSequence();
+
+    if (panelWasOpen && selectedPatientId) {
+      const row = document.querySelector(`.crm-table-row[data-patient-id="${selectedPatientId}"]`);
+      const patient = crmPatientsById[selectedPatientId];
+      if (row && patient) {
+        populateCrmSidePanel(patient);
+        row.classList.add('is-selected');
+        crmPanel.classList.add('is-active');
+        crmPanel.setAttribute('aria-hidden', 'false');
+      }
+    }
+
+    if (!isSilentSync) {
+      queueOsBootSequence();
+    }
   } catch (err) {
-    console.error('[Doctor Hub] Digest load failed:', err);
+    console.error('[Doctor Hub] Digest load failed:', err?.message || err);
+    if (isSilentSync) return;
     renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, totalRevenue: 0 });
     renderDoctorTriageRoster([]);
     renderCRMTable([]);
@@ -3341,7 +3372,7 @@ function runDoctorOsBootSequence() {
       );
     }
   } catch (err) {
-    console.error('[Doctor OS Boot] Animation failed:', err);
+    console.error('[Doctor OS Boot] Animation failed:', err?.message || err);
     revealDoctorOsBootFallback();
   }
 }
@@ -3581,7 +3612,7 @@ async function loadTeamNotes() {
     teamNotesCache = rawRows.map(normalizeTeamNote).filter(Boolean);
     renderTeamNotesList(teamNotesCache);
   } catch (error) {
-    console.error('[Team Notes] Load failed:', error);
+    console.error('[Team Notes] Load failed:', error?.message || error);
     if (teamNotesCache.length) {
       renderTeamNotesList(teamNotesCache);
       if (syncEl) syncEl.textContent = 'Sync partielle';
@@ -3597,4 +3628,51 @@ function initTeamNotesSync() {
   loadTeamNotes();
   if (teamNotesRefreshTimer) clearInterval(teamNotesRefreshTimer);
   teamNotesRefreshTimer = setInterval(loadTeamNotes, CONFIG.TEAM_NOTES_REFRESH_MS);
+}
+
+/* ── SMART SYNC — silent background refresh ─────────────────────────────── */
+let smartSyncInitialized = false;
+let smartSyncIntervalId = null;
+let lastSmartSyncAt = 0;
+let smartSyncInFlight = false;
+
+function initSmartSync() {
+  if (smartSyncInitialized) return;
+  if (document.body.classList.contains('mode-client')) return;
+  if (document.body.classList.contains('mode-assistant')) return;
+
+  smartSyncInitialized = true;
+
+  let syncTimeout;
+
+  async function runSmartSync() {
+    if (document.body.classList.contains('auth-gate-active')) return;
+    if (!sessionStorage.getItem(AUTH_CONFIG.SESSION_KEY)) return;
+    if (smartSyncInFlight) return;
+    if (Date.now() - lastSmartSyncAt < CONFIG.SMART_SYNC_DEBOUNCE_MS) return;
+
+    smartSyncInFlight = true;
+    lastSmartSyncAt = Date.now();
+
+    try {
+      await Promise.all([
+        loadDashboard(true),
+        loadDoctorHubData(true),
+      ]);
+    } finally {
+      smartSyncInFlight = false;
+    }
+  }
+
+  if (smartSyncIntervalId) clearInterval(smartSyncIntervalId);
+  smartSyncIntervalId = setInterval(runSmartSync, CONFIG.SMART_SYNC_INTERVAL_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => {
+      runSmartSync();
+    }, 0);
+  });
 }
