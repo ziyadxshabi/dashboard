@@ -25,7 +25,9 @@
     <path fill="url(#df-touch-shine)" d="M78 70c8-6 18-8 28-6 6 1 11 4 14 8-10 2-20 6-28 12-6 5-10 11-12 18-2-10 0-22 8-32z" opacity="0.6"/>
   </svg>
   <link rel="apple-touch-icon-precomposed" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='48' y1='32' x2='132' y2='148' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23e8c97a'/%3E%3Cstop offset='0.5' stop-color='%23b8965a'/%3E%3Cstop offset='1' stop-color='%238a6d3b'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x1='70' y1='50' x2='110' y2='90' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23ffffff' stop-opacity='0.35'/%3E%3Cstop offset='1' stop-color='%23ffffff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='40' fill='%230C0F14'/%3E%3Cpath fill='url(%23g)' d='M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z'/%3E%3Cpath fill='url(%23s)' d='M78 70c8-6 18-8 28-6 6 1 11 4 14 8-10 2-20 6-28 12-6 5-10 11-12 18-2-10 0-22 8-32z' opacity='0.6'/%3E%3C/svg%3E">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./Fonts/bold/style.css" />
   <link rel="stylesheet" href="./Fonts/duotone/style.css" />
   <link rel="stylesheet" href="./Fonts/fill/style.css" />
@@ -52,9 +54,7 @@
         <header class="login-brand login-coalesce-item" data-coalesce="brand">
           <div class="login-brand-mark" aria-hidden="true">
             <span class="login-mark-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 3c-2.5 0-4.5 2.2-4.5 5 0 2.2 1.2 4.2 2.8 5.5-.3 2.5-.8 5-2.3 6.5 2.5-.5 4.5-2 5.5-4 1 2 3 3.5 5.5 4-1.5-1.5-2-4-2.3-6.5 1.6-1.3 2.8-3.3 2.8-5.5C16.5 5.2 14.5 3 12 3z"/>
-              </svg>
+              <i data-lucide="tooth" class="icon-sm" aria-hidden="true"></i>
             </span>
           </div>
           <h1 class="login-title">DentaFlow OS</h1>
@@ -105,10 +105,7 @@
                 aria-label="Afficher le mot de passe"
                 aria-pressed="false"
               >
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.75"/>
-                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.75"/>
-                </svg>
+                <i data-lucide="eye" id="login-password-toggle-icon" class="icon-sm" aria-hidden="true"></i>
               </button>
             </div>
           </div>
@@ -136,9 +133,7 @@
     <aside class="sidebar" aria-label="Navigation principale">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3c-2.5 0-4.5 2.2-4.5 5 0 2.2 1.2 4.2 2.8 5.5-.3 2.5-.8 5-2.3 6.5 2.5-.5 4.5-2 5.5-4 1 2 3 3.5 5.5 4-1.5-1.5-2-4-2.3-6.5 1.6-1.3 2.8-3.3 2.8-5.5C16.5 5.2 14.5 3 12 3z"/>
-          </svg>
+          <i data-lucide="tooth" class="nav-icon" aria-hidden="true"></i>
         </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
@@ -148,31 +143,31 @@
 
       <nav class="sidebar-nav" data-lenis-prevent>
         <a href="#overview" class="nav-link is-active" data-nav="overview">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+          <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
           <span>Vue d'ensemble</span>
         </a>
         <a href="#doctor-hub" class="nav-link" data-nav="doctor-hub">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-2 2 2 2"/><path d="M16 15h6"/></svg>
+          <i data-lucide="activity" class="nav-icon" aria-hidden="true"></i>
           <span>Cabinet Live</span>
         </a>
         <a href="#calendar" class="nav-link" data-nav="calendar">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
           <span>Calendrier</span>
         </a>
         <a href="#waitlist" class="nav-link" data-nav="waitlist">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
           <span>Liste d'attente</span>
         </a>
         <a href="#crm" class="nav-link" data-nav="crm">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
+          <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
           <span>Dossiers Patients</span>
         </a>
         <a href="#analytics" class="nav-link" data-nav="analytics">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+          <i data-lucide="bar-chart-2" class="nav-icon" aria-hidden="true"></i>
           <span>Performances</span>
         </a>
         <a href="#sms" class="nav-link" data-nav="sms">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <i data-lucide="messages-square" class="nav-icon" aria-hidden="true"></i>
           <span>Campagnes SMS</span>
         </a>
       </nav>
@@ -205,23 +200,19 @@
           aria-controls="account-menu-popover"
           aria-label="Menu compte"
         >
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="12" cy="5" r="1.75"/>
-            <circle cx="12" cy="12" r="1.75"/>
-            <circle cx="12" cy="19" r="1.75"/>
-          </svg>
+          <i data-lucide="ellipsis-vertical" aria-hidden="true"></i>
         </button>
         <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
           <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
             Paramètres
           </button>
           <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
             Facturation
           </button>
           <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
             Déconnexion
           </button>
         </div>
@@ -231,35 +222,35 @@
     <!-- ── MOBILE BOTTOM TAB BAR — horizontal swipe ribbon (8 items) ─────── -->
     <nav class="mobile-tabbar" aria-label="Navigation mobile" data-lenis-prevent>
       <a href="#overview" class="tab-link is-active" data-nav="overview" aria-label="Vue d'ensemble">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+        <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
         <span>Vue d'ensemble</span>
       </a>
       <a href="#doctor-hub" class="tab-link" data-nav="doctor-hub" aria-label="Cabinet Live">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-2 2 2 2"/><path d="M16 15h6"/></svg>
+        <i data-lucide="activity" class="tab-icon" aria-hidden="true"></i>
         <span>Cabinet Live</span>
       </a>
       <a href="#calendar" class="tab-link" data-nav="calendar" aria-label="Calendrier">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <i data-lucide="calendar-clock" class="tab-icon" aria-hidden="true"></i>
         <span>Calendrier</span>
       </a>
       <a href="#waitlist" class="tab-link" data-nav="waitlist" aria-label="Liste d'attente">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <i data-lucide="users" class="tab-icon" aria-hidden="true"></i>
         <span>Liste d'attente</span>
       </a>
       <a href="#crm" class="tab-link" data-nav="crm" aria-label="Dossiers Patients">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 .87 6.87"/></svg>
+        <i data-lucide="clipboard-list" class="tab-icon" aria-hidden="true"></i>
         <span>Dossiers Patients</span>
       </a>
       <a href="#analytics" class="tab-link" data-nav="analytics" aria-label="Performances">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+        <i data-lucide="bar-chart-2" class="tab-icon" aria-hidden="true"></i>
         <span>Performances</span>
       </a>
       <a href="#sms" class="tab-link" data-nav="sms" aria-label="Campagnes SMS">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <i data-lucide="messages-square" class="tab-icon" aria-hidden="true"></i>
         <span>Campagnes SMS</span>
       </a>
       <a href="#settings" class="tab-link" data-nav="settings" aria-label="Paramètres">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <i data-lucide="settings" class="tab-icon" aria-hidden="true"></i>
         <span>Paramètres</span>
       </a>
     </nav>
@@ -597,11 +588,7 @@
                   aria-controls="waitlist-admin-popover"
                   aria-label="Actions administratives de la liste d'attente"
                 >
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <circle cx="12" cy="5" r="1.75"/>
-                    <circle cx="12" cy="12" r="1.75"/>
-                    <circle cx="12" cy="19" r="1.75"/>
-                  </svg>
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
                 </button>
                 <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
                   <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
@@ -743,7 +730,7 @@
           <!-- Card 0: Profil Utilisateur -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <i data-lucide="user" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Profil Utilisateur</h3>
             <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du tableau de bord.</p>
@@ -773,7 +760,7 @@
           <!-- Card: Apparence -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              <i data-lucide="sun" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Apparence</h3>
             <p class="settings-card-desc">Choisissez le thème visuel du tableau de bord clinique.</p>
@@ -798,7 +785,7 @@
           <!-- Card 1: Objectif & Clinique -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <i data-lucide="circle-dollar-sign" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Objectif &amp; Clinique</h3>
             <p class="settings-card-desc">Définissez l'objectif de production journalier affiché sur le tableau de bord.</p>
@@ -820,7 +807,7 @@
           <!-- Card 2: Notifications -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
             <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
@@ -851,7 +838,7 @@
           <!-- Card: Horaires d'Ouverture -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+              <i data-lucide="clock" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Horaires d'Ouverture</h3>
             <p class="settings-card-desc">Plage horaire affichée sur le planning et les créneaux réservables.</p>
@@ -882,7 +869,7 @@
           <!-- Card: Gestion des Urgences -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <i data-lucide="triangle-alert" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Gestion des Urgences</h3>
             <p class="settings-card-desc">Réservez une capacité tampon pour les cas urgents du jour.</p>
@@ -915,7 +902,7 @@
           <!-- Card 3: Sécurité -->
           <article class="settings-card settings-card--security">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <i data-lucide="lock" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Sécurité</h3>
             <p class="settings-card-desc">Contrôle d'accès — rotation des identifiants Docteur et Assistante.</p>
@@ -935,7 +922,7 @@
                     aria-labelledby="security-account-label security-account-value"
                   >
                     <span class="ghost-select__value" id="security-account-value">Compte Docteur (Admin)</span>
-                    <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                    <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
                   </button>
                   <ul class="ghost-select__list" id="security-account-list" role="listbox" aria-labelledby="security-account-label" hidden>
                     <li class="ghost-select__option is-selected" role="option" data-value="doc" aria-selected="true" tabindex="-1">Compte Docteur (Admin)</li>
@@ -977,7 +964,7 @@
           <!-- Card: Sauvegarde & Synchronisation -->
           <article class="settings-card settings-card--wide">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+              <i data-lucide="cloud" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Sauvegarde &amp; Synchronisation</h3>
             <p class="settings-card-desc">État de la connexion entre le cabinet et l'infrastructure DentaFlow Cloud.</p>
@@ -1007,7 +994,7 @@
       aria-describedby="crm-panel-subtitle"
     >
       <button type="button" class="crm-side-panel-close crm-modal-close" id="crm-side-panel-close" aria-label="Fermer le dossier">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
       </button>
 
       <header class="crm-side-panel-header">
@@ -1059,6 +1046,7 @@
     Impossible de charger les données. Vérifiez la connexion n8n.
   </div>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="dom-safe.js"></script>
   <script src="auth.js"></script>
   <script src="dashboard_app.js"></script>

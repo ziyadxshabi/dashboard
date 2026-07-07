@@ -1,5 +1,7 @@
 ﻿  <!-- Phosphor icon packs (local) — also linked in index.html <head> when embedded -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./Fonts/bold/style.css" />
   <link rel="stylesheet" href="./Fonts/duotone/style.css" />
   <link rel="stylesheet" href="./Fonts/fill/style.css" />
@@ -10,9 +12,7 @@
     <aside class="sidebar assistant-sidebar" aria-label="Navigation assistante">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3c-2.5 0-4.5 2.2-4.5 5 0 2.2 1.2 4.2 2.8 5.5-.3 2.5-.8 5-2.3 6.5 2.5-.5 4.5-2 5.5-4 1 2 3 3.5 5.5 4-1.5-1.5-2-4-2.3-6.5 1.6-1.3 2.8-3.3 2.8-5.5C16.5 5.2 14.5 3 12 3z"/>
-          </svg>
+          <i data-lucide="tooth" class="nav-icon" aria-hidden="true"></i>
         </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
@@ -22,37 +22,19 @@
 
       <nav class="sidebar-nav" aria-label="Navigation principale">
         <a href="#" class="nav-link is-active" data-nav="overview" aria-current="page">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7" rx="2"/>
-            <rect x="14" y="3" width="7" height="7" rx="2"/>
-            <rect x="3" y="14" width="7" height="7" rx="2"/>
-            <rect x="14" y="14" width="7" height="7" rx="2"/>
-          </svg>
+          <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
           <span>Vue du jour</span>
         </a>
         <a href="#" class="nav-link" data-nav="calendar">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="18" rx="3"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
+          <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
           <span>Calendrier</span>
         </a>
         <a href="#" class="nav-link" data-nav="waitlist">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <circle cx="12" cy="12" r="9"/>
-            <path d="M12 7v5l3 3"/>
-          </svg>
+          <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
           <span>Liste d'attente</span>
         </a>
         <a href="#" class="nav-link" data-nav="crm">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 .87 6.87"/>
-          </svg>
+          <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
           <span>Dossiers Patients</span>
         </a>
 
@@ -66,16 +48,14 @@
             aria-controls="superpouvoirs-accordion"
           >
             <span class="nav-accordion-header__label" id="actions-title">Superpouvoirs</span>
-            <svg class="nav-accordion-header__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
+            <i data-lucide="chevron-down" class="nav-accordion-header__chevron icon-xs" aria-hidden="true"></i>
           </div>
           <div class="superpouvoirs-accordion" id="superpouvoirs-accordion">
             <div class="superpouvoirs-content">
               <div class="superpowers-grid" id="superpowers-grid">
             <button type="button" class="btn-super btn-super--compact" id="btn-export-excel">
               <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
               </span>
               <span class="btn-super__text">
                 <span class="btn-super__label">Générer Rapport Journalier</span>
@@ -84,7 +64,7 @@
             </button>
             <button type="button" class="btn-super btn-super--compact" id="btn-force-sms">
               <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <i data-lucide="bell-ring" aria-hidden="true"></i>
               </span>
               <span class="btn-super__text">
                 <span class="btn-super__label">Forcer Rappels</span>
@@ -93,7 +73,7 @@
             </button>
             <button type="button" class="btn-super btn-super--compact" id="btn-block-slot">
               <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+                <i data-lucide="calendar-x-2" aria-hidden="true"></i>
               </span>
               <span class="btn-super__text">
                 <span class="btn-super__label">Bloquer Créneau Urgence</span>
@@ -102,7 +82,7 @@
             </button>
             <button type="button" class="btn-super btn-super--compact" id="btn-fill-slot">
               <span class="btn-super__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <i data-lucide="message-square-dashed" aria-hidden="true"></i>
               </span>
               <span class="btn-super__text">
                 <span class="btn-super__label">Remplir un Créneau Vide</span>
@@ -132,23 +112,19 @@
           aria-controls="account-menu-popover"
           aria-label="Menu compte"
         >
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="12" cy="5" r="1.75"/>
-            <circle cx="12" cy="12" r="1.75"/>
-            <circle cx="12" cy="19" r="1.75"/>
-          </svg>
+          <i data-lucide="ellipsis-vertical" aria-hidden="true"></i>
         </button>
         <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
           <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
             Paramètres
           </button>
           <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
             Facturation
           </button>
           <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
             Déconnexion
           </button>
         </div>
@@ -212,11 +188,7 @@
                   aria-controls="roster-admin-popover"
                   aria-label="Actions administratives du planning"
                 >
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <circle cx="12" cy="5" r="1.75"/>
-                    <circle cx="12" cy="12" r="1.75"/>
-                    <circle cx="12" cy="19" r="1.75"/>
-                  </svg>
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
                 </button>
                 <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
                   <button type="button" class="actions-popover__item v-disabled" id="btn-daily-report" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
@@ -239,9 +211,7 @@
                     Envoyer SMS groupé
                   </button>
                   <p role="note" style="display:flex;align-items:flex-start;gap:6px;margin:8px 12px 4px;padding:0;font-size:11px;line-height:1.45;color:#8C8C9A;">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="14" height="14" aria-hidden="true" style="flex-shrink:0;margin-top:1px;opacity:0.85">
-                      <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/>
-                    </svg>
+                    <i data-lucide="info" class="icon-xs" aria-hidden="true" style="flex-shrink:0;margin-top:1px;opacity:0.85"></i>
                     <span>Remarque&nbsp;: En cas d'annulation multiple, la synchronisation avec le registre Google Sheets peut accuser un léger retard.</span>
                   </p>
                 </div>
@@ -292,7 +262,7 @@
                 aria-label="Catégorie de la note"
               >
                 <span class="ghost-select__value" id="handoff-category-label">Info</span>
-                <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
               </button>
               <ul class="ghost-select__list" id="handoff-category-list" role="listbox" aria-label="Catégories" hidden>
                 <li class="ghost-select__option is-selected" role="option" data-value="Info" aria-selected="true" tabindex="-1">Info</li>
@@ -387,7 +357,7 @@
                       aria-labelledby="waitlist-priority-label waitlist-priority-value"
                     >
                       <span class="ghost-select__value" id="waitlist-priority-value">Normale</span>
-                      <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                      <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
                     </button>
                     <ul class="ghost-select__list" id="waitlist-priority-list" role="listbox" aria-labelledby="waitlist-priority-label" hidden>
                       <li class="ghost-select__option is-selected" role="option" data-value="Normale" aria-selected="true" tabindex="-1">Normale</li>
@@ -446,11 +416,7 @@
                   aria-controls="waitlist-admin-popover"
                   aria-label="Actions administratives de la liste d'attente"
                 >
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <circle cx="12" cy="5" r="1.75"/>
-                    <circle cx="12" cy="12" r="1.75"/>
-                    <circle cx="12" cy="19" r="1.75"/>
-                  </svg>
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
                 </button>
                 <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
                   <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
@@ -540,7 +506,7 @@
         <div class="settings-grid">
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <i data-lucide="user" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Profil Utilisateur</h3>
             <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du command center.</p>
@@ -569,7 +535,7 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              <i data-lucide="sun" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Apparence</h3>
             <p class="settings-card-desc">Choisissez le thème visuel du command center.</p>
@@ -593,7 +559,7 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
             <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
@@ -623,7 +589,7 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+              <i data-lucide="calendar-clock" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Ergonomie du Planning</h3>
             <p class="settings-card-desc">Vue par défaut du planning du jour à l'ouverture du command center.</p>
@@ -641,7 +607,7 @@
                   aria-labelledby="settings-planning-view-label"
                 >
                   <span class="ghost-select__value" id="settings-planning-view-label-value">Chronologique</span>
-                  <svg class="ghost-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
                 </button>
                 <ul class="ghost-select__list" id="settings-planning-view-list" role="listbox" aria-label="Vue du planning" hidden>
                   <li class="ghost-select__option is-selected" role="option" data-value="chronologique" data-label="Chronologique" aria-selected="true" tabindex="-1">Vue par défaut : Chronologique</li>
@@ -653,7 +619,7 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <i data-lucide="volume-2" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Alertes Sonores</h3>
             <p class="settings-card-desc">Signaux discrets sur le poste assistante — sans notification patient.</p>
@@ -683,7 +649,7 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M6 16h12"/></svg>
+              <i data-lucide="keyboard" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Raccourcis Clavier</h3>
             <p class="settings-card-desc">Commandes rapides du command center — lecture seule.</p>
@@ -701,41 +667,23 @@
 
     <nav class="mobile-bottom-nav" aria-label="Navigation mobile" data-lenis-prevent>
       <a href="#" class="tab-link is-active" data-nav="overview" aria-label="Vue d'ensemble">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-          <rect x="3" y="3" width="7" height="7" rx="2"/>
-          <rect x="14" y="3" width="7" height="7" rx="2"/>
-          <rect x="3" y="14" width="7" height="7" rx="2"/>
-          <rect x="14" y="14" width="7" height="7" rx="2"/>
-        </svg>
+        <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
         <span>Vue d'ensemble</span>
       </a>
       <a href="#" class="tab-link" data-nav="planning" aria-label="Planning du jour">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="18" rx="3"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
+        <i data-lucide="calendar-clock" class="tab-icon" aria-hidden="true"></i>
         <span>Planning</span>
       </a>
       <a href="#" class="tab-link" data-nav="transmission" aria-label="Tableau de transmission">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
+        <i data-lucide="message-square-dashed" class="tab-icon" aria-hidden="true"></i>
         <span>Transmission</span>
       </a>
       <a href="#" class="tab-link" data-nav="waitlist" aria-label="Listes d'attente">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-          <circle cx="12" cy="12" r="9"/>
-          <path d="M12 7v5l3 3"/>
-        </svg>
+        <i data-lucide="users" class="tab-icon" aria-hidden="true"></i>
         <span>Listes</span>
       </a>
       <a href="#" class="tab-link" data-nav="settings" aria-label="Paramètres">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
+        <i data-lucide="settings" class="tab-icon" aria-hidden="true"></i>
         <span>Paramètres</span>
       </a>
     </nav>
@@ -753,7 +701,7 @@
       aria-describedby="crm-panel-subtitle"
     >
       <button type="button" class="crm-side-panel-close crm-modal-close" id="crm-side-panel-close" aria-label="Fermer le dossier">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
       </button>
 
       <header class="crm-side-panel-header">

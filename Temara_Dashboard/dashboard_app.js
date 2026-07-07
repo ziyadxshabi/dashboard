@@ -280,6 +280,10 @@ function initializeDoctorDashboard() {
   if (activeView === 'calendar') {
     initDashboardCalendar();
   }
+
+  if (typeof window.refreshLucideIcons === 'function') {
+    window.refreshLucideIcons(document.getElementById('doctor-shell') || document);
+  }
 }
 
 window.initializeDoctorDashboard = initializeDoctorDashboard;

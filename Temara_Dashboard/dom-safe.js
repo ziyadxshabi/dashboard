@@ -51,6 +51,20 @@
     return pill;
   }
 
+  function lucideIcon(name, className = '') {
+    const cls = className ? ` class="${className}"` : '';
+    return `<i data-lucide="${name}"${cls} aria-hidden="true"></i>`;
+  }
+
+  function refreshLucideIcons(root) {
+    if (typeof lucide === 'undefined' || typeof lucide.createIcons !== 'function') return;
+    const options = { attrs: { 'stroke-width': 2 } };
+    if (root && typeof root.querySelectorAll === 'function') {
+      options.root = root;
+    }
+    lucide.createIcons(options);
+  }
+
   window.DentaFlowDom = {
     text,
     clear,
@@ -60,4 +74,6 @@
     appendParagraph,
     createStatusPill,
   };
+  window.refreshLucideIcons = refreshLucideIcons;
+  window.lucideIcon = lucideIcon;
 })();

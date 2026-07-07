@@ -18,6 +18,7 @@
     if (!card) return;
     requestAnimationFrame(() => {
       card.classList.add('login-assembled');
+      window.refreshLucideIcons?.(document.getElementById('login-overlay'));
     });
   }
 
@@ -90,6 +91,11 @@
       passwordInput.type = isHidden ? 'text' : 'password';
       toggle.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
       toggle.setAttribute('aria-label', isHidden ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+      const icon = document.getElementById('login-password-toggle-icon');
+      if (icon) {
+        icon.setAttribute('data-lucide', isHidden ? 'eye-off' : 'eye');
+        window.refreshLucideIcons?.(toggle);
+      }
     });
   }
 

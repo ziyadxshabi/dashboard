@@ -5,7 +5,8 @@
 
 /* ── 1. SHARED STRUCTURAL TOKENS ───────────────────────────── */
 :root {
-  --font-primary: 'Inter', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-primary: var(--font-sans);
   --font-icon: 'Phosphor', sans-serif;
   --font-icon-bold: 'Phosphor-Bold', sans-serif;
   --font-icon-duotone: 'Phosphor-Duotone', sans-serif;
@@ -217,7 +218,7 @@ html {
 }
 
 body {
-  font-family: var(--font-primary);
+  font-family: var(--font-sans);
   font-weight: 400;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -227,6 +228,29 @@ body {
   background: var(--bg-main, #141211);
   color: var(--text-main, #F4F1EE);
   overscroll-behavior-y: none;
+}
+
+.kpi-number,
+.kpi-value,
+.doctor-metric-value,
+.pulse-card__value,
+.pulse-card__value--split span,
+.kinetic-value,
+.hero-value,
+.reclaimed-banner__value,
+.timeline-item__time,
+.timeline-card__time,
+.roster-time,
+.roster-count,
+.roster-confirmed,
+.roster-waiting,
+.appt-time,
+.handoff-note__time,
+.sms-char-counter,
+.data-table td,
+.waitlist-table td {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 /* ── 2a. NATIVE iOS — MOMENTUM SCROLLING ───────────────────── */
@@ -253,7 +277,6 @@ h1, h2, h3,
 .hero-value,
 .doctor-metric-value {
   font-weight: 500;
-  letter-spacing: -0.02em;
 }
 
 .kpi-label,
@@ -399,6 +422,81 @@ h1, h2, h3,
 
 .nav-link.is-active .nav-icon {
   opacity: 1;
+}
+
+/* Lucide clinical icon system */
+[data-lucide],
+.lucide.nav-icon,
+.lucide.tab-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke: var(--text-muted);
+  transition: stroke 0.3s ease, transform 0.2s ease;
+}
+
+.sidebar-item.active [data-lucide],
+.nav-link.is-active [data-lucide],
+.nav-link.is-active .lucide.nav-icon,
+.mobile-bottom-nav .nav-item.active [data-lucide],
+.mobile-bottom-nav .tab-link.is-active [data-lucide],
+.mobile-bottom-nav .tab-link.is-active .lucide.tab-icon,
+.mobile-tabbar .tab-link.is-active [data-lucide],
+.mobile-tabbar .tab-link.is-active .lucide.tab-icon {
+  stroke: var(--accent-gold);
+}
+
+.settings-card-icon [data-lucide],
+.settings-card-icon .lucide,
+.btn-super__icon [data-lucide],
+.btn-super__icon .lucide {
+  width: 20px;
+  height: 20px;
+  stroke: var(--accent-gold);
+}
+
+/* Utility Lucide sizes */
+.icon-sm,
+.icon-sm.lucide,
+[data-lucide].icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-xs,
+.icon-xs.lucide,
+[data-lucide].icon-xs {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-lg,
+.icon-lg.lucide,
+[data-lucide].icon-lg {
+  width: 48px;
+  height: 48px;
+}
+
+.btn-icon-menu [data-lucide],
+.btn-icon-menu .lucide,
+.btn-icon-menu svg,
+.btn-row-menu [data-lucide],
+.btn-row-menu .lucide,
+.row-action-btn [data-lucide],
+.row-action-btn .lucide,
+.actions-popover__item [data-lucide],
+.actions-popover__item .lucide,
+.crm-side-panel-close [data-lucide],
+.crm-modal-close [data-lucide],
+.login-password-toggle [data-lucide],
+.login-mark-icon [data-lucide],
+.handoff-note__system-icon [data-lucide],
+.handoff-note__pin-badge [data-lucide],
+.roster-noshow-flag [data-lucide] {
+  stroke: currentColor;
 }
 
 .sidebar-profile {
@@ -845,7 +943,9 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   flex-shrink: 0;
 }
 
-.settings-card-icon svg {
+.settings-card-icon svg,
+.settings-card-icon [data-lucide],
+.settings-card-icon .lucide {
   width: 20px;
   height: 20px;
 }
@@ -2757,7 +2857,9 @@ body.dashboard-offline .sync-label {
   background: rgba(227, 193, 143, 0.08);
 }
 
-.login-password-toggle svg {
+.login-password-toggle svg,
+.login-password-toggle [data-lucide],
+.login-password-toggle .lucide {
   width: 20px;
   height: 20px;
 }
@@ -5607,7 +5709,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   gap: 10px;
 }
 
-#doctor-shell .sidebar-brand-icon svg {
+#doctor-shell .sidebar-brand-icon svg,
+#doctor-shell .sidebar-brand-icon [data-lucide],
+#doctor-shell .sidebar-brand-icon .lucide {
   display: block;
   width: 22px;
   height: 22px;
@@ -5745,7 +5849,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
-.btn-account-menu svg {
+.btn-account-menu svg,
+.btn-account-menu [data-lucide],
+.btn-account-menu .lucide {
   width: 14px;
   height: 14px;
 }
@@ -5788,7 +5894,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   gap: 8px;
 }
 
-.account-menu-popover .actions-popover__item svg {
+.account-menu-popover .actions-popover__item svg,
+.account-menu-popover .actions-popover__item [data-lucide],
+.account-menu-popover .actions-popover__item .lucide {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
@@ -6019,7 +6127,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   font-size: 0;
 }
 
-.crm-modal-close svg {
+.crm-modal-close svg,
+.crm-modal-close [data-lucide],
+.crm-modal-close .lucide {
   width: 16px;
   height: 16px;
 }
@@ -6206,7 +6316,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
     height: 32px;
   }
 
-  #doctor-shell #view-settings .settings-card-icon svg {
+  #doctor-shell #view-settings .settings-card-icon svg,
+  #doctor-shell #view-settings .settings-card-icon [data-lucide],
+  #doctor-shell #view-settings .settings-card-icon .lucide {
     width: 16px;
     height: 16px;
   }

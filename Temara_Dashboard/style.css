@@ -4,7 +4,8 @@
    ============================================================ */
 
 :root {
-  --font-primary: 'Inter', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-primary: var(--font-sans);
   --font-icon: 'Phosphor', sans-serif;
   --font-icon-bold: 'Phosphor-Bold', sans-serif;
   --font-icon-duotone: 'Phosphor-Duotone', sans-serif;
@@ -211,7 +212,7 @@ html {
 }
 
 body {
-  font-family: var(--font-primary);
+  font-family: var(--font-sans);
   font-weight: 400;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -221,6 +222,29 @@ body {
   background: var(--bg-main, #141211);
   color: var(--text-main, #F4F1EE);
   overscroll-behavior-y: none;
+}
+
+.kpi-number,
+.kpi-value,
+.doctor-metric-value,
+.pulse-card__value,
+.pulse-card__value--split span,
+.kinetic-value,
+.hero-value,
+.reclaimed-banner__value,
+.timeline-item__time,
+.timeline-card__time,
+.roster-time,
+.roster-count,
+.roster-confirmed,
+.roster-waiting,
+.appt-time,
+.handoff-note__time,
+.sms-char-counter,
+.data-table td,
+.waitlist-table td {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-nav {
@@ -348,6 +372,81 @@ body {
 
 .nav-link.is-active .nav-icon {
   opacity: 1;
+}
+
+/* Lucide clinical icon system */
+[data-lucide],
+.lucide.nav-icon,
+.lucide.tab-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke: var(--text-muted);
+  transition: stroke 0.3s ease, transform 0.2s ease;
+}
+
+.sidebar-item.active [data-lucide],
+.nav-link.is-active [data-lucide],
+.nav-link.is-active .lucide.nav-icon,
+.mobile-bottom-nav .nav-item.active [data-lucide],
+.mobile-bottom-nav .tab-link.is-active [data-lucide],
+.mobile-bottom-nav .tab-link.is-active .lucide.tab-icon,
+.mobile-tabbar .tab-link.is-active [data-lucide],
+.mobile-tabbar .tab-link.is-active .lucide.tab-icon {
+  stroke: var(--accent-gold);
+}
+
+.settings-card-icon [data-lucide],
+.settings-card-icon .lucide,
+.btn-super__icon [data-lucide],
+.btn-super__icon .lucide {
+  width: 20px;
+  height: 20px;
+  stroke: var(--accent-gold);
+}
+
+/* Utility Lucide sizes */
+.icon-sm,
+.icon-sm.lucide,
+[data-lucide].icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-xs,
+.icon-xs.lucide,
+[data-lucide].icon-xs {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-lg,
+.icon-lg.lucide,
+[data-lucide].icon-lg {
+  width: 48px;
+  height: 48px;
+}
+
+.btn-icon-menu [data-lucide],
+.btn-icon-menu .lucide,
+.btn-icon-menu svg,
+.btn-row-menu [data-lucide],
+.btn-row-menu .lucide,
+.row-action-btn [data-lucide],
+.row-action-btn .lucide,
+.actions-popover__item [data-lucide],
+.actions-popover__item .lucide,
+.crm-side-panel-close [data-lucide],
+.crm-modal-close [data-lucide],
+.login-password-toggle [data-lucide],
+.login-mark-icon [data-lucide],
+.handoff-note__system-icon [data-lucide],
+.handoff-note__pin-badge [data-lucide],
+.roster-noshow-flag [data-lucide] {
+  stroke: currentColor;
 }
 
 .sidebar-profile {
@@ -833,7 +932,9 @@ body.mode-assistant {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.ghost-select__chevron {
+.ghost-select__chevron,
+.ghost-select__chevron [data-lucide],
+.ghost-select__chevron .lucide {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
@@ -1081,7 +1182,9 @@ body.mode-assistant {
   color: var(--accent-gold);
 }
 
-.handoff-note__pin-badge svg {
+.handoff-note__pin-badge svg,
+.handoff-note__pin-badge [data-lucide],
+.handoff-note__pin-badge .lucide {
   width: 11px;
   height: 11px;
 }
@@ -1097,7 +1200,9 @@ body.mode-assistant {
   color: var(--text-muted);
 }
 
-.handoff-note__system-icon svg {
+.handoff-note__system-icon svg,
+.handoff-note__system-icon [data-lucide],
+.handoff-note__system-icon .lucide {
   width: 12px;
   height: 12px;
 }
@@ -1451,7 +1556,9 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   cursor: help;
 }
 
-.roster-noshow-flag svg {
+.roster-noshow-flag svg,
+.roster-noshow-flag [data-lucide],
+.roster-noshow-flag .lucide {
   width: 14px;
   height: 14px;
 }
@@ -1641,7 +1748,9 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
   border-radius: var(--radius-sm);
 }
 
-.sidebar-superpouvoirs .btn-super--compact .btn-super__icon svg {
+.sidebar-superpouvoirs .btn-super--compact .btn-super__icon svg,
+.sidebar-superpouvoirs .btn-super--compact .btn-super__icon [data-lucide],
+.sidebar-superpouvoirs .btn-super--compact .btn-super__icon .lucide {
   width: 14px;
   height: 14px;
 }
@@ -1674,7 +1783,9 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   border-radius: var(--radius-sm);
 }
 
-.superpowers-grid .btn-super--compact .btn-super__icon svg {
+.superpowers-grid .btn-super--compact .btn-super__icon svg,
+.superpowers-grid .btn-super--compact .btn-super__icon [data-lucide],
+.superpowers-grid .btn-super--compact .btn-super__icon .lucide {
   width: 20px;
   height: 20px;
 }
@@ -1741,7 +1852,9 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   color: var(--accent-gold);
 }
 
-.btn-super__icon svg {
+.btn-super__icon svg,
+.btn-super__icon [data-lucide],
+.btn-super__icon .lucide {
   width: 22px;
   height: 22px;
 }
@@ -2988,7 +3101,9 @@ html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-daygrid-event:hover {
   color: var(--accent-gold);
 }
 
-.settings-card-icon svg {
+.settings-card-icon svg,
+.settings-card-icon [data-lucide],
+.settings-card-icon .lucide {
   width: 20px;
   height: 20px;
 }
@@ -3884,7 +3999,7 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-hierarchy-secondary, #9CA3AF);
-  letter-spacing: 0.02em;
+  letter-spacing: -0.02em;
   flex-shrink: 0;
 }
 
@@ -4196,7 +4311,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   background: rgba(255, 255, 255, 0.05);
 }
 
-.btn-icon-menu svg {
+.btn-icon-menu svg,
+.btn-icon-menu [data-lucide],
+.btn-icon-menu .lucide {
   width: 18px;
   height: 18px;
 }
@@ -4402,7 +4519,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   outline-offset: 1px;
 }
 
-.row-action-btn svg {
+.row-action-btn svg,
+.row-action-btn [data-lucide],
+.row-action-btn .lucide {
   width: 16px;
   height: 16px;
 }
@@ -4434,7 +4553,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   color: rgba(255, 255, 255, 0.5);
 }
 
-.empty-state__icon svg {
+.empty-state__icon svg,
+.empty-state__icon [data-lucide],
+.empty-state__icon .lucide {
   width: 48px;
   height: 48px;
 }
@@ -4554,7 +4675,11 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 /* ── Premium Command Center refresh ─────────────────────────────────────── */
 
 .sidebar-brand-icon svg,
-.login-mark-icon svg {
+.sidebar-brand-icon [data-lucide],
+.sidebar-brand-icon .lucide,
+.login-mark-icon svg,
+.login-mark-icon [data-lucide],
+.login-mark-icon .lucide {
   display: block;
   width: 22px;
   height: 22px;
@@ -4659,7 +4784,11 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 }
 
 .btn-account-menu svg,
-.btn-row-menu svg {
+.btn-account-menu [data-lucide],
+.btn-account-menu .lucide,
+.btn-row-menu svg,
+.btn-row-menu [data-lucide],
+.btn-row-menu .lucide {
   width: 14px;
   height: 14px;
 }
@@ -4698,7 +4827,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   transform-origin: bottom right;
 }
 
-.actions-popover__item svg {
+.actions-popover__item svg,
+.actions-popover__item [data-lucide],
+.actions-popover__item .lucide {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
@@ -4947,7 +5078,9 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   font-size: 0;
 }
 
-.crm-modal-close svg {
+.crm-modal-close svg,
+.crm-modal-close [data-lucide],
+.crm-modal-close .lucide {
   width: 16px;
   height: 16px;
 }
