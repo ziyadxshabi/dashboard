@@ -1405,10 +1405,23 @@ let handoffNotes = [];
     return [];
   }
 
+  function isBenignEmptyRosterProxyPayload(payload) {
+    if (!payload || typeof payload !== 'object' || payload.ok !== false) return false;
+    const detail = String(payload.details || payload.error || '').trim();
+    if (!detail) return true;
+    return /réponse vide|respond to webhook/i.test(detail);
+  }
+
   function unwrapRosterProxyPayload(payload) {
     if (payload && typeof payload === 'object' && payload.ok === false) {
-      const detail = payload.details || payload.error || 'Erreur proxy roster';
-      throw new Error(detail);
+      if (isBenignEmptyRosterProxyPayload(payload)) {
+        return [];
+      }
+      const detail = String(payload.details || payload.error || '').trim();
+      const friendlyMessage = /réponse vide|respond to webhook/i.test(detail)
+        ? 'Aucun rendez-vous trouvé ou données indisponibles.'
+        : (detail || 'Aucun rendez-vous trouvé ou données indisponibles.');
+      throw new Error(friendlyMessage);
     }
     if (payload && typeof payload === 'object' && payload.ok === true && 'data' in payload) {
       const inner = payload.data;
@@ -2120,7 +2133,7 @@ let handoffNotes = [];
       return 'Impossible de charger le planning — Mode hors-ligne';
     }
     if (/réponse vide|respond to webhook|webhook not registered/i.test(msg)) {
-      return msg;
+      return 'Aucun rendez-vous trouvé ou données indisponibles.';
     }
     if (msg.startsWith('{') && msg.includes('"error"')) {
       return PLANNING_UPSTREAM_ERROR_MESSAGE;
@@ -3849,12 +3862,17 @@ let handoffNotes = [];
 
     const contentType = response.headers.get('content-type') || '';
     const rawText = await response.text();
+    const trimmedText = rawText.trim();
 
     let payload;
     try {
-      payload = rawText.trim() ? JSON.parse(rawText) : [];
+      payload = trimmedText ? JSON.parse(trimmedText) : [];
     } catch (parseError) {
-      throw new Error(`Réponse non-JSON (${contentType || 'unknown'}): ${parseError.message}`);
+      if (!trimmedText && response.ok) {
+        payload = [];
+      } else {
+        throw new Error(`Réponse non-JSON (${contentType || 'unknown'}): ${parseError.message}`);
+      }
     }
 
     if (!response.ok) {
