@@ -6297,3 +6297,81 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
     font-size: 13px;
   }
 }
+
+@media (max-width: 768px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #doctor-shell.app-shell {
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+  }
+
+  #doctor-shell .main,
+  #doctor-shell .dashboard-view {
+    min-height: auto;
+    overflow: visible;
+  }
+
+  #doctor-shell .kpi-row,
+  #doctor-shell .doctor-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #doctor-shell .dashboard-grid,
+  #doctor-shell .brutalist-triage-grid,
+  #doctor-shell .waitlist-layout,
+  #doctor-shell .charts-grid,
+  #doctor-shell .settings-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #doctor-shell .view-page-header--row,
+  #doctor-shell .schedule-header--with-actions,
+  #doctor-shell .assistant-panel__head,
+  #doctor-shell .hero-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #doctor-shell .crm-search-wrap,
+  #doctor-shell .hero-sync {
+    width: 100%;
+  }
+
+  #doctor-shell .waitlist-table-wrap,
+  #doctor-shell .crm-table-scroll,
+  #doctor-shell .brutalist-triage-panel__table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #doctor-shell .waitlist-table,
+  #doctor-shell .crm-table,
+  #doctor-shell .brutalist-triage-table {
+    min-width: 600px;
+  }
+
+  #doctor-shell .waitlist-submit-btn,
+  #doctor-shell .security-form__submit,
+  #doctor-shell .btn-gold,
+  #doctor-shell .chart-toggle-btn,
+  #doctor-shell .theme-switch-btn,
+  #doctor-shell .ghost-select__trigger {
+    min-height: 44px;
+  }
+
+  #doctor-shell .waitlist-submit-btn,
+  #doctor-shell .security-form__submit,
+  #doctor-shell .btn-gold {
+    width: 100%;
+  }
+}

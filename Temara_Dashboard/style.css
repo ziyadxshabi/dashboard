@@ -5183,3 +5183,120 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
     font-size: 0.75rem;
   }
 }
+
+@media (max-width: 768px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body.mode-assistant,
+  body.mode-assistant #assistant-shell,
+  body.mode-assistant #assistant-mount,
+  body.mode-assistant #assistant-shell .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.mode-assistant #assistant-shell .app-shell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  body.mode-assistant .assistant-sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    display: flex;
+    width: 100%;
+    min-height: auto;
+    height: auto;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0 0 16px 16px;
+    z-index: 20;
+  }
+
+  body.mode-assistant .assistant-sidebar .sidebar-brand {
+    padding: 4px 8px 12px;
+  }
+
+  body.mode-assistant .assistant-sidebar .sidebar-nav {
+    min-height: auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  body.mode-assistant .assistant-sidebar .nav-link,
+  body.mode-assistant .assistant-sidebar .btn-super,
+  body.mode-assistant .assistant-sidebar .btn-account-menu {
+    min-height: 44px;
+  }
+
+  .assistant-main {
+    margin-left: 0;
+    width: 100%;
+    min-width: 0;
+    min-height: auto;
+    overflow: visible;
+    padding:
+      max(16px, var(--safe-top))
+      max(16px, var(--safe-inline-end))
+      max(88px, var(--safe-bottom))
+      max(16px, var(--safe-inline));
+  }
+
+  .assistant-grid,
+  .waitlist-layout,
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .view-page-header--row,
+  .assistant-panel__head,
+  .schedule-header--with-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .assistant-pulse-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .pulse-card {
+    min-width: 0;
+  }
+
+  .waitlist-table-wrap,
+  .crm-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .waitlist-table,
+  .crm-table {
+    min-width: 600px;
+  }
+
+  .handoff-compose__submit,
+  .waitlist-submit-btn,
+  .btn-matte-primary,
+  #btn-bulk-confirm {
+    min-height: 44px;
+    width: 100%;
+  }
+}
