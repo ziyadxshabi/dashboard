@@ -22,7 +22,16 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.cal.com/v1/bookings?apiKey={{ $vars.CALCOM_API_KEY }}",
+        "url": "https://api.cal.com/v1/bookings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.CALCOM_API_KEY }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"eventTypeId\": {{ $vars.CALCOM_EVENT_TYPE_ID }},\n  \"start\": \"{{ $now.plus(1, 'hour').toISO() }}\",\n  \"end\": \"{{ $now.plus(1, 'hour').plus(30, 'minute').toISO() }}\",\n  \"responses\": {\n    \"name\": \"Urgence DentaFlow\",\n    \"email\": \"{{ $vars.CLINIC_URGENCY_EMAIL }}\",\n    \"notes\": \"Créneau bloqué automatiquement via DentaFlow OS — Superpouvoir\"\n  },\n  \"metadata\": {\n    \"source\": \"dentaflow-superpouvoir-block-slot\"\n  }\n}",
