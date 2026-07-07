@@ -1980,6 +1980,10 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   letter-spacing: -0.01em;
 }
 
+.mobile-bottom-nav {
+  display: none;
+}
+
 .sidebar-profile--assistant .profile-avatar {
   background: rgba(227, 193, 143, 0.12);
   color: var(--accent-gold);
@@ -2027,9 +2031,7 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   }
 
   .assistant-mobile-bar {
-    display: flex;
-    margin: -16px -16px 20px;
-    width: calc(100% + 32px);
+    display: none !important;
   }
 
   .roster-table-wrap {
@@ -5210,35 +5212,112 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   }
 
   body.mode-assistant .assistant-sidebar {
-    position: relative;
-    top: auto;
-    left: auto;
-    bottom: auto;
+    display: none !important;
+  }
+
+  body.mode-assistant .mobile-bottom-nav {
     display: flex;
-    width: 100%;
-    min-height: auto;
-    height: auto;
-    padding: 12px;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    border-radius: 0 0 16px 16px;
-    z-index: 20;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4px;
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 420px;
+    z-index: 9999;
+    margin: 0;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    border-radius: 20px;
+    background: rgba(20, 20, 25, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(227, 193, 143, 0.04);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  body.mode-assistant .assistant-sidebar .sidebar-brand {
-    padding: 4px 8px 12px;
+  body.mode-assistant .mobile-bottom-nav::-webkit-scrollbar {
+    display: none;
   }
 
-  body.mode-assistant .assistant-sidebar .sidebar-nav {
-    min-height: auto;
-    overflow: visible;
-    padding-right: 0;
-  }
-
-  body.mode-assistant .assistant-sidebar .nav-link,
-  body.mode-assistant .assistant-sidebar .btn-super,
-  body.mode-assistant .assistant-sidebar .btn-account-menu {
+  body.mode-assistant .mobile-bottom-nav .tab-link {
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 6px;
+    border-radius: 14px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    color: var(--text-muted, rgba(255, 255, 255, 0.55));
+    text-decoration: none;
+    text-align: center;
+    white-space: nowrap;
+    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    touch-action: manipulation;
+  }
+
+  body.mode-assistant .mobile-bottom-nav .tab-link .tab-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    transition: stroke 0.2s ease;
+  }
+
+  body.mode-assistant .mobile-bottom-nav .tab-link.is-active {
+    color: var(--accent-gold, #E3C18F);
+    background: var(--accent-dim, rgba(217, 107, 39, 0.1));
+    box-shadow: inset 0 0 0 1px rgba(227, 193, 143, 0.18);
+  }
+
+  body.mode-assistant .mobile-bottom-nav .tab-link.is-active .tab-icon {
+    stroke: var(--accent-gold, #E3C18F);
+  }
+
+  body.mode-assistant .mobile-bottom-nav .tab-link:active {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.mode-assistant .mobile-bottom-nav .tab-link:active {
+      transform: none;
+    }
+  }
+
+  body.mode-assistant.mobile-dock-active .assistant-main {
+    padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .assistant-header,
+  body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .assistant-pulse,
+  body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .assistant-panel--handoff {
+    display: none !important;
+  }
+
+  body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .assistant-header,
+  body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .assistant-pulse,
+  body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .assistant-panel--roster {
+    display: none !important;
+  }
+
+  body.mode-assistant.mobile-dock-active.mobile-section-overview #view-overview.active .assistant-panel--roster,
+  body.mode-assistant.mobile-dock-active.mobile-section-overview #view-overview.active .assistant-panel--handoff {
+    display: none !important;
   }
 
   .assistant-main {

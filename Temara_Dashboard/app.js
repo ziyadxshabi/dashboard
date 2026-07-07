@@ -47,6 +47,16 @@ const VIEW_MAP = {
   settings: 'view-settings',
 };
 
+const MOBILE_DOCK_NAV = new Set(['overview', 'planning', 'transmission', 'waitlist']);
+const MOBILE_OVERVIEW_SECTIONS = new Set(['overview', 'planning', 'transmission']);
+
+function isFetchAborted(error) {
+  if (!error) return false;
+  const name = String(error.name || error.constructor?.name || '');
+  const message = String(error.message || error);
+  return name === 'AbortError' || /aborted/i.test(message);
+}
+
 const NOSHOW_SVG = `
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
@@ -143,6 +153,7 @@ let handoffNotes = [];
   let waitlistUrgentOnly = false;
   let selectedPatientIds = [];
   let activeView = 'overview';
+  let activeMobileTab = 'overview';
   let osBootSequencePlayed = false;
 
   function $(id) {
@@ -416,7 +427,7 @@ let handoffNotes = [];
 
   async function loadHandoffNotes() {
     const feed = $('handoff-feed');
-    if (feed) {
+    if (feed && !handoffNotes.length) {
       feed.replaceChildren();
       window.DentaFlowDom?.appendParagraph(feed, 'handoff-feed__empty', 'Chargement des transmissions…');
     }
@@ -443,6 +454,13 @@ let handoffNotes = [];
       handoffNotes = rawRows.map(normalizeHandoffRecord).filter(Boolean);
       renderHandoffBoard();
     } catch (error) {
+      if (isFetchAborted(error)) {
+        console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+        if (handoffNotes.length) {
+          renderHandoffBoard();
+        }
+        return;
+      }
       console.error('[Handoff] Load failed:', error?.message || error);
       handoffNotes = [];
       renderHandoffBoard({
@@ -773,6 +791,12 @@ let handoffNotes = [];
 
         showToast('Note d\'équipe publiée.', 'success');
       } catch (error) {
+        if (isFetchAborted(error)) {
+          console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+          handoffNotes = handoffNotes.filter(note => note.id !== tempId);
+          renderHandoffBoard();
+          return;
+        }
         console.error('[Handoff] POST failed:', error?.message || error);
         handoffNotes = handoffNotes.filter(note => note.id !== tempId);
         renderHandoffBoard();
@@ -1926,6 +1950,11 @@ let handoffNotes = [];
       animateInlineConfirmSuccess(ids);
       showToast(`${ids.length} rendez-vous confirmés avec succès`, 'success');
     } catch (error) {
+      if (isFetchAborted(error)) {
+        console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+        revertOptimisticBulkSnapshots(optimisticSnapshots);
+        return;
+      }
       console.error('[Bulk Confirm] Failed:', error?.message || error);
       revertOptimisticBulkSnapshots(optimisticSnapshots);
       showToast('Erreur de synchronisation. Annulation des changements.', 'error');
@@ -1960,6 +1989,11 @@ let handoffNotes = [];
         showToast('Rendez-vous annulés avec succès', 'success');
       }
     } catch (error) {
+      if (isFetchAborted(error)) {
+        console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+        revertOptimisticBulkSnapshots(optimisticSnapshots);
+        return;
+      }
       console.error('[Bulk Cancel] Failed:', error?.message || error);
       revertOptimisticBulkSnapshots(optimisticSnapshots);
       loadPlanning();
@@ -2053,7 +2087,14 @@ let handoffNotes = [];
   }
 
   function formatRosterErrorMessage(error) {
+    if (isFetchAborted(error)) {
+      return '';
+    }
+
     let msg = String(error?.message || '').trim();
+    if (/aborted/i.test(msg)) {
+      return '';
+    }
     msg = parseUpstreamErrorDetail(msg) || msg;
 
     if (window.location.protocol === 'file:') {
@@ -3756,6 +3797,10 @@ let handoffNotes = [];
       ? message
       : formatRosterErrorMessage({ message });
 
+    if (!friendlyMessage || /aborted/i.test(friendlyMessage)) {
+      return;
+    }
+
     const timeline = $('planning-timeline');
     if (timeline) {
       timeline.replaceChildren();
@@ -3843,6 +3888,14 @@ let handoffNotes = [];
       setSyncIndicator('ok');
       queueOsBootSequence();
     } catch (error) {
+      if (isFetchAborted(error)) {
+        console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+        if (allRosterRecords.length) {
+          renderPlanning(filterTodayRosterRecords(allRosterRecords));
+          setSyncIndicator('ok');
+        }
+        return;
+      }
       console.error('[Roster] Fetch failed:', error?.message || error);
 
       showTableError(formatRosterErrorMessage(error));
@@ -4026,6 +4079,10 @@ let handoffNotes = [];
         selectEl.disabled = false;
       }, 2000);
     } catch (error) {
+      if (isFetchAborted(error)) {
+        console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+        return;
+      }
       console.error('[Roster Status] Update failed:', error?.message || error);
       selectEl.value = previousStatus;
       applyMatteSelectSkin(selectEl, previousStatus);
@@ -4068,14 +4125,132 @@ let handoffNotes = [];
     cards?.addEventListener('change', handleChange);
   }
 
+  function clearMobileOverviewSectionClasses() {
+    MOBILE_OVERVIEW_SECTIONS.forEach((key) => {
+      document.body.classList.remove(`mobile-section-${key}`);
+    });
+  }
+
+  function applyMobileOverviewSection(sectionKey) {
+    MOBILE_OVERVIEW_SECTIONS.forEach((key) => {
+      document.body.classList.toggle(`mobile-section-${key}`, sectionKey === key);
+    });
+  }
+
+  function isMobileViewport() {
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function syncDockNavStates(tabKey) {
+    document.querySelectorAll('.mobile-bottom-nav .tab-link[data-nav]').forEach((link) => {
+      const isActive = link.dataset.nav === tabKey;
+      link.classList.toggle('is-active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+
+    document.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+      const navKey = link.dataset.nav;
+      const isActive = MOBILE_OVERVIEW_SECTIONS.has(tabKey)
+        ? navKey === 'overview'
+        : navKey === tabKey;
+      link.classList.toggle('is-active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function navigateToMobileTab(tabKey) {
+    if (!MOBILE_DOCK_NAV.has(tabKey)) return;
+    if (
+      tabKey === activeMobileTab
+      && MOBILE_OVERVIEW_SECTIONS.has(tabKey)
+      && activeView === 'overview'
+    ) {
+      return;
+    }
+    if (tabKey === activeMobileTab && tabKey === 'waitlist' && activeView === 'waitlist') {
+      return;
+    }
+
+    activeMobileTab = tabKey;
+
+    if (MOBILE_OVERVIEW_SECTIONS.has(tabKey)) {
+      if (activeView !== 'overview') {
+        navigateToView('overview', { skipMobileSync: true });
+      }
+      applyMobileOverviewSection(tabKey);
+    } else if (tabKey === 'waitlist') {
+      clearMobileOverviewSectionClasses();
+      if (activeView !== 'waitlist') {
+        navigateToView('waitlist', { skipMobileSync: true });
+      }
+    }
+
+    syncDockNavStates(tabKey);
+  }
+
+  function initMobileDock() {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const applyMobileDockState = () => {
+      const mobile = mq.matches;
+      document.body.classList.toggle('mobile-dock-active', mobile);
+
+      if (!mobile) {
+        clearMobileOverviewSectionClasses();
+        return;
+      }
+
+      if (MOBILE_OVERVIEW_SECTIONS.has(activeMobileTab) && activeView === 'overview') {
+        applyMobileOverviewSection(activeMobileTab);
+      } else if (activeMobileTab === 'waitlist' && activeView === 'waitlist') {
+        clearMobileOverviewSectionClasses();
+      } else if (activeView === 'overview') {
+        activeMobileTab = 'overview';
+        applyMobileOverviewSection('overview');
+      } else if (activeView === 'waitlist') {
+        activeMobileTab = 'waitlist';
+        clearMobileOverviewSectionClasses();
+      }
+
+      syncDockNavStates(activeMobileTab);
+    };
+
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', applyMobileDockState);
+    } else {
+      mq.addListener(applyMobileDockState);
+    }
+
+    applyMobileDockState();
+  }
+
   function initNavigation() {
-    document.querySelectorAll('.nav-link[data-nav]').forEach(link => {
-      link?.addEventListener('click', event => {
+    document.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+      link?.addEventListener('click', (event) => {
         event.preventDefault();
         const nav = link.dataset.nav;
         if (nav && VIEW_MAP[nav]) navigateToView(nav);
       });
     });
+
+    document.querySelectorAll('.mobile-bottom-nav .tab-link[data-nav]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        const nav = link.dataset.nav;
+        if (nav && MOBILE_DOCK_NAV.has(nav)) {
+          navigateToMobileTab(nav);
+        }
+      });
+    });
+
+    initMobileDock();
   }
 
   const VIEW_TRANSITION_MS = 400;
@@ -4158,24 +4333,39 @@ let handoffNotes = [];
       viewEl.classList.add('view-enter-ready', 'view-stagger');
     }
   }
-  function navigateToView(viewKey) {
+  function navigateToView(viewKey, options = {}) {
+    const { skipMobileSync = false, animate = true } = options;
     const targetId = VIEW_MAP[viewKey];
-    if (!targetId || viewKey === activeView) return;
+    if (!targetId) return;
+    if (viewKey === activeView && !skipMobileSync) return;
 
     const targetView = document.getElementById(targetId);
     if (!targetView) return;
 
-    activateDashboardView(targetView, { animate: true });
+    activateDashboardView(targetView, { animate });
 
-    document.querySelectorAll('.nav-link[data-nav]').forEach(link => {
-      const isActive = link.dataset.nav === viewKey;
-      link.classList.toggle('is-active', isActive);
-      if (isActive) {
-        link.setAttribute('aria-current', 'page');
+    if (isMobileViewport() && !skipMobileSync) {
+      if (viewKey === 'overview') {
+        activeMobileTab = MOBILE_OVERVIEW_SECTIONS.has(activeMobileTab) ? activeMobileTab : 'overview';
+        applyMobileOverviewSection(activeMobileTab);
+      } else if (viewKey === 'waitlist') {
+        activeMobileTab = 'waitlist';
+        clearMobileOverviewSectionClasses();
       } else {
-        link.removeAttribute('aria-current');
+        clearMobileOverviewSectionClasses();
       }
-    });
+      syncDockNavStates(activeMobileTab);
+    } else {
+      document.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+        const isActive = link.dataset.nav === viewKey;
+        link.classList.toggle('is-active', isActive);
+        if (isActive) {
+          link.setAttribute('aria-current', 'page');
+        } else {
+          link.removeAttribute('aria-current');
+        }
+      });
+    }
 
     activeView = viewKey;
 
@@ -4408,6 +4598,10 @@ let handoffNotes = [];
         });
         showToast('Patient ajouté à la liste d\'attente avec succès', 'success');
       } catch (error) {
+        if (isFetchAborted(error)) {
+          console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+          return;
+        }
         console.error('[Waitlist] Submission failed:', error?.message || error);
         showToast('Échec de la connexion au serveur. Veuillez réessayer.', 'error');
       } finally {
@@ -4938,6 +5132,12 @@ let handoffNotes = [];
           btnDelay.classList.remove('is-success');
         }, feedbackMs);
       } catch (error) {
+        if (isFetchAborted(error)) {
+          console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
+          btnDelay.disabled = false;
+          btnDelay.classList.remove('is-loading', 'is-success');
+          return;
+        }
         console.error('[Delay Alert] Request failed:', error?.message || error);
         btnDelay.disabled = false;
         btnDelay.classList.remove('is-loading', 'is-success');
