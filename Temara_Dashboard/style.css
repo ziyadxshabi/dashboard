@@ -1984,6 +1984,10 @@ html[data-theme="pearl-clinic"] .sidebar-superpouvoirs {
   display: none;
 }
 
+.overview-timeline-section {
+  display: none;
+}
+
 .sidebar-profile--assistant .profile-avatar {
   background: rgba(227, 193, 143, 0.12);
   color: var(--accent-gold);
@@ -5216,20 +5220,20 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   }
 
   body.mode-assistant .mobile-bottom-nav {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-around;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
+    align-items: stretch;
+    text-align: center;
     position: fixed;
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
-    width: calc(100% - 32px);
-    max-width: 420px;
+    width: calc(100% - 24px);
+    max-width: 430px;
     z-index: 9999;
     margin: 0;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
     border-radius: 20px;
     background: rgba(20, 20, 25, 0.8);
     backdrop-filter: blur(20px);
@@ -5240,6 +5244,8 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
       0 0 0 1px rgba(227, 193, 143, 0.04);
     overflow-x: auto;
     overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-tap-highlight-color: transparent;
@@ -5250,20 +5256,19 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   }
 
   body.mode-assistant .mobile-bottom-nav .tab-link {
-    flex: 1 1 0;
     min-width: 0;
     min-height: 44px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 8px 6px;
-    border-radius: 14px;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    line-height: 1.15;
+    gap: 2px;
+    padding: 6px 2px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
     color: var(--text-muted, rgba(255, 255, 255, 0.55));
     text-decoration: none;
     text-align: center;
@@ -5273,10 +5278,16 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   }
 
   body.mode-assistant .mobile-bottom-nav .tab-link .tab-icon {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
     transition: stroke 0.2s ease;
+  }
+
+  body.mode-assistant .mobile-bottom-nav .tab-link span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   body.mode-assistant .mobile-bottom-nav .tab-link.is-active {
@@ -5305,12 +5316,14 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
 
   body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .assistant-header,
   body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .assistant-pulse,
+  body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .overview-timeline-section,
   body.mode-assistant.mobile-dock-active.mobile-section-planning #view-overview.active .assistant-panel--handoff {
     display: none !important;
   }
 
   body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .assistant-header,
   body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .assistant-pulse,
+  body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .overview-timeline-section,
   body.mode-assistant.mobile-dock-active.mobile-section-transmission #view-overview.active .assistant-panel--roster {
     display: none !important;
   }
@@ -5318,6 +5331,162 @@ body.os-boot-pending .dashboard-view.active.view-stagger .waitlist-table tbody t
   body.mode-assistant.mobile-dock-active.mobile-section-overview #view-overview.active .assistant-panel--roster,
   body.mode-assistant.mobile-dock-active.mobile-section-overview #view-overview.active .assistant-panel--handoff {
     display: none !important;
+  }
+
+  body.mode-assistant.mobile-dock-active.mobile-section-overview #view-overview.active .overview-timeline-section {
+    display: block;
+    margin-top: 24px;
+  }
+
+  body.mode-assistant.mobile-dock-active .overview-timeline-section .section-header-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  body.mode-assistant.mobile-dock-active .overview-timeline-section .section-header-inline__title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-hierarchy-primary, #f3f4f6);
+  }
+
+  body.mode-assistant.mobile-dock-active .live-indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.15);
+    flex-shrink: 0;
+    animation: overview-live-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes overview-live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(0.92); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.mode-assistant.mobile-dock-active .live-indicator-dot {
+      animation: none;
+    }
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-scroll-axis {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-scroll-axis::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-scroll-axis::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card {
+    display: grid;
+    grid-template-columns: minmax(52px, auto) minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    border-left-width: 3px;
+    border-left-style: solid;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card--confirmé {
+    border-left-color: #4ade80;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card--attente {
+    border-left-color: #facc15;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card--urgence {
+    border-left-color: #f87171;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card--annulé {
+    border-left-color: rgba(255, 255, 255, 0.2);
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card__time {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--text-hierarchy-primary, #f3f4f6);
+    white-space: nowrap;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card__info {
+    min-width: 0;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card__name {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-hierarchy-primary, #f3f4f6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card__reason {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #888893;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card__status {
+    flex-shrink: 0;
+  }
+
+  body.mode-assistant.mobile-dock-active .timeline-card__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: var(--accent-gold, #e3c18f);
+    background: rgba(227, 193, 143, 0.1);
+    border: 1px solid rgba(227, 193, 143, 0.18);
+  }
+
+  body.mode-assistant.mobile-dock-active .empty-timeline {
+    padding: 28px 16px;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #888893;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
   }
 
   .assistant-main {

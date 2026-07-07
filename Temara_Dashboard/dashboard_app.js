@@ -1945,9 +1945,35 @@ function renderKPICards(data) {
 
 /* ── OPERATIONAL ANALYTICS (Performances view) ──────────────────────────── */
 
+const OPERATIONAL_CHART_GOLD = '#C89E66';
+const OPERATIONAL_CHART_TICK = '#888893';
+const OPERATIONAL_CHART_GRID = 'rgba(255, 255, 255, 0.03)';
+const OPERATIONAL_CHART_MUTED_BAR = 'rgba(255, 255, 255, 0.05)';
+
+function getOperationalChartTooltipOptions() {
+  return {
+    backgroundColor: 'rgba(20, 20, 25, 0.85)',
+    titleColor: '#FFFFFF',
+    bodyColor: '#A0A0AB',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    padding: 12,
+    cornerRadius: 8,
+    displayColors: true,
+    boxPadding: 6,
+  };
+}
+
+function getOperationalChartTickStyle() {
+  return {
+    color: OPERATIONAL_CHART_TICK,
+    font: { family: 'Inter, sans-serif', size: 11 },
+  };
+}
+
 function applyChartJsDefaults() {
   if (typeof Chart === 'undefined') return;
-  Chart.defaults.color = '#9CA3AF';
+  Chart.defaults.color = OPERATIONAL_CHART_TICK;
   Chart.defaults.font.family = 'Inter, sans-serif';
 }
 
@@ -1996,13 +2022,13 @@ function createRecoveryAreaGradient(canvas) {
   const ctx = canvas.getContext('2d');
   const height = canvas.parentElement?.clientHeight || 300;
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, 'rgba(184, 150, 90, 0.4)');
-  gradient.addColorStop(1, 'rgba(184, 150, 90, 0)');
+  gradient.addColorStop(0, 'rgba(200, 158, 102, 0.2)');
+  gradient.addColorStop(1, 'rgba(200, 158, 102, 0)');
   return gradient;
 }
 
 function getFlowBarColors() {
-  return ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.16)', '#e8c97a'];
+  return [OPERATIONAL_CHART_MUTED_BAR, OPERATIONAL_CHART_MUTED_BAR, OPERATIONAL_CHART_GOLD];
 }
 
 function initOperationalCharts(data = {}) {
@@ -2010,7 +2036,6 @@ function initOperationalCharts(data = {}) {
 
   applyChartJsDefaults();
   const payload = buildOperationalChartPayload(data);
-  const chartTheme = getChartThemeColors();
 
   const recoveryCtx = document.getElementById('recoveryChart');
   if (recoveryCtx) {
@@ -2030,22 +2055,22 @@ function initOperationalCharts(data = {}) {
             type: 'bar',
             label: 'Annulations',
             data: payload.recovery.cancellations,
-            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            backgroundColor: OPERATIONAL_CHART_MUTED_BAR,
             borderWidth: 0,
-            borderRadius: 8,
+            borderRadius: 6,
             order: 2,
           },
           {
             type: 'line',
             label: 'Créneaux Récupérés',
             data: payload.recovery.recovered,
-            borderColor: '#e8c97a',
+            borderColor: OPERATIONAL_CHART_GOLD,
             backgroundColor: recoveryGradient,
-            borderWidth: 2.5,
+            borderWidth: 2,
             pointRadius: 0,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: '#e8c97a',
-            pointHoverBorderColor: '#111118',
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: OPERATIONAL_CHART_GOLD,
+            pointHoverBorderColor: '#1A1A1F',
             pointHoverBorderWidth: 2,
             tension: 0.4,
             fill: true,
@@ -2061,27 +2086,34 @@ function initOperationalCharts(data = {}) {
           legend: {
             position: 'top',
             align: 'end',
-            labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true },
+            labels: {
+              boxWidth: 10,
+              boxHeight: 10,
+              usePointStyle: true,
+              color: OPERATIONAL_CHART_TICK,
+              font: { family: 'Inter, sans-serif', size: 11 },
+            },
           },
-          tooltip: {
-            backgroundColor: chartTheme.tooltipBg,
-            borderColor: chartTheme.tooltipBorder,
-            borderWidth: 1,
-            titleColor: chartTheme.tooltipTitle,
-            bodyColor: chartTheme.tooltipBody,
-          },
+          tooltip: getOperationalChartTooltipOptions(),
         },
         scales: {
           x: {
             grid: { display: false },
             border: { display: false },
-            ticks: { color: 'rgba(255, 255, 255, 0.35)', font: { size: 11 } },
+            ticks: getOperationalChartTickStyle(),
           },
           y: {
             beginAtZero: true,
-            grid: { display: false },
+            grid: {
+              display: true,
+              color: OPERATIONAL_CHART_GRID,
+              drawTicks: false,
+            },
             border: { display: false },
-            ticks: { precision: 0, color: 'rgba(255, 255, 255, 0.35)', font: { size: 11 } },
+            ticks: {
+              ...getOperationalChartTickStyle(),
+              precision: 0,
+            },
           },
         },
       },
@@ -2103,7 +2135,7 @@ function initOperationalCharts(data = {}) {
           data: payload.flow.values,
           backgroundColor: getFlowBarColors(),
           borderWidth: 0,
-          borderRadius: 9999,
+          borderRadius: 6,
           borderSkipped: false,
           barThickness: 14,
         }],
@@ -2115,11 +2147,7 @@ function initOperationalCharts(data = {}) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: chartTheme.tooltipBg,
-            borderColor: chartTheme.tooltipBorder,
-            borderWidth: 1,
-            titleColor: chartTheme.tooltipTitle,
-            bodyColor: chartTheme.tooltipBody,
+            ...getOperationalChartTooltipOptions(),
             callbacks: {
               label: (ctx) => ` ${ctx.label}: ${ctx.parsed.x}%`,
             },
@@ -2129,21 +2157,21 @@ function initOperationalCharts(data = {}) {
           x: {
             beginAtZero: true,
             max: 100,
-            grid: { display: false },
+            grid: {
+              display: true,
+              color: OPERATIONAL_CHART_GRID,
+              drawTicks: false,
+            },
             border: { display: false },
             ticks: {
-              color: 'rgba(255, 255, 255, 0.35)',
-              font: { size: 11 },
+              ...getOperationalChartTickStyle(),
               callback: (value) => `${value}%`,
             },
           },
           y: {
             grid: { display: false },
             border: { display: false },
-            ticks: {
-              color: 'rgba(255, 255, 255, 0.55)',
-              font: { size: 11 },
-            },
+            ticks: getOperationalChartTickStyle(),
           },
         },
       },

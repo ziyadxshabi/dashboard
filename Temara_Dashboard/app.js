@@ -47,8 +47,9 @@ const VIEW_MAP = {
   settings: 'view-settings',
 };
 
-const MOBILE_DOCK_NAV = new Set(['overview', 'planning', 'transmission', 'waitlist']);
+const MOBILE_DOCK_NAV = new Set(['overview', 'planning', 'transmission', 'waitlist', 'settings']);
 const MOBILE_OVERVIEW_SECTIONS = new Set(['overview', 'planning', 'transmission']);
+const MOBILE_FULL_VIEW_TABS = new Set(['waitlist', 'settings']);
 
 function isFetchAborted(error) {
   if (!error) return false;
@@ -3685,6 +3686,60 @@ let handoffNotes = [];
     return tr;
   }
 
+  function createOverviewTimelineCard(record) {
+    const card = document.createElement('article');
+    card.className = `timeline-card timeline-card--${getMatteChipModifier(record.status)}`;
+    card.setAttribute('role', 'listitem');
+
+    const timeCol = document.createElement('div');
+    timeCol.className = 'timeline-card__time';
+    timeCol.textContent = record.time || '—';
+
+    const infoCol = document.createElement('div');
+    infoCol.className = 'timeline-card__info';
+
+    const nameEl = document.createElement('p');
+    nameEl.className = 'timeline-card__name';
+    nameEl.textContent = record.name || 'Non spécifié';
+
+    const reasonEl = document.createElement('p');
+    reasonEl.className = 'timeline-card__reason';
+    reasonEl.textContent = record.treatment || 'Consultation';
+
+    infoCol.append(nameEl, reasonEl);
+
+    const statusCol = document.createElement('div');
+    statusCol.className = 'timeline-card__status';
+    const badge = document.createElement('span');
+    badge.className = 'timeline-card__badge';
+    badge.textContent = record.status || 'Confirmé';
+    statusCol.appendChild(badge);
+
+    card.append(timeCol, infoCol, statusCol);
+    return card;
+  }
+
+  function renderOverviewTimeline(rosterData) {
+    const container = document.getElementById('overview-timeline-container');
+    if (!container) return;
+
+    container.replaceChildren();
+    const rows = Array.isArray(rosterData) ? rosterData.filter(Boolean) : [];
+
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-timeline';
+      empty.textContent = 'Aucun rendez-vous planifié aujourd\'hui.';
+      container.appendChild(empty);
+      return;
+    }
+
+    const sorted = sortRosterByTime([...rows]);
+    const fragment = document.createDocumentFragment();
+    sorted.forEach((record) => fragment.appendChild(createOverviewTimelineCard(record)));
+    container.appendChild(fragment);
+  }
+
   function renderPlanning(records) {
     return safeRender('renderPlanning', () => {
     const rows = Array.isArray(records) ? records.filter(Boolean) : [];
@@ -3758,6 +3813,7 @@ let handoffNotes = [];
 
     renderOperationalPulse(computeOperationalPulse(rows));
     refreshInvisibleUIDecorations($('assistant-pulse-grid'));
+    renderOverviewTimeline(rows);
     });
   }
 
@@ -4174,7 +4230,7 @@ let handoffNotes = [];
       const navKey = link.dataset.nav;
       const isActive = MOBILE_OVERVIEW_SECTIONS.has(tabKey)
         ? navKey === 'overview'
-        : navKey === tabKey;
+        : MOBILE_FULL_VIEW_TABS.has(tabKey) && navKey === tabKey;
       link.classList.toggle('is-active', isActive);
       if (isActive) {
         link.setAttribute('aria-current', 'page');
@@ -4196,6 +4252,9 @@ let handoffNotes = [];
     if (tabKey === activeMobileTab && tabKey === 'waitlist' && activeView === 'waitlist') {
       return;
     }
+    if (tabKey === activeMobileTab && tabKey === 'settings' && activeView === 'settings') {
+      return;
+    }
 
     activeMobileTab = tabKey;
 
@@ -4204,10 +4263,10 @@ let handoffNotes = [];
         navigateToView('overview', { skipMobileSync: true });
       }
       applyMobileOverviewSection(tabKey);
-    } else if (tabKey === 'waitlist') {
+    } else if (MOBILE_FULL_VIEW_TABS.has(tabKey)) {
       clearMobileOverviewSectionClasses();
-      if (activeView !== 'waitlist') {
-        navigateToView('waitlist', { skipMobileSync: true });
+      if (activeView !== tabKey) {
+        navigateToView(tabKey, { skipMobileSync: true });
       }
     }
 
@@ -4229,11 +4288,16 @@ let handoffNotes = [];
         applyMobileOverviewSection(activeMobileTab);
       } else if (activeMobileTab === 'waitlist' && activeView === 'waitlist') {
         clearMobileOverviewSectionClasses();
+      } else if (activeMobileTab === 'settings' && activeView === 'settings') {
+        clearMobileOverviewSectionClasses();
       } else if (activeView === 'overview') {
         activeMobileTab = 'overview';
         applyMobileOverviewSection('overview');
       } else if (activeView === 'waitlist') {
         activeMobileTab = 'waitlist';
+        clearMobileOverviewSectionClasses();
+      } else if (activeView === 'settings') {
+        activeMobileTab = 'settings';
         clearMobileOverviewSectionClasses();
       }
 
@@ -4366,8 +4430,8 @@ let handoffNotes = [];
       if (viewKey === 'overview') {
         activeMobileTab = MOBILE_OVERVIEW_SECTIONS.has(activeMobileTab) ? activeMobileTab : 'overview';
         applyMobileOverviewSection(activeMobileTab);
-      } else if (viewKey === 'waitlist') {
-        activeMobileTab = 'waitlist';
+      } else if (viewKey === 'waitlist' || viewKey === 'settings') {
+        activeMobileTab = viewKey;
         clearMobileOverviewSectionClasses();
       } else {
         clearMobileOverviewSectionClasses();
