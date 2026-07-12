@@ -80,15 +80,6 @@
                 <span class="btn-super__hint">Réserver un slot prioritaire</span>
               </span>
             </button>
-            <button type="button" class="btn-super btn-super--compact" id="btn-fill-slot">
-              <span class="btn-super__icon" aria-hidden="true">
-                <i data-lucide="message-square-dashed" aria-hidden="true"></i>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Remplir un Créneau Vide</span>
-                <span class="btn-super__hint">Notifier la liste d'attente</span>
-              </span>
-            </button>
               </div>
             </div>
           </div>
@@ -168,6 +159,47 @@
           </div>
         </section>
 
+        <section class="assistant-bento-row" aria-label="Superpouvoir — campagne SMS">
+          <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
+            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
+            <header class="superpower-bento-card__head">
+              <div class="superpower-bento-card__icon" aria-hidden="true">
+                <i data-lucide="message-square-share" aria-hidden="true"></i>
+              </div>
+              <div class="superpower-bento-card__copy">
+                <p class="superpower-bento-card__eyebrow">Superpouvoir · Récupération</p>
+                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Campagne de Récupération</h2>
+                <p class="superpower-bento-card__desc">
+                  Envoie un SMS intelligent et personnalisé à tous les patients en liste d'attente pour combler les créneaux vides instantanément. À utiliser en cas d'annulation de dernière minute.
+                </p>
+              </div>
+            </header>
+            <ul class="superpower-bento-card__roi" aria-label="Bénéfices de la campagne">
+              <li class="superpower-bento-card__roi-item">
+                <i data-lucide="zap" class="icon-xs" aria-hidden="true"></i>
+                <span>ROI immédiat — créneaux comblés en moins de 15 min</span>
+              </li>
+              <li class="superpower-bento-card__roi-item">
+                <i data-lucide="users" class="icon-xs" aria-hidden="true"></i>
+                <span>Diffusion ciblée sur la liste d'attente active</span>
+              </li>
+              <li class="superpower-bento-card__roi-item">
+                <i data-lucide="shield-check" class="icon-xs" aria-hidden="true"></i>
+                <span>Conforme Loi 09-08 — consentement SMS vérifié</span>
+              </li>
+            </ul>
+            <button type="button" class="btn-super superpower-bento-card__cta" id="btn-fill-gap">
+              <span class="btn-super__icon" aria-hidden="true">
+                <i data-lucide="zap" aria-hidden="true"></i>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Lancer la campagne SMS</span>
+                <span class="btn-super__hint">Notification instantanée · moteur n8n</span>
+              </span>
+            </button>
+          </article>
+        </section>
+
         <div class="assistant-grid">
 
         <section class="assistant-panel assistant-panel--roster" aria-labelledby="roster-title">
@@ -193,9 +225,6 @@
                 <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
                   <button type="button" class="actions-popover__item v-disabled" id="btn-daily-report" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
                     Générer Rapport Journalier
-                  </button>
-                  <button type="button" class="actions-popover__item" id="btn-fill-gap" role="menuitem">
-                    Remplir un Créneau Vide
                   </button>
                   <button type="button" class="actions-popover__item" id="btn-alerte-retard" data-action="doctor-delayed" role="menuitem">
                     Alerte Retard Praticien

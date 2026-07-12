@@ -5221,6 +5221,186 @@ body.mode-assistant #view-overview .assistant-grid {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* ── Superpower Bento — Campagne de Récupération SMS ─────────────────────── */
+body.mode-assistant .assistant-bento-row {
+  margin-bottom: 22px;
+}
+
+body.mode-assistant .superpower-bento-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(18px, 3vw, 26px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  min-width: 0;
+}
+
+body.mode-assistant .superpower-bento-card__glow {
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: min(52vw, 320px);
+  height: min(52vw, 320px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(227, 193, 143, 0.14) 0%,
+    rgba(217, 107, 39, 0.06) 42%,
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+body.mode-assistant .superpower-bento-card__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+body.mode-assistant .superpower-bento-card__icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(227, 193, 143, 0.1);
+  border: 1px solid rgba(227, 193, 143, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+body.mode-assistant .superpower-bento-card__icon [data-lucide],
+body.mode-assistant .superpower-bento-card__icon .lucide {
+  width: 22px;
+  height: 22px;
+  stroke: var(--gold, var(--accent-gold));
+}
+
+body.mode-assistant .superpower-bento-card__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+body.mode-assistant .superpower-bento-card__eyebrow {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold, var(--accent-gold));
+}
+
+body.mode-assistant .superpower-bento-card__title {
+  margin: 0 0 8px;
+  font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main, var(--text));
+  line-height: 1.25;
+}
+
+body.mode-assistant .superpower-bento-card__desc {
+  margin: 0;
+  font-size: clamp(0.8125rem, 2vw, 0.875rem);
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 62ch;
+}
+
+body.mode-assistant .superpower-bento-card__roi {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.mode-assistant .superpower-bento-card__roi-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: var(--border-hairline);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim, var(--text-muted));
+}
+
+body.mode-assistant .superpower-bento-card__roi-item [data-lucide] {
+  flex-shrink: 0;
+  margin-top: 1px;
+  stroke: var(--gold, var(--accent-gold));
+  opacity: 0.9;
+}
+
+body.mode-assistant .superpower-bento-card__cta {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 48px;
+  align-self: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    135deg,
+    rgba(217, 107, 39, 0.22) 0%,
+    rgba(227, 193, 143, 0.12) 100%
+  );
+  border: 1px solid rgba(227, 193, 143, 0.28);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  transition:
+    transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
+    box-shadow 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+body.mode-assistant .superpower-bento-card__cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(227, 193, 143, 0.42);
+  box-shadow:
+    0 10px 28px rgba(217, 107, 39, 0.22),
+    0 0 0 1px rgba(227, 193, 143, 0.12);
+}
+
+body.mode-assistant .superpower-bento-card__cta:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+body.mode-assistant .superpower-bento-card__cta:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--gold, var(--accent-gold)),
+    0 0 0 4px rgba(0, 0, 0, 0.35);
+}
+
+@media (min-width: 768px) {
+  body.mode-assistant .superpower-bento-card__cta {
+    width: auto;
+    min-width: min(100%, 360px);
+    align-self: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.mode-assistant .superpower-bento-card__cta {
+    transition: none;
+  }
+}
+
 body.mode-assistant .assistant-panel--roster,
 body.mode-assistant .assistant-panel--handoff {
   grid-column: 1;

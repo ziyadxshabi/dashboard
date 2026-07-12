@@ -756,6 +756,11 @@ body.mode-assistant {
   align-items: start;
 }
 
+.assistant-bento-row {
+  width: 100%;
+  min-width: 0;
+}
+
 .assistant-panel {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
