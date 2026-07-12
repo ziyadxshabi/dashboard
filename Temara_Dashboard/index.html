@@ -49,82 +49,88 @@
 
   <!-- Secure credential gateway — Oak Lounge -->
   <div id="login-overlay" class="login-overlay is-visible">
-    <div class="login-coalesce" id="login-card">
-      <div class="login-panel-front">
-        <header class="login-brand login-coalesce-item" data-coalesce="brand">
-          <div class="login-brand-mark" aria-hidden="true">
-            <span class="login-mark-icon">
-              <i data-lucide="tooth" class="icon-sm" aria-hidden="true"></i>
-            </span>
-          </div>
-          <h1 class="login-title">DentaFlow OS</h1>
-          <p class="login-tagline">Passerelle Sécurisée</p>
-          <p class="login-clinic">Clinique Dentaire Témara Mall</p>
-        </header>
+    <header class="login-viewport-brand login-coalesce-item" data-coalesce="brand" aria-label="DentaFlow OS">
+      <div class="login-viewport-brand-mark" aria-hidden="true">
+        <span class="login-mark-icon">
+          <i data-lucide="tooth" class="icon-sm" aria-hidden="true"></i>
+        </span>
+      </div>
+      <div class="login-viewport-brand-text">
+        <span class="login-viewport-brand-name">DentaFlow OS</span>
+        <span class="login-viewport-brand-sub">Clinique Dentaire Témara Mall</span>
+      </div>
+    </header>
 
-        <div class="login-role-section login-coalesce-item" data-coalesce="role">
-          <p class="login-field-label">Profil d'accès</p>
-          <div class="login-role-switch" role="group" aria-label="Choisir le profil">
-            <button type="button" class="login-role-btn is-active" id="role-btn-doctor" aria-pressed="true">Praticien (Doctor)</button>
-            <button type="button" class="login-role-btn" id="role-btn-assistant" aria-pressed="false">Assistante (Assistant)</button>
-          </div>
-        </div>
-
-        <form id="login-form" class="login-credentials login-coalesce-item" data-coalesce="credentials" novalidate>
-          <div class="login-field">
-            <label class="login-field-label" for="login-username">Identifiant</label>
-            <input
-              class="login-input"
-              type="text"
-              id="login-username"
-              name="username"
-              autocomplete="username"
-              autocapitalize="none"
-              spellcheck="false"
-              required
-              placeholder="nom.utilisateur"
-            />
-          </div>
-
-          <div class="login-field login-field--password">
-            <label class="login-field-label" for="login-password">Mot de passe</label>
-            <div class="login-password-wrap">
-              <input
-                class="login-input"
-                type="password"
-                id="login-password"
-                name="password"
-                autocomplete="current-password"
-                required
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                class="login-password-toggle"
-                id="login-password-toggle"
-                aria-label="Afficher le mot de passe"
-                aria-pressed="false"
-              >
-                <i data-lucide="eye" id="login-password-toggle-icon" class="icon-sm" aria-hidden="true"></i>
-              </button>
+    <div class="login-stage">
+      <div class="login-coalesce" id="login-card">
+        <div class="login-panel-front">
+          <div class="login-role-section login-role-section--preserved" aria-hidden="true">
+            <div class="login-role-switch" role="group" aria-label="Choisir le profil">
+              <button type="button" class="login-role-btn is-active" id="role-btn-doctor" aria-pressed="true" tabindex="-1">Praticien (Doctor)</button>
+              <button type="button" class="login-role-btn" id="role-btn-assistant" aria-pressed="false" tabindex="-1">Assistante (Assistant)</button>
             </div>
           </div>
 
-          <button type="submit" class="login-submit" id="login-submit">
-            <span class="login-submit__label">Se connecter</span>
-            <span class="login-submit__spinner" aria-hidden="true"></span>
-          </button>
+          <form id="login-form" class="login-credentials login-coalesce-item" data-coalesce="credentials" novalidate>
+            <div class="login-field">
+              <label class="login-field-label" for="login-username">Identifiant</label>
+              <input
+                class="login-input"
+                type="text"
+                id="login-username"
+                name="username"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
+                required
+                placeholder="nom.utilisateur"
+              />
+            </div>
 
-          <p class="login-error" id="login-error" role="alert" hidden></p>
-        </form>
+            <div class="login-field login-field--password">
+              <label class="login-field-label" for="login-password">Mot de passe</label>
+              <div class="login-password-wrap">
+                <input
+                  class="login-input"
+                  type="password"
+                  id="login-password"
+                  name="password"
+                  autocomplete="current-password"
+                  required
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  class="login-password-toggle"
+                  id="login-password-toggle"
+                  aria-label="Afficher le mot de passe"
+                  aria-pressed="false"
+                >
+                  <i data-lucide="eye" id="login-password-toggle-icon" class="icon-sm" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
 
-        <footer class="login-security-banner login-coalesce-item" data-coalesce="footer">
-          <span class="login-security-text">Session chiffrée JWT</span>
-          <span class="login-security-sep" aria-hidden="true">•</span>
-          <span class="login-security-text">Propulsé par DentaFlow</span>
-        </footer>
+            <button type="submit" class="login-submit" id="login-submit">
+              <span class="login-submit__label">Se connecter</span>
+              <span class="login-submit__spinner" aria-hidden="true"></span>
+            </button>
+
+            <p class="login-error" id="login-error" role="alert" hidden></p>
+          </form>
+        </div>
       </div>
     </div>
+
+    <footer class="login-enterprise-footer login-coalesce-item" data-coalesce="footer" aria-label="Informations légales et support">
+      <ul class="login-enterprise-footer-list">
+        <li><span class="login-enterprise-footer-copy">DentaFlow OS © 2026</span></li>
+        <li><a href="#" class="login-enterprise-footer-link">Conditions d'utilisation</a></li>
+        <li><a href="#" class="login-enterprise-footer-link">Politique de confidentialité</a></li>
+        <li><a href="#" class="login-enterprise-footer-link">Directives cliniques</a></li>
+        <li><a href="#" class="login-enterprise-footer-link">Support Technique</a></li>
+      </ul>
+    </footer>
   </div>
 
   <div id="doctor-shell" class="app-shell" style="display: none;">

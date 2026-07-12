@@ -944,8 +944,9 @@ function initAccountCardMenu() {
   document.getElementById('account-menu-settings')?.addEventListener('click', () => {
     if (VIEW_MAP.settings) navigateToView('settings');
   });
-  document.getElementById('account-menu-logout')?.addEventListener('click', () => {
-    window.DentaFlowAuth?.clearSession?.();
+  document.getElementById('account-menu-logout')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    void window.DentaFlowAuth?.logout?.();
   });
 }
 
@@ -1611,8 +1612,7 @@ async function loadDashboard(isSilentSync = false) {
     });
 
     if (response.status === 401) {
-      window.DentaFlowAuth?.clearSession?.();
-      sessionStorage.removeItem('dentaflow_role');
+      void window.DentaFlowAuth?.logout?.();
       throw new Error('Session expirée — reconnectez-vous.');
     }
 
@@ -3371,9 +3371,8 @@ async function updateRosterStatus(selectEl, previousStatus) {
     console.log('[Roster Status] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
     if (response.status === 401) {
-      window.DentaFlowAuth?.clearSession?.();
-      sessionStorage.removeItem('dentaflow_role');
       showDashboardToast('Session expirée — veuillez vous reconnecter.', 'error');
+      void window.DentaFlowAuth?.logout?.();
       throw new Error('Session expirée — veuillez vous reconnecter.');
     }
 
@@ -3974,3 +3973,20 @@ function initSmartSync() {
     }, 0);
   });
 }
+
+window.DentaFlowAuth?.registerLogoutTeardown?.(async function teardownDoctorSession() {
+  if (teamNotesRefreshTimer) {
+    clearInterval(teamNotesRefreshTimer);
+    teamNotesRefreshTimer = null;
+  }
+  if (smartSyncIntervalId) {
+    clearInterval(smartSyncIntervalId);
+    smartSyncIntervalId = null;
+  }
+  smartSyncInitialized = false;
+  doctorDashboardInitialized = false;
+  if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
+  if (acceptanceChart) { acceptanceChart.destroy(); acceptanceChart = null; }
+  if (recoveryOpChart) { recoveryOpChart.destroy(); recoveryOpChart = null; }
+  if (flowOpChart) { flowOpChart.destroy(); flowOpChart = null; }
+});

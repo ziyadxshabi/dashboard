@@ -12,13 +12,17 @@
   let selectedRole = 'doctor';
   let authInitialized = false;
   let isSubmitting = false;
+  let isLoggingOut = false;
+  const logoutTeardowns = [];
 
   function initLoginReveal() {
+    const overlay = document.getElementById('login-overlay');
     const card = document.getElementById('login-card');
-    if (!card) return;
+    if (!overlay || !card) return;
     requestAnimationFrame(() => {
+      overlay.classList.add('login-assembled');
       card.classList.add('login-assembled');
-      window.refreshLucideIcons?.(document.getElementById('login-overlay'));
+      window.refreshLucideIcons?.(overlay);
     });
   }
 
@@ -344,15 +348,47 @@
     return headers;
   }
 
+  function clearSession() {
+    try {
+      sessionStorage.removeItem(SESSION_ROLE_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    } catch { /* private browsing / disabled storage */ }
+  }
+
+  function registerLogoutTeardown(fn) {
+    if (typeof fn === 'function') logoutTeardowns.push(fn);
+  }
+
+  async function logout() {
+    if (isLoggingOut) return;
+    isLoggingOut = true;
+
+    clearSession();
+
+    for (const teardown of logoutTeardowns) {
+      try {
+        await teardown();
+      } catch { /* proceed */ }
+    }
+
+    if (typeof window.onDentaFlowLogout === 'function') {
+      try {
+        await window.onDentaFlowLogout();
+      } catch { /* always proceed to login redirect */ }
+    }
+
+    const loginUrl = `${window.location.pathname}${window.location.search}`;
+    window.location.replace(loginUrl);
+  }
+
   window.DentaFlowAuth = {
     SESSION_ROLE_KEY,
     SESSION_TOKEN_KEY,
     getRole: () => sessionStorage.getItem(SESSION_ROLE_KEY),
     getToken: getBearerToken,
     getAuthHeaders: buildAuthHeaders,
-    clearSession() {
-      sessionStorage.removeItem(SESSION_ROLE_KEY);
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
-    },
+    clearSession,
+    registerLogoutTeardown,
+    logout,
   };
 })();

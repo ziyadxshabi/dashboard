@@ -2877,8 +2877,9 @@ let handoffNotes = [];
     $('account-menu-settings')?.addEventListener('click', () => {
       if (VIEW_MAP.settings) navigateToView('settings');
     });
-    $('account-menu-logout')?.addEventListener('click', () => {
-      window.DentaFlowAuth?.clearSession?.();
+    $('account-menu-logout')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      void window.DentaFlowAuth?.logout?.();
     });
   }
 
@@ -4097,7 +4098,7 @@ let handoffNotes = [];
       console.log('[Roster Status] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
       if (response.status === 401) {
-        window.DentaFlowAuth?.clearSession?.();
+        void window.DentaFlowAuth?.logout?.();
         throw new Error('Session expirée — veuillez vous reconnecter.');
       }
 
@@ -5403,4 +5404,8 @@ let handoffNotes = [];
     EMPTY_STATE_DEFAULT_MESSAGE,
     EMPTY_STATE_SVG_INBOX,
   };
+
+  window.DentaFlowAuth?.registerLogoutTeardown?.(async function teardownAssistantSession() {
+    assistantDashboardInitialized = false;
+  });
 })();
