@@ -5401,6 +5401,176 @@ body.mode-assistant .superpower-bento-card__cta:focus-visible {
   }
 }
 
+/* ── Doctor Hub — custom SMS blast (mode-doctor only) ───────────────────── */
+body.mode-doctor .doctor-bento-row {
+  margin-bottom: 28px;
+}
+
+body.mode-doctor .superpower-bento-card--doctor-custom {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(18px, 3vw, 26px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  min-width: 0;
+}
+
+body.mode-doctor .superpower-bento-card--doctor-custom .superpower-bento-card__glow {
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: min(52vw, 320px);
+  height: min(52vw, 320px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(227, 193, 143, 0.12) 0%,
+    rgba(217, 107, 39, 0.05) 42%,
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+body.mode-doctor .superpower-bento-card--doctor-custom .superpower-bento-card__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+body.mode-doctor .superpower-bento-card--doctor-custom .superpower-bento-card__icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(227, 193, 143, 0.1);
+  border: 1px solid rgba(227, 193, 143, 0.18);
+}
+
+body.mode-doctor .superpower-bento-card--doctor-custom .superpower-bento-card__icon [data-lucide],
+body.mode-doctor .superpower-bento-card--doctor-custom .superpower-bento-card__icon .lucide {
+  width: 22px;
+  height: 22px;
+  stroke: var(--gold, var(--accent-gold));
+}
+
+body.mode-doctor .doctor-custom-sms-compose {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+body.mode-doctor .doctor-custom-sms-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+body.mode-doctor .doctor-custom-sms-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-white, var(--text-main));
+  font-family: var(--font-sans, var(--font-primary));
+  font-size: 14px;
+  line-height: 1.55;
+  resize: none;
+  transition: var(--transition);
+  box-sizing: border-box;
+}
+
+body.mode-doctor .doctor-custom-sms-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+body.mode-doctor .doctor-custom-sms-textarea:hover {
+  border-color: var(--border-2, rgba(255, 255, 255, 0.12));
+}
+
+body.mode-doctor .doctor-custom-sms-textarea:focus {
+  outline: none;
+  border-color: var(--gold, var(--accent-gold));
+  box-shadow: 0 0 0 2px var(--gold, var(--accent-gold));
+}
+
+body.mode-doctor .doctor-custom-sms-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+body.mode-doctor .doctor-custom-sms-helper {
+  margin: 0;
+  flex: 1;
+  font-size: var(--text-meta, 11px);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+body.mode-doctor .doctor-custom-sms-counter {
+  flex-shrink: 0;
+  font-size: var(--text-meta, 11px);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+body.mode-doctor .doctor-custom-sms-counter.is-limit {
+  color: var(--accent-gold);
+}
+
+body.mode-doctor .doctor-custom-sms-submit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  transition:
+    transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
+    box-shadow 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+body.mode-doctor .doctor-custom-sms-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 28px rgba(217, 107, 39, 0.22),
+    0 0 0 1px rgba(227, 193, 143, 0.12);
+}
+
+body.mode-doctor .doctor-custom-sms-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+@media (min-width: 768px) {
+  body.mode-doctor .doctor-custom-sms-submit {
+    width: auto;
+    min-width: min(100%, 280px);
+    align-self: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.mode-doctor .doctor-custom-sms-textarea,
+  body.mode-doctor .doctor-custom-sms-submit {
+    transition: none;
+  }
+}
+
 body.mode-assistant .assistant-panel--roster,
 body.mode-assistant .assistant-panel--handoff {
   grid-column: 1;

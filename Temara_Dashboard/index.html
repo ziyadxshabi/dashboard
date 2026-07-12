@@ -428,6 +428,44 @@
           ></div>
         </article>
 
+        <section class="doctor-bento-row" aria-label="Superpouvoir — message sur-mesure">
+          <article class="superpower-bento-card superpower-bento-card--doctor-custom" aria-labelledby="doctor-custom-sms-title">
+            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
+            <header class="superpower-bento-card__head">
+              <div class="superpower-bento-card__icon" aria-hidden="true">
+                <i data-lucide="message-square-share" aria-hidden="true"></i>
+              </div>
+              <div class="superpower-bento-card__copy">
+                <p class="superpower-bento-card__eyebrow">Superpouvoir · Diffusion</p>
+                <h2 class="superpower-bento-card__title" id="doctor-custom-sms-title">Message Sur-Mesure</h2>
+                <p class="superpower-bento-card__desc">
+                  Rédigez un SMS personnalisé et diffusez-le à votre base patients active. Idéal pour annonces, rappels ciblés ou communications premium du cabinet.
+                </p>
+              </div>
+            </header>
+            <div class="doctor-custom-sms-compose">
+              <label class="doctor-custom-sms-label" for="doctor-custom-sms-text">Message personnalisé</label>
+              <textarea
+                id="doctor-custom-sms-text"
+                class="doctor-custom-sms-textarea"
+                rows="3"
+                maxlength="320"
+                placeholder="Écrivez votre message personnalisé ici..."
+                aria-describedby="doctor-custom-sms-helper doctor-custom-sms-count"
+              ></textarea>
+              <div class="doctor-custom-sms-meta">
+                <p class="doctor-custom-sms-helper" id="doctor-custom-sms-helper">
+                  Diffusion globale — message validé avant envoi par le moteur n8n.
+                </p>
+                <span class="doctor-custom-sms-counter" id="doctor-custom-sms-count" aria-live="polite">0 / 320</span>
+              </div>
+              <button type="button" id="btn-doctor-custom-sms" class="btn btn-primary doctor-custom-sms-submit">
+                Envoyer le message
+              </button>
+            </div>
+          </article>
+        </section>
+
         <div class="brutalist-triage-grid" aria-label="Centre de triage">
           <article class="brutalist-triage-panel" aria-label="Salle d'attente">
             <header class="brutalist-triage-panel__header">

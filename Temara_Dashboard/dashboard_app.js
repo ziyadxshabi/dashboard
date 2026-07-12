@@ -137,6 +137,7 @@ const CONFIG = {
   ROSTER_PROXY:         '/api/roster',
   UPDATE_STATUS_PROXY:  '/api/update-status',
   TEAM_NOTES_PROXY:     '/api/team-notes',
+  BULK_SMS_PROXY:       '/api/bulk-sms',
   DAILY_GOAL_MAD:       15000,
   REFRESH_INTERVAL_MS:  300_000,
   SMART_SYNC_INTERVAL_MS: 180_000,
@@ -260,6 +261,7 @@ function initializeDoctorDashboard() {
   initCrmSidePanel();
   initSmsCampaign();
   initDoctorHub();
+  initDoctorCustomSms();
   initOperationalCharts();
   renderDoctorHubCharts();
   bindKpiMicroCharts({});
@@ -1379,6 +1381,64 @@ function initCrmSidePanel() {
 
 /* ── SMS CAMPAIGN ────────────────────────────────────────────────────────── */
 const SMS_MAX_CHARS = 320;
+const DOCTOR_CUSTOM_SMS_MAX = 320;
+
+function initDoctorCustomSms() {
+  const textarea = document.getElementById('doctor-custom-sms-text');
+  const submitBtn = document.getElementById('btn-doctor-custom-sms');
+  const counter = document.getElementById('doctor-custom-sms-count');
+  if (!textarea || !submitBtn || submitBtn.dataset.wired === 'true') return;
+  submitBtn.dataset.wired = 'true';
+
+  function updateCounter() {
+    if (!counter) return;
+    const len = textarea.value.length;
+    counter.textContent = `${len} / ${DOCTOR_CUSTOM_SMS_MAX}`;
+    counter.classList.toggle('is-limit', len >= DOCTOR_CUSTOM_SMS_MAX);
+  }
+
+  textarea.addEventListener('input', updateCounter);
+  updateCounter();
+
+  submitBtn.addEventListener('click', async () => {
+    const customMessage = textarea.value.trim();
+    if (!customMessage) {
+      showDashboardToast('Saisissez un message avant d\'envoyer.', 'error');
+      textarea.focus();
+      return;
+    }
+
+    const lock = lockSubmitButton(submitBtn, 'Envoi en cours…');
+    submitBtn.classList.add('is-loading');
+
+    try {
+      const response = await fetch(CONFIG.BULK_SMS_PROXY, {
+        method: 'POST',
+        headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ customMessage }),
+        signal: AbortSignal.timeout(12_000),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || payload?.details || `HTTP ${response.status}`);
+      }
+
+      showDashboardToast('Message personnalisé envoyé avec succès.', 'success');
+      textarea.value = '';
+      updateCounter();
+    } catch (err) {
+      console.error('[Doctor Custom SMS] Failed:', err?.message || err);
+      showDashboardToast('Échec de l\'envoi — réessayez.', 'error');
+    } finally {
+      submitBtn.classList.remove('is-loading');
+      setTimeout(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = lock.defaultLabel;
+      }, lock.minRemaining());
+    }
+  });
+}
 
 function initSmsCampaign() {
   const form     = document.getElementById('sms-campaign-form');

@@ -2917,7 +2917,7 @@ let handoffNotes = [];
     if (fillBtn && fillBtn.dataset.adminWired !== 'true') {
       fillBtn.dataset.adminWired = 'true';
       fillBtn.addEventListener('click', async () => {
-      const rosterFill = $('btn-fill-gap');
+      const rosterFill = $('btn-super-fill-gap') || $('btn-fill-gap');
       if (rosterFill) {
         rosterFill.click();
         return;
@@ -5147,10 +5147,15 @@ let handoffNotes = [];
     });
   }
 
+  function wireFillGapButtons() {
+    wireFillGapButton($('btn-super-fill-gap'));
+    wireFillGapButton($('btn-fill-gap'));
+  }
+
   function initQuickActions() {
     guardDeployingFeatureButtons();
 
-    wireFillGapButton($('btn-fill-gap'));
+    wireFillGapButtons();
 
     const btnDelay = $('btn-alerte-retard');
 
