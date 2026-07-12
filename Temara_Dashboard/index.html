@@ -64,14 +64,13 @@
     <div class="login-stage">
       <div class="login-coalesce" id="login-card">
         <div class="login-panel-front">
-          <div class="login-role-section login-role-section--preserved" aria-hidden="true">
-            <div class="login-role-switch" role="group" aria-label="Choisir le profil">
-              <button type="button" class="login-role-btn is-active" id="role-btn-doctor" aria-pressed="true" tabindex="-1">Praticien (Doctor)</button>
-              <button type="button" class="login-role-btn" id="role-btn-assistant" aria-pressed="false" tabindex="-1">Assistante (Assistant)</button>
-            </div>
-          </div>
-
           <form id="login-form" class="login-credentials login-coalesce-item" data-coalesce="credentials" novalidate>
+            <div class="login-role-toggle" role="group" aria-label="Choisir le profil">
+              <span class="login-role-toggle__thumb" aria-hidden="true"></span>
+              <button type="button" class="login-role-btn is-active" id="role-btn-doctor" aria-pressed="true">Médecin</button>
+              <button type="button" class="login-role-btn" id="role-btn-assistant" aria-pressed="false">Assistant(e)</button>
+            </div>
+
             <div class="login-field">
               <label class="login-field-label" for="login-username">Identifiant</label>
               <input

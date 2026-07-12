@@ -3013,18 +3013,6 @@ body.dashboard-offline .sync-label {
     0 1px 0 rgba(227, 193, 143, 0.06) inset;
 }
 
-.login-role-section--preserved {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .login-brand {
   margin-bottom: 28px;
 }
@@ -3084,45 +3072,68 @@ body.dashboard-offline .sync-label {
   margin-bottom: 20px;
 }
 
-.login-role-section {
-  margin-bottom: 24px;
-}
-
-.login-role-switch {
+/* ── Role toggle — premium pill segmented control ── */
+.login-role-toggle {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  align-items: stretch;
   padding: 4px;
-  border-radius: 12px;
-  border: 1px solid rgba(227, 193, 143, 0.18);
-  background: rgba(12, 10, 9, 0.35);
+  border-radius: 999px;
+  background: #1C1917;
+  border: 1px solid rgba(227, 193, 143, 0.12);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+  isolation: isolate;
+}
+
+.login-role-toggle__thumb {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(60, 54, 49, 0.96) 0%, rgba(44, 40, 36, 0.96) 100%);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(227, 193, 143, 0.14);
+  transition: transform 0.3s ease;
+  will-change: transform;
+}
+
+.login-role-toggle:has(#role-btn-assistant.is-active) .login-role-toggle__thumb {
+  transform: translateX(100%);
 }
 
 .login-role-btn {
+  position: relative;
+  z-index: 1;
   min-height: 44px;
   padding: 10px 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 999px;
   background: transparent;
-  color: var(--login-taupe);
+  color: rgba(158, 148, 140, 0.7);
   font-family: var(--font-primary);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.25;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: color 0.3s ease;
 }
 
 .login-role-btn.is-active {
-  color: var(--login-off-white);
-  background: rgba(227, 193, 143, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(227, 193, 143, 0.28);
+  color: var(--login-champagne);
 }
 
 .login-role-btn:focus-visible {
   outline: 2px solid var(--login-champagne);
   outline-offset: 2px;
+  border-radius: 999px;
 }
 
 body.auth-gate-active #doctor-shell,
@@ -3372,6 +3383,11 @@ body.auth-gate-active #assistant-shell {
   .login-submit {
     min-height: 48px;
     width: 100%;
+  }
+
+  .login-role-btn {
+    min-height: 46px;
+    font-size: 13px;
   }
 
   .login-password-toggle {
