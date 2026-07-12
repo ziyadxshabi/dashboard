@@ -3309,46 +3309,104 @@ body.auth-gate-active #assistant-shell {
   border-radius: 2px;
 }
 
-@media (max-width: 480px) {
+/* ── Login screen — mobile-only layout (desktop rules above stay untouched) ── */
+@media (max-width: 768px) {
   .login-viewport-brand {
-    top: max(20px, env(safe-area-inset-top, 20px));
-    left: max(20px, env(safe-area-inset-left, 20px));
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 10px;
+    text-align: center;
+    margin-top: max(2rem, env(safe-area-inset-top, 2rem));
+    padding-inline: max(16px, env(safe-area-inset-left, 16px)) max(16px, env(safe-area-inset-right, 16px));
+  }
+
+  .login-viewport-brand-text {
+    align-items: center;
   }
 
   .login-viewport-brand-mark {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
   }
 
   .login-viewport-brand-name {
-    font-size: 14px;
+    font-size: 16px;
   }
 
   .login-viewport-brand-sub {
     font-size: 10px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
+    max-width: 18rem;
   }
 
   .login-stage {
-    padding-top: 64px;
-    padding-bottom: 72px;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding:
+      1.25rem 5%
+      max(4.75rem, calc(env(safe-area-inset-bottom, 0px) + 3.5rem));
+  }
+
+  .login-stage .login-coalesce {
+    width: 90%;
+    max-width: 90%;
   }
 
   .login-panel-front {
-    padding: 28px 22px 24px;
+    padding: 1.75rem 1.375rem 1.5rem;
+  }
+
+  .login-input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .login-submit {
+    min-height: 48px;
+    width: 100%;
+  }
+
+  .login-password-toggle {
+    width: 48px;
+    height: 48px;
+  }
+
+  .login-enterprise-footer {
+    left: max(16px, env(safe-area-inset-left, 16px));
+    right: max(16px, env(safe-area-inset-right, 16px));
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
   }
 
   .login-enterprise-footer-list {
-    gap: 10px 16px;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .login-enterprise-footer-list > li:nth-child(2),
+  .login-enterprise-footer-list > li:nth-child(3),
+  .login-enterprise-footer-list > li:nth-child(4) {
+    display: none;
   }
 
   .login-enterprise-footer-copy,
   .login-enterprise-footer-link {
     font-size: 10px;
+    letter-spacing: 0.03em;
+    line-height: 1.35;
   }
+}
 
+@media (max-width: 480px) {
   .login-title {
     font-size: 22px;
   }
