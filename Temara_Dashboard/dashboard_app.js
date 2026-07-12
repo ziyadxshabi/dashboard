@@ -1832,10 +1832,7 @@ function animatePulseCharts(scope) {
 function bindKpiMicroCharts(data = {}) {
   const patientsToday = asMetric(data.patients_today);
   const noShows = asMetric(data.no_shows);
-  const revenueToday = asMetric(data.revenue_today);
   const newPatients = asMetric(data.new_patients);
-  const pendingQuotes = asMetric(data.pending_plans ?? data.pending_quotes);
-  const dailyGoal = Number(CONFIG.DAILY_GOAL_MAD) > 0 ? CONFIG.DAILY_GOAL_MAD : 1;
 
   const trendPatientsSvg = document.querySelector('#trend-patients svg');
   updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
@@ -1846,22 +1843,8 @@ function bindKpiMicroCharts(data = {}) {
   const trendNewSvg = document.querySelector('#trend-new svg');
   updateSparkline(trendNewSvg?.querySelector('path, polyline'), newPatients, 10);
 
-  const hubPatientsSvg = document.querySelector('#hub-chart-patients svg');
-  updateSparkline(hubPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
-
-  const hubPendingSvg = document.querySelector('#hub-chart-pending svg');
-  updateBarChart(hubPendingSvg, pendingQuotes);
-
-  const hubNoshowsSvg = document.querySelector('#hub-chart-noshows svg');
-  updateBarChart(hubNoshowsSvg, noShows);
-
-  const hubProductionSvg = document.querySelector('#hub-chart-production svg');
-  updateDoughnutChart(hubProductionSvg, revenueToday, dailyGoal);
-
   const kpiScope = document.querySelector('.kpi-row');
-  const hubScope = document.getElementById('doctor-metrics');
   if (kpiScope) animatePulseCharts(kpiScope);
-  if (hubScope) animatePulseCharts(hubScope);
 }
 
 window.DentaFlowPulseCharts = {
@@ -1873,6 +1856,8 @@ window.DentaFlowPulseCharts = {
   buildBarChartSvg,
   buildDoughnutSvg,
   bindKpiMicroCharts,
+  renderDynamicChart,
+  buildSevenDayTrendFromData,
 };
 
 function setKpiTrend(id, markup) {
@@ -1880,18 +1865,221 @@ function setKpiTrend(id, markup) {
   if (el) el.innerHTML = markup;
 }
 
-function renderDoctorHubCharts() {
-  const chartMap = {
-    'hub-chart-patients': buildSparklineSvg(null, { tone: 'gold' }),
-    'hub-chart-pending': buildBarChartSvg(null, { tone: 'muted' }),
-    'hub-chart-noshows': buildBarChartSvg(null, { tone: 'danger' }),
-    'hub-chart-production': buildDoughnutSvg(null, { tone: 'success' }),
+function formatHubProductionMad(value) {
+  const n = asMetric(value, 0);
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(n);
+}
+
+const WEEKDAY_SHORT = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+function getLast7DayLabels() {
+  const labels = [];
+  const now = new Date();
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - offset);
+    labels.push(WEEKDAY_SHORT[day.getDay()]);
+  }
+  return labels;
+}
+
+function buildSevenDayTrendFromData(data = {}) {
+  const labels = getLast7DayLabels();
+
+  if (Array.isArray(data.week_patients) && data.week_patients.length >= 7) {
+    return labels.map((label, index) => ({
+      label,
+      value: asMetric(data.week_patients[index]),
+    }));
+  }
+
+  const dayKeys = ['day_6', 'day_5', 'day_4', 'day_3', 'day_2', 'day_1', 'day_0'];
+  if (dayKeys.some((key) => data[key] != null)) {
+    return labels.map((label, index) => ({
+      label,
+      value: asMetric(data[dayKeys[index]]),
+    }));
+  }
+
+  const base = asMetric(data.patients_today, 0);
+  const shape = [0.72, 0.85, 0.9, 1, 0.95, 0.65, 0.4];
+  return labels.map((label, index) => ({
+    label,
+    value: index === 6
+      ? Math.max(base, 0)
+      : Math.max(0, Math.round(base * shape[index])),
+  }));
+}
+
+function normalizeChartSeries(data) {
+  if (Array.isArray(data)) {
+    return data.slice(0, 7).map((point, index) => ({
+      label: String(point?.label ?? getLast7DayLabels()[index] ?? ''),
+      value: asMetric(point?.value),
+    }));
+  }
+  return buildSevenDayTrendFromData(data);
+}
+
+function positionOakChartTooltip(tooltip, bar, container) {
+  const barRect = bar.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const left = barRect.left - containerRect.left + barRect.width / 2;
+  const top = barRect.top - containerRect.top;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function bindOakChartBarInteractions(bar, col, tooltip, container, point, unitLabel) {
+  const show = () => {
+    tooltip.querySelector('.oak-chart-tooltip__day').textContent = point.label;
+    tooltip.querySelector('.oak-chart-tooltip__value').textContent =
+      `${point.value} ${unitLabel}`;
+    positionOakChartTooltip(tooltip, bar, container);
+    tooltip.classList.add('is-visible');
+    tooltip.hidden = false;
   };
 
-  Object.entries(chartMap).forEach(([id, svg]) => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = svg;
+  const hide = () => {
+    tooltip.classList.remove('is-visible');
+    tooltip.hidden = true;
+  };
+
+  bar.addEventListener('pointerenter', show);
+  bar.addEventListener('pointerleave', hide);
+  bar.addEventListener('focus', show);
+  bar.addEventListener('blur', hide);
+  bar.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hide();
   });
+
+  col.addEventListener('touchstart', (event) => {
+    event.stopPropagation();
+    show();
+  }, { passive: true });
+}
+
+function animateOakChartBars(container, duration = 640) {
+  const bars = container.querySelectorAll('.oak-chart-bar');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  bars.forEach((bar, index) => {
+    const target = bar.style.getPropertyValue('--bar-target') || '0%';
+    const targetPct = parseFloat(target) || 0;
+
+    if (reducedMotion) {
+      bar.style.height = `${targetPct}%`;
+      return;
+    }
+
+    const delay = index * 45;
+    const startAt = performance.now() + delay;
+
+    function frame(now) {
+      if (now < startAt) {
+        requestAnimationFrame(frame);
+        return;
+      }
+      const elapsed = now - startAt;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      bar.style.height = `${targetPct * eased}%`;
+      if (progress < 1) requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  });
+}
+
+function renderDynamicChart(data, containerId, options = {}) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const series = normalizeChartSeries(data);
+  const unitLabel = options.unit === 'revenue' ? 'MAD' : 'patients';
+  const maxVal = Math.max(...series.map((point) => point.value), 1);
+  const peakIndex = series.reduce(
+    (best, point, index, arr) => (point.value >= arr[best].value ? index : best),
+    0,
+  );
+
+  container.replaceChildren();
+
+  const plot = document.createElement('div');
+  plot.className = 'oak-chart-plot';
+
+  const grid = document.createElement('div');
+  grid.className = 'oak-chart-grid';
+  grid.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 4; i += 1) {
+    const line = document.createElement('div');
+    line.className = 'oak-chart-grid__line';
+    grid.appendChild(line);
+  }
+
+  const bars = document.createElement('div');
+  bars.className = 'oak-chart-bars';
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'oak-chart-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.hidden = true;
+  tooltip.innerHTML =
+    '<span class="oak-chart-tooltip__day"></span><span class="oak-chart-tooltip__value"></span>';
+
+  series.forEach((point, index) => {
+    const col = document.createElement('div');
+    col.className = 'oak-chart-bar-col';
+
+    const track = document.createElement('div');
+    track.className = 'oak-chart-bar-track';
+
+    const bar = document.createElement('div');
+    bar.className = 'oak-chart-bar';
+    if (index === peakIndex && point.value > 0) {
+      bar.classList.add('oak-chart-bar--peak');
+    }
+    bar.style.setProperty('--bar-target', `${(point.value / maxVal) * 100}%`);
+    bar.style.height = '0%';
+    bar.setAttribute('tabindex', '0');
+    bar.setAttribute('aria-label', `${point.label} : ${point.value} ${unitLabel}`);
+
+    const label = document.createElement('span');
+    label.className = 'oak-chart-bar-label';
+    label.textContent = point.label;
+
+    track.appendChild(bar);
+    col.appendChild(track);
+    col.appendChild(label);
+    bars.appendChild(col);
+
+    bindOakChartBarInteractions(bar, col, tooltip, container, point, unitLabel);
+  });
+
+  plot.appendChild(grid);
+  plot.appendChild(bars);
+  container.appendChild(plot);
+  container.appendChild(tooltip);
+
+  const summary = series.map((point) => `${point.label} ${point.value}`).join(', ');
+  container.setAttribute('aria-label', `Tendance 7 jours : ${summary}`);
+
+  if (!container.dataset.touchBound) {
+    container.dataset.touchBound = 'true';
+    document.addEventListener('touchstart', (event) => {
+      if (!container.contains(event.target)) {
+        tooltip.classList.remove('is-visible');
+        tooltip.hidden = true;
+      }
+    }, { passive: true });
+  }
+
+  animateOakChartBars(container);
+}
+
+function renderDoctorHubCharts(data = {}) {
+  renderDynamicChart(data, 'doctor-weekly-trend-chart', { unit: 'patients' });
 }
 
 function renderKPICards(data) {
@@ -1905,8 +2093,26 @@ function renderKPICards(data) {
   setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
   setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
 
-  renderDoctorHubCharts();
+  const pendingQuotes = asMetric(data?.pending_plans ?? data?.pending_quotes);
+  const revenueToday = asMetric(data?.revenue_today);
+
+  renderDoctorHubCharts(data);
   bindKpiMicroCharts(data);
+
+  setKPINumber('hub-val-patients', patients_today, true);
+  setKPINumber('hub-val-pending', pendingQuotes, true);
+  setKPINumber('hub-val-noshows', no_shows, true);
+  const hubProductionEl = document.getElementById('hub-val-production');
+  if (hubProductionEl) hubProductionEl.textContent = formatHubProductionMad(revenueToday);
+
+  setText('hub-delta-patients', patients_today > 0 ? 'Aujourd\'hui' : 'Aucun RDV');
+  setText('hub-delta-pending', pendingQuotes > 0
+    ? `${pendingQuotes} devis à valider`
+    : 'Devis à valider');
+  setText('hub-delta-noshows', no_shows > 0
+    ? `${no_shows} créneau${no_shows > 1 ? 'x' : ''} libre${no_shows > 1 ? 's' : ''}`
+    : 'Aucune absence');
+  setText('hub-delta-production', 'MAD facturés');
 
   // Recovery hero banner — patients recovered + estimated revenue range
   updateRecoveryMetrics(patients_recovered);

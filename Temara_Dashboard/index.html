@@ -386,36 +386,47 @@
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="patients">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">Patients</span>
-              <span class="doctor-metric-chart" id="hub-chart-patients" aria-hidden="true"></span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-patients">8</span>
-            <span class="doctor-metric-delta doctor-metric-delta--up">+2 vs hier</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-patients">—</span>
+            <span class="doctor-metric-delta doctor-metric-delta--up" id="hub-delta-patients">Aujourd'hui</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="pending">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">En attente</span>
-              <span class="doctor-metric-chart" id="hub-chart-pending" aria-hidden="true"></span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-pending">3</span>
-            <span class="doctor-metric-delta">Devis à valider</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-pending">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-pending">Devis à valider</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">No-shows</span>
-              <span class="doctor-metric-chart" id="hub-chart-noshows" aria-hidden="true"></span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">2</span>
-            <span class="doctor-metric-delta doctor-metric-delta--warn">Créneaux libres</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">—</span>
+            <span class="doctor-metric-delta doctor-metric-delta--warn" id="hub-delta-noshows">Créneaux libres</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="production">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">Production</span>
-              <span class="doctor-metric-chart" id="hub-chart-production" aria-hidden="true"></span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-production">9.4k</span>
-            <span class="doctor-metric-delta">MAD facturés</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-production">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-production">MAD facturés</span>
           </article>
         </div>
+
+        <article class="chart-card chart-card--doctor-trend" aria-label="Tendance patients sur 7 jours">
+          <header class="chart-header">
+            <div>
+              <h3 class="chart-title">Tendance 7 jours</h3>
+              <p class="chart-sub">Patients par jour — flux hebdomadaire du cabinet</p>
+            </div>
+          </header>
+          <div
+            id="doctor-weekly-trend-chart"
+            class="oak-dynamic-chart"
+            role="img"
+            aria-label="Graphique en barres — patients sur les 7 derniers jours"
+          ></div>
+        </article>
 
         <div class="brutalist-triage-grid" aria-label="Centre de triage">
           <article class="brutalist-triage-panel" aria-label="Salle d'attente">
