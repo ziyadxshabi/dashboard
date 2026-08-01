@@ -163,6 +163,30 @@ let handoffNotes = [];
     };
   }
 
+  function assertAuthorizedResponse(response) {
+    if (typeof window.DentaFlowAuth?.assertAuthorizedResponse === 'function') {
+      return window.DentaFlowAuth.assertAuthorizedResponse(response);
+    }
+    if (response?.status === 401) {
+      void window.DentaFlowAuth?.logout?.();
+      const err = new Error('Session expirée — reconnectez-vous.');
+      err.code = 'UNAUTHORIZED';
+      throw err;
+    }
+    return response;
+  }
+
+  function isUnauthorizedError(error) {
+    if (typeof window.DentaFlowAuth?.isUnauthorizedError === 'function') {
+      return window.DentaFlowAuth.isUnauthorizedError(error);
+    }
+    return Boolean(
+      error &&
+      (error.code === 'UNAUTHORIZED' ||
+        /session expir[eé]e|unauthorized|401/i.test(String(error?.message || '')))
+    );
+  }
+
   function setHeaderDate() {
     const el = $('assistant-date');
     if (!el) return;
@@ -1765,6 +1789,8 @@ let handoffNotes = [];
   }
 
   async function postBulkAction(endpoint, payload) {
+    window.DentaFlowAuth?.requireSession?.();
+
     const body = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
       ? payload
       : { rowIds: payload };
@@ -1777,6 +1803,8 @@ let handoffNotes = [];
         body: JSON.stringify(body),
       }
     );
+
+    assertAuthorizedResponse(response);
 
     const rawText = await response.text();
     let parsed = null;
@@ -2881,6 +2909,10 @@ let handoffNotes = [];
       event.preventDefault();
       void window.DentaFlowAuth?.logout?.();
     });
+    $('mobile-logout-btn')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      void window.DentaFlowAuth?.logout?.();
+    });
   }
 
   function initRowActionHover() {
@@ -2931,6 +2963,7 @@ let handoffNotes = [];
           headers: apiHeaders(),
           body: JSON.stringify({}),
         });
+        assertAuthorizedResponse(response);
         const payload = await response.json();
         if (!response.ok || payload?.ok === false) throw new Error(payload?.error || `HTTP ${response.status}`);
         showToast('Blast SMS envoyé à la liste d\'attente.', 'success');
@@ -3895,10 +3928,14 @@ let handoffNotes = [];
   }
 
   async function fetchRosterPayload(url) {
+    window.DentaFlowAuth?.requireSession?.();
+
     const response = await fetch(url, {
       method: 'GET',
       headers: rosterFetchHeaders(),
     });
+
+    assertAuthorizedResponse(response);
 
     const contentType = response.headers.get('content-type') || '';
     const rawText = await response.text();
@@ -3928,6 +3965,14 @@ let handoffNotes = [];
   }
 
   async function loadPlanning() {
+    if (
+      typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
+      !window.DentaFlowAuth.isAuthenticated()
+    ) {
+      void window.DentaFlowAuth.logout?.();
+      return;
+    }
+
     showTableLoader();
     setSyncIndicator('loading');
 
@@ -3946,6 +3991,10 @@ let handoffNotes = [];
       setSyncIndicator('ok');
       queueOsBootSequence();
     } catch (error) {
+      if (isUnauthorizedError(error)) {
+        // Logout/redirect already in flight — do not enter Mode dégradé.
+        return;
+      }
       if (isFetchAborted(error)) {
         console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
         if (allRosterRecords.length) {
@@ -4097,10 +4146,7 @@ let handoffNotes = [];
       }
       console.log('[Roster Status] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
-      if (response.status === 401) {
-        void window.DentaFlowAuth?.logout?.();
-        throw new Error('Session expirée — veuillez vous reconnecter.');
-      }
+      assertAuthorizedResponse(response);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
@@ -5177,6 +5223,8 @@ let handoffNotes = [];
           headers: apiHeaders(),
         });
 
+        assertAuthorizedResponse(response);
+
         const responseText = await response.text();
         let responsePayload = responseText;
         try {
@@ -5378,6 +5426,19 @@ let handoffNotes = [];
 
   function initializeAssistantDashboard() {
     if (assistantDashboardInitialized) return;
+    if (
+      typeof window.DentaFlowAuth?.enforceRouteGuard === 'function' &&
+      !window.DentaFlowAuth.enforceRouteGuard()
+    ) {
+      return;
+    }
+    if (
+      typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
+      !window.DentaFlowAuth.isAuthenticated()
+    ) {
+      void window.DentaFlowAuth.logout?.();
+      return;
+    }
     assistantDashboardInitialized = true;
     init();
   }

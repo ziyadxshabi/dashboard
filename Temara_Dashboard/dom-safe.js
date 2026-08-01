@@ -62,7 +62,12 @@
     if (root && typeof root.querySelectorAll === 'function') {
       options.root = root;
     }
-    lucide.createIcons(options);
+    try {
+      lucide.createIcons(options);
+    } catch (error) {
+      // Never let a missing icon name crash dashboard boot.
+      console.warn('[Lucide] createIcons failed:', error?.message || error);
+    }
   }
 
   window.DentaFlowDom = {

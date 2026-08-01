@@ -15,7 +15,39 @@ function getApiAuthHeaders(extra = {}) {
   };
 }
 
+function assertAuthorizedResponse(response) {
+  if (typeof window.DentaFlowAuth?.assertAuthorizedResponse === 'function') {
+    return window.DentaFlowAuth.assertAuthorizedResponse(response);
+  }
+  if (response?.status === 401) {
+    void window.DentaFlowAuth?.logout?.();
+    const err = new Error('Session expirée — reconnectez-vous.');
+    err.code = 'UNAUTHORIZED';
+    throw err;
+  }
+  return response;
+}
+
+function isUnauthorizedError(error) {
+  if (typeof window.DentaFlowAuth?.isUnauthorizedError === 'function') {
+    return window.DentaFlowAuth.isUnauthorizedError(error);
+  }
+  return Boolean(
+    error &&
+    (error.code === 'UNAUTHORIZED' ||
+      /session expir[eé]e|unauthorized|401/i.test(String(error?.message || '')))
+  );
+}
+
 function unlockDashboard({ skipDashboardFetch = false } = {}) {
+  if (
+    typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
+    !window.DentaFlowAuth.isAuthenticated()
+  ) {
+    void window.DentaFlowAuth.logout?.();
+    return;
+  }
+
   const overlay = document.getElementById('login-overlay');
   if (overlay) {
     overlay.classList.add('is-unlocking');
@@ -244,6 +276,19 @@ function initializeDoctorDashboard() {
   if (doctorDashboardInitialized) return;
   if (document.body.classList.contains('mode-client')) return;
   if (document.body.classList.contains('mode-assistant')) return;
+  if (
+    typeof window.DentaFlowAuth?.enforceRouteGuard === 'function' &&
+    !window.DentaFlowAuth.enforceRouteGuard()
+  ) {
+    return;
+  }
+  if (
+    typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
+    !window.DentaFlowAuth.isAuthenticated()
+  ) {
+    void window.DentaFlowAuth.logout?.();
+    return;
+  }
 
   doctorDashboardInitialized = true;
   initMotionStack();
@@ -783,6 +828,8 @@ async function submitWaitlistEntry(data) {
     }),
   });
 
+  assertAuthorizedResponse(response);
+
   if (!response.ok) {
     throw new Error(`Waitlist webhook failed: HTTP ${response.status}`);
   }
@@ -945,6 +992,10 @@ function initAccountCardMenu() {
     if (VIEW_MAP.settings) navigateToView('settings');
   });
   document.getElementById('account-menu-logout')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    void window.DentaFlowAuth?.logout?.();
+  });
+  document.getElementById('mobile-logout-btn')?.addEventListener('click', (event) => {
     event.preventDefault();
     void window.DentaFlowAuth?.logout?.();
   });
@@ -1420,6 +1471,8 @@ function initDoctorCustomSms() {
         signal: AbortSignal.timeout(12_000),
       });
 
+      assertAuthorizedResponse(response);
+
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload?.ok === false) {
         throw new Error(payload?.error || payload?.details || `HTTP ${response.status}`);
@@ -1600,6 +1653,8 @@ async function loadDashboard(isSilentSync = false) {
   const errorBanner = document.getElementById('error-banner');
 
   try {
+    window.DentaFlowAuth?.requireSession?.();
+
     if (!isSilentSync) {
       applySkeletonState();
     }
@@ -1611,10 +1666,7 @@ async function loadDashboard(isSilentSync = false) {
       signal:  AbortSignal.timeout(10_000),
     });
 
-    if (response.status === 401) {
-      void window.DentaFlowAuth?.logout?.();
-      throw new Error('Session expirée — reconnectez-vous.');
-    }
+    assertAuthorizedResponse(response);
 
     if (response.status === 429 || response.status === 504) {
       throw new Error(describeHttpError(response.status));
@@ -1660,6 +1712,10 @@ async function loadDashboard(isSilentSync = false) {
     setSyncState('ok', `Mis à jour à ${now}`);
 
   } catch (err) {
+    if (isUnauthorizedError(err)) {
+      // Logout/redirect already in flight — skip offline/degraded UI.
+      return;
+    }
     if (isSilentSync) {
       console.warn('[Dashboard] Silent sync failed:', err?.message || err);
       return;
@@ -3370,11 +3426,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
     }
     console.log('[Roster Status] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
 
-    if (response.status === 401) {
-      showDashboardToast('Session expirée — veuillez vous reconnecter.', 'error');
-      void window.DentaFlowAuth?.logout?.();
-      throw new Error('Session expirée — veuillez vous reconnecter.');
-    }
+    assertAuthorizedResponse(response);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
@@ -3493,12 +3545,16 @@ async function loadDoctorHubData(isSilentSync = false) {
   const selectedPatientId = document.querySelector('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
 
   try {
+    window.DentaFlowAuth?.requireSession?.();
+
     const response = await fetch(CONFIG.ROSTER_PROXY, {
       method: 'GET',
       headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     });
+
+    assertAuthorizedResponse(response);
 
     const payload = await response.json();
 
@@ -3543,6 +3599,7 @@ async function loadDoctorHubData(isSilentSync = false) {
       queueOsBootSequence();
     }
   } catch (err) {
+    if (isUnauthorizedError(err)) return;
     console.error('[Doctor Hub] Digest load failed:', err?.message || err);
     if (isSilentSync) return;
     renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, totalRevenue: 0 });
@@ -3886,12 +3943,16 @@ async function loadTeamNotes() {
   }
 
   try {
+    window.DentaFlowAuth?.requireSession?.();
+
     const response = await fetch(CONFIG.TEAM_NOTES_PROXY, {
       method: 'GET',
       headers: getApiAuthHeaders(),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     });
+
+    assertAuthorizedResponse(response);
 
     const rawText = await response.text();
     let payload;
@@ -3909,6 +3970,7 @@ async function loadTeamNotes() {
     teamNotesCache = rawRows.map(normalizeTeamNote).filter(Boolean);
     renderTeamNotesList(teamNotesCache);
   } catch (error) {
+    if (isUnauthorizedError(error)) return;
     console.error('[Team Notes] Load failed:', error?.message || error);
     if (teamNotesCache.length) {
       renderTeamNotesList(teamNotesCache);

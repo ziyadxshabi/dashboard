@@ -264,29 +264,6 @@
     showShell(mount);
   }
 
-  async function unlockDoctorModule() {
-    document.body.classList.add('mode-doctor');
-    document.body.classList.remove('mode-assistant');
-    isolateDoctorShell();
-
-    if (typeof window.initializeDoctorDashboard === 'function') {
-      window.initializeDoctorDashboard();
-    }
-    if (typeof window.unlockDashboard === 'function') {
-      window.unlockDashboard();
-    }
-  }
-
-  async function unlockAssistantModule() {
-    document.body.classList.add('mode-assistant');
-    document.body.classList.remove('mode-doctor');
-    await isolateAssistantShell();
-
-    if (typeof window.initializeAssistantDashboard === 'function') {
-      window.initializeAssistantDashboard();
-    }
-  }
-
   async function handleAuthSuccess(role) {
     document.body.classList.remove('auth-gate-active');
     dismissLoginOverlay();
@@ -301,19 +278,21 @@
     triggerRoleBootSequence(role);
   }
 
-  function tryRestoreSession() {
-    const role = sessionStorage.getItem(SESSION_ROLE_KEY);
-    const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
+  function showLoginGate() {
+    initLoginReveal();
+    setupRoleSelector();
+    setupPasswordToggle();
+    setupLoginForm();
+  }
 
-    if (!role || !token) {
-      initLoginReveal();
-      setupRoleSelector();
-      setupPasswordToggle();
-      setupLoginForm();
+  function tryRestoreSession() {
+    if (!isAuthenticated()) {
+      clearSession();
+      showLoginGate();
       return;
     }
 
-    handleAuthSuccess(role);
+    handleAuthSuccess(getStoredRole());
   }
 
   function initAuthGate() {
@@ -321,7 +300,15 @@
     authInitialized = true;
 
     if (document.body.classList.contains('mode-client')) return;
-    if (!document.body.classList.contains('auth-gate-active')) return;
+
+    // No auth gate marker + no session → hard redirect to login entry.
+    if (!document.body.classList.contains('auth-gate-active')) {
+      if (!isAuthenticated()) {
+        clearSession();
+        window.location.replace(getLoginHref());
+      }
+      return;
+    }
 
     tryRestoreSession();
   }
@@ -333,7 +320,33 @@
   }
 
   function getBearerToken() {
-    return sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+    try {
+      return sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function getStoredRole() {
+    try {
+      return sessionStorage.getItem(SESSION_ROLE_KEY) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function isAuthenticated() {
+    return Boolean(getBearerToken() && getStoredRole());
+  }
+
+  /** Alias used by dashboard modules for explicit session probes. */
+  function checkSession() {
+    return isAuthenticated();
+  }
+
+  function getLoginHref() {
+    // Login lives on the same entry document (overlay gate), not a separate login.html.
+    return `${window.location.pathname}${window.location.search}`;
   }
 
   function buildAuthHeaders(extra = {}) {
@@ -359,6 +372,61 @@
     if (typeof fn === 'function') logoutTeardowns.push(fn);
   }
 
+  function createUnauthorizedError(message) {
+    const err = new Error(message || 'Session expirée — reconnectez-vous.');
+    err.code = 'UNAUTHORIZED';
+    return err;
+  }
+
+  /**
+   * Strict route guard: protected shells must not initialize without a token.
+   * Returns false when navigation/redirect was triggered.
+   */
+  function enforceRouteGuard() {
+    if (document.body.classList.contains('mode-client')) return true;
+
+    // Auth gate page may render login UI while unauthenticated.
+    if (document.body.classList.contains('auth-gate-active')) {
+      return isAuthenticated();
+    }
+
+    if (!isAuthenticated()) {
+      clearSession();
+      window.location.replace(getLoginHref());
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Call before any protected data fetch. Throws after starting logout/redirect.
+   */
+  function requireSession() {
+    if (isAuthenticated()) return true;
+    void logout();
+    throw createUnauthorizedError();
+  }
+
+  /**
+   * Mid-session 401 interceptor — never fall through to "Mode dégradé".
+   */
+  function assertAuthorizedResponse(response) {
+    if (response && response.status === 401) {
+      void logout();
+      throw createUnauthorizedError();
+    }
+    return response;
+  }
+
+  function isUnauthorizedError(error) {
+    return Boolean(
+      error &&
+      (error.code === 'UNAUTHORIZED' ||
+        /session expir[eé]e|unauthorized|401/i.test(String(error.message || '')))
+    );
+  }
+
   async function logout() {
     if (isLoggingOut) return;
     isLoggingOut = true;
@@ -377,16 +445,54 @@
       } catch { /* always proceed to login redirect */ }
     }
 
-    const loginUrl = `${window.location.pathname}${window.location.search}`;
-    window.location.replace(loginUrl);
+    window.location.replace(getLoginHref());
+  }
+
+  async function unlockDoctorModule() {
+    if (!enforceRouteGuard() || !isAuthenticated()) {
+      void logout();
+      return;
+    }
+
+    document.body.classList.add('mode-doctor');
+    document.body.classList.remove('mode-assistant');
+    isolateDoctorShell();
+
+    if (typeof window.initializeDoctorDashboard === 'function') {
+      window.initializeDoctorDashboard();
+    }
+    if (typeof window.unlockDashboard === 'function') {
+      window.unlockDashboard();
+    }
+  }
+
+  async function unlockAssistantModule() {
+    if (!enforceRouteGuard() || !isAuthenticated()) {
+      void logout();
+      return;
+    }
+
+    document.body.classList.add('mode-assistant');
+    document.body.classList.remove('mode-doctor');
+    await isolateAssistantShell();
+
+    if (typeof window.initializeAssistantDashboard === 'function') {
+      window.initializeAssistantDashboard();
+    }
   }
 
   window.DentaFlowAuth = {
     SESSION_ROLE_KEY,
     SESSION_TOKEN_KEY,
-    getRole: () => sessionStorage.getItem(SESSION_ROLE_KEY),
+    getRole: getStoredRole,
     getToken: getBearerToken,
     getAuthHeaders: buildAuthHeaders,
+    isAuthenticated,
+    checkSession,
+    enforceRouteGuard,
+    requireSession,
+    assertAuthorizedResponse,
+    isUnauthorizedError,
     clearSession,
     registerLogoutTeardown,
     logout,

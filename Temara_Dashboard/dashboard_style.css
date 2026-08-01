@@ -3504,6 +3504,25 @@ body.auth-gate-active #assistant-shell {
     -webkit-backdrop-filter: var(--glass-blur);
   }
 
+  #doctor-shell .mobile-logout-dock,
+  body.mode-assistant .mobile-logout-dock {
+    display: block;
+    position: fixed;
+    left: max(16px, var(--safe-inline));
+    right: max(16px, var(--safe-inline-end));
+    bottom: max(calc(24px + 68px), calc(env(safe-area-inset-bottom, 0px) + 92px));
+    z-index: 52;
+    padding: 0;
+    pointer-events: none;
+  }
+
+  #doctor-shell .mobile-logout-dock .mobile-logout-btn,
+  body.mode-assistant .mobile-logout-dock .mobile-logout-btn {
+    display: flex;
+    width: 100%;
+    pointer-events: auto;
+  }
+
   #doctor-shell .doctor-account-dock {
     grid-area: topbar;
     position: relative;
@@ -6460,6 +6479,65 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   outline-offset: 2px;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
+}
+
+/* Mobile logout — hidden on desktop; revealed in @media (max-width: 768px) */
+.mobile-logout-dock {
+  display: none;
+}
+
+#mobile-logout-btn.mobile-logout-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(227, 193, 143, 0.16);
+  border-radius: 12px;
+  background: rgba(12, 10, 9, 0.55);
+  color: var(--login-taupe, #9E948C);
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.mobile-logout-btn .nav-icon,
+.mobile-logout-btn [data-lucide],
+.mobile-logout-btn .lucide {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.mobile-logout-btn__label {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+}
+
+.mobile-logout-btn:active {
+  background: rgba(217, 107, 39, 0.16);
+  border-color: rgba(217, 107, 39, 0.38);
+  color: var(--login-champagne, #E3C18F);
+  box-shadow: 0 0 0 1px rgba(227, 193, 143, 0.12);
+}
+
+.mobile-logout-btn:focus-visible {
+  outline: 2px solid var(--login-champagne, #E3C18F);
+  outline-offset: 2px;
 }
 
 .account-menu-popover,
