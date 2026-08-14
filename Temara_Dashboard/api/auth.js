@@ -15,6 +15,7 @@ const {
   getRoleCredentials,
   recordLoginFailure,
   resetLoginFailures,
+  setAuthCookie,
   signJwt,
   verifyPassword,
 } = require('./_lib/auth-crypto');
@@ -80,9 +81,10 @@ module.exports = async function handler(req, res) {
     jwtSecret
   );
 
+  setAuthCookie(res, token);
+
   return res.status(200).json({
     ok: true,
-    token,
     role: normalizedRole,
     expiresInSec: 8 * 60 * 60,
   });
