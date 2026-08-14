@@ -2877,9 +2877,7 @@ function enterDoctorApp() {
 
   if (!document.body.classList.contains('auth-gate-active')) {
     initializeDoctorDashboard();
-    if (sessionStorage.getItem('dentaflow_session')) {
-      unlockDashboard();
-    }
+    unlockDashboard();
     syncTabFromHash();
   }
 }
@@ -3408,12 +3406,6 @@ async function updateRosterStatus(selectEl, previousStatus) {
   selectEl.classList.remove('status-success', 'status-error');
 
   try {
-    const token = window.DentaFlowAuth?.getToken?.();
-    if (!token) {
-      showDashboardToast('Session expirée — veuillez vous reconnecter.', 'error');
-      throw new Error('Session expirée — veuillez vous reconnecter.');
-    }
-
     const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
       method: 'POST',
       credentials: 'include',
@@ -4012,7 +4004,6 @@ function initSmartSync() {
 
   async function runSmartSync() {
     if (document.body.classList.contains('auth-gate-active')) return;
-    if (!sessionStorage.getItem(AUTH_CONFIG.SESSION_KEY)) return;
     if (smartSyncInFlight) return;
     if (Date.now() - lastSmartSyncAt < CONFIG.SMART_SYNC_DEBOUNCE_MS) return;
 

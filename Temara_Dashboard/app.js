@@ -4129,11 +4129,6 @@ let handoffNotes = [];
     selectEl.classList.remove('status-success', 'status-error');
 
     try {
-      const token = window.DentaFlowAuth?.getToken?.();
-      if (!token) {
-        throw new Error('Session expirée — veuillez vous reconnecter.');
-      }
-
       const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
         method: 'POST',
         credentials: 'include',

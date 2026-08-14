@@ -2456,7 +2456,7 @@ let handoffNotes = [];
 
   function maybeBootAssistant() {
     if (document.body.classList.contains('auth-gate-active')) return;
-    if (sessionStorage.getItem('dentaflow_role') === 'assistant' && sessionStorage.getItem('dentaflow_session')) {
+    if (sessionStorage.getItem('dentaflow_role') === 'assistant') {
       init();
     }
   }
