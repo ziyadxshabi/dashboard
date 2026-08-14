@@ -12,13 +12,15 @@
 
 DentaFlow OS enforces a strict **Single Source of Truth** protocol: every durable fact about a patient, slot, or operational event is owned by **one** authoritative store, and every other surface (dashboard, SMS, Slack, IVR) is a **projection** or **side effect** of that store.
 
-| Domain | Authoritative store | Consumers (read-only / derived) |
-|--------|---------------------|----------------------------------|
-| Appointments / calendar | **Cal.com** | Concierge workflows, dashboard roster proxies, Slack alerts |
-| Patients, waitlist, broadcast logs | **Baserow** (PostgreSQL-backed relational tables) | Waitlist cascade, SMS confirmation paths, slot-filled cleanup |
-| Operational KPIs (selected metrics) | **Google Sheets** (Calculs tab) via n8n | Doctor dashboard charts |
-| Ephemeral concurrency / rate limits / dedup | **Redis** (Upstash REST) | Booking locks, login throttling, Twilio/webhook dedup, error-monitor dedup |
-| Staff session identity | **JWT** issued by `/api/auth` (not stored server-side) | Frontend shells, Vercel API proxies |
+
+| Domain                                      | Authoritative store                                    | Consumers (read-only / derived)                                            |
+| ------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Appointments / calendar                     | **Cal.com**                                            | Concierge workflows, dashboard roster proxies, Slack alerts                |
+| Patients, waitlist, broadcast logs          | **Baserow** (PostgreSQL-backed relational tables)      | Waitlist cascade, SMS confirmation paths, slot-filled cleanup              |
+| Operational KPIs (selected metrics)         | **Google Sheets** (Calculs tab) via n8n                | Doctor dashboard charts                                                    |
+| Ephemeral concurrency / rate limits / dedup | **Redis** (Upstash REST)                               | Booking locks, login throttling, Twilio/webhook dedup, error-monitor dedup |
+| Staff session identity                      | **JWT** issued by `/api/auth` (not stored server-side) | Frontend shells, Vercel API proxies                                        |
+
 
 **Rules of engagement:**
 
@@ -27,6 +29,8 @@ DentaFlow OS enforces a strict **Single Source of Truth** protocol: every durabl
 - Do **not** use Redis for permanent patient or schedule records — locks and counters only.
 - Dashboard UIs must never treat a failed auth response as “empty clinic data” (see §4).
 
+
+
 ### 1.2 Core Objectives
 
 1. **Zero-friction booking** — Patients book via Cal.com (web), Twilio Voice IVR (“Press 1 to book”), or staff-assisted flows; all paths converge on the same calendar and confirmation pipeline.
@@ -34,6 +38,8 @@ DentaFlow OS enforces a strict **Single Source of Truth** protocol: every durabl
 3. **Cryptographic double-booking prevention** — Millisecond-scale mutual exclusion via Redis `SET key 1 NX EX <ttl>` (Upstash REST) before mutating shared slot state; webhook authenticity via HMAC (Cal.com, Twilio) and timing-safe comparisons in n8n Code nodes (`crypto`).
 
 ---
+
+
 
 ## 2. Infrastructure & Component Stack
 
@@ -61,6 +67,8 @@ DentaFlow OS enforces a strict **Single Source of Truth** protocol: every durabl
               tables)                 Voice)
 ```
 
+
+
 ### 2.1 Frontend — Cloud-hosted clinic dashboard
 
 - **Host:** Vercel (static assets + Node serverless functions under `Temara_Dashboard/api/`).
@@ -69,20 +77,24 @@ DentaFlow OS enforces a strict **Single Source of Truth** protocol: every durabl
   - **Assistant** — `assistant-shell.html` + `app.js` (roster, fill-gap SMS, day-of ops).
 - **Auth client:** `auth.js` (`window.DentaFlowAuth`) — JWT in `sessionStorage` (`dentaflow_session`, `dentaflow_role`); login overlay on the same page (no separate `login.html`).
 - **UX constraints:** Dark-mode, mobile-responsive layout; mobile logout dock; role toggle (Médecin / Assistant(e)).
-- **Design note:** Frontend never holds n8n webhook secrets — all privileged calls go through `/api/*` proxies.
+- **Design note:** Frontend never holds n8n webhook secrets — all privileged calls go through `/api/`* proxies.
+
+
 
 ### 2.2 Backend / Engine — n8n
 
 n8n owns **all** automated workflows, inbound webhooks, and API bridging:
 
-| Workflow family (repo export) | Responsibility |
-|-------------------------------|----------------|
-| `Production Concierge Engine v2` | Cal.com book/cancel → Baserow + Twilio confirmations + Slack + Redis locks + waitlist slot-filled cleanup |
-| `No-Show Waitlist Engine` | Waitlist cascade / no-show recovery |
-| `Twilio Voice Menu v4.90` | Inbound IVR (“Press 1…”), signature validation, Redis rate limits |
-| `Dashboard Data Endpoint` / `Workflow 1–5` | Dashboard KPI pull, roster, bulk confirm, status updates |
-| `Agency Master Error Monitor` | Slack-facing error routing with Redis dedup |
-| `Superpouvoir_*` | Urgency slot block (Cal.com), force SMS |
+
+| Workflow family (repo export)              | Responsibility                                                                                            |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `Production Concierge Engine v2`           | Cal.com book/cancel → Baserow + Twilio confirmations + Slack + Redis locks + waitlist slot-filled cleanup |
+| `No-Show Waitlist Engine`                  | Waitlist cascade / no-show recovery                                                                       |
+| `Twilio Voice Menu v4.90`                  | Inbound IVR (“Press 1…”), signature validation, Redis rate limits                                         |
+| `Dashboard Data Endpoint` / `Workflow 1–5` | Dashboard KPI pull, roster, bulk confirm, status updates                                                  |
+| `Agency Master Error Monitor`              | Slack-facing error routing with Redis dedup                                                               |
+| `Superpouvoir_*`                           | Urgency slot block (Cal.com), force SMS                                                                   |
+
 
 **n8n Code nodes** require Node built-in `crypto` (see §5.1). Prefer `$vars['KEY'] ?? $env['KEY']` for configuration.
 
@@ -94,17 +106,21 @@ n8n owns **all** automated workflows, inbound webhooks, and API bridging:
 
 > If a direct PostgreSQL connection string is introduced later (analytics, audit archive), keep Baserow/Cal.com as the write path for operational facts unless a formal migration plan reassigns SSOT ownership.
 
+
+
 ### 2.4 Caching / Locking — Redis (Upstash)
 
 Redis is used **exclusively** for short-lived coordination — **not** as a patient database:
 
-| Use case | Pattern |
-|----------|---------|
-| Double-booking / slot mutex | `SET <key> 1 NX EX <ttl>` via Upstash REST |
-| Login brute-force limit | Increment + TTL window (`auth-crypto.js` + Redis REST) |
-| Webhook / SMS status dedup | `SET NX` with short TTL |
-| Twilio Voice rate limit | Sliding window increment |
-| Error monitor spam control | Dedup key `errmon:dedup:*` (~300s) |
+
+| Use case                    | Pattern                                                |
+| --------------------------- | ------------------------------------------------------ |
+| Double-booking / slot mutex | `SET <key> 1 NX EX <ttl>` via Upstash REST             |
+| Login brute-force limit     | Increment + TTL window (`auth-crypto.js` + Redis REST) |
+| Webhook / SMS status dedup  | `SET NX` with short TTL                                |
+| Twilio Voice rate limit     | Sliding window increment                               |
+| Error monitor spam control  | Dedup key `errmon:dedup:*` (~300s)                     |
+
 
 **Required env:** `REDIS_CONNECTION_URL` (Upstash REST base URL), `REDIS_REST_TOKEN` (Bearer).
 
@@ -112,7 +128,11 @@ Shared helper: `n8n/_snippets/redis_upstash.js` (and inlined equivalents in work
 
 ---
 
+
+
 ## 3. Data Flows & External Services
+
+
 
 ### 3.1 Cal.com — Inbound bookings & cancellations
 
@@ -134,6 +154,8 @@ n8n Concierge — Validate Cal.com Auth
 - **Outbound from n8n:** Cal.com REST with `CALCOM_API_KEY` / `CALCOM_EVENT_TYPE_ID` (e.g. Superpouvoir urgency block).
 - **Inbound security:** Timing-safe HMAC verification of webhook signature in Concierge Code nodes (`require('crypto')`).
 
+
+
 ### 3.2 Twilio — Outbound messaging & inbound voice
 
 **Outbound**
@@ -153,6 +175,8 @@ n8n Concierge — Validate Cal.com Auth
 
 - Clinic messaging may ride **Twilio’s WhatsApp/SMS APIs** (Twilio Account SID + From number + Auth Token). Meta Business credentials, when used, sit behind the Twilio/WhatsApp sender configuration — keep Meta App secrets in the Twilio/Meta console, not in the static frontend.
 
+
+
 ### 3.3 Slack — Internal clinic routing
 
 - Cancellation alerts (“créneau libéré”).
@@ -165,20 +189,26 @@ Slack is **never** SSOT — it is a staff notification bus only.
 
 Browser → `Authorization: Bearer <JWT>` → Vercel `/api/*` → n8n webhook with `x-agency-auth` (and related keys).
 
-| Proxy (representative) | Env webhook / auth |
-|------------------------|--------------------|
-| `/api/auth` | `JWT_SECRET`, role username/hash pairs, Redis rate limit |
-| `/api/dashboard-data` | `N8N_WEBHOOK_DASHBOARD`, `DASHBOARD_AUTH_KEY` |
-| `/api/roster` | `N8N_WEBHOOK_ROSTER`, `N8N_AUTH_KEY` |
-| `/api/waitlist` | `N8N_WAITLIST_WEBHOOK`, `N8N_AGENCY_AUTH_KEY` |
-| `/api/team-notes` | `N8N_WEBHOOK_GET_NOTES`, `N8N_WEBHOOK_POST_NOTE` |
-| `/api/fill-gap`, `/api/bulk-sms`, … | Matching `N8N_WEBHOOK_*` + `N8N_AUTH_KEY` |
+
+| Proxy (representative)              | Env webhook / auth                                       |
+| ----------------------------------- | -------------------------------------------------------- |
+| `/api/auth`                         | `JWT_SECRET`, role username/hash pairs, Redis rate limit |
+| `/api/dashboard-data`               | `N8N_WEBHOOK_DASHBOARD`, `DASHBOARD_AUTH_KEY`            |
+| `/api/roster`                       | `N8N_WEBHOOK_ROSTER`, `N8N_AUTH_KEY`                     |
+| `/api/waitlist`                     | `N8N_WAITLIST_WEBHOOK`, `N8N_AGENCY_AUTH_KEY`            |
+| `/api/team-notes`                   | `N8N_WEBHOOK_GET_NOTES`, `N8N_WEBHOOK_POST_NOTE`         |
+| `/api/fill-gap`, `/api/bulk-sms`, … | Matching `N8N_WEBHOOK_*` + `N8N_AUTH_KEY`                |
+
 
 CORS on selected n8n webhook responses is scoped to `VERCEL_FRONTEND_URL`.
 
 ---
 
+
+
 ## 4. Security & Authentication Architecture
+
+
 
 ### 4.1 Frontend route guarding (JWT)
 
@@ -193,14 +223,16 @@ CORS on selected n8n webhook responses is scoped to `VERCEL_FRONTEND_URL`.
 - `sessionStorage`: `dentaflow_session` (JWT), `dentaflow_role`.
 - Session is **tab-scoped** (cleared when the tab closes) — intentional for shared clinic machines.
 
-**Guards (`auth.js`)**
+**Guards (**`auth.js`**)**
 
-| Mechanism | Behavior |
-|-----------|----------|
-| `enforceRouteGuard` / `requireSession` / `checkSession` | No valid JWT → hard teardown + login overlay |
-| `assertAuthorizedResponse(response)` | HTTP **401** → `logout()` immediately |
-| `registerLogoutTeardown` | Clears intervals/charts/init flags before redirect |
-| `logout()` | Clears storage, runs teardowns, `location.replace(pathname + search)` |
+
+| Mechanism                                               | Behavior                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------- |
+| `enforceRouteGuard` / `requireSession` / `checkSession` | No valid JWT → hard teardown + login overlay                          |
+| `assertAuthorizedResponse(response)`                    | HTTP **401** → `logout()` immediately                                 |
+| `registerLogoutTeardown`                                | Clears intervals/charts/init flags before redirect                    |
+| `logout()`                                              | Clears storage, runs teardowns, `location.replace(pathname + search)` |
+
 
 **Anti-cascade rule:** On unauthorized API responses, the UI **must not** enter “Mode dégradé” empty-state paths. Treat 401 as session death, not as missing clinic data. `app.js` / `dashboard_app.js` call `assertAuthorizedResponse` (or equivalent) before interpreting payloads.
 
@@ -215,12 +247,16 @@ Used across Concierge, waitlist, Twilio status dedup, and error monitor paths. F
 
 ### 4.3 Webhook & API authenticity
 
-| Boundary | Control |
-|----------|---------|
-| Cal.com → n8n | HMAC-SHA256 webhook secret (`CAL_WEBHOOK_SECRET`), timing-safe compare |
-| Twilio → n8n | `X-Twilio-Signature` vs Auth Token (`N8N_TWILIO_AUTH_TOKEN`) |
-| Vercel → n8n | Shared secret header `x-agency-auth` / PIN; SHA-256 compare where `DASHBOARD_AUTH_KEY_SHA256` is configured |
-| Browser → Vercel | Bearer JWT verified in each protected serverless handler |
+
+| Boundary         | Control                                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| Cal.com → n8n    | HMAC-SHA256 webhook secret (`CAL_WEBHOOK_SECRET`), timing-safe compare                                      |
+| Twilio → n8n     | `X-Twilio-Signature` vs Auth Token (`N8N_TWILIO_AUTH_TOKEN`)                                                |
+| Vercel → n8n     | Shared secret header `x-agency-auth` / PIN; SHA-256 compare where `DASHBOARD_AUTH_KEY_SHA256` is configured |
+| Browser → Vercel | Bearer JWT verified in each protected serverless handler                                                    |
+
+
+
 
 ### 4.4 Trust boundaries (summary)
 
@@ -232,6 +268,8 @@ SSOT stores: Cal.com (calendar), Baserow/Postgres (records), Redis (ephemeral on
 ```
 
 ---
+
+
 
 ## 5. Master Environment Variables Ledger
 
@@ -253,18 +291,24 @@ N8N_ENV_VARS_IN_ALLOWED_ENV=REDIS_CONNECTION_URL,REDIS_REST_TOKEN,BASEROW_API_TO
 
 > Adjust the allowlist to match whatever your n8n host actually injects. Prefer n8n **Variables** (`$vars`) for secrets when the deployment model supports them; keep `$vars['X'] ?? $env['X']` in Code nodes.
 
+
+
 ### 5.2 Vercel / frontend API (`Temara_Dashboard`)
+
+
 
 #### Authentication
 
-| Variable | Purpose |
-|----------|---------|
-| `JWT_SECRET` | HS256 signing key for clinic JWTs (**≥ 32 random chars**) |
-| `DOCTOR_USERNAME` | Doctor login identifier |
-| `DOCTOR_PASSWORD_HASH` | `scrypt$…` hash from `api/_lib/auth-crypto.js` |
-| `ASSISTANT_USERNAME` | Assistant login identifier |
-| `ASSISTANT_PASSWORD_HASH` | `scrypt$…` hash |
-| `DOCTOR_PIN` / `ASSISTANT_PIN` | Optional PIN paths if enabled in workflows |
+
+| Variable                       | Purpose                                                   |
+| ------------------------------ | --------------------------------------------------------- |
+| `JWT_SECRET`                   | HS256 signing key for clinic JWTs (**≥ 32 random chars**) |
+| `DOCTOR_USERNAME`              | Doctor login identifier                                   |
+| `DOCTOR_PASSWORD_HASH`         | `scrypt$…` hash from `api/_lib/auth-crypto.js`            |
+| `ASSISTANT_USERNAME`           | Assistant login identifier                                |
+| `ASSISTANT_PASSWORD_HASH`      | `scrypt$…` hash                                           |
+| `DOCTOR_PIN` / `ASSISTANT_PIN` | Optional PIN paths if enabled in workflows                |
+
 
 Generate hashes:
 
@@ -273,33 +317,45 @@ cd Temara_Dashboard
 node -e "const c=require('./api/_lib/auth-crypto');console.log(c.hashPassword('your-password'))"
 ```
 
+
+
 #### n8n bridge secrets & webhooks
 
-| Variable | Purpose |
-|----------|---------|
-| `N8N_AUTH_KEY` | Sent as `x-agency-auth` to n8n from most proxies |
-| `N8N_AGENCY_AUTH_KEY` | Waitlist / agency-scoped auth (may equal `N8N_AUTH_KEY`) |
-| `DASHBOARD_AUTH_KEY` | Dashboard KPI endpoint auth |
-| `N8N_WEBHOOK_URL` | Legacy / generic dashboard webhook (dev ngrok) |
-| `N8N_WEBHOOK_DASHBOARD` | Doctor KPI pull |
-| `N8N_WEBHOOK_ROSTER` | Daily roster |
-| `N8N_WEBHOOK_UPDATE_STATUS` | Status push |
-| `N8N_WEBHOOK_DELAY_ALERT` | Delay alert |
-| `N8N_WEBHOOK_FILL_GAP` | Fill-gap SMS trigger |
-| `N8N_WEBHOOK_BULK_SMS` | Bulk SMS |
-| `N8N_WEBHOOK_GET_NOTES` / `N8N_WEBHOOK_POST_NOTE` | Team notes |
-| `N8N_WEBHOOK_LEAD_CAPTURE` | Patient portal leads |
-| `N8N_WEBHOOK_ASSISTANT_PROXY` | Assistant generic proxy |
-| `N8N_WAITLIST_WEBHOOK` | Waitlist intake |
+
+| Variable                                          | Purpose                                                  |
+| ------------------------------------------------- | -------------------------------------------------------- |
+| `N8N_AUTH_KEY`                                    | Sent as `x-agency-auth` to n8n from most proxies         |
+| `N8N_AGENCY_AUTH_KEY`                             | Waitlist / agency-scoped auth (may equal `N8N_AUTH_KEY`) |
+| `DASHBOARD_AUTH_KEY`                              | Dashboard KPI endpoint auth                              |
+| `N8N_WEBHOOK_URL`                                 | Legacy / generic dashboard webhook (dev ngrok)           |
+| `N8N_WEBHOOK_DASHBOARD`                           | Doctor KPI pull                                          |
+| `N8N_WEBHOOK_ROSTER`                              | Daily roster                                             |
+| `N8N_WEBHOOK_UPDATE_STATUS`                       | Status push                                              |
+| `N8N_WEBHOOK_DELAY_ALERT`                         | Delay alert                                              |
+| `N8N_WEBHOOK_FILL_GAP`                            | Fill-gap SMS trigger                                     |
+| `N8N_WEBHOOK_BULK_SMS`                            | Bulk SMS                                                 |
+| `N8N_WEBHOOK_GET_NOTES` / `N8N_WEBHOOK_POST_NOTE` | Team notes                                               |
+| `N8N_WEBHOOK_LEAD_CAPTURE`                        | Patient portal leads                                     |
+| `N8N_WEBHOOK_ASSISTANT_PROXY`                     | Assistant generic proxy                                  |
+| `N8N_WAITLIST_WEBHOOK`                            | Waitlist intake                                          |
+
+
+
 
 #### Redis (login rate limit on Vercel)
 
-| Variable | Purpose |
-|----------|---------|
-| `REDIS_CONNECTION_URL` | Upstash REST base URL |
-| `REDIS_REST_TOKEN` | Bearer token for Upstash REST |
+
+| Variable               | Purpose                       |
+| ---------------------- | ----------------------------- |
+| `REDIS_CONNECTION_URL` | Upstash REST base URL         |
+| `REDIS_REST_TOKEN`     | Bearer token for Upstash REST |
+
+
+
 
 ### 5.3 n8n runtime variables / env
+
+
 
 #### Redis
 
@@ -307,6 +363,8 @@ node -e "const c=require('./api/_lib/auth-crypto');console.log(c.hashPassword('y
 REDIS_CONNECTION_URL=https://<region>.upstash.io
 REDIS_REST_TOKEN=<upstash-rest-token>
 ```
+
+
 
 #### Baserow (relational / Postgres-backed SSOT for clinic records)
 
@@ -319,7 +377,9 @@ BASEROW_WAITLIST_BROADCAST_TABLE_ID=<broadcast-log>   # or BASEROW_TABLE_ID wher
 BASEROW_LEADS_TABLE_ID=<leads>
 ```
 
-#### Cal.com
+
+
+#### [Cal.com](http://Cal.com)
 
 ```text
 CAL_WEBHOOK_SECRET=<hmac-secret>
@@ -327,6 +387,8 @@ CALCOM_API_KEY=<api-key>
 CALCOM_EVENT_TYPE_ID=<numeric-id>
 CLINIC_URGENCY_EMAIL=<clinic-urgency@domain>
 ```
+
+
 
 #### Twilio / messaging
 
@@ -350,46 +412,60 @@ WAITLIST_WORKFLOW_ID=<n8n-workflow-id>          # if cross-workflow triggers use
 N8N_AGENCY_AUTH_KEY=<shared-secret>
 ```
 
+
+
 ### 5.4 Optional / legacy aliases
 
-| Variable | Notes |
-|----------|-------|
-| `N8N_WEBHOOK_URL` | Older single-webhook name; prefer explicit `N8N_WEBHOOK_*` in production |
-| `KEY` | Avoid; use named secrets only |
+
+| Variable                             | Notes                                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `N8N_WEBHOOK_URL`                    | Older single-webhook name; prefer explicit `N8N_WEBHOOK_*` in production                 |
+| `KEY`                                | Avoid; use named secrets only                                                            |
 | Direct `DATABASE_URL` / `POSTGRES_*` | Not wired in current dashboard/n8n Code paths; reserve for future direct Postgres access |
+
+
+
 
 ### 5.5 Environment matrix (checklist)
 
-| Concern | Development | Production |
-|---------|-------------|------------|
-| Frontend host | Local static or Vercel Preview | Vercel Production |
-| n8n reachability | ngrok / tunnel → `N8N_WEBHOOK_*` | Stable HTTPS n8n host |
-| `VERCEL_FRONTEND_URL` | Preview URL(s) | Canonical prod URL |
-| Cal.com / Twilio webhooks | Test event types / test numbers | Live secrets + signature gates on |
-| Redis | Shared Upstash **dev** DB or separate prefix keys | Dedicated prod Upstash |
-| JWT / passwords | Non-prod hashes | Unique `JWT_SECRET` + strong hashes |
-| `NODE_FUNCTION_ALLOW_BUILTIN` | `crypto` | `crypto` |
+
+| Concern                       | Development                                       | Production                          |
+| ----------------------------- | ------------------------------------------------- | ----------------------------------- |
+| Frontend host                 | Local static or Vercel Preview                    | Vercel Production                   |
+| n8n reachability              | ngrok / tunnel → `N8N_WEBHOOK_*`                  | Stable HTTPS n8n host               |
+| `VERCEL_FRONTEND_URL`         | Preview URL(s)                                    | Canonical prod URL                  |
+| Cal.com / Twilio webhooks     | Test event types / test numbers                   | Live secrets + signature gates on   |
+| Redis                         | Shared Upstash **dev** DB or separate prefix keys | Dedicated prod Upstash              |
+| JWT / passwords               | Non-prod hashes                                   | Unique `JWT_SECRET` + strong hashes |
+| `NODE_FUNCTION_ALLOW_BUILTIN` | `crypto`                                          | `crypto`                            |
+
 
 ---
 
+
+
 ## Appendix A — Key repository paths
 
-| Path | Role |
-|------|------|
-| `Temara_Dashboard/` | Production clinic UI + Vercel APIs |
-| `Temara_Dashboard/auth.js` | Client JWT session, route guard, 401 logout |
-| `Temara_Dashboard/api/_lib/auth-crypto.js` | scrypt, JWT, Redis login limiter |
-| `Temara_Dashboard/.env.example` | Non-secret template for Vercel env |
-| `n8n/` | Exported workflow JSON (import into n8n) |
-| `n8n/_snippets/` | Shared Code-node snippets (Redis, auth gates) |
+
+| Path                                       | Role                                          |
+| ------------------------------------------ | --------------------------------------------- |
+| `Temara_Dashboard/`                        | Production clinic UI + Vercel APIs            |
+| `Temara_Dashboard/auth.js`                 | Client JWT session, route guard, 401 logout   |
+| `Temara_Dashboard/api/_lib/auth-crypto.js` | scrypt, JWT, Redis login limiter              |
+| `Temara_Dashboard/.env.example`            | Non-secret template for Vercel env            |
+| `n8n/`                                     | Exported workflow JSON (import into n8n)      |
+| `n8n/_snippets/`                           | Shared Code-node snippets (Redis, auth gates) |
+
+
+
 
 ## Appendix B — Operational invariants
 
-1. **Calendar SSOT = Cal.com.**  
-2. **Patient/waitlist SSOT = Baserow (Postgres-backed).**  
-3. **Redis = locks & rate limits only.**  
-4. **401 = logout**, never degraded empty dashboard.  
-5. **Webhook signatures on** before any write to Baserow or outbound SMS in production.  
+1. **Calendar SSOT = Cal.com.**
+2. **Patient/waitlist SSOT = Baserow (Postgres-backed).**
+3. **Redis = locks & rate limits only.**
+4. **401 = logout**, never degraded empty dashboard.
+5. **Webhook signatures on** before any write to Baserow or outbound SMS in production.
 6. **Secrets never in static JS** — only in Vercel env, n8n credentials/variables, and host env allowlists.
 
 ---
