@@ -112,6 +112,7 @@
     try {
       const response = await fetch(AUTH_ENDPOINT, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
@@ -136,8 +137,6 @@
       }
 
       sessionStorage.setItem(SESSION_ROLE_KEY, selectedRole);
-      sessionStorage.setItem(SESSION_TOKEN_KEY, payload.token || 'session-valid');
-      sessionStorage.setItem(SESSION_PIN_KEY, currentPin);
 
       await handleAuthSuccess(selectedRole);
     } catch {
@@ -227,34 +226,52 @@
     await unlockDoctorModule();
   }
 
-  function tryRestoreSession() {
-    const role = sessionStorage.getItem(SESSION_ROLE_KEY);
-    const session = sessionStorage.getItem(SESSION_TOKEN_KEY);
+  async function validateSession() {
+    try {
+      const response = await fetch('/api/auth/me', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
 
-    if (!role || !session) {
+  async function tryRestoreSession() {
+    const session = await validateSession();
+    if (!session?.ok) {
+      clearSession();
       initLoginReveal();
       setupRoleSelector();
       setupKeypad();
       return;
     }
-
-    handleAuthSuccess(role);
+    handleAuthSuccess(session.role);
   }
 
-  function initAuthGate() {
+  async function initAuthGate() {
     if (authInitialized) return;
     authInitialized = true;
-
     if (document.body.classList.contains('mode-client')) return;
     if (!document.body.classList.contains('auth-gate-active')) return;
-
-    tryRestoreSession();
+    await tryRestoreSession();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAuthGate);
+    document.addEventListener('DOMContentLoaded', () => initAuthGate());
   } else {
     initAuthGate();
+  }
+
+  function clearSession() {
+    try {
+      sessionStorage.removeItem(SESSION_ROLE_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_PIN_KEY);
+    } catch { /* private browsing */ }
   }
 
   window.DentaFlowAuth = {
@@ -263,10 +280,17 @@
     SESSION_PIN_KEY,
     getRole: () => sessionStorage.getItem(SESSION_ROLE_KEY),
     getSession: () => sessionStorage.getItem(SESSION_TOKEN_KEY),
-    clearSession() {
-      sessionStorage.removeItem(SESSION_ROLE_KEY);
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
-      sessionStorage.removeItem(SESSION_PIN_KEY);
+    clearSession,
+    logout: async () => {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+      } catch { /* proceed */ }
+      clearSession();
+      window.location.reload();
     },
   };
 })();

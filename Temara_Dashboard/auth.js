@@ -135,6 +135,7 @@
     try {
       const response = await fetch(AUTH_ENDPOINT, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
@@ -171,13 +172,12 @@
       }
 
       const payload = await response.json();
-      if (!payload?.ok || !payload?.token) {
+      if (!payload?.ok) {
         showLoginError('Identifiants incorrects.');
         return;
       }
 
       sessionStorage.setItem(SESSION_ROLE_KEY, payload.role || selectedRole);
-      sessionStorage.setItem(SESSION_TOKEN_KEY, payload.token);
 
       if (passwordInput) passwordInput.value = '';
 
@@ -285,17 +285,31 @@
     setupLoginForm();
   }
 
-  function tryRestoreSession() {
-    if (!isAuthenticated()) {
+  async function validateSession() {
+    try {
+      const response = await fetch('/api/auth/me', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  async function tryRestoreSession() {
+    const session = await validateSession();
+    if (!session?.ok) {
       clearSession();
       showLoginGate();
       return;
     }
-
-    handleAuthSuccess(getStoredRole());
+    handleAuthSuccess(session.role);
   }
 
-  function initAuthGate() {
+  async function initAuthGate() {
     if (authInitialized) return;
     authInitialized = true;
 
@@ -310,21 +324,17 @@
       return;
     }
 
-    tryRestoreSession();
+    await tryRestoreSession();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAuthGate);
+    document.addEventListener('DOMContentLoaded', () => initAuthGate());
   } else {
     initAuthGate();
   }
 
   function getBearerToken() {
-    try {
-      return sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
-    } catch {
-      return '';
-    }
+    return '';
   }
 
   function getStoredRole() {
@@ -336,7 +346,7 @@
   }
 
   function isAuthenticated() {
-    return Boolean(getBearerToken() && getStoredRole());
+    return Boolean(getStoredRole());
   }
 
   /** Alias used by dashboard modules for explicit session probes. */
@@ -350,15 +360,10 @@
   }
 
   function buildAuthHeaders(extra = {}) {
-    const headers = {
+    return {
       Accept: 'application/json',
       ...extra,
     };
-    const token = getBearerToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-    return headers;
   }
 
   function clearSession() {
@@ -430,6 +435,14 @@
   async function logout() {
     if (isLoggingOut) return;
     isLoggingOut = true;
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+    } catch { /* proceed even if logout fails */ }
 
     clearSession();
 
