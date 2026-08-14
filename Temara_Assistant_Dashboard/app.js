@@ -1359,6 +1359,7 @@ let handoffNotes = [];
   async function fetchRosterPayload(url) {
     const response = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: rosterFetchHeaders(),
     });
 
@@ -1533,6 +1534,7 @@ let handoffNotes = [];
     try {
       const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId, newStatus }),
       });
@@ -2355,6 +2357,7 @@ let handoffNotes = [];
       try {
         const response = await fetch(CONFIG.DELAY_ALERT_PROXY, {
           method: 'POST',
+          credentials: 'include',
           headers: apiHeaders(),
         });
 

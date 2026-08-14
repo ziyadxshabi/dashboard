@@ -439,7 +439,7 @@ let handoffNotes = [];
     try {
       const response = await fetch(
         CONFIG.TEAM_NOTES_PROXY,
-        { method: 'GET', headers: rosterFetchHeaders() }
+        { method: 'GET', credentials: 'include', headers: rosterFetchHeaders() }
       );
 
       const rawText = await response.text();
@@ -764,6 +764,7 @@ let handoffNotes = [];
           CONFIG.TEAM_NOTES_PROXY,
           {
             method: 'POST',
+            credentials: 'include',
             headers: apiHeaders(),
             body: JSON.stringify({
               text: newNote.text,
@@ -2960,6 +2961,7 @@ let handoffNotes = [];
       try {
         const response = await fetch(CONFIG.FILL_GAP_PROXY, {
           method: 'POST',
+          credentials: 'include',
           headers: apiHeaders(),
           body: JSON.stringify({}),
         });
@@ -3932,6 +3934,7 @@ let handoffNotes = [];
 
     const response = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: rosterFetchHeaders(),
     });
 
@@ -4133,6 +4136,7 @@ let handoffNotes = [];
 
       const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
         method: 'POST',
+        credentials: 'include',
         headers: apiHeaders(),
         body: JSON.stringify({ bookingId, newStatus }),
       });
@@ -5175,7 +5179,7 @@ let handoffNotes = [];
       try {
         const response = await fetch(
           CONFIG.FILL_GAP_PROXY,
-          { method: 'POST', headers: apiHeaders(), body: JSON.stringify({}) }
+          { method: 'POST', credentials: 'include', headers: apiHeaders(), body: JSON.stringify({}) }
         );
         const payload = await response.json();
         if (!response.ok || payload?.ok === false) {
@@ -5220,6 +5224,7 @@ let handoffNotes = [];
       try {
         const response = await fetch(CONFIG.DELAY_ALERT_PROXY, {
           method: 'POST',
+          credentials: 'include',
           headers: apiHeaders(),
         });
 

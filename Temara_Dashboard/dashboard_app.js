@@ -820,6 +820,7 @@ function initWaitlistForm() {
 async function submitWaitlistEntry(data) {
   const response = await fetch('/api/waitlist', {
     method:  'POST',
+    credentials: 'include',
     headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       nom:       data.nom,
@@ -1466,6 +1467,7 @@ function initDoctorCustomSms() {
     try {
       const response = await fetch(CONFIG.BULK_SMS_PROXY, {
         method: 'POST',
+        credentials: 'include',
         headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ customMessage }),
         signal: AbortSignal.timeout(12_000),
@@ -1661,6 +1663,7 @@ async function loadDashboard(isSilentSync = false) {
 
     const response = await fetch(CONFIG.DATA_URL, {
       method:  'GET',
+      credentials: 'include',
       headers: getApiAuthHeaders(),
       cache:   'no-store',
       signal:  AbortSignal.timeout(10_000),
@@ -3413,6 +3416,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
 
     const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
       method: 'POST',
+      credentials: 'include',
       headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ bookingId, newStatus }),
     });
@@ -3549,6 +3553,7 @@ async function loadDoctorHubData(isSilentSync = false) {
 
     const response = await fetch(CONFIG.ROSTER_PROXY, {
       method: 'GET',
+      credentials: 'include',
       headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
@@ -3947,6 +3952,7 @@ async function loadTeamNotes() {
 
     const response = await fetch(CONFIG.TEAM_NOTES_PROXY, {
       method: 'GET',
+      credentials: 'include',
       headers: getApiAuthHeaders(),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
