@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/api/auth/me", "destination": "/api/auth?action=me" },
+    { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
