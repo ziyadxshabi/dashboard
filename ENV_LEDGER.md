@@ -19,8 +19,8 @@
 - [x] DASHBOARD_AUTH_KEY
 
 ### Redis (Server-only)
-- [x] REDIS_CONNECTION_URL
-- [x] REDIS_REST_TOKEN
+- [x] UPSTASH_REDIS_REST_URL
+- [x] UPSTASH_REDIS_REST_TOKEN
 
 ## Missing in Vercel (Confirmed by Codebase Audit)
 

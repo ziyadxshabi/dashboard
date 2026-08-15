@@ -2,11 +2,12 @@
  * Doctor dashboard data proxy — JWT-gated bridge to n8n dashboard webhook.
  * Set JWT_SECRET, N8N_WEBHOOK_DASHBOARD, and DASHBOARD_AUTH_KEY in Vercel env.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
+const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'GET, OPTIONS');
     return res.status(204).end();
@@ -18,6 +19,14 @@ module.exports = async function handler(req, res) {
 
   const session = requireBearerSession(req, res, { allowedRoles: ['doctor'] });
   if (!session) return;
+
+  const dashKey = cacheKey('dash', req);
+  const cached = await cacheGet(dashKey);
+  if (cached) {
+    req.dfCache = 'hit';
+    return res.status(200).json(cached);
+  }
+  req.dfCache = 'miss';
 
   const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD;
   if (!webhookUrl) {
@@ -64,10 +73,13 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    await cacheSet(dashKey, payload, 30);
     return res.status(200).json(payload);
   } catch (err) {
     clearTimeout(timeoutId);
     console.error('[dashboard-data] Upstream fetch failed:', err);
     return res.status(500).json({ error: 'n8n unreachable' });
   }
-};
+}
+
+module.exports = withRequestLog(handler);

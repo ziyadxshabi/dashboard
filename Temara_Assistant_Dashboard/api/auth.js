@@ -15,6 +15,7 @@ const {
   setAuthCookie,
   signJwt,
   verifyJwt,
+  withRequestLog,
 } = require('./_lib/auth-crypto');
 
 function resolveAuthRoute(req) {
@@ -55,6 +56,7 @@ async function handleMe(req, res) {
     return res.status(401).json({ ok: false, error: 'Session expired' });
   }
 
+  req.dfAuthRole = payload.role;
   return res.status(200).json({
     ok: true,
     role: payload.role,
@@ -105,10 +107,11 @@ async function handleLogin(req, res) {
 
   setAuthCookie(res, token, 'dentaflow_session_ast');
 
+  req.dfAuthRole = normalizedRole;
   return res.status(200).json({ ok: true, role: normalizedRole });
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'POST, OPTIONS');
     return res.status(204).end();
@@ -122,4 +125,6 @@ module.exports = async function handler(req, res) {
   if (route === 'me') return handleMe(req, res);
   if (route === 'logout') return handleLogout(req, res);
   return handleLogin(req, res);
-};
+}
+
+module.exports = withRequestLog(handler);

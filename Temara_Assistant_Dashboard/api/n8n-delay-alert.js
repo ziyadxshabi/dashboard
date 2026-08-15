@@ -2,9 +2,11 @@
  * Doctor delay alert proxy — POST bridge to n8n webhook doctor-delayed.
  * Set N8N_WEBHOOK_URL_DELAY_ALERT + optional N8N_AUTH_KEY in Vercel env.
  */
+const { withRequestLog } = require('./_lib/auth-crypto');
+
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -70,4 +72,6 @@ module.exports = async function handler(req, res) {
       details: err?.message || 'Unknown proxy error',
     });
   }
-};
+}
+
+module.exports = withRequestLog(handler);

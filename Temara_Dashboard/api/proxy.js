@@ -2,7 +2,7 @@
  * Universal n8n webhook proxy for miscellaneous POST targets.
  * Set the N8N_WEBHOOK_* env vars below + N8N_AUTH_KEY in Vercel.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 30_000;
 
@@ -13,7 +13,7 @@ const TARGET_ENV = {
   'bulk-cancel': 'N8N_WEBHOOK_BULK_CANCEL',
 };
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'POST, OPTIONS');
     return res.status(204).end();
@@ -91,4 +91,6 @@ module.exports = async function handler(req, res) {
       details: err?.message || 'Unknown proxy error',
     });
   }
-};
+}
+
+module.exports = withRequestLog(handler);

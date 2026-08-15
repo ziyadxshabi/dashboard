@@ -2,6 +2,9 @@
  * Assistant roster proxy — same-origin bridge to n8n webhook assistant-data.
  * Set N8N_WEBHOOK_URL_ASSISTANT_ROSTER + optional N8N_AUTH_KEY in Vercel env.
  */
+const { withRequestLog } = require('./_lib/auth-crypto');
+const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
+
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 function isHtmlPayload(text, contentType) {
@@ -40,7 +43,7 @@ function normalizeUpstreamRosterRows(parsed) {
   return [];
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -51,6 +54,14 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
+
+  const rosterCacheKey = cacheKey('roster', req);
+  const cached = await cacheGet(rosterCacheKey);
+  if (cached) {
+    req.dfCache = 'hit';
+    return res.status(200).json(cached);
+  }
+  req.dfCache = 'miss';
 
   const webhookUrl = process.env.N8N_WEBHOOK_ROSTER;
   if (!webhookUrl) {
@@ -127,7 +138,9 @@ module.exports = async function handler(req, res) {
     }
 
     const rows = normalizeUpstreamRosterRows(parsed);
-    return res.status(200).json({ ok: true, data: rows });
+    const body = { ok: true, data: rows };
+    await cacheSet(rosterCacheKey, body, 30);
+    return res.status(200).json(body);
   } catch (err) {
     clearTimeout(timeoutId);
     const isTimeout = err?.name === 'AbortError';
@@ -137,4 +150,6 @@ module.exports = async function handler(req, res) {
       details: err?.message || 'Unknown proxy error',
     });
   }
-};
+}
+
+module.exports = withRequestLog(handler);

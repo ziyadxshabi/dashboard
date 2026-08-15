@@ -122,7 +122,7 @@ Redis is used **exclusively** for short-lived coordination — **not** as a pati
 | Error monitor spam control  | Dedup key `errmon:dedup:*` (~300s)                     |
 
 
-**Required env:** `REDIS_CONNECTION_URL` (Upstash REST base URL), `REDIS_REST_TOKEN` (Bearer).
+**Required env:** `UPSTASH_REDIS_REST_URL` (Upstash REST base URL), `UPSTASH_REDIS_REST_TOKEN` (Bearer).
 
 Shared helper: `n8n/_snippets/redis_upstash.js` (and inlined equivalents in workflow JSON).
 
@@ -286,7 +286,7 @@ NODE_FUNCTION_ALLOW_BUILTIN=crypto
 To expose selected host env vars into expressions / `$env` safely, configure an allowlist (exact variable names as deployed):
 
 ```bash
-N8N_ENV_VARS_IN_ALLOWED_ENV=REDIS_CONNECTION_URL,REDIS_REST_TOKEN,BASEROW_API_TOKEN,BASEROW_API_URL,BASEROW_TABLE_ID,BASEROW_WAITLIST_TABLE_ID,BASEROW_WAITLIST_BROADCAST_TABLE_ID,BASEROW_LEADS_TABLE_ID,N8N_TWILIO_AUTH_TOKEN,N8N_WEBHOOK_BASE_URL,CAL_WEBHOOK_SECRET,CALCOM_API_KEY,CALCOM_EVENT_TYPE_ID,DASHBOARD_AUTH_KEY,DASHBOARD_AUTH_KEY_SHA256,VERCEL_FRONTEND_URL,CLINIC_ID,CLINIC_URGENCY_EMAIL,TWILIO_ACCOUNT_SID,TWILIO_FROM_NUMBER,WAITLIST_WORKFLOW_ID
+N8N_ENV_VARS_IN_ALLOWED_ENV=UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,BASEROW_API_TOKEN,BASEROW_API_URL,BASEROW_TABLE_ID,BASEROW_WAITLIST_TABLE_ID,BASEROW_WAITLIST_BROADCAST_TABLE_ID,BASEROW_LEADS_TABLE_ID,N8N_TWILIO_AUTH_TOKEN,N8N_WEBHOOK_BASE_URL,CAL_WEBHOOK_SECRET,CALCOM_API_KEY,CALCOM_EVENT_TYPE_ID,DASHBOARD_AUTH_KEY,DASHBOARD_AUTH_KEY_SHA256,VERCEL_FRONTEND_URL,CLINIC_ID,CLINIC_URGENCY_EMAIL,TWILIO_ACCOUNT_SID,TWILIO_FROM_NUMBER,WAITLIST_WORKFLOW_ID
 ```
 
 > Adjust the allowlist to match whatever your n8n host actually injects. Prefer n8n **Variables** (`$vars`) for secrets when the deployment model supports them; keep `$vars['X'] ?? $env['X']` in Code nodes.
@@ -347,8 +347,8 @@ node -e "const c=require('./api/_lib/auth-crypto');console.log(c.hashPassword('y
 
 | Variable               | Purpose                       |
 | ---------------------- | ----------------------------- |
-| `REDIS_CONNECTION_URL` | Upstash REST base URL         |
-| `REDIS_REST_TOKEN`     | Bearer token for Upstash REST |
+| `UPSTASH_REDIS_REST_URL` | Upstash REST base URL         |
+| `UPSTASH_REDIS_REST_TOKEN`     | Bearer token for Upstash REST |
 
 
 
@@ -360,8 +360,8 @@ node -e "const c=require('./api/_lib/auth-crypto');console.log(c.hashPassword('y
 #### Redis
 
 ```text
-REDIS_CONNECTION_URL=https://<region>.upstash.io
-REDIS_REST_TOKEN=<upstash-rest-token>
+UPSTASH_REDIS_REST_URL=https://<region>.upstash.io
+UPSTASH_REDIS_REST_TOKEN=<upstash-rest-token>
 ```
 
 

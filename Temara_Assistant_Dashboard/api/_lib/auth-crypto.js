@@ -99,18 +99,18 @@ function getClientFingerprint(req) {
 }
 
 function redisBaseUrl() {
-  return String(process.env.REDIS_CONNECTION_URL || '').replace(/\/+$/, '');
+  return String(process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
 }
 
 function redisHeaders() {
-  const token = String(process.env.REDIS_REST_TOKEN || '').trim();
+  const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function redisPost(path) {
   const base = redisBaseUrl();
   if (!base) {
-    throw new Error('REDIS_CONNECTION_URL missing');
+    throw new Error('UPSTASH_REDIS_REST_URL missing');
   }
 
   const controller = new AbortController();
@@ -300,7 +300,40 @@ function requireBearerSession(req, res, options = {}) {
     return null;
   }
 
+  req.dfAuthRole = payload.role;
   return payload;
+}
+
+function logRequest(req, res, extra = {}) {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.url;
+  const ip = getClientIp(req);
+  const userAgent = String(req.headers['user-agent'] || '').slice(0, 80);
+  const role = extra.role || req.dfAuthRole || 'anonymous';
+
+  console.log(JSON.stringify({
+    timestamp,
+    method,
+    url,
+    ip,
+    userAgent,
+    role,
+    statusCode: res.statusCode,
+    ...extra,
+  }));
+}
+
+function withRequestLog(handler) {
+  return async function loggedHandler(req, res) {
+    try {
+      return await handler(req, res);
+    } finally {
+      const extra = { role: req.dfAuthRole || 'anonymous' };
+      if (req.dfCache) extra.cache = req.dfCache;
+      logRequest(req, res, extra);
+    }
+  };
 }
 
 module.exports = {
@@ -320,5 +353,7 @@ module.exports = {
   setAuthCookie,
   clearAuthCookie,
   getTokenFromRequest,
+  logRequest,
+  withRequestLog,
   DEFAULT_JWT_TTL_SEC,
 };
