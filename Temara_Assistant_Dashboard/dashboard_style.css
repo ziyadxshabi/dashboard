@@ -4624,3 +4624,73 @@ body.os-boot-pending #doctor-emergencies-body tr:not(.triage-empty) {
     will-change: auto;
   }
 }
+
+/* ── Destructive action confirmation ─────────────────────────────────────── */
+.df-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 16px);
+  background: var(--login-overlay-bg, rgba(20, 18, 17, 0.85));
+}
+
+.df-confirm-overlay[hidden] {
+  display: none !important;
+}
+
+.df-confirm-dialog {
+  width: min(420px, 100%);
+  padding: var(--space-5, 24px);
+  border-radius: var(--radius-md, 16px);
+  background: var(--login-modal-bg, var(--bg-elevated, #1C1917));
+  border: 1px solid var(--login-modal-border, var(--border-color));
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+  color: var(--text-main, #F4F1EE);
+}
+
+.df-confirm-title {
+  margin: 0 0 var(--space-3, 12px);
+  font-family: var(--font-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-main, inherit);
+}
+
+.df-confirm-message {
+  margin: 0 0 var(--space-5, 24px);
+  font-family: var(--font-primary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text-dim, inherit);
+}
+
+.df-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3, 12px);
+}
+
+.df-confirm-btn {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-family: var(--font-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 8px);
+  cursor: pointer;
+}
+
+.df-confirm-btn--cancel {
+  color: var(--text-main, inherit);
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(227, 193, 143, 0.25));
+}
+
+.df-confirm-btn--confirm {
+  color: #fff;
+  background: var(--login-terracotta, #D96B27);
+  border: 1px solid transparent;
+}

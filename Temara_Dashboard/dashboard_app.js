@@ -38,6 +38,13 @@ function isUnauthorizedError(error) {
   );
 }
 
+function askConfirm(message) {
+  if (typeof window.DentaFlowConfirm?.confirmAction === 'function') {
+    return window.DentaFlowConfirm.confirmAction(message);
+  }
+  return Promise.resolve(true);
+}
+
 function unlockDashboard({ skipDashboardFetch = false } = {}) {
   if (
     typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
@@ -983,11 +990,15 @@ function initAccountCardMenu() {
   });
   doctorEl('account-menu-logout')?.addEventListener('click', (event) => {
     event.preventDefault();
-    void window.DentaFlowAuth?.logout?.();
+    void askConfirm('Se déconnecter ?').then((ok) => {
+      if (ok) void window.DentaFlowAuth?.logout?.();
+    });
   });
   doctorEl('mobile-logout-btn')?.addEventListener('click', (event) => {
     event.preventDefault();
-    void window.DentaFlowAuth?.logout?.();
+    void askConfirm('Se déconnecter ?').then((ok) => {
+      if (ok) void window.DentaFlowAuth?.logout?.();
+    });
   });
 }
 
@@ -1449,6 +1460,9 @@ function initDoctorCustomSms() {
       textarea.focus();
       return;
     }
+
+    const confirmed = await askConfirm('Envoyer un SMS à plusieurs patients ? Cette action est irréversible.');
+    if (!confirmed) return;
 
     const lock = lockSubmitButton(submitBtn, 'Envoi en cours…');
     submitBtn.classList.add('is-loading');

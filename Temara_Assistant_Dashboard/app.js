@@ -122,6 +122,13 @@ let handoffNotes = [];
     };
   }
 
+  function askConfirm(message) {
+    if (typeof window.DentaFlowConfirm?.confirmAction === 'function') {
+      return window.DentaFlowConfirm.confirmAction(message);
+    }
+    return Promise.resolve(true);
+  }
+
   /** GET roster — no Content-Type to avoid unnecessary CORS preflight on simple requests */
   function rosterFetchHeaders() {
     return {
@@ -1039,6 +1046,14 @@ let handoffNotes = [];
 
     const ids = [...selectedPatientIds];
     const records = getRecordsForSelectedIds(ids);
+    const cancelName = records.length === 1
+      ? (records[0]?.name || 'ce patient')
+      : `${records.length} patients`;
+    const confirmed = await askConfirm(
+      `Annuler le rendez-vous de ${cancelName} ? Cette action est irréversible.`
+    );
+    if (!confirmed) return;
+
     const targetRowIds = getSelectedRowIdsForApi(ids);
     const optimisticSnapshots = applyOptimisticBulkCancel(records);
 
@@ -1067,6 +1082,12 @@ let handoffNotes = [];
 
   async function bulkSmsSelected() {
     if (!selectedPatientIds.length) return;
+
+    const n = selectedPatientIds.length;
+    const confirmed = await askConfirm(
+      `Envoyer un SMS à ${n} patients ? Cette action est irréversible.`
+    );
+    if (!confirmed) return;
 
     const ids = [...selectedPatientIds];
     const targetRowIds = getSelectedRowIdsForApi(ids);
@@ -1631,6 +1652,21 @@ let handoffNotes = [];
       if (!select || select.disabled) return;
 
       const previousStatus = select.dataset.previousStatus ?? select.value;
+      const newStatus = select.value;
+      if (newStatus === 'Annulé' && previousStatus !== 'Annulé') {
+        const container = select.closest('[data-patient-id]');
+        const patientId = container?.dataset.patientId;
+        const patient = rosterData.find((p) => String(p.id) === String(patientId));
+        const name = patient?.name || 'ce patient';
+        void askConfirm(`Annuler le rendez-vous de ${name} ? Cette action est irréversible.`).then((ok) => {
+          if (!ok) {
+            select.value = previousStatus;
+            return;
+          }
+          updateRosterStatus(select, previousStatus);
+        });
+        return;
+      }
       updateRosterStatus(select, previousStatus);
     }
 
@@ -2324,6 +2360,9 @@ let handoffNotes = [];
     });
 
     btnFillGap?.addEventListener('click', async () => {
+      const confirmed = await askConfirm('Remplacer le créneau avec un patient de la liste d\'attente ?');
+      if (!confirmed) return;
+
       btnFillGap.classList.add('is-loading');
       btnFillGap.disabled = true;
       try {
@@ -2398,6 +2437,9 @@ let handoffNotes = [];
     });
 
     btnReminders?.addEventListener('click', async () => {
+      const confirmed = await askConfirm('Forcer l\'envoi des rappels maintenant ?');
+      if (!confirmed) return;
+
       btnReminders.classList.add('is-loading');
       btnReminders.disabled = true;
       try {

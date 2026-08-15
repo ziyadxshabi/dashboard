@@ -211,6 +211,13 @@ let handoffNotes = [];
     );
   }
 
+  function askConfirm(message) {
+    if (typeof window.DentaFlowConfirm?.confirmAction === 'function') {
+      return window.DentaFlowConfirm.confirmAction(message);
+    }
+    return Promise.resolve(true);
+  }
+
   function setHeaderDate() {
     const el = $('assistant-date');
     if (!el) return;
@@ -2014,6 +2021,14 @@ let handoffNotes = [];
 
     const ids = [...selectedPatientIds];
     const records = getRecordsForSelectedIds(ids);
+    const cancelName = records.length === 1
+      ? (records[0]?.name || 'ce patient')
+      : `${records.length} patients`;
+    const confirmed = await askConfirm(
+      `Annuler le rendez-vous de ${cancelName} ? Cette action est irréversible.`
+    );
+    if (!confirmed) return;
+
     const cancelPayload = getSelectedBulkCancelPayload(ids);
     const optimisticSnapshots = applyOptimisticBulkCancel(records);
 
@@ -2054,6 +2069,12 @@ let handoffNotes = [];
 
   async function bulkSmsSelected() {
     if (!selectedPatientIds.length) return;
+
+    const n = selectedPatientIds.length;
+    const confirmed = await askConfirm(
+      `Envoyer un SMS à ${n} patients ? Cette action est irréversible.`
+    );
+    if (!confirmed) return;
 
     const ids = [...selectedPatientIds];
     const targetRowIds = getSelectedRowIdsForApi(ids);
@@ -2937,11 +2958,15 @@ let handoffNotes = [];
     });
     $('account-menu-logout')?.addEventListener('click', (event) => {
       event.preventDefault();
-      void window.DentaFlowAuth?.logout?.();
+      void askConfirm('Se déconnecter ?').then((ok) => {
+        if (ok) void window.DentaFlowAuth?.logout?.();
+      });
     });
     $('mobile-logout-btn')?.addEventListener('click', (event) => {
       event.preventDefault();
-      void window.DentaFlowAuth?.logout?.();
+      void askConfirm('Se déconnecter ?').then((ok) => {
+        if (ok) void window.DentaFlowAuth?.logout?.();
+      });
     });
   }
 
@@ -2985,6 +3010,9 @@ let handoffNotes = [];
         rosterFill.click();
         return;
       }
+
+      const confirmed = await askConfirm('Remplacer le créneau avec un patient de la liste d\'attente ?');
+      if (!confirmed) return;
 
       fillBtn.disabled = true;
       try {
@@ -4246,6 +4274,22 @@ let handoffNotes = [];
       if (!select || select.disabled) return;
 
       const previousStatus = select.dataset.previousStatus ?? select.value;
+      const newStatus = select.value;
+      if (newStatus === 'Annulé' && previousStatus !== 'Annulé') {
+        const container = select.closest('[data-patient-id]');
+        const patientId = container?.dataset.patientId;
+        const patient = rosterData.find((p) => String(p.id) === String(patientId));
+        const name = patient?.name || 'ce patient';
+        void askConfirm(`Annuler le rendez-vous de ${name} ? Cette action est irréversible.`).then((ok) => {
+          if (!ok) {
+            select.value = previousStatus;
+            applyMatteSelectSkin(select, previousStatus);
+            return;
+          }
+          updateRosterStatus(select, previousStatus);
+        });
+        return;
+      }
       updateRosterStatus(select, previousStatus);
     }
 
@@ -5169,6 +5213,9 @@ let handoffNotes = [];
     button.dataset.fillGapWired = 'true';
 
     button.addEventListener('click', async () => {
+      const confirmed = await askConfirm('Remplacer le créneau avec un patient de la liste d\'attente ?');
+      if (!confirmed) return;
+
       button.classList.add('is-loading');
       button.disabled = true;
       try {
