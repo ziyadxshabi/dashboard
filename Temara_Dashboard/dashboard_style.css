@@ -2504,6 +2504,33 @@ body.dashboard-offline .sync-label {
   user-select: none;
 }
 
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-wrapper .skeleton {
+  background: linear-gradient(90deg, var(--border, #e0e0e0) 25%, var(--border-2, #f0f0f0) 50%, var(--border, #e0e0e0) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-text { height: 16px; margin-bottom: 8px; }
+.skeleton-text.short { width: 60%; }
+.skeleton-card { height: 80px; margin-bottom: 12px; }
+.skeleton-table-row { height: 40px; margin-bottom: 4px; }
+
+.skeleton-wrapper[hidden] {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-wrapper .skeleton {
+    animation: none;
+  }
+}
+
 /* ── 15. RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 1280px) {
   .dashboard-grid {
@@ -7432,4 +7459,108 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   color: #fff;
   background: var(--login-terracotta, #D96B27);
   border: 1px solid transparent;
+}
+
+/* ── Mobile hamburger + slide-out drawer (< 768px) ──────────────────────── */
+.mobile-only {
+  display: none;
+}
+
+.mobile-menu-btn {
+  width: 40px;
+  height: 40px;
+  padding: 10px 8px;
+  flex-shrink: 0;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  cursor: pointer;
+}
+
+.hamburger-line {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text-main, currentColor);
+  border-radius: 1px;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: -280px;
+  width: 280px;
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--space-4, 1rem);
+  background: var(--bg-elevated, var(--bg-sidebar, #fff));
+  color: var(--text-main);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  transition: right 0.25s ease;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.mobile-drawer.open {
+  right: 0;
+}
+
+.mobile-drawer[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.mobile-drawer__close {
+  display: block;
+  margin: 0 0 1rem auto;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.mobile-drawer__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-drawer__nav .nav-link {
+  display: block;
+  padding: 12px 10px;
+  text-decoration: none;
+  color: var(--text-main);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.mobile-drawer__nav .nav-link.is-active {
+  background: var(--surface-hover, rgba(227, 193, 143, 0.12));
+}
+
+@media (max-width: 767px) {
+  .mobile-only,
+  .mobile-menu-btn.mobile-only {
+    display: flex;
+  }
+
+  .desktop-nav {
+    display: none;
+  }
+
+  .doctor-mobile-bar,
+  .assistant-mobile-bar {
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-drawer {
+    transition: none;
+  }
 }

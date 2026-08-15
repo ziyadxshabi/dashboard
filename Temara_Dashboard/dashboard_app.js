@@ -325,6 +325,7 @@ function initializeDoctorDashboard() {
   initMotionStack();
   initHeroGreeting();
   initNavigation();
+  initMobileNav();
   initChartToggles();
   initWaitlistForm();
   initUserProfile();
@@ -674,6 +675,39 @@ function initNavigation() {
   syncTabFromHash();
 }
 
+function initMobileNav() {
+  const root = doctorEl('doctor-shell') || document;
+  const btn = root.querySelector('.mobile-menu-btn');
+  const drawer = root.querySelector('.mobile-drawer');
+  const closeBtn = root.querySelector('.mobile-drawer__close');
+  if (!btn || !drawer) return;
+  if (btn.dataset.mobileNavBound === 'true') return;
+  btn.dataset.mobileNavBound = 'true';
+
+  function toggleMenu(open) {
+    drawer.classList.toggle('open', open);
+    drawer.setAttribute('aria-hidden', String(!open));
+    btn.setAttribute('aria-expanded', String(open));
+  }
+
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleMenu(!drawer.classList.contains('open'));
+  });
+  closeBtn?.addEventListener('click', () => toggleMenu(false));
+  drawer.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+    link.addEventListener('click', () => toggleMenu(false));
+  });
+  document.addEventListener('click', (event) => {
+    if (!drawer.classList.contains('open')) return;
+    if (drawer.contains(event.target) || btn.contains(event.target)) return;
+    toggleMenu(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') toggleMenu(false);
+  });
+}
+
 function navigateToView(viewKey) {
   if (!VIEW_MAP[viewKey]) return;
 
@@ -728,6 +762,7 @@ function renderWaitlistPanel() {
       });
     }
     if (table) table.hidden = true;
+    hideSkeleton('waitlist');
     return;
   }
 
@@ -737,6 +772,7 @@ function renderWaitlistPanel() {
   const fragment = document.createDocumentFragment();
   waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
   container.appendChild(fragment);
+  hideSkeleton('waitlist');
 }
 
 /* ── NO-SHOW RECOVERY — WAITLIST FORM ────────────────────────────────────── */
@@ -1266,6 +1302,7 @@ function renderCRMTable(records) {
     cell.textContent = 'Aucun patient trouvé';
     emptyRow.appendChild(cell);
     tbody.appendChild(emptyRow);
+    hideSkeleton('crm');
     return;
   }
 
@@ -1308,6 +1345,7 @@ function renderCRMTable(records) {
     tr.append(nameCell, phoneCell, emailCell, motifCell);
     tbody.appendChild(tr);
   });
+  hideSkeleton('crm');
 }
 
 function getCrmStatutTagClass(statut) {
@@ -1525,8 +1563,36 @@ function initSmsCampaign() {
 }
 
 /* ── SKELETON LOADING STATE ──────────────────────────────────────────────── */
+function showSkeleton(section) {
+  const sk = doctorEl(`${section}-skeleton`);
+  const content = doctorEl(`${section}-content`);
+  if (sk) {
+    sk.hidden = false;
+    sk.style.display = 'block';
+  }
+  if (content) {
+    content.hidden = true;
+    content.style.display = 'none';
+  }
+}
+
+function hideSkeleton(section) {
+  const sk = doctorEl(`${section}-skeleton`);
+  const content = doctorEl(`${section}-content`);
+  if (sk) {
+    sk.hidden = true;
+    sk.style.display = 'none';
+  }
+  if (content) {
+    content.hidden = false;
+    content.style.display = '';
+  }
+}
+
 function applySkeletonState() {
   setSyncState('loading', 'Actualisation…');
+  showSkeleton('stats');
+  showSkeleton('roster');
   ['val-patients','val-noshows','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
     const el = doctorEl(id);
     if (el) el.classList.add('skeleton');
@@ -1534,6 +1600,8 @@ function applySkeletonState() {
 }
 
 function clearSkeletonState() {
+  hideSkeleton('stats');
+  hideSkeleton('roster');
   ['val-patients','val-noshows','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
     const el = doctorEl(id);
     if (el) el.classList.remove('skeleton');
@@ -3501,6 +3569,7 @@ function renderDoctorTriageRoster(records) {
     emergencies.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
     emergencyBody.appendChild(fragment);
   }
+  hideSkeleton('triage');
 }
 
 function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
@@ -3525,6 +3594,11 @@ async function loadDoctorHubData(isSilentSync = false) {
   const crmPanel = doctorEl('crm-side-panel');
   const panelWasOpen = Boolean(crmPanel?.classList.contains('is-active'));
   const selectedPatientId = doctorQuery('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
+
+  if (!isSilentSync) {
+    showSkeleton('crm');
+    showSkeleton('triage');
+  }
 
   try {
     window.DentaFlowAuth?.requireSession?.();
@@ -3589,6 +3663,11 @@ async function loadDoctorHubData(isSilentSync = false) {
     renderDoctorTriageRoster([]);
     renderCRMTable([]);
     queueOsBootSequence();
+  } finally {
+    if (!isSilentSync) {
+      hideSkeleton('crm');
+      hideSkeleton('triage');
+    }
   }
 }
 

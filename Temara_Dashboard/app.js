@@ -156,6 +156,32 @@ let handoffNotes = [];
     return document.getElementById(id);
   }
 
+  function showSkeleton(section) {
+    const sk = $(`${section}-skeleton`);
+    const content = $(`${section}-content`);
+    if (sk) {
+      sk.hidden = false;
+      sk.style.display = 'block';
+    }
+    if (content) {
+      content.hidden = true;
+      content.style.display = 'none';
+    }
+  }
+
+  function hideSkeleton(section) {
+    const sk = $(`${section}-skeleton`);
+    const content = $(`${section}-content`);
+    if (sk) {
+      sk.hidden = true;
+      sk.style.display = 'none';
+    }
+    if (content) {
+      content.hidden = false;
+      content.style.display = '';
+    }
+  }
+
   function assistantQuery(selector) {
     return assistantRoot().querySelector(selector);
   }
@@ -3890,54 +3916,19 @@ let handoffNotes = [];
     refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     renderOverviewTimeline(rows);
     window.refreshLucideIcons?.(document.getElementById('assistant-mount') || document);
+    hideSkeleton('roster');
+    hideSkeleton('crm');
     });
   }
 
   function showTableLoader() {
-    const timeline = $('planning-timeline');
-    if (timeline) {
-      timeline.replaceChildren();
-      const loading = document.createElement('div');
-      loading.className = 'timeline-loading planning-timeline__message';
-      const inner = document.createElement('span');
-      inner.className = 'roster-loading__inner';
-      const spinner = document.createElement('span');
-      spinner.className = 'roster-loading__spinner';
-      spinner.setAttribute('aria-hidden', 'true');
-      inner.append(spinner, document.createTextNode('Chargement du planning…'));
-      loading.appendChild(inner);
-      timeline.appendChild(loading);
-    }
-
-    const tbody = $('roster-tbody');
-    if (tbody) {
-      tbody.replaceChildren();
-      const tr = document.createElement('tr');
-      tr.className = 'roster-loading';
-      const td = document.createElement('td');
-      td.colSpan = 5;
-      const inner = document.createElement('span');
-      inner.className = 'roster-loading__inner';
-      const spinner = document.createElement('span');
-      spinner.className = 'roster-loading__spinner';
-      spinner.setAttribute('aria-hidden', 'true');
-      inner.append(spinner, document.createTextNode('Chargement du planning…'));
-      td.appendChild(inner);
-      tr.appendChild(td);
-      tbody.appendChild(tr);
-    }
-
-    const cards = $('roster-cards');
-    if (cards) {
-      cards.replaceChildren();
-      const loading = document.createElement('p');
-      loading.className = 'roster-cards__loading';
-      loading.textContent = 'Chargement du planning…';
-      cards.appendChild(loading);
-    }
+    showSkeleton('roster');
+    showSkeleton('crm');
   }
 
   function showTableError(message = 'Impossible de charger le planning — Mode hors-ligne') {
+    hideSkeleton('roster');
+    hideSkeleton('crm');
     const friendlyMessage = typeof message === 'string' && message.includes('Erreur de connexion au serveur')
       ? message
       : formatRosterErrorMessage({ message });
@@ -4437,6 +4428,42 @@ let handoffNotes = [];
     initMobileDock();
   }
 
+  function initMobileNav() {
+    const root = document.getElementById('assistant-mount')
+      || document.getElementById('assistant-shell')
+      || document.querySelector('.assistant-app-root')
+      || document;
+    const btn = root.querySelector('.mobile-menu-btn');
+    const drawer = root.querySelector('.mobile-drawer');
+    const closeBtn = root.querySelector('.mobile-drawer__close');
+    if (!btn || !drawer) return;
+    if (btn.dataset.mobileNavBound === 'true') return;
+    btn.dataset.mobileNavBound = 'true';
+
+    function toggleMenu(open) {
+      drawer.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', String(!open));
+      btn.setAttribute('aria-expanded', String(open));
+    }
+
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleMenu(!drawer.classList.contains('open'));
+    });
+    closeBtn?.addEventListener('click', () => toggleMenu(false));
+    drawer.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+      link.addEventListener('click', () => toggleMenu(false));
+    });
+    document.addEventListener('click', (event) => {
+      if (!drawer.classList.contains('open')) return;
+      if (drawer.contains(event.target) || btn.contains(event.target)) return;
+      toggleMenu(false);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') toggleMenu(false);
+    });
+  }
+
   const VIEW_TRANSITION_MS = 400;
   const SETTINGS_STORAGE_KEY = 'dentaflow_assistant_prefs';
 
@@ -4652,6 +4679,7 @@ let handoffNotes = [];
         iconSvg: EMPTY_STATE_SVG_INBOX,
       });
       if (table) table.hidden = true;
+      hideSkeleton('waitlist');
       return;
     }
 
@@ -4662,6 +4690,7 @@ let handoffNotes = [];
     waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
     container.appendChild(fragment);
     refreshInvisibleUIDecorations(container);
+    hideSkeleton('waitlist');
     });
   }
 
@@ -5411,7 +5440,10 @@ let handoffNotes = [];
       applyTheme(volatileSettings.theme);
     });
     runInitStep('header', () => setHeaderDate());
-    runInitStep('navigation', () => initNavigation());
+    runInitStep('navigation', () => {
+      initNavigation();
+      initMobileNav();
+    });
     runInitStep('superpouvoirs', () => {
       initSuperpouvoirsAccordion();
       initSuperpouvoirs();

@@ -139,7 +139,7 @@
   <div id="doctor-shell" class="app-shell" style="display: none;">
 
     <!-- ── SIDEBAR (desktop) ─────────────────────────────────────────────── -->
-    <aside class="sidebar" aria-label="Navigation principale">
+    <aside class="sidebar desktop-nav" aria-label="Navigation principale">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">
           <i data-lucide="smile" class="nav-icon" aria-hidden="true"></i>
@@ -188,7 +188,33 @@
         <span class="doctor-mobile-bar__title">DentaFlow OS</span>
         <span class="doctor-mobile-bar__sub">Témara Mall</span>
       </div>
+      <button
+        type="button"
+        id="mobile-menu-btn"
+        class="mobile-only mobile-menu-btn"
+        aria-label="Ouvrir le menu"
+        aria-expanded="false"
+        aria-controls="mobile-drawer"
+      >
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
     </header>
+
+    <div id="mobile-drawer" class="mobile-drawer" aria-hidden="true">
+      <button type="button" id="mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
+      <nav class="mobile-drawer__nav" aria-label="Navigation">
+        <a href="#overview" class="nav-link" data-nav="overview">Vue d'ensemble</a>
+        <a href="#doctor-hub" class="nav-link" data-nav="doctor-hub">Cabinet Live</a>
+        <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
+        <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
+        <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
+        <a href="#analytics" class="nav-link" data-nav="analytics">Performances</a>
+        <a href="#sms" class="nav-link" data-nav="sms">Campagnes SMS</a>
+        <a href="#settings" class="nav-link" data-nav="settings">Paramètres</a>
+      </nav>
+    </div>
 
     <!-- Account dock — sidebar bottom on desktop, top bar on mobile -->
     <div class="doctor-account-dock">
@@ -313,7 +339,13 @@
           </div>
         </section>
 
-        <section class="kpi-row" aria-label="Indicateurs clés du jour">
+        <section id="stats-container" aria-label="Indicateurs clés du jour">
+          <div class="skeleton-wrapper kpi-row" id="stats-skeleton">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+          <div id="stats-content" class="kpi-row" hidden>
 
           <article class="kpi-card kpi-card--matte" id="card-patients">
             <div class="kpi-card__head">
@@ -342,6 +374,7 @@
             <div class="kpi-sub" id="sub-new">Formulaires d'entrée requis</div>
           </article>
 
+          </div>
         </section>
 
         <section class="team-messages-panel" aria-label="Messages de l'équipe">
@@ -386,8 +419,18 @@
               <div class="chart-title">Prochains Rendez-vous</div>
               <div class="chart-sub">Aujourd'hui — ordre chronologique</div>
             </div>
-            <div class="schedule-list" id="appointments-list" data-lenis-prevent>
-              <!-- populated by renderAppointmentsList() -->
+            <div id="roster-container">
+              <div class="skeleton-wrapper" id="roster-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+              </div>
+              <div id="roster-content" hidden>
+                <div class="schedule-list" id="appointments-list" data-lenis-prevent>
+                  <!-- populated by renderAppointmentsList() -->
+                </div>
+              </div>
             </div>
           </article>
 
@@ -487,7 +530,17 @@
           </article>
         </section>
 
-        <div class="brutalist-triage-grid" aria-label="Centre de triage">
+        <div id="triage-container">
+          <div class="skeleton-wrapper" id="triage-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="triage-content" class="brutalist-triage-grid" aria-label="Centre de triage" hidden>
           <article class="brutalist-triage-panel" aria-label="Salle d'attente">
             <header class="brutalist-triage-panel__header">
               <h3 class="brutalist-triage-panel__title">Salle d'Attente</h3>
@@ -531,6 +584,7 @@
               </table>
             </div>
           </article>
+          </div>
         </div>
 
         <div class="brutalist-digest-container">
@@ -674,7 +728,15 @@
                 </div>
               </div>
             </div>
-            <div class="waitlist-table-wrap" data-lenis-prevent>
+            <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container">
+              <div class="skeleton-wrapper" id="waitlist-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+              </div>
+              <div id="waitlist-content" hidden>
               <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
               <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
                 <thead>
@@ -688,6 +750,7 @@
                   <!-- populated by renderWaitlistPanel() -->
                 </tbody>
               </table>
+              </div>
             </div>
           </article>
 
@@ -712,7 +775,16 @@
           </div>
         </header>
 
-        <article class="crm-table-panel" aria-label="Liste des patients">
+        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
+          <div class="skeleton-wrapper" id="crm-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="crm-content" hidden>
           <div class="crm-table-scroll" data-lenis-prevent>
             <table class="crm-table" id="crm-patient-table">
               <thead>
@@ -729,6 +801,7 @@
                 </tr>
               </tbody>
             </table>
+          </div>
           </div>
         </article>
       </section>

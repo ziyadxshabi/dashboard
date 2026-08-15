@@ -9,7 +9,7 @@
 
   <div class="app-shell">
 
-    <aside class="sidebar assistant-sidebar" aria-label="Navigation assistante">
+    <aside class="sidebar assistant-sidebar desktop-nav" aria-label="Navigation assistante">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">
           <i data-lucide="smile" class="nav-icon" aria-hidden="true"></i>
@@ -126,7 +126,30 @@
 
       <header class="assistant-mobile-bar" aria-label="En-tête mobile">
         <span class="assistant-mobile-bar__brand">Command Center</span>
+        <button
+          type="button"
+          id="asst-mobile-menu-btn"
+          class="mobile-only mobile-menu-btn"
+          aria-label="Ouvrir le menu"
+          aria-expanded="false"
+          aria-controls="asst-mobile-drawer"
+        >
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+        </button>
       </header>
+
+      <div id="asst-mobile-drawer" class="mobile-drawer" aria-hidden="true">
+        <button type="button" id="asst-mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
+        <nav class="mobile-drawer__nav" aria-label="Navigation">
+          <a href="#overview" class="nav-link" data-nav="overview">Vue du jour</a>
+          <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
+          <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
+          <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
+          <a href="#settings" class="nav-link" data-nav="settings">Paramètres</a>
+        </nav>
+      </div>
 
       <section id="view-overview" class="dashboard-view active" aria-label="Vue du jour">
 
@@ -234,15 +257,24 @@
             </div>
           </div>
 
-          <div class="planning-timeline-wrap" data-lenis-prevent>
+          <div class="planning-timeline-wrap" data-lenis-prevent id="roster-container">
+            <div class="skeleton-wrapper" id="roster-skeleton">
+              <div class="skeleton skeleton-text"></div>
+              <div class="skeleton skeleton-text short"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-table-row"></div>
+              <div class="skeleton skeleton-table-row"></div>
+            </div>
+            <div id="roster-content" hidden>
             <div id="planning-empty-state" class="empty-state-host" hidden></div>
             <div class="planning-timeline" id="planning-timeline" aria-labelledby="roster-title" role="list">
               <!-- rendered by app.js — vertical chronological timeline -->
             </div>
-          </div>
-
-          <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
-            <!-- rendered by app.js -->
+            <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
+              <!-- rendered by app.js -->
+            </div>
+            </div>
           </div>
         </section>
 
@@ -448,7 +480,15 @@
               </div>
             </div>
             </div>
-            <div class="waitlist-table-wrap" data-lenis-prevent>
+            <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container">
+              <div class="skeleton-wrapper" id="waitlist-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+              </div>
+              <div id="waitlist-content" hidden>
               <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
               <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
                 <thead>
@@ -462,6 +502,7 @@
                   <!-- populated by renderWaitlistPanel() -->
                 </tbody>
               </table>
+              </div>
             </div>
           </article>
         </div>
@@ -485,7 +526,7 @@
           </div>
         </header>
 
-        <article class="crm-table-panel" aria-label="Liste des patients">
+        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
           <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
             <button
               type="button"
@@ -496,6 +537,14 @@
               Non payé
             </button>
           </div>
+          <div class="skeleton-wrapper" id="crm-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="crm-content" hidden>
           <div class="crm-table-scroll">
             <table class="crm-table" id="crm-patient-table">
               <thead>
@@ -512,6 +561,7 @@
                 <!-- populated by renderCRMTable() from Vue du jour data -->
               </tbody>
             </table>
+          </div>
           </div>
         </article>
       </section>

@@ -91,7 +91,7 @@
 
   <div id="assistant-shell" class="app-shell" hidden>
 
-    <aside class="sidebar assistant-sidebar" aria-label="Navigation assistante">
+    <aside class="sidebar assistant-sidebar desktop-nav" aria-label="Navigation assistante">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">🦷</span>
         <div class="sidebar-brand-text">
@@ -157,7 +157,30 @@
 
       <header class="assistant-mobile-bar" aria-label="En-tête mobile">
         <span class="assistant-mobile-bar__brand">Command Center</span>
+        <button
+          type="button"
+          id="mobile-menu-btn"
+          class="mobile-only mobile-menu-btn"
+          aria-label="Ouvrir le menu"
+          aria-expanded="false"
+          aria-controls="mobile-drawer"
+        >
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+        </button>
       </header>
+
+      <div id="mobile-drawer" class="mobile-drawer" aria-hidden="true">
+        <button type="button" id="mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
+        <nav class="mobile-drawer__nav" aria-label="Navigation">
+          <a href="#" class="nav-link" data-nav="overview">Vue du jour</a>
+          <a href="#" class="nav-link" data-nav="calendar">Calendrier</a>
+          <a href="#" class="nav-link" data-nav="waitlist">Liste d'attente</a>
+          <a href="#" class="nav-link" data-nav="crm">Dossiers Patients</a>
+          <a href="#" class="nav-link" data-nav="settings">Paramètres</a>
+        </nav>
+      </div>
 
       <section id="view-overview" class="dashboard-view active" aria-label="Vue du jour">
 
@@ -200,7 +223,17 @@
             </div>
           </div>
 
-          <div class="roster-table-wrap">
+          <div class="roster-table-wrap" id="roster-container">
+            <div class="skeleton-wrapper" id="roster-skeleton">
+              <div class="skeleton skeleton-text"></div>
+              <div class="skeleton skeleton-text short"></div>
+              <div class="skeleton skeleton-table-row"></div>
+              <div class="skeleton skeleton-table-row"></div>
+              <div class="skeleton skeleton-table-row"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+            </div>
+            <div id="roster-content" hidden>
             <table class="roster-table" aria-describedby="roster-title">
               <thead>
                 <tr>
@@ -215,10 +248,10 @@
                 <!-- rendered by app.js -->
               </tbody>
             </table>
-          </div>
-
-          <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
-            <!-- rendered by app.js -->
+            <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
+              <!-- rendered by app.js -->
+            </div>
+            </div>
           </div>
         </section>
 
@@ -433,8 +466,18 @@
               <div class="chart-title">Patients Prioritaires</div>
               <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
             </div>
-            <div class="schedule-list schedule-list--full" id="waitlist-panel-list">
+            <div class="schedule-list schedule-list--full" id="waitlist-container">
+              <div class="skeleton-wrapper" id="waitlist-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+              </div>
+              <div id="waitlist-content" hidden>
+              <div id="waitlist-panel-list">
               <!-- populated by renderWaitlistPanel() -->
+              </div>
+              </div>
             </div>
           </article>
         </div>
@@ -458,7 +501,15 @@
           </div>
         </header>
 
-        <article class="crm-table-panel" aria-label="Liste des patients">
+        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
+          <div class="skeleton-wrapper" id="crm-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="crm-content" hidden>
           <div class="crm-table-scroll">
             <table class="crm-table" id="crm-patient-table">
               <thead>
@@ -474,6 +525,7 @@
                 <!-- populated by renderCRMTable() from Vue du jour data -->
               </tbody>
             </table>
+          </div>
           </div>
         </article>
       </section>

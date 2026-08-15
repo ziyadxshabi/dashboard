@@ -114,6 +114,32 @@ let handoffNotes = [];
     return document.getElementById(id);
   }
 
+  function showSkeleton(section) {
+    const sk = $(`${section}-skeleton`);
+    const content = $(`${section}-content`);
+    if (sk) {
+      sk.hidden = false;
+      sk.style.display = 'block';
+    }
+    if (content) {
+      content.hidden = true;
+      content.style.display = 'none';
+    }
+  }
+
+  function hideSkeleton(section) {
+    const sk = $(`${section}-skeleton`);
+    const content = $(`${section}-content`);
+    if (sk) {
+      sk.hidden = true;
+      sk.style.display = 'none';
+    }
+    if (content) {
+      content.hidden = false;
+      content.style.display = '';
+    }
+  }
+
   function apiHeaders(extra = {}) {
     return {
       'Content-Type': 'application/json',
@@ -1363,28 +1389,18 @@ let handoffNotes = [];
     if (rows.length) {
       updateCRMSidePanel(toCrmPatient(rows[0]));
     }
+    hideSkeleton('roster');
+    hideSkeleton('crm');
   }
 
   function showTableLoader() {
-    const tbody = $('roster-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = `
-      <tr class="roster-loading">
-        <td colspan="5">
-          <span class="roster-loading__inner">
-            <span class="roster-loading__spinner" aria-hidden="true"></span>
-            <span>Chargement du planning…</span>
-          </span>
-        </td>
-      </tr>`;
-
-    const cards = $('roster-cards');
-    if (cards) {
-      cards.innerHTML = `<p class="roster-cards__loading">Chargement du planning…</p>`;
-    }
+    showSkeleton('roster');
+    showSkeleton('crm');
   }
 
   function showTableError(message = 'Impossible de charger le planning — Mode hors-ligne') {
+    hideSkeleton('roster');
+    hideSkeleton('crm');
     const safeMessage = escapeHtml(message);
     const tbody = $('roster-tbody');
     if (!tbody) return;
@@ -1686,6 +1702,40 @@ let handoffNotes = [];
     });
   }
 
+  function initMobileNav() {
+    const root = document.querySelector('.assistant-app-root') || document.getElementById('assistant-shell');
+    const btn = (root || document).querySelector('#mobile-menu-btn');
+    const drawer = (root || document).querySelector('#mobile-drawer');
+    const closeBtn = (root || document).querySelector('#mobile-close-btn');
+    if (!btn || !drawer) return;
+
+    function toggleMenu(open) {
+      drawer.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', String(!open));
+      btn.setAttribute('aria-expanded', String(open));
+      document.body.classList.toggle('mobile-drawer-open', open);
+    }
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMenu(!drawer.classList.contains('open'));
+    });
+    closeBtn?.addEventListener('click', () => toggleMenu(false));
+
+    document.addEventListener('click', (e) => {
+      if (drawer.classList.contains('open') && !drawer.contains(e.target) && !btn.contains(e.target)) {
+        toggleMenu(false);
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') toggleMenu(false);
+    });
+
+    drawer.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+      link.addEventListener('click', () => toggleMenu(false));
+    });
+  }
+
   const VIEW_TRANSITION_MS = 400;
   const SETTINGS_STORAGE_KEY = 'dentaflow_assistant_prefs';
 
@@ -1880,6 +1930,14 @@ let handoffNotes = [];
     if (!container) return;
     const waitlist = [];
     container.innerHTML = waitlist.map(buildApptCardHTML).join('');
+    if (!waitlist.length) {
+      container.textContent = '';
+      const empty = document.createElement('p');
+      empty.className = 'schedule-empty';
+      empty.textContent = 'Aucun patient en liste d\'attente';
+      container.appendChild(empty);
+    }
+    hideSkeleton('waitlist');
   }
 
   function setWaitlistFormProcessing(form, isProcessing) {
@@ -2471,6 +2529,7 @@ let handoffNotes = [];
     applyTheme(volatileSettings.theme);
     setHeaderDate();
     initNavigation();
+    initMobileNav();
     initStatusListener();
     initQuickActions();
     initBulkActionBar();
