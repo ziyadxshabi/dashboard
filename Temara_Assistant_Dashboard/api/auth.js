@@ -43,7 +43,9 @@ function resolveAuthRoute(req) {
 async function handleMe(req, res) {
   applyCors(res, 'POST, OPTIONS');
 
-  const token = getTokenFromRequest(req);
+  const expectedRole = req.body?.expectedRole || req.headers['x-expected-role'];
+  const token = getTokenFromRequest(req, expectedRole);
+
   if (!token) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }

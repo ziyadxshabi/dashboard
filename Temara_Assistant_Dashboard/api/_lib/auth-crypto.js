@@ -235,8 +235,16 @@ function clearAuthCookie(res) {
   ]);
 }
 
-function getTokenFromRequest(req) {
+function getTokenFromRequest(req, expectedRole) {
   const cookies = parseCookies(req);
+
+  if (expectedRole === 'assistant') {
+    return cookies[AUTH_COOKIE_NAME_ASSISTANT] || null;
+  }
+  if (expectedRole === 'doctor') {
+    return cookies[AUTH_COOKIE_NAME] || null;
+  }
+
   const fromCookie = cookies[AUTH_COOKIE_NAME] || cookies[AUTH_COOKIE_NAME_ASSISTANT];
   if (fromCookie) return fromCookie;
 
@@ -279,7 +287,7 @@ function requireBearerSession(req, res, options = {}) {
     return null;
   }
 
-  const token = getTokenFromRequest(req);
+  const token = getTokenFromRequest(req, options.expectedRole);
   const payload = verifyJwt(token, secret);
   if (!payload?.role) {
     res.status(401).json({ ok: false, error: 'Unauthorized' });

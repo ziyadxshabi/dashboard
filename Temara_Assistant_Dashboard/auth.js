@@ -228,10 +228,15 @@
 
   async function validateSession() {
     try {
+      const role = sessionStorage.getItem(SESSION_ROLE_KEY);
       const response = await fetch('/api/auth/me', {
         method: 'POST',
         credentials: 'include',
-        headers: { Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ expectedRole: role }),
       });
       if (!response.ok) return null;
       return await response.json();
