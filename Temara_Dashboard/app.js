@@ -4632,6 +4632,10 @@ let handoffNotes = [];
     const form = $('waitlist-form');
     if (!form) return;
 
+    const V = window.DentaFlowValidators;
+    V?.bindField($('waitlist-name'), 'name', { required: true });
+    V?.bindField($('waitlist-phone'), 'phone', { required: true });
+
     form?.addEventListener('submit', async (event) => {
       event.preventDefault();
 
@@ -4647,9 +4651,12 @@ let handoffNotes = [];
       const patientPhone = phoneEl.value.trim();
       const patientPriority = priorityEl.value;
 
-      if (!patientName || !patientPhone) {
+      const nameOk = V ? V.validateInput(nameEl, 'name', { required: true }) : Boolean(patientName);
+      const phoneOk = V ? V.validateInput(phoneEl, 'phone', { required: true }) : Boolean(patientPhone);
+
+      if (!nameOk || !phoneOk) {
         showToast('Veuillez renseigner le nom et le numéro de téléphone.', 'warning');
-        if (!patientName) nameEl.focus();
+        if (!nameOk) nameEl.focus();
         else phoneEl.focus();
         return;
       }

@@ -35,10 +35,45 @@
     updatePinDots();
   }
 
+  function pinValidationMessage() {
+    return window.DentaFlowValidators?.MESSAGES?.pin || 'Code PIN de 4 chiffres requis';
+  }
+
+  function isPinFormatValid(pin) {
+    const message = window.DentaFlowValidators
+      ? window.DentaFlowValidators.validatePin(pin, true)
+      : (/^\d{4}$/.test(pin) ? '' : pinValidationMessage());
+    return !message;
+  }
+
+  function showPinFormatError() {
+    const dotsEl = document.getElementById('pin-dots');
+    const errorEl = document.getElementById('login-error');
+    dotsEl?.setAttribute('aria-invalid', 'true');
+    dotsEl?.setAttribute('aria-describedby', 'login-error');
+    dotsEl?.classList.add('is-error');
+    if (errorEl) {
+      errorEl.textContent = pinValidationMessage();
+      errorEl.hidden = false;
+    }
+  }
+
+  function clearPinFormatError() {
+    const dotsEl = document.getElementById('pin-dots');
+    const errorEl = document.getElementById('login-error');
+    dotsEl?.removeAttribute('aria-invalid');
+    dotsEl?.classList.remove('is-error');
+    if (errorEl && errorEl.textContent === pinValidationMessage()) {
+      errorEl.textContent = '';
+      errorEl.hidden = true;
+    }
+  }
+
   function showInvalidPinFeedback() {
     const dotsEl = document.getElementById('pin-dots');
     const errorEl = document.getElementById('login-error');
     dotsEl?.classList.add('is-error', 'is-shaking');
+    dotsEl?.setAttribute('aria-invalid', 'true');
     if (errorEl) {
       errorEl.textContent = 'Code incorrect';
       errorEl.hidden = false;
@@ -90,17 +125,23 @@
       if (btn.id === 'key-delete') {
         currentPin = currentPin.slice(0, -1);
         updatePinDots();
+        clearPinFormatError();
         return;
       }
 
       if (btn.id === 'key-enter') {
-        if (currentPin.length === 4) setTimeout(submitAuth, 80);
+        if (!isPinFormatValid(currentPin)) {
+          showPinFormatError();
+          return;
+        }
+        setTimeout(submitAuth, 80);
         return;
       }
 
       if (btn.dataset.digit && currentPin.length < 4) {
         currentPin += btn.dataset.digit;
         updatePinDots();
+        clearPinFormatError();
         if (currentPin.length === 4) {
           setTimeout(submitAuth, 120);
         }
@@ -109,6 +150,11 @@
   }
 
   async function submitAuth() {
+    if (!isPinFormatValid(currentPin)) {
+      showPinFormatError();
+      return;
+    }
+
     try {
       const response = await fetch(AUTH_ENDPOINT, {
         method: 'POST',

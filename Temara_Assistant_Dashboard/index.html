@@ -51,7 +51,7 @@
         <div class="login-pin-section login-coalesce-item" data-coalesce="pin">
           <p class="login-pin-label">Code d'accès à 4 chiffres</p>
 
-          <div class="pin-dots" id="pin-dots" role="group" aria-label="Indicateur de code PIN">
+          <div class="pin-dots" id="pin-dots" role="group" aria-label="Indicateur de code PIN" aria-describedby="login-error">
             <span class="pin-dot" data-slot="0" aria-hidden="true"></span>
             <span class="pin-dot" data-slot="1" aria-hidden="true"></span>
             <span class="pin-dot" data-slot="2" aria-hidden="true"></span>
@@ -380,7 +380,9 @@
                   placeholder="Nom et prénom"
                   autocomplete="name"
                   required
+                  aria-describedby="waitlist-name-error"
                 />
+                <p class="login-error" id="waitlist-name-error" role="alert" hidden></p>
               </div>
 
               <div class="waitlist-field">
@@ -394,7 +396,9 @@
                   autocomplete="tel"
                   inputmode="tel"
                   required
+                  aria-describedby="waitlist-phone-error"
                 />
+                <p class="login-error" id="waitlist-phone-error" role="alert" hidden></p>
               </div>
 
               <div class="waitlist-field">
@@ -635,6 +639,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="form-validators.js"></script>
   <script src="auth.js"></script>
   <script src="app.js"></script>
 </body>

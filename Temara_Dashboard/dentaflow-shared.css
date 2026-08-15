@@ -1,0 +1,305 @@
+/* ============================================================
+   DentaFlow OS — shared tokens, themes, reset
+   Loaded before each dashboard stylesheet. Vanilla CSS only.
+   ============================================================ */
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-primary: var(--font-sans);
+  --font-icon: 'Phosphor', sans-serif;
+  --font-icon-bold: 'Phosphor-Bold', sans-serif;
+  --font-icon-duotone: 'Phosphor-Duotone', sans-serif;
+  --font-icon-fill: 'Phosphor-Fill', sans-serif;
+  --font-icon-light: 'Phosphor-Light', sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius:      var(--radius-md);
+  --radius-pill: 9999px;
+  --transition:  all 0.2s ease;
+  --sidebar-w:   260px;
+  --glass-blur:  blur(16px) saturate(110%);
+  --text-table:  12px;
+  --text-meta:   11px;
+  --tracking-tight: -0.015em;
+  --border-hairline: 1px solid rgba(0, 0, 0, 0.08);
+  --cell-py:     var(--space-2);
+  --cell-px:     var(--space-4);
+
+  --safe-inline:       max(var(--space-4), env(safe-area-inset-left));
+  --safe-inline-end:   max(var(--space-4), env(safe-area-inset-right));
+  --safe-top:          max(var(--space-4), env(safe-area-inset-top));
+  --safe-bottom:       max(var(--space-5), env(safe-area-inset-bottom));
+  --tabbar-float-radius: 20px;
+  --tabbar-float-bg:     rgba(34, 30, 28, 0.9);
+  --tabbar-float-border: rgba(227, 193, 143, 0.15);
+  --tabbar-float-shadow: 0 8px 32px rgba(217, 107, 39, 0.05);
+  --tabbar-float-offset: calc(88px + var(--safe-bottom));
+
+  --danger:      #A63A2B;
+  --danger-dim:  rgba(166, 58, 43, 0.10);
+  --success:     #5E7359;
+  --success-dim: rgba(94, 115, 89, 0.12);
+
+  --med-blue:        #1e6fd9;
+  --med-blue-dark:   #1557b0;
+  --med-blue-light:  #e8f2ff;
+  --med-teal:        #0d9488;
+  --med-white:       #ffffff;
+  --med-gray-50:     #f8fafc;
+  --med-gray-100:    #f1f5f9;
+  --med-gray-200:    #e2e8f0;
+  --med-gray-400:    #94a3b8;
+  --med-gray-600:    #475569;
+  --med-gray-800:    #1e293b;
+  --med-radius:      var(--radius-md);
+  --med-radius-lg:   var(--radius-lg);
+  --med-shadow:      0 4px 24px rgba(30, 111, 217, 0.08);
+  --med-shadow-lg:   0 12px 40px rgba(15, 23, 42, 0.1);
+
+  --accent-charcoal: #333333;
+}
+
+.ph,
+.ph-bold,
+.ph-duotone,
+.ph-fill,
+.ph-light {
+  vertical-align: middle;
+  display: inline-block;
+  font-style: normal;
+  line-height: 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ph { font-family: var(--font-icon) !important; }
+.ph-bold { font-family: var(--font-icon-bold) !important; }
+.ph-duotone { font-family: var(--font-icon-duotone) !important; }
+.ph-fill { font-family: var(--font-icon-fill) !important; }
+.ph-light { font-family: var(--font-icon-light) !important; }
+
+.nav-icon.ph,
+.nav-icon.ph-bold,
+.nav-icon.ph-duotone,
+.nav-icon.ph-fill,
+.nav-icon.ph-light,
+.sidebar-brand-icon .ph,
+.sidebar-brand-icon .ph-light {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+html[data-theme="oak-lounge"] {
+  --bg-main:       #141211;
+  --bg-sidebar:    #1C1917;
+  --bg-card:       rgba(34, 30, 28, 0.65);
+  --border-color:  rgba(227, 193, 143, 0.15);
+  --accent-primary:#D96B27;
+  --accent-gold:   #E3C18F;
+  --text-main:     #F4F1EE;
+  --text-muted:    #9E948C;
+
+  --text-hierarchy-primary:   #F3F4F6;
+  --text-hierarchy-secondary: #9CA3AF;
+  --text-hierarchy-tertiary:  rgba(255, 255, 255, 0.5);
+  --divider-subtle:           rgba(255, 255, 255, 0.06);
+  --surface-row-hover:        rgba(255, 255, 255, 0.03);
+  --card-padding:             1.5rem;
+
+  --tabbar-float-bg:     rgba(34, 30, 28, 0.9);
+  --tabbar-float-border: rgba(227, 193, 143, 0.15);
+  --tabbar-float-shadow: none;
+
+  --shadow-card:   none;
+  --shadow-hover:  none;
+  --border-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-blur:    blur(16px) saturate(110%);
+  --input-bg:      rgba(20, 18, 17, 0.55);
+
+  --void:          var(--bg-main);
+  --surface:       var(--bg-card);
+  --surface-2:     rgba(28, 25, 23, 0.80);
+  --border:        var(--border-color);
+  --border-2:      rgba(227, 193, 143, 0.22);
+  --accent:        var(--accent-primary);
+  --accent-2:      var(--accent-gold);
+  --accent-dim:    rgba(217, 107, 39, 0.10);
+  --accent-glow:   transparent;
+  --danger-glow:   transparent;
+  --text:          var(--text-main);
+  --text-dim:      var(--text-muted);
+}
+
+html[data-theme="oak-lounge"],
+html[data-theme="oak-lounge"] body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+html[data-theme="pearl-clinic"] {
+  --bg-main:       #EAE6DF;
+  --bg-sidebar:    #E1DBD1;
+  --bg-card:       rgba(253, 252, 250, 0.6);
+  --border-color:  #D5CFC4;
+  --accent-primary:#C55A1A;
+  --accent-gold:   #C2A276;
+  --accent-charcoal: #0A0A0A;
+  --executive-black: #0A0A0A;
+  --card-border-executive: rgba(0, 0, 0, 0.85);
+  --text-main:     #262322;
+  --text-muted:    #7A726A;
+
+  --text-hierarchy-primary:   #1A1714;
+  --text-hierarchy-secondary: #7A726A;
+  --text-hierarchy-tertiary:  rgba(38, 35, 34, 0.55);
+  --divider-subtle:           rgba(0, 0, 0, 0.06);
+  --surface-row-hover:        rgba(0, 0, 0, 0.03);
+  --card-padding:             1.5rem;
+
+  --tabbar-float-bg:     rgba(253, 252, 250, 0.92);
+  --tabbar-float-border: rgba(0, 0, 0, 0.85);
+  --tabbar-float-shadow: none;
+
+  --shadow-card:   none;
+  --shadow-hover:  none;
+  --border-hairline: 1px solid rgba(0, 0, 0, 0.08);
+  --glass-blur:    blur(16px) saturate(110%);
+  --input-bg:      rgba(253, 252, 250, 0.85);
+
+  --void:          var(--bg-main);
+  --surface:       var(--bg-card);
+  --surface-2:     rgba(248, 246, 242, 0.75);
+  --border:        var(--border-color);
+  --border-2:      #C9C2B6;
+  --accent:        var(--accent-primary);
+  --accent-2:      var(--accent-gold);
+  --accent-dim:    rgba(197, 90, 26, 0.08);
+  --accent-glow:   transparent;
+  --danger-glow:   transparent;
+  --text:          var(--text-main);
+  --text-dim:      var(--text-muted);
+}
+
+html[data-theme="pearl-clinic"],
+html[data-theme="pearl-clinic"] body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html {
+  font-size: var(--space-4);
+  background: var(--bg-main, #141211);
+  color: var(--text-main, #F4F1EE);
+  min-height: 100%;
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-main, #141211);
+  color: var(--text-main, #F4F1EE);
+  overscroll-behavior-y: none;
+}
+
+.kpi-number,
+.kpi-value,
+.doctor-metric-value,
+.pulse-card__value,
+.pulse-card__value--split span,
+.kinetic-value,
+.hero-value,
+.reclaimed-banner__value,
+.timeline-item__time,
+.timeline-card__time,
+.roster-time,
+.roster-count,
+.roster-confirmed,
+.roster-waiting,
+.appt-time,
+.handoff-note__time,
+.sms-char-counter,
+.data-table td,
+.waitlist-table td {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+}
+
+.sidebar-nav,
+.schedule-list,
+.crm-table-scroll,
+.crm-side-panel-body {
+  -webkit-overflow-scrolling: touch;
+}
+
+h1, h2, h3,
+.hero-title,
+.view-page-title,
+.login-title,
+.settings-card-title {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.kpi-number,
+.kpi-value,
+.reclaimed-banner__value,
+.hero-value,
+.doctor-metric-value {
+  font-weight: 500;
+}
+
+.kpi-label,
+.nav-link,
+.sidebar-link,
+.tab-link,
+.chart-toggle-btn,
+.pill-toggle,
+.login-pin-label,
+.login-tagline,
+.sync-label,
+.chart-sub {
+  letter-spacing: 0.01em;
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill,
+  .chart-toggle-slider,
+  .kpi-card,
+  .chart-card,
+  .schedule-widget,
+  .appt-card,
+  .nav-link,
+  .dashboard-view,
+  .reclaimed-banner { transition: none; }
+  .sync-dot,
+  .reclaimed-banner { animation: none; }
+  * { animation-duration: 0.001ms !important; }
+}

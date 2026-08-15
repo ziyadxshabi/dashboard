@@ -83,7 +83,9 @@
                 spellcheck="false"
                 required
                 placeholder="nom.utilisateur"
+                aria-describedby="login-username-error"
               />
+              <p class="login-error" id="login-username-error" role="alert" hidden></p>
             </div>
 
             <div class="login-field login-field--password">
@@ -97,6 +99,7 @@
                   autocomplete="current-password"
                   required
                   placeholder="••••••••"
+                  aria-describedby="login-password-error"
                 />
                 <button
                   type="button"
@@ -108,6 +111,7 @@
                   <i data-lucide="eye" id="login-password-toggle-icon" class="icon-sm" aria-hidden="true"></i>
                 </button>
               </div>
+              <p class="login-error" id="login-password-error" role="alert" hidden></p>
             </div>
 
             <button type="submit" class="login-submit" id="login-submit">
@@ -594,7 +598,9 @@
                   placeholder="Nom et prénom"
                   autocomplete="name"
                   required
+                  aria-describedby="waitlist-name-error"
                 />
+                <p class="login-error" id="waitlist-name-error" role="alert" hidden></p>
               </div>
 
               <div class="waitlist-field">
@@ -608,7 +614,9 @@
                   autocomplete="tel"
                   inputmode="tel"
                   required
+                  aria-describedby="waitlist-phone-error"
                 />
+                <p class="login-error" id="waitlist-phone-error" role="alert" hidden></p>
               </div>
 
               <div class="waitlist-field">
@@ -1114,6 +1122,7 @@
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="dom-safe.js"></script>
+  <script src="form-validators.js"></script>
   <script src="auth.js"></script>
   <script src="dashboard_app.js"></script>
   <script src="app.js"></script>

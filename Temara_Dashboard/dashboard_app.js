@@ -737,6 +737,10 @@ function initWaitlistForm() {
   const form = doctorEl('waitlist-form');
   if (!form) return;
 
+  const V = window.DentaFlowValidators;
+  V?.bindField(doctorEl('waitlist-name'), 'name', { required: true });
+  V?.bindField(doctorEl('waitlist-phone'), 'phone', { required: true });
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -747,6 +751,14 @@ function initWaitlistForm() {
     const consentEl  = doctorEl('waitlist-sms-consent');
 
     if (!btn || !nameEl || !phoneEl || !priorityEl) return;
+
+    const nameOk = V ? V.validateInput(nameEl, 'name', { required: true }) : Boolean(nameEl.value.trim());
+    const phoneOk = V ? V.validateInput(phoneEl, 'phone', { required: true }) : Boolean(phoneEl.value.trim());
+    if (!nameOk || !phoneOk) {
+      if (!nameOk) nameEl.focus();
+      else phoneEl.focus();
+      return;
+    }
 
     if (!consentEl?.checked) {
       consentEl?.focus();

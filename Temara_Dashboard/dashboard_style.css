@@ -2990,6 +2990,18 @@ body.dashboard-offline .sync-label {
   text-align: center;
 }
 
+.login-field .login-error,
+.waitlist-field .login-error {
+  text-align: left;
+  margin: 0;
+  min-height: 0;
+}
+
+.login-input[aria-invalid="true"],
+.waitlist-input[aria-invalid="true"] {
+  border-color: #c45c4a;
+}
+
 @keyframes login-fade-up {
   from {
     opacity: 0;
@@ -3251,6 +3263,13 @@ body.auth-gate-active #assistant-shell {
   letter-spacing: 0.04em;
   margin-top: 16px;
   min-height: 18px;
+}
+
+.login-field .login-error,
+.waitlist-field .login-error {
+  text-align: left;
+  margin-top: 6px;
+  min-height: 0;
 }
 
 .login-security-banner {

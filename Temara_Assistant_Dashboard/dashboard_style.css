@@ -2460,6 +2460,21 @@ body.auth-gate-active #assistant-shell {
   min-height: 18px;
 }
 
+.waitlist-field .login-error {
+  text-align: left;
+  margin-top: 6px;
+  min-height: 0;
+  font-weight: 500;
+}
+
+.waitlist-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.pin-dots[aria-invalid="true"] {
+  outline: none;
+}
+
 .login-security-banner {
   display: flex;
   align-items: center;

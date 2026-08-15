@@ -103,13 +103,49 @@
     });
   }
 
+  function bindLoginFieldValidators() {
+    const V = window.DentaFlowValidators;
+    if (!V) return;
+    V.bindField(document.getElementById('login-username'), 'username', { required: true });
+    V.bindField(document.getElementById('login-password'), 'password', { required: true });
+  }
+
+  function validateLoginFields() {
+    const V = window.DentaFlowValidators;
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    if (!V) {
+      const username = usernameInput?.value?.trim() ?? '';
+      const password = passwordInput?.value ?? '';
+      if (!username || username.length < 3 || username.length > 50) {
+        showLoginError('Identifiant requis (min. 3 caractères)');
+        return false;
+      }
+      if (!password || password.length < 6) {
+        showLoginError('Mot de passe requis (min. 6 caractères)');
+        return false;
+      }
+      return true;
+    }
+    const userOk = V.validateInput(usernameInput, 'username', { required: true });
+    const passOk = V.validateInput(passwordInput, 'password', { required: true });
+    if (!userOk || !passOk) {
+      if (!userOk) usernameInput?.focus();
+      else passwordInput?.focus();
+      return false;
+    }
+    return true;
+  }
+
   function setupLoginForm() {
     const form = document.getElementById('login-form');
     if (!form || form.dataset.bound === 'true') return;
     form.dataset.bound = 'true';
+    bindLoginFieldValidators();
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
+      if (!validateLoginFields()) return;
       void submitAuth();
     });
   }
@@ -124,10 +160,7 @@
 
     clearLoginError();
 
-    if (!username || !password) {
-      showLoginError('Identifiant et mot de passe requis.');
-      return;
-    }
+    if (!validateLoginFields()) return;
 
     isSubmitting = true;
     setSubmitLoading(true);

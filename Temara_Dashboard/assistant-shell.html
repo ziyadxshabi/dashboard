@@ -341,7 +341,9 @@
                     placeholder="Nom et prénom"
                     autocomplete="name"
                     required
+                    aria-describedby="waitlist-name-error"
                   />
+                  <p class="login-error" id="waitlist-name-error" role="alert" hidden></p>
                 </div>
 
                 <div class="waitlist-field">
@@ -355,7 +357,9 @@
                     autocomplete="tel"
                     inputmode="tel"
                     required
+                    aria-describedby="waitlist-phone-error"
                   />
+                  <p class="login-error" id="waitlist-phone-error" role="alert" hidden></p>
                 </div>
 
                 <div class="waitlist-field waitlist-field--priority">
