@@ -101,7 +101,7 @@ async function handleLogin(req, res) {
     jwtSecret
   );
 
-  setAuthCookie(res, token);
+  setAuthCookie(res, token, 'dentaflow_session_ast');
 
   return res.status(200).json({ ok: true, role: normalizedRole });
 }

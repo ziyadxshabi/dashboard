@@ -195,6 +195,7 @@ function extractBearerToken(req) {
 }
 
 const AUTH_COOKIE_NAME = 'dentaflow_session';
+const AUTH_COOKIE_NAME_ASSISTANT = 'dentaflow_session_ast';
 const AUTH_COOKIE_MAX_AGE_SEC = DEFAULT_JWT_TTL_SEC;
 
 function parseCookies(req) {
@@ -219,23 +220,24 @@ function parseCookies(req) {
   return cookies;
 }
 
-function setAuthCookie(res, token) {
+function setAuthCookie(res, token, cookieName = AUTH_COOKIE_NAME) {
   const value = encodeURIComponent(String(token ?? ''));
   res.setHeader(
     'Set-Cookie',
-    `${AUTH_COOKIE_NAME}=${value}; HttpOnly; Secure; SameSite=Lax; Max-Age=${AUTH_COOKIE_MAX_AGE_SEC}; Path=/`
+    `${cookieName}=${value}; HttpOnly; Secure; SameSite=Lax; Max-Age=${AUTH_COOKIE_MAX_AGE_SEC}; Path=/`
   );
 }
 
 function clearAuthCookie(res) {
-  res.setHeader(
-    'Set-Cookie',
-    `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`
-  );
+  res.setHeader('Set-Cookie', [
+    `${AUTH_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`,
+    `${AUTH_COOKIE_NAME_ASSISTANT}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`,
+  ]);
 }
 
 function getTokenFromRequest(req) {
-  const fromCookie = parseCookies(req)[AUTH_COOKIE_NAME];
+  const cookies = parseCookies(req);
+  const fromCookie = cookies[AUTH_COOKIE_NAME] || cookies[AUTH_COOKIE_NAME_ASSISTANT];
   if (fromCookie) return fromCookie;
 
   const fromBearer = extractBearerToken(req);
