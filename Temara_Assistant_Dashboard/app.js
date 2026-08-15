@@ -9,19 +9,25 @@ const CONFIG = {
   UPDATE_STATUS_PROXY: '/api/update-status',
   FILL_GAP_PROXY: '/api/fill-gap',
   TEAM_NOTES_PROXY: '/api/team-notes',
-  N8N_PROXY: '/api/n8n-proxy',
+  PROXY: '/api/proxy',
   ENDPOINTS: {
     GET_ROSTER: '/api/roster',
     UPDATE_STATUS: '/api/update-status',
-    EXPORT_DAILY: '/api/n8n-proxy',
+    EXPORT_DAILY: '/api/proxy',
     DELAY_ALERT: '/api/n8n-delay-alert',
-    FORCE_REMINDERS: '/api/n8n-proxy',
+    FORCE_REMINDERS: '/api/proxy',
     GET_NOTES: '/api/team-notes',
     POST_NOTE: '/api/team-notes',
     WAITLIST_ADD: '/api/waitlist',
-    BULK_CONFIRM: '/api/n8n-proxy',
-    BULK_CANCEL: '/api/n8n-proxy',
+    BULK_CONFIRM: '/api/proxy',
+    BULK_CANCEL: '/api/proxy',
     BULK_SMS: '/api/bulk-sms',
+  },
+  PROXY_TARGETS: {
+    EXPORT_DAILY: 'daily-report-export',
+    FORCE_REMINDERS: 'force-reminders',
+    BULK_CONFIRM: 'bulk-confirm',
+    BULK_CANCEL: 'bulk-cancel',
   },
 };
 
@@ -871,14 +877,18 @@ let handoffNotes = [];
     updateBulkBarUI();
   }
 
-  async function postBulkAction(endpoint, rowIds) {
+  async function postBulkAction(endpoint, payload) {
+    const body = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+      ? { ...payload }
+      : { rowIds: payload };
+
     const response = await fetch(
       endpoint,
       {
         method: 'POST',
         credentials: 'include',
         headers: apiHeaders(),
-        body: JSON.stringify({ rowIds }),
+        body: JSON.stringify(body),
       }
     );
 
@@ -998,7 +1008,10 @@ let handoffNotes = [];
     const optimisticSnapshots = applyOptimisticBulkConfirm(records);
 
     try {
-      await postBulkAction(CONFIG.ENDPOINTS.BULK_CONFIRM, targetRowIds);
+      await postBulkAction(CONFIG.ENDPOINTS.BULK_CONFIRM, {
+        target: CONFIG.PROXY_TARGETS.BULK_CONFIRM,
+        rowIds: targetRowIds,
+      });
 
       selectedPatientIds = [];
       document.querySelectorAll('#roster-tbody .row-checkbox').forEach((checkbox) => {
@@ -1025,7 +1038,10 @@ let handoffNotes = [];
     try {
       console.log('Payload sending:', { rowIds: targetRowIds });
       await Promise.all([
-        postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, targetRowIds),
+        postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, {
+          target: CONFIG.PROXY_TARGETS.BULK_CANCEL,
+          rowIds: targetRowIds,
+        }),
         animateRowsVaporize(ids),
       ]);
 
@@ -2302,7 +2318,12 @@ let handoffNotes = [];
       try {
         const response = await fetch(
           CONFIG.ENDPOINTS.EXPORT_DAILY,
-          { method: 'GET', credentials: 'include', headers: apiHeaders() }
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: apiHeaders(),
+            body: JSON.stringify({ target: CONFIG.PROXY_TARGETS.EXPORT_DAILY }),
+          }
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -2405,7 +2426,12 @@ let handoffNotes = [];
       try {
         const response = await fetch(
           CONFIG.ENDPOINTS.FORCE_REMINDERS,
-          { method: 'POST', credentials: 'include', headers: apiHeaders() }
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: apiHeaders(),
+            body: JSON.stringify({ target: CONFIG.PROXY_TARGETS.FORCE_REMINDERS }),
+          }
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 

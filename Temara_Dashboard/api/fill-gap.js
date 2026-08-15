@@ -5,8 +5,6 @@
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/fill-gap';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -21,7 +19,10 @@ module.exports = async function handler(req, res) {
   const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
   if (!session) return;
 
-  const webhookUrl = process.env.N8N_WEBHOOK_FILL_GAP || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_FILL_GAP;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[fill-gap] N8N_AUTH_KEY is not configured');

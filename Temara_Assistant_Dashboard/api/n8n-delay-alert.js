@@ -3,8 +3,6 @@
  * Set N8N_WEBHOOK_URL_DELAY_ALERT + optional N8N_AUTH_KEY in Vercel env.
  */
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/doctor-delayed';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -18,7 +16,10 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_DELAY_ALERT || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_DELAY_ALERT;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = process.env.N8N_AUTH_KEY;
 
   const headers = {

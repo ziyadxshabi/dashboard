@@ -5,8 +5,6 @@
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/dashboard-data';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -21,7 +19,10 @@ module.exports = async function handler(req, res) {
   const session = requireBearerSession(req, res, { allowedRoles: ['doctor'] });
   if (!session) return;
 
-  const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = String(process.env.DASHBOARD_AUTH_KEY ?? process.env.N8N_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[dashboard-data] DASHBOARD_AUTH_KEY is not configured');

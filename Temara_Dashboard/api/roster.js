@@ -5,8 +5,6 @@
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/assistant-data';
 
 function isHtmlPayload(text, contentType) {
   const trimmed = (text ?? '').trim().toLowerCase();
@@ -57,7 +55,10 @@ module.exports = async function handler(req, res) {
   const session = requireBearerSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
   if (!session) return;
 
-  const webhookUrl = process.env.N8N_WEBHOOK_ROSTER || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_ROSTER;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[roster] N8N_AUTH_KEY is not configured');

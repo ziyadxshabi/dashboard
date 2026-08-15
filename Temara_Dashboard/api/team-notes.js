@@ -5,10 +5,6 @@
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_GET_NOTES_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/get-notes';
-const DEFAULT_POST_NOTE_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/post-note';
 
 function upstreamHeaders(authKey, includeJson = false) {
   const headers = {
@@ -42,8 +38,11 @@ module.exports = async function handler(req, res) {
   }
 
   const webhookUrl = req.method === 'GET'
-    ? (process.env.N8N_WEBHOOK_GET_NOTES || DEFAULT_GET_NOTES_URL)
-    : (process.env.N8N_WEBHOOK_POST_NOTE || DEFAULT_POST_NOTE_URL);
+    ? process.env.N8N_WEBHOOK_GET_NOTES
+    : process.env.N8N_WEBHOOK_POST_NOTE;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);

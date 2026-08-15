@@ -5,8 +5,6 @@
 const { applyCors } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/lead-capture';
 
 function upstreamHeaders(authKey) {
   return {
@@ -42,7 +40,10 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'nom and telephone are required' });
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_LEAD_CAPTURE || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_LEAD_CAPTURE;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const payload = { nom, telephone };
 
   const abortController = new AbortController();

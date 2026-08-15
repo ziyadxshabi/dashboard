@@ -5,8 +5,6 @@
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/update-status';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -25,7 +23,10 @@ module.exports = async function handler(req, res) {
     return res.status(403).json({ error: 'Accès refusé: Rôle non autorisé.' });
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_UPDATE_STATUS || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_UPDATE_STATUS;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[update-status] N8N_AUTH_KEY is not configured');

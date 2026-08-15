@@ -5,8 +5,6 @@
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 12_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/bulk-sms';
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -26,7 +24,10 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'customMessage is required' });
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_BULK_SMS || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_BULK_SMS;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[bulk-sms] N8N_AUTH_KEY is not configured');

@@ -3,8 +3,6 @@
  * Set N8N_WEBHOOK_URL_ASSISTANT_ROSTER + optional N8N_AUTH_KEY in Vercel env.
  */
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const DEFAULT_WEBHOOK_URL =
-  'https://glade-rigor-perennial.ngrok-free.dev/webhook/assistant-data';
 
 function isHtmlPayload(text, contentType) {
   const trimmed = (text ?? '').trim().toLowerCase();
@@ -54,7 +52,10 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_ROSTER || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_ROSTER;
+  if (!webhookUrl) {
+    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  }
   const authKey = process.env.N8N_AUTH_KEY;
 
   const headers = {
