@@ -9,7 +9,6 @@ function getApiAuthHeaders(extra = {}) {
     : { Accept: 'application/json' };
 
   return {
-    'ngrok-skip-browser-warning': 'true',
     ...authHeaders,
     ...extra,
   };
@@ -164,7 +163,6 @@ function persistThemePreference(theme) {
 }
 
 const CONFIG = {
-  API_BASE:             'https://glade-rigor-perennial.ngrok-free.dev',
   DATA_URL:             '/api/dashboard-data',
   ROSTER_PROXY:         '/api/roster',
   UPDATE_STATUS_PROXY:  '/api/update-status',
@@ -175,7 +173,7 @@ const CONFIG = {
   SMART_SYNC_INTERVAL_MS: 180_000,
   SMART_SYNC_DEBOUNCE_MS: 15_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
-  ROSTER_ENDPOINT:      '/webhook/assistant-data',
+  ROSTER_ENDPOINT:      '/api/roster',
   DIGEST_DAILY_GOAL_MAD: 6000,
   DIGEST_REVENUE_PER_PATIENT_MAD: 400,
   CURRENCY_LOCALE:      'fr-MA',

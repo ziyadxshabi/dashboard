@@ -4,22 +4,24 @@
  */
 
 const CONFIG = {
-  API_BASE: 'https://glade-rigor-perennial.ngrok-free.dev',
   ROSTER_PROXY: '/api/roster',
   DELAY_ALERT_PROXY: '/api/n8n-delay-alert',
   UPDATE_STATUS_PROXY: '/api/update-status',
+  FILL_GAP_PROXY: '/api/fill-gap',
+  TEAM_NOTES_PROXY: '/api/team-notes',
+  N8N_PROXY: '/api/n8n-proxy',
   ENDPOINTS: {
-    GET_ROSTER: '/webhook/assistant-data',
-    UPDATE_STATUS: '/webhook/update-status',
-    EXPORT_DAILY: '/webhook/daily-report-export',
-    DELAY_ALERT: '/webhook/doctor-delayed',
-    FORCE_REMINDERS: '/webhook/force-reminders',
-    GET_NOTES: '/webhook/get-notes',
-    POST_NOTE: '/webhook/post-note',
-    WAITLIST_ADD: '/webhook/waitlist-add',
-    BULK_CONFIRM: '/webhook/bulk-confirm',
-    BULK_CANCEL: '/webhook/bulk-cancel',
-    BULK_SMS: '/webhook/bulk-sms',
+    GET_ROSTER: '/api/roster',
+    UPDATE_STATUS: '/api/update-status',
+    EXPORT_DAILY: '/api/n8n-proxy',
+    DELAY_ALERT: '/api/n8n-delay-alert',
+    FORCE_REMINDERS: '/api/n8n-proxy',
+    GET_NOTES: '/api/team-notes',
+    POST_NOTE: '/api/team-notes',
+    WAITLIST_ADD: '/api/waitlist',
+    BULK_CONFIRM: '/api/n8n-proxy',
+    BULK_CANCEL: '/api/n8n-proxy',
+    BULK_SMS: '/api/bulk-sms',
   },
 };
 
@@ -105,7 +107,6 @@ let handoffNotes = [];
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
       ...extra,
     };
   }
@@ -114,7 +115,6 @@ let handoffNotes = [];
   function rosterFetchHeaders() {
     return {
       'Accept': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
     };
   }
 
@@ -326,8 +326,8 @@ let handoffNotes = [];
 
     try {
       const response = await fetch(
-        `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.GET_NOTES}`,
-        { method: 'GET', headers: rosterFetchHeaders() }
+        CONFIG.ENDPOINTS.GET_NOTES,
+        { method: 'GET', credentials: 'include', headers: rosterFetchHeaders() }
       );
 
       const rawText = await response.text();
@@ -449,9 +449,10 @@ let handoffNotes = [];
 
       try {
         const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.POST_NOTE}`,
+          CONFIG.ENDPOINTS.POST_NOTE,
           {
             method: 'POST',
+            credentials: 'include',
             headers: apiHeaders(),
             body: JSON.stringify({
               text: newNote.text,
@@ -872,9 +873,10 @@ let handoffNotes = [];
 
   async function postBulkAction(endpoint, rowIds) {
     const response = await fetch(
-      `${CONFIG.API_BASE}${endpoint}`,
+      endpoint,
       {
         method: 'POST',
+        credentials: 'include',
         headers: apiHeaders(),
         body: JSON.stringify({ rowIds }),
       }
@@ -1909,9 +1911,10 @@ let handoffNotes = [];
         const consentTimestamp = consentSms ? new Date().toISOString() : null;
 
         const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.WAITLIST_ADD}`,
+          CONFIG.ENDPOINTS.WAITLIST_ADD,
           {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name: patientName,
@@ -2298,8 +2301,8 @@ let handoffNotes = [];
       btnReport.disabled = true;
       try {
         const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.EXPORT_DAILY}`,
-          { method: 'GET', headers: apiHeaders() }
+          CONFIG.ENDPOINTS.EXPORT_DAILY,
+          { method: 'GET', credentials: 'include', headers: apiHeaders() }
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -2327,8 +2330,8 @@ let handoffNotes = [];
       btnFillGap.disabled = true;
       try {
         const response = await fetch(
-          `${CONFIG.API_BASE}/webhook/fill-gap`,
-          { method: 'POST', headers: apiHeaders() }
+          CONFIG.FILL_GAP_PROXY,
+          { method: 'POST', credentials: 'include', headers: apiHeaders() }
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -2401,8 +2404,8 @@ let handoffNotes = [];
       btnReminders.disabled = true;
       try {
         const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.FORCE_REMINDERS}`,
-          { method: 'POST', headers: apiHeaders() }
+          CONFIG.ENDPOINTS.FORCE_REMINDERS,
+          { method: 'POST', credentials: 'include', headers: apiHeaders() }
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 

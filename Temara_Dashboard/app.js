@@ -7,24 +7,24 @@
   'use strict';
 
 const CONFIG = {
-  API_BASE: 'https://glade-rigor-perennial.ngrok-free.dev',
   ROSTER_PROXY: '/api/roster',
   DELAY_ALERT_PROXY: '/api/n8n-delay-alert',
   UPDATE_STATUS_PROXY: '/api/update-status',
   FILL_GAP_PROXY: '/api/fill-gap',
   TEAM_NOTES_PROXY: '/api/team-notes',
+  N8N_PROXY: '/api/n8n-proxy',
   ENDPOINTS: {
-    GET_ROSTER: '/webhook/assistant-data',
-    UPDATE_STATUS: '/webhook/update-status',
-    EXPORT_DAILY: '/webhook/daily-report-export',
-    DELAY_ALERT: '/webhook/doctor-delayed',
-    FORCE_REMINDERS: '/webhook/force-reminders',
-    GET_NOTES: '/webhook/get-notes',
-    POST_NOTE: '/webhook/post-note',
-    WAITLIST_ADD: '/webhook/waitlist-add',
-    BULK_CONFIRM: '/webhook/bulk-confirm',
-    BULK_CANCEL: '/webhook/bulk-cancel',
-    BULK_SMS: '/webhook/bulk-sms',
+    GET_ROSTER: '/api/roster',
+    UPDATE_STATUS: '/api/update-status',
+    EXPORT_DAILY: '/api/n8n-proxy',
+    DELAY_ALERT: '/api/n8n-delay-alert',
+    FORCE_REMINDERS: '/api/n8n-proxy',
+    GET_NOTES: '/api/team-notes',
+    POST_NOTE: '/api/team-notes',
+    WAITLIST_ADD: '/api/waitlist',
+    BULK_CONFIRM: '/api/n8n-proxy',
+    BULK_CANCEL: '/api/n8n-proxy',
+    BULK_SMS: '/api/bulk-sms',
   },
 };
 
@@ -145,7 +145,6 @@ let handoffNotes = [];
 
     return {
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
       ...authHeaders,
       ...extra,
     };
@@ -158,7 +157,6 @@ let handoffNotes = [];
       : { Accept: 'application/json' };
 
     return {
-      'ngrok-skip-browser-warning': 'true',
       ...authHeaders,
     };
   }
@@ -1797,9 +1795,10 @@ let handoffNotes = [];
       : { rowIds: payload };
 
     const response = await fetch(
-      `${CONFIG.API_BASE}${endpoint}`,
+      endpoint,
       {
         method: 'POST',
+        credentials: 'include',
         headers: apiHeaders(),
         body: JSON.stringify(body),
       }
@@ -4680,9 +4679,10 @@ let handoffNotes = [];
         const consentTimestamp = consentSms ? new Date().toISOString() : null;
 
         const response = await fetch(
-          `${CONFIG.API_BASE}${CONFIG.ENDPOINTS.WAITLIST_ADD}`,
+          CONFIG.ENDPOINTS.WAITLIST_ADD,
           {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name: patientName,
