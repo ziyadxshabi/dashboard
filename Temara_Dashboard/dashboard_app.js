@@ -47,7 +47,7 @@ function unlockDashboard({ skipDashboardFetch = false } = {}) {
     return;
   }
 
-  const overlay = document.getElementById('login-overlay');
+  const overlay = doctorEl('login-overlay');
   if (overlay) {
     overlay.classList.add('is-unlocking');
     setTimeout(() => overlay.remove(), 400);
@@ -111,6 +111,32 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 
 'use strict';
+
+function __domById(id) {
+  return document['getElementById'](id);
+}
+
+function doctorShell() {
+  return __domById('doctor-shell') || document;
+}
+
+function doctorEl(id) {
+  if (!id) return null;
+  const root = doctorShell();
+  if (root && root !== document) {
+    const scoped = root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
+    if (scoped) return scoped;
+  }
+  return __domById(id);
+}
+
+function doctorQuery(selector) {
+  return doctorShell().querySelector(selector);
+}
+
+function doctorQueryAll(selector) {
+  return doctorShell().querySelectorAll(selector);
+}
 
 /* ── CONFIG ─────────────────────────────────────────────────────────────────
  * Update these values in your deployment.
@@ -315,7 +341,7 @@ function initializeDoctorDashboard() {
   window.initProgressiveDisclosure?.();
   window.initInvisibleUI?.();
 
-  document.querySelectorAll('.dashboard-view').forEach(view => {
+  doctorQueryAll('.dashboard-view').forEach(view => {
     view.setAttribute('aria-hidden', view.classList.contains('active') ? 'false' : 'true');
     if (view.classList.contains('active')) {
       view.classList.add('view-enter-ready');
@@ -327,7 +353,7 @@ function initializeDoctorDashboard() {
   }
 
   if (typeof window.refreshLucideIcons === 'function') {
-    window.refreshLucideIcons(document.getElementById('doctor-shell') || document);
+    window.refreshLucideIcons(doctorEl('doctor-shell') || document);
   }
 }
 
@@ -485,7 +511,7 @@ function buildApptCardHTML(appt) {
 let dashboardCalendar = null;
 
 function initDashboardCalendar() {
-  const el = document.getElementById('dashboard-cal-inline');
+  const el = doctorEl('dashboard-cal-inline');
   if (!el) return;
 
   if (dashboardCalendar) {
@@ -528,8 +554,8 @@ function initDashboardCalendar() {
 
 /* ── HERO GREETING & DATE ────────────────────────────────────────────────── */
 function initHeroGreeting() {
-  const greetingEl = document.getElementById('greeting-time');
-  const dateEl     = document.getElementById('hero-date');
+  const greetingEl = doctorEl('greeting-time');
+  const dateEl     = doctorEl('hero-date');
   if (!greetingEl || !dateEl) return;
 
   const now = new Date();
@@ -575,8 +601,8 @@ function switchTab(hashId) {
   const targetId = VIEW_MAP[viewKey];
   if (!targetId || viewKey === activeView) return;
 
-  const views = document.querySelectorAll('.dashboard-view');
-  const target = document.getElementById(targetId);
+  const views = doctorQueryAll('.dashboard-view');
+  const target = doctorEl(targetId);
 
   views.forEach(view => {
     const isTarget = view.id === targetId;
@@ -585,13 +611,13 @@ function switchTab(hashId) {
     view.setAttribute('aria-hidden', isTarget ? 'false' : 'true');
   });
 
-  document.querySelectorAll('.nav-link, .tab-link').forEach(link => {
+  doctorQueryAll('.nav-link, .tab-link').forEach(link => {
     link.classList.toggle('is-active', link.dataset.nav === viewKey);
   });
 
   activeView = viewKey;
 
-  const activeTab = document.querySelector(`.tab-link[data-nav="${viewKey}"]`);
+  const activeTab = doctorQuery(`.tab-link[data-nav="${viewKey}"]`);
   activeTab?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
 
   if (viewKey === 'overview') {
@@ -655,8 +681,8 @@ function navigateToView(viewKey) {
 
 /* ── CHART PERIOD TOGGLE ─────────────────────────────────────────────────── */
 function initChartToggles() {
-  const toggle  = document.getElementById('chart-toggle');
-  const slider  = document.getElementById('chart-toggle-slider');
+  const toggle  = doctorEl('chart-toggle');
+  const slider  = doctorEl('chart-toggle-slider');
   const buttons = toggle?.querySelectorAll('.chart-toggle-btn');
   if (!toggle || !slider || !buttons?.length) return;
 
@@ -673,13 +699,13 @@ function initChartToggles() {
 
 /* ── TODAY'S SCHEDULE FEED ───────────────────────────────────────────────── */
 function renderAppointmentsList() {
-  const container = document.getElementById('appointments-list');
+  const container = doctorEl('appointments-list');
   if (!container) return;
   container.replaceChildren();
 }
 
 function renderWaitlistPanel() {
-  const container = document.getElementById('waitlist-panel-list');
+  const container = doctorEl('waitlist-panel-list');
   if (!container) return;
   const waitlist = [];
   container.replaceChildren();
@@ -708,17 +734,17 @@ function renderWaitlistPanel() {
 
 /* ── NO-SHOW RECOVERY — WAITLIST FORM ────────────────────────────────────── */
 function initWaitlistForm() {
-  const form = document.getElementById('waitlist-form');
+  const form = doctorEl('waitlist-form');
   if (!form) return;
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const btn        = document.getElementById('waitlist-submit-btn');
-    const nameEl     = document.getElementById('waitlist-name');
-    const phoneEl    = document.getElementById('waitlist-phone');
-    const priorityEl = document.getElementById('waitlist-priority');
-    const consentEl  = document.getElementById('waitlist-sms-consent');
+    const btn        = doctorEl('waitlist-submit-btn');
+    const nameEl     = doctorEl('waitlist-name');
+    const phoneEl    = doctorEl('waitlist-phone');
+    const priorityEl = doctorEl('waitlist-priority');
+    const consentEl  = doctorEl('waitlist-sms-consent');
 
     if (!btn || !nameEl || !phoneEl || !priorityEl) return;
 
@@ -788,7 +814,7 @@ async function submitWaitlistEntry(data) {
 }
 
 function prependWaitlistEntry({ nom, telephone, priorite }) {
-  const container = document.getElementById('waitlist-panel-list');
+  const container = doctorEl('waitlist-panel-list');
   if (!container) return;
 
   const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
@@ -866,8 +892,8 @@ function getChartThemeColors() {
 }
 
 function updateThemeSwitcherUI(theme) {
-  const oakBtn   = document.getElementById('theme-btn-oak');
-  const pearlBtn = document.getElementById('theme-btn-pearl');
+  const oakBtn   = doctorEl('theme-btn-oak');
+  const pearlBtn = doctorEl('theme-btn-pearl');
   const isPearl    = theme === 'pearl-clinic';
 
   oakBtn?.classList.toggle('is-active', !isPearl);
@@ -877,8 +903,8 @@ function updateThemeSwitcherUI(theme) {
 }
 
 function initThemeSwitcher() {
-  const oakBtn   = document.getElementById('theme-btn-oak');
-  const pearlBtn = document.getElementById('theme-btn-pearl');
+  const oakBtn   = doctorEl('theme-btn-oak');
+  const pearlBtn = doctorEl('theme-btn-pearl');
   if (!oakBtn || !pearlBtn) return;
 
   applyTheme(resolveInitialTheme());
@@ -914,10 +940,10 @@ function applyUserProfile(name, specialty) {
   const displayRole = (specialty ?? '').trim() || PROFILE_DEFAULTS.profileSpecialty;
   const initials    = extractInitials(displayName);
 
-  const avatarEl = document.getElementById('profile-avatar');
-  const nameEl   = document.getElementById('profile-name');
-  const roleEl   = document.getElementById('profile-role');
-  const heroEl   = document.getElementById('hero-profile-name');
+  const avatarEl = doctorEl('profile-avatar');
+  const nameEl   = doctorEl('profile-name');
+  const roleEl   = doctorEl('profile-role');
+  const heroEl   = doctorEl('hero-profile-name');
 
   if (avatarEl) avatarEl.textContent = initials;
   if (nameEl)   nameEl.textContent   = displayName;
@@ -927,8 +953,8 @@ function applyUserProfile(name, specialty) {
 
 function initUserProfile() {
   const saved = loadSettings();
-  const nameEl      = document.getElementById('settings-profile-name');
-  const specialtyEl = document.getElementById('settings-profile-specialty');
+  const nameEl      = doctorEl('settings-profile-name');
+  const specialtyEl = doctorEl('settings-profile-specialty');
 
   const profileName      = saved.profileName      ?? PROFILE_DEFAULTS.profileName;
   const profileSpecialty = saved.profileSpecialty ?? PROFILE_DEFAULTS.profileSpecialty;
@@ -940,14 +966,14 @@ function initUserProfile() {
 }
 
 function initAccountCardMenu() {
-  document.getElementById('account-menu-settings')?.addEventListener('click', () => {
+  doctorEl('account-menu-settings')?.addEventListener('click', () => {
     if (VIEW_MAP.settings) navigateToView('settings');
   });
-  document.getElementById('account-menu-logout')?.addEventListener('click', (event) => {
+  doctorEl('account-menu-logout')?.addEventListener('click', (event) => {
     event.preventDefault();
     void window.DentaFlowAuth?.logout?.();
   });
-  document.getElementById('mobile-logout-btn')?.addEventListener('click', (event) => {
+  doctorEl('mobile-logout-btn')?.addEventListener('click', (event) => {
     event.preventDefault();
     void window.DentaFlowAuth?.logout?.();
   });
@@ -960,7 +986,7 @@ function initSettings() {
   }
 
   const saved = loadSettings();
-  const goalEl = document.getElementById('settings-daily-goal');
+  const goalEl = doctorEl('settings-daily-goal');
   if (goalEl) {
     if (persistedGoal != null) {
       goalEl.value = persistedGoal;
@@ -970,8 +996,8 @@ function initSettings() {
     }
   }
 
-  const smsToggle = document.getElementById('settings-sms-toggle');
-  const emailToggle = document.getElementById('settings-email-toggle');
+  const smsToggle = doctorEl('settings-sms-toggle');
+  const emailToggle = doctorEl('settings-email-toggle');
   if (smsToggle && smsToggle.dataset.demoBound !== 'true') {
     smsToggle.checked = saved.smsReminders !== false;
   }
@@ -1018,7 +1044,7 @@ const SECURITY_TOAST_NAMES = {
 let securityToastTimer = null;
 
 function showDashboardToast(message, type = 'info') {
-  const toast = document.getElementById('assistant-toast');
+  const toast = doctorEl('assistant-toast');
   if (!toast) return;
   toast.textContent = message;
   toast.classList.remove('is-error', 'is-success', 'is-warning');
@@ -1031,11 +1057,11 @@ function showDashboardToast(message, type = 'info') {
 }
 
 function initSecurityAccountSelect() {
-  const root = document.getElementById('security-account-root');
-  const hidden = document.getElementById('security-account-input');
-  const trigger = document.getElementById('security-account-trigger');
-  const list = document.getElementById('security-account-list');
-  const label = document.getElementById('security-account-value');
+  const root = doctorEl('security-account-root');
+  const hidden = doctorEl('security-account-input');
+  const trigger = doctorEl('security-account-trigger');
+  const list = doctorEl('security-account-list');
+  const label = doctorEl('security-account-value');
   if (!root || !hidden || !trigger || !list) return null;
 
   const options = Array.from(list.querySelectorAll('.ghost-select__option'));
@@ -1109,7 +1135,7 @@ function initSecurityAccountSelect() {
 }
 
 function initSecurityManagement() {
-  const form = document.getElementById('security-access-form');
+  const form = doctorEl('security-access-form');
   if (!form || form.dataset.securityBound === 'true') return;
   form.dataset.securityBound = 'true';
 
@@ -1118,10 +1144,10 @@ function initSecurityManagement() {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
 
-    const accountInput = document.getElementById('security-account-input');
-    const passwordNew = document.getElementById('security-password-new');
-    const passwordConfirm = document.getElementById('security-password-confirm');
-    const submitBtn = document.getElementById('security-submit-btn');
+    const accountInput = doctorEl('security-account-input');
+    const passwordNew = doctorEl('security-password-new');
+    const passwordConfirm = doctorEl('security-password-confirm');
+    const submitBtn = doctorEl('security-submit-btn');
 
     if (!accountInput || !passwordNew || !passwordConfirm) return;
 
@@ -1163,8 +1189,8 @@ function initSecurityManagement() {
 
 /* ── CRM PATIENT SEARCH ──────────────────────────────────────────────────── */
 function initCrmSearch() {
-  const searchEl = document.getElementById('crm-search');
-  const tbody    = document.getElementById('crm-table-body');
+  const searchEl = doctorEl('crm-search');
+  const tbody    = doctorEl('crm-table-body');
   if (!searchEl || !tbody) return;
 
   searchEl?.addEventListener('input', () => {
@@ -1202,7 +1228,7 @@ function toCrmPatient(record) {
 }
 
 function renderCRMTable(records) {
-  const tbody = document.getElementById('crm-table-body');
+  const tbody = doctorEl('crm-table-body');
   if (!tbody) return;
 
   const rows = Array.isArray(records) ? records.filter(Boolean) : [];
@@ -1291,13 +1317,13 @@ function readCrmRowData(row) {
 function populateCrmSidePanel(patient) {
   setText('crm-panel-name', patient.name);
 
-  const subtitleEl = document.getElementById('crm-panel-subtitle');
+  const subtitleEl = doctorEl('crm-panel-subtitle');
   if (subtitleEl) {
     const parts = [patient.phone, patient.email].filter(Boolean);
     subtitleEl.textContent = parts.join(' · ');
   }
 
-  const statutEl = document.getElementById('crm-panel-statut');
+  const statutEl = doctorEl('crm-panel-statut');
   if (statutEl) {
     const label = patient.statut || '—';
     const mod = getCrmStatutTagClass(label);
@@ -1316,12 +1342,12 @@ function populateCrmSidePanel(patient) {
 }
 
 function openCrmSidePanel(patient, selectedRow) {
-  const root = document.getElementById('crm-side-panel');
+  const root = doctorEl('crm-side-panel');
   if (!root) return;
 
   populateCrmSidePanel(patient);
 
-  document.querySelectorAll('.crm-table-row.is-selected').forEach(row => {
+  doctorQueryAll('.crm-table-row.is-selected').forEach(row => {
     row.classList.remove('is-selected');
   });
   selectedRow?.classList.add('is-selected');
@@ -1331,28 +1357,28 @@ function openCrmSidePanel(patient, selectedRow) {
   document.body.style.overflow = 'hidden';
 
   requestAnimationFrame(() => {
-    document.getElementById('crm-side-panel-close')?.focus();
+    doctorEl('crm-side-panel-close')?.focus();
   });
 }
 
 function closeCrmSidePanel() {
-  const root = document.getElementById('crm-side-panel');
+  const root = doctorEl('crm-side-panel');
   if (!root || !root.classList.contains('is-active')) return;
 
   root.classList.remove('is-active');
   root.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
 
-  document.querySelectorAll('.crm-table-row.is-selected').forEach(row => {
+  doctorQueryAll('.crm-table-row.is-selected').forEach(row => {
     row.classList.remove('is-selected');
   });
 }
 
 function initCrmSidePanel() {
-  const root     = document.getElementById('crm-side-panel');
-  const overlay  = document.getElementById('crm-side-panel-overlay');
-  const closeBtn = document.getElementById('crm-side-panel-close');
-  const tbody    = document.getElementById('crm-table-body');
+  const root     = doctorEl('crm-side-panel');
+  const overlay  = doctorEl('crm-side-panel-overlay');
+  const closeBtn = doctorEl('crm-side-panel-close');
+  const tbody    = doctorEl('crm-table-body');
   if (!root || !tbody) return;
 
   function handleRowActivate(row) {
@@ -1388,9 +1414,9 @@ const SMS_MAX_CHARS = 320;
 const DOCTOR_CUSTOM_SMS_MAX = 320;
 
 function initDoctorCustomSms() {
-  const textarea = document.getElementById('doctor-custom-sms-text');
-  const submitBtn = document.getElementById('btn-doctor-custom-sms');
-  const counter = document.getElementById('doctor-custom-sms-count');
+  const textarea = doctorEl('doctor-custom-sms-text');
+  const submitBtn = doctorEl('btn-doctor-custom-sms');
+  const counter = doctorEl('doctor-custom-sms-count');
   if (!textarea || !submitBtn || submitBtn.dataset.wired === 'true') return;
   submitBtn.dataset.wired = 'true';
 
@@ -1448,11 +1474,11 @@ function initDoctorCustomSms() {
 }
 
 function initSmsCampaign() {
-  const form     = document.getElementById('sms-campaign-form');
-  const textarea = document.getElementById('sms-campaign-body');
-  const counter  = document.getElementById('sms-char-count');
+  const form     = doctorEl('sms-campaign-form');
+  const textarea = doctorEl('sms-campaign-body');
+  const counter  = doctorEl('sms-char-count');
   const counterWrap = counter?.parentElement;
-  const submitBtn = document.getElementById('sms-campaign-submit');
+  const submitBtn = doctorEl('sms-campaign-submit');
   if (!form || !textarea || !counter) return;
 
   function updateCounter() {
@@ -1476,22 +1502,22 @@ function initSmsCampaign() {
 function applySkeletonState() {
   setSyncState('loading', 'Actualisation…');
   ['val-patients','val-noshows','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
-    const el = document.getElementById(id);
+    const el = doctorEl(id);
     if (el) el.classList.add('skeleton');
   });
 }
 
 function clearSkeletonState() {
   ['val-patients','val-noshows','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
-    const el = document.getElementById(id);
+    const el = doctorEl(id);
     if (el) el.classList.remove('skeleton');
   });
 }
 
 /* ── SYNC DOT STATE ──────────────────────────────────────────────────────── */
 function setSyncState(state, label) {
-  const dot  = document.getElementById('sync-dot');
-  const text = document.getElementById('sync-label');
+  const dot  = doctorEl('sync-dot');
+  const text = doctorEl('sync-label');
   if (!dot || !text) return;
   dot.className = `sync-dot ${state}`;
   text.textContent = label;
@@ -1557,11 +1583,11 @@ function getEmptyDashboardData() {
 function renderDashboardFallback() {
   clearSkeletonState();
 
-  const noshowCard = document.getElementById('card-noshows');
+  const noshowCard = doctorEl('card-noshows');
   noshowCard?.classList.remove('kpi-card--danger');
 
   ['patients-recovered-count', 'estimated-revenue-range', 'val-patients', 'val-noshows', 'val-new'].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = doctorEl(id);
     if (el) {
       el.textContent = '—';
       el.classList.remove('skeleton', 'kpi-metric--error');
@@ -1603,7 +1629,7 @@ async function parseDashboardJson(response) {
 
 /* ── MAIN DATA FETCH ─────────────────────────────────────────────────────── */
 async function loadDashboard(isSilentSync = false) {
-  const errorBanner = document.getElementById('error-banner');
+  const errorBanner = doctorEl('error-banner');
 
   try {
     window.DentaFlowAuth?.requireSession?.();
@@ -1887,16 +1913,16 @@ function bindKpiMicroCharts(data = {}) {
   const noShows = asMetric(data.no_shows);
   const newPatients = asMetric(data.new_patients);
 
-  const trendPatientsSvg = document.querySelector('#trend-patients svg');
+  const trendPatientsSvg = doctorQuery('#trend-patients svg');
   updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
 
-  const trendNoshowsSvg = document.querySelector('#trend-noshows svg');
+  const trendNoshowsSvg = doctorQuery('#trend-noshows svg');
   updateBarChart(trendNoshowsSvg, noShows);
 
-  const trendNewSvg = document.querySelector('#trend-new svg');
+  const trendNewSvg = doctorQuery('#trend-new svg');
   updateSparkline(trendNewSvg?.querySelector('path, polyline'), newPatients, 10);
 
-  const kpiScope = document.querySelector('.kpi-row');
+  const kpiScope = doctorQuery('.kpi-row');
   if (kpiScope) animatePulseCharts(kpiScope);
 }
 
@@ -1914,7 +1940,7 @@ window.DentaFlowPulseCharts = {
 };
 
 function setKpiTrend(id, markup) {
-  const el = document.getElementById(id);
+  const el = doctorEl(id);
   if (el) el.innerHTML = markup;
 }
 
@@ -2046,7 +2072,7 @@ function animateOakChartBars(container, duration = 640) {
 }
 
 function renderDynamicChart(data, containerId, options = {}) {
-  const container = document.getElementById(containerId);
+  const container = doctorEl(containerId);
   if (!container) return;
 
   const series = normalizeChartSeries(data);
@@ -2155,7 +2181,7 @@ function renderKPICards(data) {
   setKPINumber('hub-val-patients', patients_today, true);
   setKPINumber('hub-val-pending', pendingQuotes, true);
   setKPINumber('hub-val-noshows', no_shows, true);
-  const hubProductionEl = document.getElementById('hub-val-production');
+  const hubProductionEl = doctorEl('hub-val-production');
   if (hubProductionEl) hubProductionEl.textContent = formatHubProductionMad(revenueToday);
 
   setText('hub-delta-patients', patients_today > 0 ? 'Aujourd\'hui' : 'Aucun RDV');
@@ -2176,12 +2202,12 @@ function renderKPICards(data) {
   setText('sub-patients', `Rendez-vous confirmés`);
 
   // Card 2: No-shows / cancellations — danger state if > 0
-  const noshowCard = document.getElementById('card-noshows');
+  const noshowCard = doctorEl('card-noshows');
   if (noshowCard) {
     if (no_shows > 0) {
       noshowCard.classList.add('kpi-card--danger');
       // Danger number appears instantly — no animation
-      const el = document.getElementById('val-noshows');
+      const el = doctorEl('val-noshows');
       if (el) {
         el.textContent = no_shows;
         el.style.color = ''; // inherits danger card color via CSS
@@ -2300,7 +2326,7 @@ function initOperationalCharts(data = {}) {
   applyChartJsDefaults();
   const payload = buildOperationalChartPayload(data);
 
-  const recoveryCtx = document.getElementById('recoveryChart');
+  const recoveryCtx = doctorEl('recoveryChart');
   if (recoveryCtx) {
     if (recoveryOpChart) {
       recoveryOpChart.destroy();
@@ -2383,7 +2409,7 @@ function initOperationalCharts(data = {}) {
     });
   }
 
-  const flowCtx = document.getElementById('flowChart');
+  const flowCtx = doctorEl('flowChart');
   if (flowCtx) {
     if (flowOpChart) {
       flowOpChart.destroy();
@@ -2490,7 +2516,7 @@ function renderHoursChart(data) {
       : 'rgba(184, 150, 90, 0.25)';  // quiet
   });
 
-  const ctx = document.getElementById('chart-hours');
+  const ctx = doctorEl('chart-hours');
   if (!ctx) return;
 
   if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
@@ -2557,7 +2583,7 @@ function renderAcceptanceChart(data) {
   const pending  = asMetric(data?.pending_plans);
   const total    = accepted + pending;
 
-  const ctx = document.getElementById('chart-acceptance');
+  const ctx = doctorEl('chart-acceptance');
   if (!ctx) return;
 
   if (acceptanceChart) { acceptanceChart.destroy(); acceptanceChart = null; }
@@ -2632,7 +2658,7 @@ function renderAcceptanceChart(data) {
   });
 
   // Render custom legend
-  const legendEl = document.getElementById('pie-legend');
+  const legendEl = doctorEl('pie-legend');
   if (legendEl && !isEmpty) {
     const items = [
       { label: 'Accepté',    value: accepted, color: '#b8965a' },
@@ -2667,7 +2693,7 @@ function renderAcceptanceChart(data) {
  * @param {function(number): string} [formatter] - optional value formatter (e.g. formatMAD)
  */
 function setKPINumber(id, target, isInteger = true, formatter = null) {
-  const el = document.getElementById(id);
+  const el = doctorEl(id);
   if (!el) return;
 
   const safeTarget = asMetric(target);
@@ -2699,7 +2725,7 @@ function setKPINumber(id, target, isInteger = true, formatter = null) {
 }
 
 function setText(id, text) {
-  const el = document.getElementById(id);
+  const el = doctorEl(id);
   if (!el) return;
   const safe = text == null ? '—' : String(text);
   el.textContent = safe;
@@ -2722,8 +2748,8 @@ function formatThousandsFR(value) {
  */
 function updateRecoveryMetrics(patientCount) {
   const count = asMetric(patientCount);
-  const patientsEl = document.getElementById('patients-recovered-count');
-  const revenueEl = document.getElementById('estimated-revenue-range');
+  const patientsEl = doctorEl('patients-recovered-count');
+  const revenueEl = doctorEl('estimated-revenue-range');
 
   if (patientsEl) {
     patientsEl.textContent = formatThousandsFR(count);
@@ -2824,7 +2850,7 @@ function initAppMode() {
 
   setAppMode('doctor');
 
-  document.getElementById('link-doctor-app')?.addEventListener('click', (e) => {
+  doctorEl('link-doctor-app')?.addEventListener('click', (e) => {
     e.preventDefault();
     enterDoctorApp();
   });
@@ -2893,7 +2919,7 @@ function updateBookingProgress(step) {
 
 function goToBookingStep(nextStep) {
   const fromEl = document.querySelector('.booking-step.is-active');
-  const toEl = document.getElementById(`booking-step-${nextStep}`);
+  const toEl = doctorEl(`booking-step-${nextStep}`);
   if (!fromEl || !toEl || nextStep === BOOKING_STATE.step) return;
 
   const direction = nextStep > BOOKING_STATE.step ? 1 : -1;
@@ -2903,18 +2929,18 @@ function goToBookingStep(nextStep) {
 }
 
 function initClientBooking() {
-  const wizard = document.getElementById('booking-wizard');
+  const wizard = doctorEl('booking-wizard');
   if (!wizard || wizard.dataset.initialized === 'true') return;
   wizard.dataset.initialized = 'true';
 
-  const btnStep1Next = document.getElementById('btn-step1-next');
-  const btnStep2Back = document.getElementById('btn-step2-back');
-  const btnStep2Next = document.getElementById('btn-step2-next');
-  const btnStep3Back = document.getElementById('btn-step3-back');
-  const btnConfirm   = document.getElementById('btn-booking-confirm');
-  const summaryService = document.getElementById('summary-service');
-  const summarySlot    = document.getElementById('summary-slot');
-  const successEl      = document.getElementById('booking-success');
+  const btnStep1Next = doctorEl('btn-step1-next');
+  const btnStep2Back = doctorEl('btn-step2-back');
+  const btnStep2Next = doctorEl('btn-step2-next');
+  const btnStep3Back = doctorEl('btn-step3-back');
+  const btnConfirm   = doctorEl('btn-booking-confirm');
+  const summaryService = doctorEl('summary-service');
+  const summarySlot    = doctorEl('summary-slot');
+  const successEl      = doctorEl('booking-success');
 
   document.querySelectorAll('.service-card').forEach((card) => {
     card.addEventListener('click', () => {
@@ -3023,7 +3049,7 @@ function togglePatientRow(row) {
 }
 
 function initDoctorHub() {
-  const list = document.getElementById('doctor-patient-list');
+  const list = doctorEl('doctor-patient-list');
   if (!list || list.dataset.initialized === 'true') return;
   list.dataset.initialized = 'true';
 
@@ -3227,7 +3253,7 @@ function filterTodayAppointments(records) {
 
 /* ── Kinetic Data Counters ─────────────────────────────────────────────── */
 function animateKineticCounter(elementId, targetValue, suffix = '') {
-  const element = document.getElementById(elementId);
+  const element = doctorEl(elementId);
   if (!element) return;
 
   const numericTarget = Number(targetValue);
@@ -3254,10 +3280,10 @@ function animateKineticCounter(elementId, targetValue, suffix = '') {
 }
 
 function setDigestFinalValues({ totalVus, totalAnnules, totalRevenue, progressPercent }) {
-  const vusEl = document.getElementById('digest-patients-vus');
-  const annulEl = document.getElementById('digest-annulations');
-  const revEl = document.getElementById('digest-revenue');
-  const progEl = document.getElementById('digest-progress');
+  const vusEl = doctorEl('digest-patients-vus');
+  const annulEl = doctorEl('digest-annulations');
+  const revEl = doctorEl('digest-revenue');
+  const progEl = doctorEl('digest-progress');
 
   if (vusEl) vusEl.textContent = String(totalVus);
   if (annulEl) annulEl.textContent = String(totalAnnules);
@@ -3281,7 +3307,7 @@ function startDigestKineticCounters({ instant = false } = {}) {
   animateKineticCounter('digest-annulations', totalAnnules);
   animateKineticCounter('digest-revenue', totalRevenue, ' MAD');
 
-  const progEl = document.getElementById('digest-progress');
+  const progEl = doctorEl('digest-progress');
   if (progEl) {
     progEl.style.width = '0%';
     requestAnimationFrame(() => {
@@ -3409,8 +3435,8 @@ function createDoctorTriageRow(record) {
 }
 
 function renderDoctorTriageRoster(records) {
-  const waitingBody = document.getElementById('doctor-waiting-room-body');
-  const emergencyBody = document.getElementById('doctor-emergencies-body');
+  const waitingBody = doctorEl('doctor-waiting-room-body');
+  const emergencyBody = doctorEl('doctor-emergencies-body');
   if (!waitingBody || !emergencyBody) return;
 
   const todayRows = filterTodayAppointments(records)
@@ -3458,10 +3484,10 @@ function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
   digestKineticsStarted = false;
   pendingDigestKinetics = { totalVus, totalAnnules, totalRevenue, progressPercent };
 
-  const vusEl = document.getElementById('digest-patients-vus');
-  const annulEl = document.getElementById('digest-annulations');
-  const revEl = document.getElementById('digest-revenue');
-  const progEl = document.getElementById('digest-progress');
+  const vusEl = doctorEl('digest-patients-vus');
+  const annulEl = doctorEl('digest-annulations');
+  const revEl = doctorEl('digest-revenue');
+  const progEl = doctorEl('digest-progress');
 
   if (vusEl) vusEl.textContent = '0';
   if (annulEl) annulEl.textContent = '0';
@@ -3470,9 +3496,9 @@ function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
 }
 
 async function loadDoctorHubData(isSilentSync = false) {
-  const crmPanel = document.getElementById('crm-side-panel');
+  const crmPanel = doctorEl('crm-side-panel');
   const panelWasOpen = Boolean(crmPanel?.classList.contains('is-active'));
-  const selectedPatientId = document.querySelector('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
+  const selectedPatientId = doctorQuery('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
 
   try {
     window.DentaFlowAuth?.requireSession?.();
@@ -3516,7 +3542,7 @@ async function loadDoctorHubData(isSilentSync = false) {
     renderCRMTable(records);
 
     if (panelWasOpen && selectedPatientId) {
-      const row = document.querySelector(`.crm-table-row[data-patient-id="${selectedPatientId}"]`);
+      const row = doctorQuery(`.crm-table-row[data-patient-id="${selectedPatientId}"]`);
       const patient = crmPatientsById[selectedPatientId];
       if (row && patient) {
         populateCrmSidePanel(patient);
@@ -3549,10 +3575,10 @@ const DOCTOR_OS_BOOT_SELECTORS = {
 
 function collectDoctorOsBootTargets() {
   return [
-    document.querySelector(DOCTOR_OS_BOOT_SELECTORS.sidebar),
-    ...document.querySelectorAll(DOCTOR_OS_BOOT_SELECTORS.triagePanels),
-    ...document.querySelectorAll(DOCTOR_OS_BOOT_SELECTORS.digestTargets),
-    ...document.querySelectorAll(DOCTOR_OS_BOOT_SELECTORS.triageRows),
+    doctorQuery(DOCTOR_OS_BOOT_SELECTORS.sidebar),
+    ...doctorQueryAll(DOCTOR_OS_BOOT_SELECTORS.triagePanels),
+    ...doctorQueryAll(DOCTOR_OS_BOOT_SELECTORS.digestTargets),
+    ...doctorQueryAll(DOCTOR_OS_BOOT_SELECTORS.triageRows),
   ].filter(Boolean);
 }
 
@@ -3591,10 +3617,10 @@ function runDoctorOsBootSequence() {
       return;
     }
 
-    const sidebar = document.querySelector(DOCTOR_OS_BOOT_SELECTORS.sidebar);
-    const triagePanels = document.querySelectorAll(DOCTOR_OS_BOOT_SELECTORS.triagePanels);
-    const digestTargets = document.querySelectorAll(DOCTOR_OS_BOOT_SELECTORS.digestTargets);
-    const triageRows = document.querySelectorAll(DOCTOR_OS_BOOT_SELECTORS.triageRows);
+    const sidebar = doctorQuery(DOCTOR_OS_BOOT_SELECTORS.sidebar);
+    const triagePanels = doctorQueryAll(DOCTOR_OS_BOOT_SELECTORS.triagePanels);
+    const digestTargets = doctorQueryAll(DOCTOR_OS_BOOT_SELECTORS.digestTargets);
+    const triageRows = doctorQueryAll(DOCTOR_OS_BOOT_SELECTORS.triageRows);
     const bootTargets = collectDoctorOsBootTargets();
     const hasBootContent =
       sidebar || triagePanels.length || digestTargets.length || triageRows.length;
@@ -3827,8 +3853,8 @@ function createTeamNoteElement(note) {
 }
 
 function renderTeamNotesList(notes, { errorMessage = null } = {}) {
-  const listEl = document.getElementById('team-notes-list');
-  const syncEl = document.getElementById('team-notes-sync');
+  const listEl = doctorEl('team-notes-list');
+  const syncEl = doctorEl('team-notes-sync');
   if (!listEl) return;
 
   listEl.setAttribute('aria-busy', 'false');
@@ -3863,8 +3889,8 @@ function renderTeamNotesList(notes, { errorMessage = null } = {}) {
 }
 
 async function loadTeamNotes() {
-  const listEl = document.getElementById('team-notes-list');
-  const syncEl = document.getElementById('team-notes-sync');
+  const listEl = doctorEl('team-notes-list');
+  const syncEl = doctorEl('team-notes-sync');
 
   if (listEl && !teamNotesCache.length) {
     listEl.setAttribute('aria-busy', 'true');

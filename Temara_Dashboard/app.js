@@ -140,8 +140,28 @@ let handoffNotes = [];
   let activeMobileTab = 'overview';
   let osBootSequencePlayed = false;
 
+  function assistantRoot() {
+    return document.getElementById('assistant-mount')
+      || document.getElementById('assistant-shell')
+      || document.querySelector('.assistant-app-root')
+      || document;
+  }
+
   function $(id) {
+    const root = assistantRoot();
+    if (root && root !== document) {
+      const scoped = root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
+      if (scoped) return scoped;
+    }
     return document.getElementById(id);
+  }
+
+  function assistantQuery(selector) {
+    return assistantRoot().querySelector(selector);
+  }
+
+  function assistantQueryAll(selector) {
+    return assistantRoot().querySelectorAll(selector);
   }
 
   function apiHeaders(extra = {}) {
@@ -1336,8 +1356,8 @@ let handoffNotes = [];
   }
 
   function setSyncIndicator(state) {
-    const dot = document.querySelector('.sync-dot');
-    const label = document.querySelector('.sync-label');
+    const dot = assistantQuery('.sync-dot');
+    const label = assistantQuery('.sync-label');
     if (!dot || !label) return;
     dot.classList.remove('ok', 'loading', 'error');
     dot.classList.add(state);
@@ -4031,10 +4051,10 @@ let handoffNotes = [];
 
   function collectOsBootTargets() {
     return [
-      document.querySelector(OS_BOOT_SELECTORS.sidebar),
-      ...document.querySelectorAll(OS_BOOT_SELECTORS.pulseCards),
-      ...document.querySelectorAll(OS_BOOT_SELECTORS.gridPanels),
-      ...document.querySelectorAll(OS_BOOT_SELECTORS.dataRows),
+      assistantQuery(OS_BOOT_SELECTORS.sidebar),
+      ...assistantQueryAll(OS_BOOT_SELECTORS.pulseCards),
+      ...assistantQueryAll(OS_BOOT_SELECTORS.gridPanels),
+      ...assistantQueryAll(OS_BOOT_SELECTORS.dataRows),
     ].filter(Boolean);
   }
 
@@ -4071,10 +4091,10 @@ let handoffNotes = [];
       return;
     }
 
-    const sidebar = document.querySelector(OS_BOOT_SELECTORS.sidebar);
-    const pulseCards = document.querySelectorAll(OS_BOOT_SELECTORS.pulseCards);
-    const gridPanels = document.querySelectorAll(OS_BOOT_SELECTORS.gridPanels);
-    const dataRows = document.querySelectorAll(OS_BOOT_SELECTORS.dataRows);
+    const sidebar = assistantQuery(OS_BOOT_SELECTORS.sidebar);
+    const pulseCards = assistantQueryAll(OS_BOOT_SELECTORS.pulseCards);
+    const gridPanels = assistantQueryAll(OS_BOOT_SELECTORS.gridPanels);
+    const dataRows = assistantQueryAll(OS_BOOT_SELECTORS.dataRows);
     const bootTargets = collectOsBootTargets();
     const hasBootContent = sidebar || pulseCards.length || gridPanels.length || dataRows.length;
 
@@ -4264,7 +4284,7 @@ let handoffNotes = [];
       }
     });
 
-    document.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+    assistantQueryAll('.nav-link[data-nav]').forEach((link) => {
       const navKey = link.dataset.nav;
       const isActive = MOBILE_OVERVIEW_SECTIONS.has(tabKey)
         ? navKey === 'overview'
@@ -4352,7 +4372,7 @@ let handoffNotes = [];
   }
 
   function initNavigation() {
-    document.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+    assistantQueryAll('.nav-link[data-nav]').forEach((link) => {
       link?.addEventListener('click', (event) => {
         event.preventDefault();
         const nav = link.dataset.nav;
@@ -4434,7 +4454,7 @@ let handoffNotes = [];
   function activateDashboardView(viewEl, { animate = true } = {}) {
     if (!viewEl) return;
 
-    document.querySelectorAll('.dashboard-view').forEach(view => {
+    assistantQueryAll('.dashboard-view').forEach(view => {
       view.classList.remove('active', 'view-enter', 'view-enter-ready', 'view-stagger');
       view.setAttribute('aria-hidden', 'true');
     });
@@ -4476,7 +4496,7 @@ let handoffNotes = [];
       }
       syncDockNavStates(activeMobileTab);
     } else {
-      document.querySelectorAll('.nav-link[data-nav]').forEach((link) => {
+      assistantQueryAll('.nav-link[data-nav]').forEach((link) => {
         const isActive = link.dataset.nav === viewKey;
         link.classList.toggle('is-active', isActive);
         if (isActive) {
@@ -5035,7 +5055,7 @@ let handoffNotes = [];
 
     updateCRMSidePanel(patient);
 
-    document.querySelectorAll('.crm-table-row.active-row').forEach((row) => {
+    assistantQueryAll('.crm-table-row.active-row').forEach((row) => {
       if (row !== selectedRow) row.classList.remove('active-row');
     });
     selectedRow?.classList.add('active-row');
@@ -5057,7 +5077,7 @@ let handoffNotes = [];
     root.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
 
-    document.querySelectorAll('.crm-table-row.active-row').forEach((row) => {
+    assistantQueryAll('.crm-table-row.active-row').forEach((row) => {
       row.classList.remove('active-row');
     });
   }
@@ -5247,7 +5267,7 @@ let handoffNotes = [];
   }
 
   function clickAssistantNav(viewKey) {
-    const link = document.querySelector(`.nav-link[data-nav="${viewKey}"]`);
+    const link = assistantQuery(`.nav-link[data-nav="${viewKey}"]`);
     link?.click();
   }
 
@@ -5379,7 +5399,7 @@ let handoffNotes = [];
     runInitStep('planning', () => loadPlanning());
 
     runInitStep('activeView', () => {
-      const activeViewEl = document.getElementById(VIEW_MAP[activeView]);
+      const activeViewEl = $(VIEW_MAP[activeView]);
       if (activeViewEl) {
         activateDashboardView(activeViewEl, { animate: false });
       }

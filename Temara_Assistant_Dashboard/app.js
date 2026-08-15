@@ -106,6 +106,11 @@ let handoffNotes = [];
   let osBootSequencePlayed = false;
 
   function $(id) {
+    const root = document.querySelector('.assistant-app-root') || document;
+    if (root !== document) {
+      const scoped = root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
+      if (scoped) return scoped;
+    }
     return document.getElementById(id);
   }
 
