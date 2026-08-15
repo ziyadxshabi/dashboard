@@ -17,12 +17,6 @@ const {
   verifyJwt,
 } = require('./_lib/auth-crypto');
 
-function applyPinCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
-}
-
 function resolveAuthRoute(req) {
   const raw = String(req.url || '');
   let pathname = raw.split('?')[0];
@@ -73,6 +67,8 @@ function handleLogout(req, res) {
 }
 
 async function handleLogin(req, res) {
+  applyCors(res, 'POST, OPTIONS');
+
   const { role, pin } = req.body ?? {};
   const normalizedRole = typeof role === 'string' ? role.trim().toLowerCase() : '';
   const normalizedPin = typeof pin === 'string' ? pin.trim() : '';
@@ -112,7 +108,7 @@ async function handleLogin(req, res) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    applyPinCors(res);
+    applyCors(res, 'POST, OPTIONS');
     return res.status(204).end();
   }
 
