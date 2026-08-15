@@ -6,7 +6,7 @@
   'use strict';
 
   var PHONE_RE = /^(\+212\s?|0)[5-7]\d{8}$/;
-  var NAME_RE = /^[a-zA-Z\s\-']+$/;
+  var NAME_RE = /^[a-zA-ZÀ-ÿ\s\-']+$/;
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var PIN_RE = /^\d{4}$/;
 
