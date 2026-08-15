@@ -334,17 +334,6 @@ function initializeDoctorDashboard() {
 window.initializeDoctorDashboard = initializeDoctorDashboard;
 window.bootDoctorDashboard = initializeDoctorDashboard;
 
-/* ── APPOINTMENT LIST DATA ───────────────────────────────────────────────── */
-function getDemoAppointments() {
-  return [
-    { time: '08:30', name: 'Fatima Zahra',   phone: '+212 661 234 567', treatment: 'Consultation', tagClass: 'consultation', priority: 1 },
-    { time: '09:15', name: 'Youssef Benali', phone: '+212 612 987 654', treatment: 'Urgence',      tagClass: 'urgence',      priority: 1 },
-    { time: '10:30', name: 'Amina El Fassi', phone: '+212 678 445 120', treatment: 'Blanchiment',  tagClass: 'blanchiment',  priority: 2 },
-    { time: '11:45', name: 'Karim Alami',    phone: '+212 655 332 891', treatment: 'Consultation', tagClass: 'consultation', priority: 3 },
-    { time: '14:00', name: 'Salma Berrada',  phone: '+212 600 112 233', treatment: 'Consultation', tagClass: 'consultation', priority: 2 },
-  ];
-}
-
 function buildStatusPill(label, modifierClass = '') {
   const safeLabel = escapeHtml(label || '—');
   const classes = ['status-pill', modifierClass].filter(Boolean).join(' ');
@@ -495,34 +484,6 @@ function buildApptCardHTML(appt) {
 /* ── FULLCALENDAR — DASHBOARD MANAGEMENT CALENDAR ───────────────────────── */
 let dashboardCalendar = null;
 
-function getMondayOfCurrentWeek() {
-  const now = new Date();
-  const monday = new Date(now);
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  monday.setDate(now.getDate() + diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday;
-}
-
-function buildWeekEvent(dayOffset, hour, minute, durationMin, title) {
-  const start = new Date(getMondayOfCurrentWeek());
-  start.setDate(start.getDate() + dayOffset);
-  start.setHours(hour, minute, 0, 0);
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + durationMin);
-  return { title, start, end };
-}
-
-function getDashboardDemoEvents() {
-  return [
-    buildWeekEvent(1, 9, 0,  45, 'Consultation — Youssef Benali'),
-    buildWeekEvent(2, 10, 30, 60, 'Blanchiment — Amina El Fassi'),
-    buildWeekEvent(3, 14, 0,  45, 'Consultation — Fatima Zahra'),
-    buildWeekEvent(4, 11, 15, 30, 'Urgence — Karim Alami'),
-  ];
-}
-
 function initDashboardCalendar() {
   const el = document.getElementById('dashboard-cal-inline');
   if (!el) return;
@@ -554,7 +515,7 @@ function initDashboardCalendar() {
     slotMaxTime: '19:00:00',
     nowIndicator: true,
     allDaySlot: false,
-    events: getDashboardDemoEvents(),
+    events: [],
     eventTimeFormat: {
       hour: '2-digit',
       minute: '2-digit',
@@ -715,20 +676,12 @@ function renderAppointmentsList() {
   const container = document.getElementById('appointments-list');
   if (!container) return;
   container.replaceChildren();
-  const fragment = document.createDocumentFragment();
-  getDemoAppointments().forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
-  container.appendChild(fragment);
 }
 
 function renderWaitlistPanel() {
   const container = document.getElementById('waitlist-panel-list');
   if (!container) return;
-  const waitlist = getDemoAppointments()
-    .sort((a, b) => a.priority - b.priority)
-    .map((appt) => ({
-      ...appt,
-      statusLabel: appt.tagClass === 'urgence' ? 'Urgence' : 'En attente',
-    }));
+  const waitlist = [];
   container.replaceChildren();
 
   const table = container.closest('.waitlist-table');
@@ -1751,23 +1704,6 @@ function normaliseData(raw) {
     }
   }
   return out;
-}
-
-/* ── DEMO DATA (dev preview only — not used on fetch failure) ───────────── */
-function getDemoData() {
-  return {
-    patients_today:  8,
-    no_shows:        2,
-    revenue_today:   9400,
-    new_patients:    3,
-    accepted_plans:  11,
-    pending_plans:   4,
-    hour_08: 1, hour_09: 2, hour_10: 3, hour_11: 2,
-    hour_12: 1, hour_13: 0, hour_14: 2, hour_15: 3,
-    hour_16: 2, hour_17: 1, hour_18: 0,
-    patients_recovered: 14,
-    reclaimed_revenue: 18500,
-  };
 }
 
 /* ── KPI MICRO-CHARTS (data-driven SVG helpers) ─────────────────────────── */

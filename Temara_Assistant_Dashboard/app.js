@@ -83,13 +83,13 @@ const PIN_BADGE_SVG = `
   </svg>`;
 
 const OPERATIONAL_PULSE = {
-  patientsSeen: 18,
-  patientsPlanned: 22,
-  cancellations: 2,
-  punctuality: 85,
-  punctualityTrend: 'up',
-  turnoverMinutes: 12,
-  turnoverTrend: 'down',
+  patientsSeen: 0,
+  patientsPlanned: 0,
+  cancellations: 0,
+  punctuality: null,
+  punctualityTrend: null,
+  turnoverMinutes: null,
+  turnoverTrend: null,
 };
 
 let handoffNotes = [];
@@ -365,6 +365,8 @@ let handoffNotes = [];
     if (!grid) return;
 
     const data = OPERATIONAL_PULSE;
+    const punctualityLabel = data.punctuality == null ? '—' : `${data.punctuality}%`;
+    const turnoverLabel = data.turnoverMinutes == null ? '—' : `${data.turnoverMinutes} min`;
     const punctualityTrendClass = data.punctualityTrend === 'up' ? 'pulse-card__trend--up' : 'pulse-card__trend--down';
     const turnoverTrendClass = data.turnoverTrend === 'up' ? 'pulse-card__trend--up' : 'pulse-card__trend--down';
     const punctualityTrendSvg = data.punctualityTrend === 'up' ? TREND_UP_SVG : TREND_DOWN_SVG;
@@ -390,20 +392,20 @@ let handoffNotes = [];
       <article class="pulse-card">
         <p class="pulse-card__label">Taux de Ponctualité</p>
         <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${data.punctuality}%</p>
-          <span class="pulse-card__trend ${punctualityTrendClass}" aria-label="Tendance à la hausse">
+          <p class="pulse-card__value">${punctualityLabel}</p>
+          ${data.punctualityTrend ? `<span class="pulse-card__trend ${punctualityTrendClass}" aria-label="Tendance">
             ${punctualityTrendSvg}
-          </span>
+          </span>` : ''}
         </div>
       </article>
 
       <article class="pulse-card">
         <p class="pulse-card__label">Temps de Rotation Moyen</p>
         <div class="pulse-card__value-row">
-          <p class="pulse-card__value">${data.turnoverMinutes} min</p>
-          <span class="pulse-card__trend ${turnoverTrendClass}" aria-label="Tendance à la baisse">
+          <p class="pulse-card__value">${turnoverLabel}</p>
+          ${data.turnoverTrend ? `<span class="pulse-card__trend ${turnoverTrendClass}" aria-label="Tendance">
             ${turnoverTrendSvg}
-          </span>
+          </span>` : ''}
         </div>
       </article>`;
   }
@@ -1779,34 +1781,6 @@ let handoffNotes = [];
 
   let dashboardCalendar = null;
 
-  function getMondayOfCurrentWeek() {
-    const now = new Date();
-    const monday = new Date(now);
-    const day = now.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    monday.setDate(now.getDate() + diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  }
-
-  function buildWeekEvent(dayOffset, hour, minute, durationMin, title) {
-    const start = new Date(getMondayOfCurrentWeek());
-    start.setDate(start.getDate() + dayOffset);
-    start.setHours(hour, minute, 0, 0);
-    const end = new Date(start);
-    end.setMinutes(end.getMinutes() + durationMin);
-    return { title, start, end };
-  }
-
-  function getDashboardDemoEvents() {
-    return [
-      buildWeekEvent(1, 9, 0, 45, 'Consultation — Youssef Benali'),
-      buildWeekEvent(2, 10, 30, 60, 'Blanchiment — Amina El Fassi'),
-      buildWeekEvent(3, 14, 0, 45, 'Consultation — Fatima Zahra'),
-      buildWeekEvent(4, 11, 15, 30, 'Urgence — Karim Alami'),
-    ];
-  }
-
   function initDashboardCalendar() {
     const el = $('dashboard-cal-inline');
     if (!el) return;
@@ -1838,7 +1812,7 @@ let handoffNotes = [];
       slotMaxTime: '19:00:00',
       nowIndicator: true,
       allDaySlot: false,
-      events: getDashboardDemoEvents(),
+      events: [],
       eventTimeFormat: {
         hour: '2-digit',
         minute: '2-digit',
@@ -1847,15 +1821,6 @@ let handoffNotes = [];
     });
 
     dashboardCalendar.render();
-  }
-
-  function getDemoWaitlistPatients() {
-    return [
-      { time: 'Priorité 1', name: 'Fatima Zahra', treatment: 'Haute', tagClass: 'urgence', priority: 1 },
-      { time: 'Priorité 1', name: 'Youssef Benali', treatment: 'Haute', tagClass: 'urgence', priority: 1 },
-      { time: 'Priorité 2', name: 'Amina El Fassi', treatment: 'Normale', tagClass: 'consultation', priority: 2 },
-      { time: 'Priorité 2', name: 'Salma Berrada', treatment: 'Normale', tagClass: 'consultation', priority: 2 },
-    ];
   }
 
   function buildApptCardHTML(appt) {
@@ -1872,7 +1837,7 @@ let handoffNotes = [];
   function renderWaitlistPanel() {
     const container = $('waitlist-panel-list');
     if (!container) return;
-    const waitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
+    const waitlist = [];
     container.innerHTML = waitlist.map(buildApptCardHTML).join('');
   }
 

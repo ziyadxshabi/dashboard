@@ -4524,34 +4524,6 @@ let handoffNotes = [];
 
   let dashboardCalendar = null;
 
-  function getMondayOfCurrentWeek() {
-    const now = new Date();
-    const monday = new Date(now);
-    const day = now.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    monday.setDate(now.getDate() + diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  }
-
-  function buildWeekEvent(dayOffset, hour, minute, durationMin, title) {
-    const start = new Date(getMondayOfCurrentWeek());
-    start.setDate(start.getDate() + dayOffset);
-    start.setHours(hour, minute, 0, 0);
-    const end = new Date(start);
-    end.setMinutes(end.getMinutes() + durationMin);
-    return { title, start, end };
-  }
-
-  function getDashboardDemoEvents() {
-    return [
-      buildWeekEvent(1, 9, 0, 45, 'Consultation — Youssef Benali'),
-      buildWeekEvent(2, 10, 30, 60, 'Blanchiment — Amina El Fassi'),
-      buildWeekEvent(3, 14, 0, 45, 'Consultation — Fatima Zahra'),
-      buildWeekEvent(4, 11, 15, 30, 'Urgence — Karim Alami'),
-    ];
-  }
-
   function initDashboardCalendar() {
     const el = $('dashboard-cal-inline');
     if (!el) return;
@@ -4583,7 +4555,7 @@ let handoffNotes = [];
       slotMaxTime: '19:00:00',
       nowIndicator: true,
       allDaySlot: false,
-      events: getDashboardDemoEvents(),
+      events: [],
       eventTimeFormat: {
         hour: '2-digit',
         minute: '2-digit',
@@ -4595,15 +4567,6 @@ let handoffNotes = [];
     window.calendar = dashboardCalendar;
   }
 
-  function getDemoWaitlistPatients() {
-    return [
-      { name: 'Fatima Zahra', phone: '+212 661 234 567', treatment: 'Haute', tagClass: 'urgence', priority: 1, statusLabel: 'Urgence' },
-      { name: 'Youssef Benali', phone: '+212 612 987 654', treatment: 'Haute', tagClass: 'urgence', priority: 1, statusLabel: 'Urgence' },
-      { name: 'Amina El Fassi', phone: '+212 678 445 120', treatment: 'Normale', tagClass: 'consultation', priority: 2, statusLabel: 'En attente' },
-      { name: 'Salma Berrada', phone: '+212 655 332 891', treatment: 'Normale', tagClass: 'consultation', priority: 2, statusLabel: 'En attente' },
-    ];
-  }
-
   function createApptCardElement(appt) {
     return createWaitlistTableRow(appt);
   }
@@ -4612,7 +4575,7 @@ let handoffNotes = [];
     return safeRender('renderWaitlistPanel', () => {
     const container = $('waitlist-panel-list');
     if (!container) return;
-    const allWaitlist = getDemoWaitlistPatients().sort((a, b) => a.priority - b.priority);
+    const allWaitlist = [];
     const waitlist = waitlistUrgentOnly
       ? allWaitlist.filter(isWaitlistUrgent)
       : allWaitlist;
