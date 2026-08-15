@@ -33,10 +33,14 @@
   function showLoginError(message) {
     const errorEl = getLoginErrorEl();
     const form = document.getElementById('login-form');
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
     if (!errorEl) return;
     errorEl.textContent = message;
     errorEl.hidden = false;
     form?.classList.add('is-error');
+    if (!usernameInput?.value?.trim()) usernameInput?.setAttribute('aria-invalid', 'true');
+    if (!passwordInput?.value) passwordInput?.setAttribute('aria-invalid', 'true');
     setTimeout(() => form?.classList.remove('is-error'), 650);
   }
 
@@ -48,6 +52,8 @@
       errorEl.hidden = true;
     }
     form?.classList.remove('is-error');
+    document.getElementById('login-username')?.removeAttribute('aria-invalid');
+    document.getElementById('login-password')?.removeAttribute('aria-invalid');
   }
 
   function setSubmitLoading(loading) {

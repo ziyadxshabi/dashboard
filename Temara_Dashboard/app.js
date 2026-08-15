@@ -4239,6 +4239,7 @@ let handoffNotes = [];
       applyMatteSelectSkin(selectEl, previousStatus);
       selectEl.classList.remove('status-updating');
       selectEl.classList.add('status-error');
+      selectEl.setAttribute('aria-invalid', 'true');
       selectEl.disabled = false;
       const msg = String(error?.message || '');
       if (msg.includes('Session expirée')) {
@@ -4246,7 +4247,10 @@ let handoffNotes = [];
       } else {
         alert('Échec de la mise à jour du statut — réessayez.');
       }
-      setTimeout(() => selectEl.classList.remove('status-error'), 2000);
+      setTimeout(() => {
+        selectEl.classList.remove('status-error');
+        selectEl.removeAttribute('aria-invalid');
+      }, 2000);
     }
   }
 
@@ -4444,6 +4448,7 @@ let handoffNotes = [];
       drawer.classList.toggle('open', open);
       drawer.setAttribute('aria-hidden', String(!open));
       btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
     }
 
     btn.addEventListener('click', (event) => {

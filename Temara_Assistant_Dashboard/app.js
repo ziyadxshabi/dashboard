@@ -1648,9 +1648,13 @@ let handoffNotes = [];
       selectEl.value = previousStatus;
       selectEl.classList.remove('status-updating');
       selectEl.classList.add('status-error');
+      selectEl.setAttribute('aria-invalid', 'true');
       selectEl.disabled = false;
       alert('Échec de la mise à jour du statut — réessayez.');
-      setTimeout(() => selectEl.classList.remove('status-error'), 2000);
+      setTimeout(() => {
+        selectEl.classList.remove('status-error');
+        selectEl.removeAttribute('aria-invalid');
+      }, 2000);
     }
   }
 
@@ -1713,6 +1717,7 @@ let handoffNotes = [];
       drawer.classList.toggle('open', open);
       drawer.setAttribute('aria-hidden', String(!open));
       btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
       document.body.classList.toggle('mobile-drawer-open', open);
     }
 

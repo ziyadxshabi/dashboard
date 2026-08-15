@@ -4798,3 +4798,63 @@ body.os-boot-pending #doctor-emergencies-body tr:not(.triage-empty) {
   .desktop-nav { display: none; }
   .assistant-mobile-bar { justify-content: space-between; }
 }
+
+/* ── Accessibility: focus, skip link, contrast tweaks ───────────────────── */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  z-index: 10000;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.sidebar .nav-link:not(.is-active) {
+  color: #C4BBB3;
+}
+
+.sidebar .nav-link:focus-visible {
+  text-decoration: underline;
+}
+
+html[data-theme="pearl-clinic"] .sidebar .nav-link:not(.is-active) {
+  color: #4B5563;
+}
+
+html[data-theme="pearl-clinic"] input::placeholder,
+html[data-theme="pearl-clinic"] textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+html[data-theme="oak-lounge"] .crm-tag--confirmé,
+html[data-theme="oak-lounge"] .crm-tag--confirme,
+html[data-theme="oak-lounge"] .status-pill--confirmé {
+  color: #A8C4A4 !important;
+}
+
+html[data-theme="oak-lounge"] .crm-tag--urgence,
+html[data-theme="oak-lounge"] .status-pill--urgence,
+html[data-theme="oak-lounge"] .appt-tag--urgence {
+  color: #E8A090 !important;
+}

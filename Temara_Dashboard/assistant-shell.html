@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="./Fonts/fill/style.css" />
   <link rel="stylesheet" href="./Fonts/light/style.css" />
 
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
   <div class="app-shell">
 
     <aside class="sidebar assistant-sidebar desktop-nav" aria-label="Navigation assistante">
@@ -20,7 +21,7 @@
         </div>
       </div>
 
-      <nav class="sidebar-nav" aria-label="Navigation principale">
+      <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale">
         <a href="#" class="nav-link is-active" data-nav="overview" aria-current="page">
           <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
           <span>Vue du jour</span>
@@ -122,7 +123,7 @@
       </div>
     </aside>
 
-    <main class="assistant-main" id="assistant-content">
+    <main class="assistant-main" id="main-content">
 
       <header class="assistant-mobile-bar" aria-label="En-tête mobile">
         <span class="assistant-mobile-bar__brand">Command Center</span>
@@ -142,7 +143,7 @@
 
       <div id="asst-mobile-drawer" class="mobile-drawer" aria-hidden="true">
         <button type="button" id="asst-mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
-        <nav class="mobile-drawer__nav" aria-label="Navigation">
+        <nav class="mobile-drawer__nav" role="navigation" aria-label="Navigation">
           <a href="#overview" class="nav-link" data-nav="overview">Vue du jour</a>
           <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
           <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
@@ -257,7 +258,7 @@
             </div>
           </div>
 
-          <div class="planning-timeline-wrap" data-lenis-prevent id="roster-container">
+          <div class="planning-timeline-wrap" data-lenis-prevent id="roster-container" role="region" aria-label="Planning du jour" tabindex="0">
             <div class="skeleton-wrapper" id="roster-skeleton">
               <div class="skeleton skeleton-text"></div>
               <div class="skeleton skeleton-text short"></div>
@@ -287,6 +288,7 @@
           </div>
 
           <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
+            <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
             <input
               type="text"
               class="handoff-compose__input"
@@ -296,6 +298,7 @@
               autocomplete="off"
               maxlength="280"
               required
+              aria-required="true"
             />
             <div class="ghost-select" id="handoff-category-root" data-ghost-select>
               <input type="hidden" id="handoff-category" name="handoff-category" value="Info" />
@@ -480,7 +483,7 @@
               </div>
             </div>
             </div>
-            <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container">
+            <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container" role="region" aria-label="Patients en liste d'attente" tabindex="0">
               <div class="skeleton-wrapper" id="waitlist-skeleton">
                 <div class="skeleton skeleton-text"></div>
                 <div class="skeleton skeleton-text short"></div>
@@ -545,7 +548,7 @@
             <div class="skeleton skeleton-table-row"></div>
           </div>
           <div id="crm-content" hidden>
-          <div class="crm-table-scroll">
+          <div class="crm-table-scroll" role="region" aria-label="Tableau des dossiers patients" tabindex="0">
             <table class="crm-table" id="crm-patient-table">
               <thead>
                 <tr>
@@ -746,7 +749,7 @@
       </button>
     </div>
 
-    <nav class="mobile-bottom-nav" aria-label="Navigation mobile" data-lenis-prevent>
+    <nav class="mobile-bottom-nav" role="navigation" aria-label="Navigation mobile" data-lenis-prevent>
       <a href="#" class="tab-link is-active" data-nav="overview" aria-label="Vue d'ensemble">
         <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
         <span>Vue d'ensemble</span>

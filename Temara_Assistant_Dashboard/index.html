@@ -27,6 +27,7 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 </head>
 <body class="os-boot-pending auth-gate-active" data-auth-mode="assistant-only">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
 
   <div id="login-overlay" class="login-overlay is-visible">
     <div class="login-coalesce" id="login-card">
@@ -100,7 +101,7 @@
         </div>
       </div>
 
-      <nav class="sidebar-nav" aria-label="Navigation principale">
+      <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale">
         <a href="#" class="nav-link is-active" data-nav="overview" aria-current="page">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
             <rect x="3" y="3" width="7" height="7" rx="2"/>
@@ -153,7 +154,7 @@
       </div>
     </aside>
 
-    <main class="assistant-main" id="assistant-content">
+    <main class="assistant-main" id="main-content">
 
       <header class="assistant-mobile-bar" aria-label="En-tête mobile">
         <span class="assistant-mobile-bar__brand">Command Center</span>
@@ -173,7 +174,7 @@
 
       <div id="mobile-drawer" class="mobile-drawer" aria-hidden="true">
         <button type="button" id="mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
-        <nav class="mobile-drawer__nav" aria-label="Navigation">
+        <nav class="mobile-drawer__nav" role="navigation" aria-label="Navigation">
           <a href="#" class="nav-link" data-nav="overview">Vue du jour</a>
           <a href="#" class="nav-link" data-nav="calendar">Calendrier</a>
           <a href="#" class="nav-link" data-nav="waitlist">Liste d'attente</a>
@@ -223,7 +224,7 @@
             </div>
           </div>
 
-          <div class="roster-table-wrap" id="roster-container">
+          <div class="roster-table-wrap" id="roster-container" role="region" aria-label="Planning du jour" tabindex="0">
             <div class="skeleton-wrapper" id="roster-skeleton">
               <div class="skeleton skeleton-text"></div>
               <div class="skeleton skeleton-text short"></div>
@@ -343,6 +344,7 @@
           </div>
 
           <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
+            <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
             <input
               type="text"
               class="handoff-compose__input"
@@ -352,6 +354,7 @@
               autocomplete="off"
               maxlength="280"
               required
+              aria-required="true"
             />
             <select class="handoff-compose__select" id="handoff-category" name="handoff-category" aria-label="Catégorie">
               <option value="Info">Info</option>
@@ -413,6 +416,7 @@
                   placeholder="Nom et prénom"
                   autocomplete="name"
                   required
+                  aria-required="true"
                   aria-describedby="waitlist-name-error"
                 />
                 <p class="login-error" id="waitlist-name-error" role="alert" hidden></p>
@@ -429,6 +433,7 @@
                   autocomplete="tel"
                   inputmode="tel"
                   required
+                  aria-required="true"
                   aria-describedby="waitlist-phone-error"
                 />
                 <p class="login-error" id="waitlist-phone-error" role="alert" hidden></p>
@@ -436,7 +441,7 @@
 
               <div class="waitlist-field">
                 <label class="waitlist-label" for="waitlist-priority">Priorité</label>
-                <select class="waitlist-select" id="waitlist-priority" name="priorite" required>
+                <select class="waitlist-select" id="waitlist-priority" name="priorite" required aria-required="true">
                   <option value="Haute">Haute</option>
                   <option value="Normale" selected>Normale</option>
                 </select>
@@ -450,6 +455,7 @@
                     class="form-consent-checkbox"
                     name="sms_consent"
                     required
+                    aria-required="true"
                   />
                   <span class="form-consent-text">J'accepte de recevoir des notifications par SMS concernant mon rendez-vous (Loi 09-08).</span>
                 </label>
@@ -466,7 +472,7 @@
               <div class="chart-title">Patients Prioritaires</div>
               <div class="chart-sub">Classés par urgence — synchronisé avec Google Sheets</div>
             </div>
-            <div class="schedule-list schedule-list--full" id="waitlist-container">
+            <div class="schedule-list schedule-list--full" id="waitlist-container" role="region" aria-label="Patients en liste d'attente" tabindex="0">
               <div class="skeleton-wrapper" id="waitlist-skeleton">
                 <div class="skeleton skeleton-text"></div>
                 <div class="skeleton skeleton-text short"></div>
@@ -510,7 +516,7 @@
             <div class="skeleton skeleton-table-row"></div>
           </div>
           <div id="crm-content" hidden>
-          <div class="crm-table-scroll">
+          <div class="crm-table-scroll" role="region" aria-label="Tableau des dossiers patients" tabindex="0">
             <table class="crm-table" id="crm-patient-table">
               <thead>
                 <tr>

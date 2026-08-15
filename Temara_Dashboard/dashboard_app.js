@@ -620,7 +620,13 @@ function switchTab(hashId) {
   });
 
   doctorQueryAll('.nav-link, .tab-link').forEach(link => {
-    link.classList.toggle('is-active', link.dataset.nav === viewKey);
+    const isActive = link.dataset.nav === viewKey;
+    link.classList.toggle('is-active', isActive);
+    if (isActive) {
+      link.setAttribute('aria-current', 'page');
+    } else {
+      link.removeAttribute('aria-current');
+    }
   });
 
   activeView = viewKey;
@@ -688,6 +694,7 @@ function initMobileNav() {
     drawer.classList.toggle('open', open);
     drawer.setAttribute('aria-hidden', String(!open));
     btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
   }
 
   btn.addEventListener('click', (event) => {
@@ -3489,6 +3496,7 @@ async function updateRosterStatus(selectEl, previousStatus) {
 
     selectEl.classList.remove('status-updating');
     selectEl.classList.add('status-success');
+    selectEl.removeAttribute('aria-invalid');
     showDashboardToast('Statut mis à jour avec succès.', 'success');
 
     setTimeout(() => {
@@ -3500,12 +3508,16 @@ async function updateRosterStatus(selectEl, previousStatus) {
     selectEl.value = previousStatus;
     selectEl.classList.remove('status-updating');
     selectEl.classList.add('status-error');
+    selectEl.setAttribute('aria-invalid', 'true');
     selectEl.disabled = false;
     const msg = String(error?.message || '');
     if (!msg.includes('Session expirée')) {
       showDashboardToast('Erreur: Impossible de mettre à jour le statut.', 'error');
     }
-    setTimeout(() => selectEl.classList.remove('status-error'), 2000);
+    setTimeout(() => {
+      selectEl.classList.remove('status-error');
+      selectEl.removeAttribute('aria-invalid');
+    }, 2000);
   }
 }
 
