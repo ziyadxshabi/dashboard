@@ -1,0 +1,335 @@
+---
+description: Complete DentaFlow OS ruleset — schema, proxies, Redis, shells, auth, errors
+alwaysApply: true
+---
+
+# DentaFlow OS — Project Rules
+
+Clinique Dentaire Témara Mall. Timezone for all clinic dates: **Africa/Casablanca**.
+
+---
+
+## 1. Project Overview
+
+Three interfaces, one operations stack:
+
+| Interface | Folder / entry | Role |
+|---|---|---|
+| Patient portal | `Temara_Patient_Portal/` | Public booking + lead capture |
+| Doctor dashboard | `Temara_Dashboard/index.html` (`#doctor-shell`) | KPIs, charts, operational overview |
+| Assistant command center | `Temara_Dashboard/assistant-shell.html` and/or `Temara_Assistant_Dashboard/` (`#assistant-shell` / `.assistant-app-root`) | Roster, waitlist, CRM, SMS, notes |
+
+**Stack**
+
+- Frontend: vanilla HTML / CSS / JS. No build system, no bundler, no ES modules.
+- Backend: Vercel Node serverless functions under `Temara_Dashboard/api/` (and twin copies in assistant/patient apps). Browser calls **`/api/*` only**.
+- Automation: n8n workflows triggered by webhooks. Frontend never calls n8n.
+- Data: **Baserow** (PostgreSQL) for patients, bookings, waitlist, team notes. **Cal.com** is calendar SSOT. Google Sheets is **not** used for live KPIs.
+- Auth: JWT (HS256) issued by `POST /api/auth`. Target storage is **httpOnly cookies**. Do not store tokens in `localStorage` / `sessionStorage`.
+- Cache / locks: **Upstash Redis**. Cache is optional; locks on critical booking paths are not.
+
+---
+
+## 2. Baserow Schema
+
+Database: **Agency Operations** (`database/462074`). Prefer display names (`user_field_names = true`). Unwrap single-select objects `{ value, id }` to `.value` in Code nodes.
+
+### 2.1 Bookings (table ID `1017856`)
+
+Canonical URL pattern: `baserow.io/database/462074/table/1017856/…`  
+Hardcode table ID **`1017856`** in n8n Baserow nodes (data pointer, not a secret). Do not use `$vars.BASEROW_TABLE_ID` in Dashboard Data Endpoint.
+
+| # | Field name (exact) | Type | Values / notes |
+|---|---|---|---|
+| 1 | `Patient (Nom Complet)` | Text | Required for roster / CRM |
+| 2 | `Email Contact` | Email / text | |
+| 3 | `Téléphone (WhatsApp)` | Phone / text | Normalize to E.164 `+212…` in n8n |
+| 4 | `Date & Heure du RDV` | Date/time | ISO `2026-08-15T10:15:00.000Z` or `DD/MM/YYYY HH:mm` |
+| 5 | `Motif de Consultation` | Text / select | |
+| 6 | `Observations Médicales` | Long text | |
+| 7 | `Statut du RDV` | Single select | `Confirmé`, `Annulé`, `No-Show`, `En attente` |
+| 8 | `Statut Facturation` | Single select | `Payé`, `Non payé` |
+| 9 | `Montant (MAD)` | Number | Decimal; comma or space thousands OK |
+| 10 | `Couverture Médicale` | Text / select | Insurance label shown in CRM |
+| 11 | `N° d'Assurance` | Text | Policy number |
+| 12 | `Cal Booking ID` | Text | Cal.com booking uid |
+| 13 | `Nouveau Patient ?` | Single select | `Oui`, `Non` |
+| 14 | `Médecin Traitant` | Single select / text | Assigned doctor |
+| 15 | `id` | Number (system) | Baserow row id; used for status PATCH |
+| 16 | `order` | Number (system) | Baserow row order |
+
+Roster code may also read `Praticien Assigné` as a **fallback** for `Médecin Traitant` — do not invent extra columns in writes.
+
+### 2.2 Tableau de Transmission (team notes)
+
+Table ID in n8n: **`1039835`**.
+
+| Field name (exact) | Type | Notes |
+|---|---|---|
+| `Auteur` | Text | Staff display name |
+| `Message` | Long text | Note body |
+| `Heure` | Text / datetime | Casablanca wall clock as sent by UI |
+| `Épinglé` | Boolean | Pinned flag |
+
+n8n create node may also write `Catégorie` from `body.category`. Do not drop the four fields above.
+
+### 2.3 Liste d'attente (waitlist)
+
+Table ID in n8n: **`1039940`**.
+
+| Field name (exact) | Type | Values |
+|---|---|---|
+| `Nom` | Text | Patient name |
+| `Priorité` | Single select | `Urgent`, `Haute`, `Normale`, `Basse` |
+| `Téléphone (WhatsApp)` | Phone / text | E.164 for SMS cascade |
+
+---
+
+## 3. n8n Webhook URL Patterns
+
+Vercel stores full webhook URLs in `N8N_WEBHOOK_*` (or `N8N_WAITLIST_WEBHOOK`). Paths below are the n8n **webhook path** segment only. Never put hostnames in frontend JS.
+
+| # | Vercel proxy | Env var | n8n path | Typical method |
+|---|---|---|---|---|
+| 1 | `/api/dashboard-data` | `N8N_WEBHOOK_DASHBOARD` | `dashboard-data` | GET |
+| 2 | `/api/roster` | `N8N_WEBHOOK_ROSTER` | `assistant-data` | GET |
+| 3 | `/api/n8n-proxy` | `N8N_WEBHOOK_DASHBOARD` or `N8N_WEBHOOK_ASSISTANT_PROXY` | `dashboard-data` / `assistant-data` | GET |
+| 4 | `/api/update-status` | `N8N_WEBHOOK_UPDATE_STATUS` | `update-status` | POST |
+| 5 | `/api/waitlist` | `N8N_WAITLIST_WEBHOOK` | `waitlist-add` (cascade also uses `dashboard-waitlist-add`) | POST |
+| 6 | `/api/team-notes` GET | `N8N_WEBHOOK_GET_NOTES` | `get-notes` | GET |
+| 7 | `/api/team-notes` POST | `N8N_WEBHOOK_POST_NOTE` | `post-note` | POST |
+| 8 | `/api/fill-gap` | `N8N_WEBHOOK_FILL_GAP` | `fill-empty-slot` | POST |
+| 9 | `/api/bulk-sms` | `N8N_WEBHOOK_BULK_SMS` | `bulk-sms` | POST |
+| 10 | `/api/lead-capture` | `N8N_WEBHOOK_LEAD_CAPTURE` | `lead-capture` | POST |
+| 11 | `/api/n8n-delay-alert` | `N8N_WEBHOOK_DELAY_ALERT` | delay-alert webhook (env URL) | POST |
+
+Misc POST router `/api/proxy.js` maps `body.target` → extra env URLs (`bulk-confirm`, `bulk-cancel`, …). Same rules: env-only URLs, JWT, `x-agency-auth`.
+
+n8n header to Vercel: **`x-agency-auth`**. Keys: `DASHBOARD_AUTH_KEY` and/or `N8N_AUTH_KEY` / `N8N_AGENCY_AUTH_KEY` (server-only).
+
+---
+
+## 4. Vercel `/api/*` Endpoint Conventions
+
+**Layout:** `Temara_Dashboard/api/<name>.js` → `https://<vercel-host>/api/<name>`. Shared helpers: `api/_lib/auth-crypto.js`, `api/_lib/redis.js`.
+
+### Proxy pattern (10 steps)
+
+1. Handle `OPTIONS` → CORS `204`.
+2. Reject wrong HTTP method → `405`.
+3. `requireBearerSession` (JWT + allowed roles). On fail return immediately (401).
+4. Optional Redis `GET` (`cacheGet`). On miss or Redis down, continue.
+5. Read `process.env.N8N_WEBHOOK_*`. If empty → **`503` `{ ok: false, error: 'Webhook not configured' }`**. No hardcoded fallback hosts.
+6. Read agency auth key from env. Attach `x-agency-auth`.
+7. `fetch` upstream with `AbortController` timeout (typically 8–30s).
+8. Parse JSON. Upstream HTML / invalid JSON is a failure, not clinic data.
+9. Optional Redis `SET` with TTL. Failures are ignored.
+10. Return JSON to the browser. Never leak stack traces or env values.
+
+### Auth flow
+
+```
+Browser  POST /api/auth  { username, password }
+    → scrypt verify (DOCTOR_* / ASSISTANT_*)
+    → Redis ratelimit:login:<ip>  (5 / 900s)
+    → HS256 JWT (role, ~8h)
+    → Set httpOnly cookie (target) — never sessionStorage
+
+Browser  GET/POST /api/<proxy>
+    Authorization: Bearer <JWT>  (until cookie migration is complete on the server)
+    → requireBearerSession
+    → n8n webhook + x-agency-auth
+    → JSON
+
+Any 401 from /api/* → logout immediately.
+Do not treat 401 as empty roster / empty KPIs.
+```
+
+---
+
+## 5. Redis Key Naming Scheme
+
+| Pattern | TTL | Purpose |
+|---|---|---|
+| `dashboard:kpi:payload` | 60s | n8n KPI object for Dashboard Data Endpoint |
+| `dash:<role>:<qs\|default>` | 30s | Vercel `/api/dashboard-data` response cache |
+| `authfail:dashboard:<clinicId>:<ip>` | 900s | n8n PIN / agency-key brute-force counter |
+| `ratelimit:dashboard:<ip>` | 300s | n8n dashboard request window (max 30) |
+| `ratelimit:login:<ip>` | 900s | Vercel `/api/auth` login window (max 5) |
+| `errmon:dedup:<dedupKey>` | 300s | Error-monitor Slack dedup (`SET NX`) |
+
+Slot mutex (Concierge / waitlist): `SET <lockKey> 1 NX EX <ttl>` via Upstash REST. Missing Redis on a **lock** path is a hard error. Missing Redis on a **cache** path is a miss.
+
+**Env names — do not unify**
+
+| Runtime | URL | Token |
+|---|---|---|
+| Vercel | `UPSTASH_REDIS_REST_URL` | `UPSTASH_REDIS_REST_TOKEN` |
+| n8n (`$vars` / `$env`) | `REDIS_CONNECTION_URL` | `REDIS_REST_TOKEN` |
+
+---
+
+## 6. Frontend Shell Ownership
+
+Duplicate IDs exist across doctor + assistant shells. **Always scope queries.**
+
+| Shell | Root selector |
+|---|---|
+| Doctor | `#doctor-shell` |
+| Assistant | `#assistant-shell` or `.assistant-app-root` (mount may be `#assistant-mount`) |
+| Patient portal | `#patient-portal` (wrap portal content; do not query dashboard IDs) |
+
+```js
+function assistantRoot() {
+  return document.getElementById('assistant-mount')
+    || document.getElementById('assistant-shell')
+    || document.querySelector('.assistant-app-root')
+    || document;
+}
+
+function $(id) {
+  const root = assistantRoot();
+  if (root && root !== document) {
+    const scoped = root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
+    if (scoped) return scoped;
+  }
+  return document.getElementById(id);
+}
+```
+
+Doctor scripts must query inside `#doctor-shell`. Never `sessionStorage.clear()` — delete named keys only.
+
+---
+
+## 7. CSS Conventions
+
+Themes on `<html data-theme="…">`:
+
+- `oak-lounge` — dark
+- `pearl-clinic` — light
+
+Use CSS custom properties only (`--bg-main`, `--text-main`, `--accent-primary`, `--border-color`, …). No hardcoded hex/rgb in new CSS except inside a theme block that **defines** a custom property.
+
+UI copy is **French**. Keep existing ARIA attributes.
+
+---
+
+## 8. Critical Rules (10)
+
+1. **No hardcoded URLs or secrets in frontend.** Call `/api/*` only.
+2. **No `innerHTML` with unsanitized data.** Use `escapeHtml()` or `document.createElement`.
+3. **No auth tokens in `localStorage` / `sessionStorage`.** httpOnly cookies.
+4. **Never `sessionStorage.clear()`.** Target specific keys.
+5. **Preserve ARIA** and accessibility on every UI change.
+6. **Two themes:** `oak-lounge` and `pearl-clinic`.
+7. **French** for all user-facing strings.
+8. **CSS variables**, not one-off colors.
+9. **Frontend never calls n8n or tunnel hosts.** No ngrok URLs, no `ngrok-skip-browser-warning` in browser JS. Proxies fail closed if webhook env is missing.
+10. **Cache never blocks.** Every `/api/*` proxy must succeed if Redis is down. n8n Redis vars stay `REDIS_*`; Vercel stays `UPSTASH_*`.
+
+---
+
+## 9. Common Field Name Mappings
+
+| Baserow field | Code / JSON key | Notes |
+|---|---|---|
+| `Patient (Nom Complet)` | `name` / `Nom` | |
+| `Date & Heure du RDV` | `date`, hourly KPIs | Filter “today” in Casablanca |
+| `Statut du RDV` | `status` | Exact strings below |
+| `Montant (MAD)` | `revenue_today` sum | KPI only; do not show on CRM if product forbids it |
+| `Nouveau Patient ?` | `isNew` | |
+| `Médecin Traitant` | `practitioner` | Fallback `Praticien Assigné` |
+| `Téléphone (WhatsApp)` | `phone` | |
+| `Email Contact` | `email` | |
+| `Observations Médicales` | `observations` | |
+| `Couverture Médicale` | `coverage` / `insurance` | Not `N° d'Assurance` |
+| `Cal Booking ID` | `calBookingId` | |
+| `id` | `baserowRowId` | Status updates |
+| Waitlist `Nom` | `nom` | POST body |
+| Waitlist `Priorité` | `priorite` | |
+| Notes `Message` / `Auteur` / `Heure` / `Épinglé` | `text` / `author` / `time` / `pinned` | |
+
+**`Statut du RDV` (exact):** `'Confirmé'`, `'Annulé'`, `'No-Show'`, `'En attente'`
+
+KPI mapping: `Confirmé` → `accepted_plans`; `En attente` → `pending_plans`; `No-Show` → `no_shows`.
+
+**`Nouveau Patient ?` (exact):** `'Oui'` / `'Non'` (also accept `yes` / `true` / `1` when reading).
+
+---
+
+## 10. Error Handling Conventions
+
+**Vercel proxies**
+
+```json
+{ "ok": false, "error": "Webhook not configured" }
+```
+
+| HTTP | When |
+|---|---|
+| 401 | Missing/invalid JWT |
+| 405 | Wrong method |
+| 429 | Login rate limit |
+| 500 | Missing server auth config (agency key) |
+| 502 | Upstream timeout / fetch failure |
+| 503 | Webhook env missing |
+
+Do not put n8n HTML error pages in `error` as if they were KPI payloads.
+
+**n8n (Dashboard Data Endpoint and shared `error_handler.js`)**
+
+Internal throw prefixes: `AUTH_FAIL:…`, `RATE_LIMIT:…`. Client body:
+
+```json
+{
+  "ok": false,
+  "error": "Unauthorized | Too Many Requests | Service temporarily unavailable",
+  "message": "human-readable French or English staff message",
+  "timestamp": "fr-MA Africa/Casablanca",
+  "trace_id": "err-…"
+}
+```
+
+HTTP: 401 / 429 / 503. Never return stack traces.
+
+KPI success shape (plus `last_updated`, `schema_warnings`, cache flags):
+
+`patients_today`, `no_shows`, `revenue_today`, `new_patients`, `accepted_plans`, `pending_plans`, `hour_08` … `hour_18`.
+
+---
+
+## 11. Testing Checklist
+
+1. Doctor login and assistant login both issue a session; wrong password hits Redis rate limit after 5 tries.
+2. `/api/dashboard-data` returns the KPI keys above from **Baserow Bookings `1017856`**, not Sheets.
+3. `/api/roster` lists today’s rows using `Date & Heure du RDV` in Casablanca.
+4. Status change writes exact `'Confirmé'` / `'Annulé'` / `'No-Show'` / `'En attente'` to Bookings.
+5. Waitlist add writes `Nom`, `Priorité`, `Téléphone (WhatsApp)` to table `1039940`.
+6. Team notes GET/POST round-trip `Auteur`, `Message`, `Heure`, `Épinglé`.
+7. Fill-gap and bulk-sms only run through `/api/fill-gap` and `/api/bulk-sms`.
+8. Lead capture without `N8N_WEBHOOK_LEAD_CAPTURE` returns 503, not a tunnel URL.
+9. With Redis env unset, dashboard and roster still load (cache miss).
+10. 401 on any `/api/*` logs the user out; UI does not show empty clinic data.
+11. Frontend bundle has **no** n8n hostnames and **no** tunnel URLs.
+12. Both `oak-lounge` and `pearl-clinic` render without hardcoded leftover colors.
+13. Duplicate IDs: doctor vs assistant queries stay inside their shell roots.
+
+---
+
+## File map (serverless)
+
+| File | Route |
+|---|---|
+| `api/auth.js` | `/api/auth` |
+| `api/dashboard-data.js` | `/api/dashboard-data` |
+| `api/roster.js` | `/api/roster` |
+| `api/n8n-proxy.js` | `/api/n8n-proxy` |
+| `api/update-status.js` | `/api/update-status` |
+| `api/team-notes.js` | `/api/team-notes` |
+| `api/waitlist.js` | `/api/waitlist` |
+| `api/fill-gap.js` | `/api/fill-gap` |
+| `api/bulk-sms.js` | `/api/bulk-sms` |
+| `api/lead-capture.js` | `/api/lead-capture` |
+| `api/n8n-delay-alert.js` | `/api/n8n-delay-alert` |
+
+n8n Code nodes: `$vars` / `$env` only (see `n8n/_snippets/auth_dashboard.js`, `auth_gate.js`, `dashboard_kpis_from_baserow.js`).
