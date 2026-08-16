@@ -145,7 +145,7 @@ function doctorQueryAll(selector) {
  * Update these values in your deployment.
  *
  * DATA_URL: Vercel serverless proxy endpoint. Secrets live server-side in
- *           N8N_WEBHOOK_URL and N8N_AUTH_KEY (see api/n8n-proxy.js).
+ *           N8N_WEBHOOK_ASSISTANT_PROXY and N8N_AUTH_KEY (see api/n8n.js).
  *
  * DAILY_GOAL_MAD: Daily revenue target in Moroccan Dirham.
  *

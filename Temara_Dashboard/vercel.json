@@ -1,7 +1,10 @@
 {
   "rewrites": [
     { "source": "/api/auth/me", "destination": "/api/auth?action=me" },
-    { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" }
+    { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" },
+    { "source": "/api/n8n-proxy", "destination": "/api/n8n?action=proxy" },
+    { "source": "/api/n8n-delay-alert", "destination": "/api/n8n?action=delay-alert" },
+    { "source": "/api/proxy", "destination": "/api/n8n?action=generic-proxy" }
   ],
   "headers": [
     {
