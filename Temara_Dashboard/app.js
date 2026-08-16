@@ -191,25 +191,25 @@ let handoffNotes = [];
   }
 
   function apiHeaders(extra = {}) {
-    const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
-      ? window.DentaFlowAuth.getAuthHeaders()
+    const apiHeadersBase = typeof window.DentaFlowAuth?.buildApiHeaders === 'function'
+      ? window.DentaFlowAuth.buildApiHeaders()
       : { Accept: 'application/json' };
 
     return {
       'Content-Type': 'application/json',
-      ...authHeaders,
+      ...apiHeadersBase,
       ...extra,
     };
   }
 
-  /** GET roster — Bearer auth; no Content-Type to avoid unnecessary CORS preflight */
+  /** GET roster — cookie session; no Content-Type to avoid unnecessary CORS preflight */
   function rosterFetchHeaders() {
-    const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
-      ? window.DentaFlowAuth.getAuthHeaders()
+    const apiHeadersBase = typeof window.DentaFlowAuth?.buildApiHeaders === 'function'
+      ? window.DentaFlowAuth.buildApiHeaders()
       : { Accept: 'application/json' };
 
     return {
-      ...authHeaders,
+      ...apiHeadersBase,
     };
   }
 

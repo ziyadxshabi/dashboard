@@ -1,13 +1,16 @@
 /**
  * DentaFlow OS — centralized role + PIN authentication gate.
  * Dispatches to POST /api/auth; unlocks Doctor or Assistant modules on success.
+ *
+ * Auth flow: httpOnly cookie (dentaflow_token) stores JWT
+ * Role stored in sessionStorage for UI state only
+ * Token NEVER stored in sessionStorage/localStorage
  */
 (function () {
   'use strict';
 
   const AUTH_ENDPOINT = '/api/auth';
   const SESSION_ROLE_KEY = 'dentaflow_role';
-  const SESSION_TOKEN_KEY = 'dentaflow_session';
   const SESSION_PIN_KEY = 'dentaflow_pin';
 
   let currentPin = '';
@@ -320,17 +323,17 @@
   function clearSession() {
     try {
       sessionStorage.removeItem(SESSION_ROLE_KEY);
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
       sessionStorage.removeItem(SESSION_PIN_KEY);
     } catch { /* private browsing */ }
   }
 
   window.DentaFlowAuth = {
     SESSION_ROLE_KEY,
-    SESSION_TOKEN_KEY,
     SESSION_PIN_KEY,
     getRole: () => sessionStorage.getItem(SESSION_ROLE_KEY),
-    getSession: () => sessionStorage.getItem(SESSION_TOKEN_KEY),
+    buildApiHeaders() {
+      return { 'Accept': 'application/json' };
+    },
     clearSession,
     logout: async () => {
       try {

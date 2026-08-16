@@ -1,15 +1,11 @@
-/* --- SECURITY — auth gate handled by auth.js --- */
-const AUTH_CONFIG = {
-  SESSION_KEY: 'dentaflow_session',
-};
-
+/* --- SECURITY — auth gate handled by auth.js (httpOnly cookie; no Bearer header) --- */
 function getApiAuthHeaders(extra = {}) {
-  const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
-    ? window.DentaFlowAuth.getAuthHeaders()
+  const apiHeaders = typeof window.DentaFlowAuth?.buildApiHeaders === 'function'
+    ? window.DentaFlowAuth.buildApiHeaders()
     : { Accept: 'application/json' };
 
   return {
-    ...authHeaders,
+    ...apiHeaders,
     ...extra,
   };
 }

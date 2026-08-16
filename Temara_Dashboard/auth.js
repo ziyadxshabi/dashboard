@@ -1,13 +1,16 @@
 /**
  * DentaFlow OS — centralized username/password authentication gate.
  * Dispatches to POST /api/auth; unlocks Doctor or Assistant modules on success.
+ *
+ * Auth flow: httpOnly cookie (dentaflow_token) stores JWT
+ * Role stored in sessionStorage for UI state only
+ * Token NEVER stored in sessionStorage/localStorage
  */
 (function () {
   'use strict';
 
   const AUTH_ENDPOINT = '/api/auth';
   const SESSION_ROLE_KEY = 'dentaflow_role';
-  const SESSION_TOKEN_KEY = 'dentaflow_session';
 
   let selectedRole = 'doctor';
   let authInitialized = false;
@@ -377,10 +380,6 @@
     initAuthGate();
   }
 
-  function getBearerToken() {
-    return '';
-  }
-
   function getStoredRole() {
     try {
       return sessionStorage.getItem(SESSION_ROLE_KEY) || '';
@@ -403,17 +402,13 @@
     return `${window.location.pathname}${window.location.search}`;
   }
 
-  function buildAuthHeaders(extra = {}) {
-    return {
-      Accept: 'application/json',
-      ...extra,
-    };
+  function buildApiHeaders() {
+    return { 'Accept': 'application/json' };
   }
 
   function clearSession() {
     try {
       sessionStorage.removeItem(SESSION_ROLE_KEY);
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
     } catch { /* private browsing / disabled storage */ }
   }
 
@@ -428,7 +423,7 @@
   }
 
   /**
-   * Strict route guard: protected shells must not initialize without a token.
+   * Strict route guard: protected shells must not initialize without a session.
    * Returns false when navigation/redirect was triggered.
    */
   function enforceRouteGuard() {
@@ -540,10 +535,8 @@
 
   window.DentaFlowAuth = {
     SESSION_ROLE_KEY,
-    SESSION_TOKEN_KEY,
     getRole: getStoredRole,
-    getToken: getBearerToken,
-    getAuthHeaders: buildAuthHeaders,
+    buildApiHeaders,
     isAuthenticated,
     checkSession,
     enforceRouteGuard,
