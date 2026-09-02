@@ -10,7 +10,7 @@
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const UPSTREAM_TIMEOUT_MS = 15_000;
 const GENERIC_PROXY_TIMEOUT_MS = 30_000;
 
 const GENERIC_PROXY_TARGET_ENV = {
@@ -49,8 +49,7 @@ function isHtmlPayload(text, contentType) {
   return (
     contentType.includes('text/html') ||
     trimmed.startsWith('<!doctype') ||
-    trimmed.startsWith('<html') ||
-    trimmed.includes('ngrok')
+    trimmed.startsWith('<html')
   );
 }
 
@@ -75,19 +74,23 @@ function respondUpstreamFailure(res, rawText, error = 'Upstream Error', meta = {
   });
 }
 
-async function fetchUpstreamOnce(webhookUrl, authKey) {
+async function fetchUpstream(webhookUrl, authKey) {
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
+
+  const headers = {
+    accept: 'application/json',
+    'content-type': 'application/json',
+    'user-agent': 'DentaFlow-Proxy/1.0',
+  };
+  if (authKey) {
+    headers['x-agency-auth'] = authKey;
+  }
 
   try {
     const response = await fetch(webhookUrl, {
       method: 'GET',
-      headers: {
-        accept: 'application/json',
-        'content-type': 'application/json',
-        'user-agent': 'DentaFlow-Vercel-Proxy/1.0',
-        'x-agency-auth': authKey,
-      },
+      headers,
       signal: abortController.signal,
       redirect: 'follow',
     });
@@ -102,12 +105,6 @@ async function fetchUpstreamOnce(webhookUrl, authKey) {
     clearTimeout(timeoutId);
     throw err;
   }
-}
-
-async function fetchUpstreamWithRetry(webhookUrl, authKey) {
-  const result = await fetchUpstreamOnce(webhookUrl, authKey);
-  const allHtml = isHtmlPayload(result.rawText, result.contentType);
-  return { ...result, attemptsUsed: 1, allHtml };
 }
 
 async function handleProxy(req, res) {
@@ -140,10 +137,9 @@ async function handleProxy(req, res) {
   const host = webhookHost(webhookUrl);
 
   try {
-    const { response, contentType, rawText, attemptsUsed, allHtml } =
-      await fetchUpstreamWithRetry(webhookUrl, authKey);
+    const { response, contentType, rawText } = await fetchUpstream(webhookUrl, authKey);
 
-    const meta = { host, contentType, upstreamStatus: response.status, attemptsUsed };
+    const meta = { host, contentType, upstreamStatus: response.status };
 
     if (!response.ok) {
       return respondUpstreamFailure(
@@ -163,12 +159,12 @@ async function handleProxy(req, res) {
       );
     }
 
-    if (allHtml || isHtmlPayload(rawText, contentType)) {
+    if (isHtmlPayload(rawText, contentType)) {
       return respondUpstreamFailure(
         res,
         rawText,
         'Upstream Error',
-        { ...meta, ngrokInterstitial: true }
+        meta
       );
     }
 
