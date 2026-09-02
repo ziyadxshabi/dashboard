@@ -3,6 +3,7 @@
  * Set JWT_SECRET, N8N_WEBHOOK_FILL_GAP + N8N_AUTH_KEY in Vercel env.
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
+const { sanitizeString, validateDate, validateTime, validateRequired, createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -13,7 +14,7 @@ async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
@@ -21,12 +22,56 @@ async function handler(req, res) {
 
   const webhookUrl = process.env.N8N_WEBHOOK_FILL_GAP;
   if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Webhook not configured'));
   }
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[fill-gap] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Server misconfiguration'));
+  }
+
+  const body = req.body ?? {};
+  const slotDate = body.slotDate ?? body.date;
+  const slotTime = body.slotTime ?? body.time;
+  const reason = body.reason;
+  const patientId = body.patientId;
+
+  const required = validateRequired({ slotDate, slotTime }, ['slotDate', 'slotTime']);
+  if (!required.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Missing required slot date or time', {
+        missing: required.missing,
+      })
+    );
+  }
+
+  const dateValidation = validateDate(slotDate);
+  if (!dateValidation.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Invalid slot date format (expected YYYY-MM-DD)', {
+        field: 'slotDate',
+        received: slotDate,
+      })
+    );
+  }
+
+  const timeValidation = validateTime(slotTime);
+  if (!timeValidation.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Invalid slot time format (expected HH:MM)', {
+        field: 'slotTime',
+        received: slotTime,
+      })
+    );
+  }
+
+  const payload = {
+    slotDate: dateValidation.formatted,
+    slotTime: timeValidation.formatted,
+    reason: sanitizeString(reason, 500),
+  };
+  if (patientId != null && String(patientId).trim()) {
+    payload.patientId = sanitizeString(String(patientId), 100);
   }
 
   const headers = {
@@ -43,7 +88,7 @@ async function handler(req, res) {
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(req.body ?? {}),
+      body: JSON.stringify(payload),
       signal: abortController.signal,
     });
 
@@ -58,23 +103,22 @@ async function handler(req, res) {
     }
 
     if (!response.ok) {
-      return res.status(200).json({
-        ok: false,
-        error: 'Upstream HTTP Error',
-        details: rawText || `HTTP ${response.status}`,
-        upstreamStatus: response.status,
-      });
+      return res.status(502).json(
+        createApiError('UPSTREAM_ERROR', 'Upstream HTTP Error', rawText || `HTTP ${response.status}`)
+      );
     }
 
     return res.status(200).json({ ok: true, data: parsed });
   } catch (err) {
     clearTimeout(timeoutId);
     const isTimeout = err?.name === 'AbortError';
-    return res.status(200).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return res.status(502).json(
+      createApiError(
+        'UPSTREAM_ERROR',
+        isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
+        err?.message || 'Unknown proxy error'
+      )
+    );
   }
 }
 
