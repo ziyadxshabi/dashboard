@@ -3,6 +3,7 @@
  * Set JWT_SECRET, N8N_WEBHOOK_UPDATE_STATUS + optional N8N_AUTH_KEY in Vercel env.
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
+const { sanitizeString, validateStatus, createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -13,7 +14,7 @@ async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const session = requireBearerSession(req, res);
@@ -25,14 +26,33 @@ async function handler(req, res) {
 
   const webhookUrl = process.env.N8N_WEBHOOK_UPDATE_STATUS;
   if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Webhook not configured'));
   }
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[update-status] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Server misconfiguration'));
   }
-  const { bookingId, newStatus } = req.body ?? {};
+
+  const body = req.body ?? {};
+  const bookingId = sanitizeString(body.bookingId ?? body.id, 100);
+  if (!bookingId) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Valid booking ID is required', { field: 'bookingId' })
+    );
+  }
+
+  const newStatusRaw = body.newStatus ?? body.status;
+  const statusValidation = validateStatus(newStatusRaw);
+  if (!statusValidation.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', statusValidation.error, {
+        field: 'newStatus',
+        received: newStatusRaw,
+      })
+    );
+  }
+  const newStatus = statusValidation.normalized;
 
   const headers = {
     'content-type': 'application/json',
@@ -63,22 +83,22 @@ async function handler(req, res) {
     }
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        ok: false,
-        error: 'Upstream HTTP Error',
-        details: rawText || `HTTP ${response.status}`,
-      });
+      return res.status(502).json(
+        createApiError('UPSTREAM_ERROR', 'Upstream HTTP Error', rawText || `HTTP ${response.status}`)
+      );
     }
 
     return res.status(200).json({ ok: true, data: parsed });
   } catch (err) {
     clearTimeout(timeoutId);
     const isTimeout = err?.name === 'AbortError';
-    return res.status(502).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return res.status(502).json(
+      createApiError(
+        'UPSTREAM_ERROR',
+        isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
+        err?.message || 'Unknown proxy error'
+      )
+    );
   }
 }
 
