@@ -3,6 +3,7 @@
  * Set JWT_SECRET, N8N_WEBHOOK_GET_NOTES, N8N_WEBHOOK_POST_NOTE + N8N_AUTH_KEY in Vercel env.
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
+const { sanitizeString, validateRequired, createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -24,7 +25,7 @@ async function handler(req, res) {
   }
 
   if (!['GET', 'POST'].includes(req.method)) {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const session = requireBearerSession(req, res, { allowedRoles: ['doctor', 'assistant'] });
@@ -33,14 +34,54 @@ async function handler(req, res) {
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[team-notes] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Server misconfiguration'));
   }
 
   const webhookUrl = req.method === 'GET'
     ? process.env.N8N_WEBHOOK_GET_NOTES
     : process.env.N8N_WEBHOOK_POST_NOTE;
   if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Team notes webhook not configured'));
+  }
+
+  let postPayload = null;
+  if (req.method === 'POST') {
+    const body = req.body ?? {};
+    const noteRaw = body.note ?? body.text ?? body.content;
+    const required = validateRequired({ note: noteRaw }, ['note']);
+    const note = sanitizeString(noteRaw, 2000);
+    if (!required.valid || !note) {
+      return res.status(400).json(
+        createApiError('VALIDATION_ERROR', 'Note content is required and cannot be empty', {
+          field: 'note',
+        })
+      );
+    }
+
+    postPayload = {
+      note,
+      text: note,
+    };
+
+    const linkedId = sanitizeString(String(body.patientId ?? body.bookingId ?? ''), 100);
+    if (linkedId) {
+      if (body.patientId != null) postPayload.patientId = linkedId;
+      if (body.bookingId != null) postPayload.bookingId = linkedId;
+      if (body.patientId == null && body.bookingId == null) postPayload.patientId = linkedId;
+    }
+
+    if (body.author != null) {
+      postPayload.author = sanitizeString(body.author, 100);
+    }
+    if (body.category != null) {
+      postPayload.category = sanitizeString(String(body.category), 100);
+    }
+    if (body.time != null) {
+      postPayload.time = sanitizeString(String(body.time), 50);
+    }
+    if (body.pinned != null) {
+      postPayload.pinned = Boolean(body.pinned);
+    }
   }
 
   const abortController = new AbortController();
@@ -54,7 +95,7 @@ async function handler(req, res) {
     };
 
     if (req.method === 'POST') {
-      fetchOptions.body = JSON.stringify(req.body ?? {});
+      fetchOptions.body = JSON.stringify(postPayload);
     }
 
     const response = await fetch(webhookUrl, fetchOptions);
@@ -69,11 +110,9 @@ async function handler(req, res) {
         const parsed = rawText ? JSON.parse(rawText) : null;
         if (parsed?.message) details = String(parsed.message);
       } catch { /* keep raw slice */ }
-      return res.status(response.status).json({
-        ok: false,
-        error: 'Upstream request failed',
-        details,
-      });
+      return res.status(502).json(
+        createApiError('UPSTREAM_ERROR', 'Upstream request failed', details)
+      );
     }
 
     res.setHeader('Content-Type', contentType);
@@ -82,11 +121,13 @@ async function handler(req, res) {
     clearTimeout(timeoutId);
     console.error('[team-notes] Upstream fetch failed:', err);
     const isTimeout = err?.name === 'AbortError';
-    return res.status(502).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return res.status(502).json(
+      createApiError(
+        'UPSTREAM_ERROR',
+        isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
+        err?.message || 'Unknown proxy error'
+      )
+    );
   }
 }
 
