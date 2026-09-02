@@ -3615,8 +3615,10 @@ async function loadTeamNotes() {
 
 function initTeamNotesSync() {
   loadTeamNotes();
-  if (teamNotesRefreshTimer) clearInterval(teamNotesRefreshTimer);
-  teamNotesRefreshTimer = setInterval(loadTeamNotes, CONFIG.TEAM_NOTES_REFRESH_MS);
+  attachDoctorVisibilityListener();
+  if (isDoctorPollingAllowed()) {
+    startDoctorInterval('teamNotes', loadTeamNotes, CONFIG.TEAM_NOTES_REFRESH_MS);
+  }
 }
 
 /* ── SMART SYNC — silent background refresh ─────────────────────────────── */
@@ -3625,56 +3627,123 @@ let smartSyncIntervalId = null;
 let lastSmartSyncAt = 0;
 let smartSyncInFlight = false;
 
+const doctorPollRegistry = {
+  intervals: { teamNotes: null, smartSync: null },
+  timeouts: { smartSyncDebounce: null },
+  visibilityHandler: null,
+};
+
+function clearDoctorInterval(name) {
+  const id = doctorPollRegistry.intervals[name];
+  if (id != null) {
+    clearInterval(id);
+    doctorPollRegistry.intervals[name] = null;
+  }
+  if (name === 'teamNotes') teamNotesRefreshTimer = null;
+  if (name === 'smartSync') smartSyncIntervalId = null;
+}
+
+function startDoctorInterval(name, fn, ms) {
+  clearDoctorInterval(name);
+  const id = setInterval(fn, ms);
+  doctorPollRegistry.intervals[name] = id;
+  if (name === 'teamNotes') teamNotesRefreshTimer = id;
+  if (name === 'smartSync') smartSyncIntervalId = id;
+  return id;
+}
+
+function clearDoctorTimeout(name) {
+  const id = doctorPollRegistry.timeouts[name];
+  if (id != null) {
+    clearTimeout(id);
+    doctorPollRegistry.timeouts[name] = null;
+  }
+}
+
+function clearAllDoctorPolls() {
+  Object.keys(doctorPollRegistry.intervals).forEach(clearDoctorInterval);
+  Object.keys(doctorPollRegistry.timeouts).forEach(clearDoctorTimeout);
+}
+
+function isDoctorPollingAllowed() {
+  if (document.visibilityState !== 'visible') return false;
+  if (document.body.classList.contains('auth-gate-active')) return false;
+  if (typeof window.DentaFlowAuth?.isAuthenticated === 'function' && !window.DentaFlowAuth.isAuthenticated()) {
+    return false;
+  }
+  return true;
+}
+
+async function runSmartSync() {
+  if (!isDoctorPollingAllowed()) return;
+  if (smartSyncInFlight) return;
+  if (Date.now() - lastSmartSyncAt < CONFIG.SMART_SYNC_DEBOUNCE_MS) return;
+
+  smartSyncInFlight = true;
+  lastSmartSyncAt = Date.now();
+
+  try {
+    await Promise.all([
+      loadDashboard(true),
+      loadDoctorHubData(true),
+    ]);
+  } finally {
+    smartSyncInFlight = false;
+  }
+}
+
+function pauseDoctorPolling() {
+  clearAllDoctorPolls();
+}
+
+function resumeDoctorPolling(refresh) {
+  if (!isDoctorPollingAllowed()) return;
+  startDoctorInterval('teamNotes', loadTeamNotes, CONFIG.TEAM_NOTES_REFRESH_MS);
+  startDoctorInterval('smartSync', runSmartSync, CONFIG.SMART_SYNC_INTERVAL_MS);
+  if (refresh) {
+    loadTeamNotes();
+    void runSmartSync();
+  }
+}
+
+function onDoctorVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    pauseDoctorPolling();
+    return;
+  }
+  if (document.visibilityState === 'visible') {
+    resumeDoctorPolling(true);
+  }
+}
+
+function attachDoctorVisibilityListener() {
+  if (doctorPollRegistry.visibilityHandler) return;
+  doctorPollRegistry.visibilityHandler = onDoctorVisibilityChange;
+  document.addEventListener('visibilitychange', doctorPollRegistry.visibilityHandler);
+}
+
+function detachDoctorVisibilityListener() {
+  if (!doctorPollRegistry.visibilityHandler) return;
+  document.removeEventListener('visibilitychange', doctorPollRegistry.visibilityHandler);
+  doctorPollRegistry.visibilityHandler = null;
+}
+
 function initSmartSync() {
   if (smartSyncInitialized) return;
   if (document.body.classList.contains('mode-client')) return;
   if (document.body.classList.contains('mode-assistant')) return;
 
   smartSyncInitialized = true;
-
-  let syncTimeout;
-
-  async function runSmartSync() {
-    if (document.body.classList.contains('auth-gate-active')) return;
-    if (smartSyncInFlight) return;
-    if (Date.now() - lastSmartSyncAt < CONFIG.SMART_SYNC_DEBOUNCE_MS) return;
-
-    smartSyncInFlight = true;
-    lastSmartSyncAt = Date.now();
-
-    try {
-      await Promise.all([
-        loadDashboard(true),
-        loadDoctorHubData(true),
-      ]);
-    } finally {
-      smartSyncInFlight = false;
-    }
+  attachDoctorVisibilityListener();
+  if (isDoctorPollingAllowed()) {
+    startDoctorInterval('smartSync', runSmartSync, CONFIG.SMART_SYNC_INTERVAL_MS);
   }
-
-  if (smartSyncIntervalId) clearInterval(smartSyncIntervalId);
-  smartSyncIntervalId = setInterval(runSmartSync, CONFIG.SMART_SYNC_INTERVAL_MS);
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
-
-    clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
-      runSmartSync();
-    }, 0);
-  });
 }
 
 window.DentaFlowAuth?.registerLogoutTeardown?.(async function teardownDoctorSession() {
   clearEphemeralSecurityPasswords();
-  if (teamNotesRefreshTimer) {
-    clearInterval(teamNotesRefreshTimer);
-    teamNotesRefreshTimer = null;
-  }
-  if (smartSyncIntervalId) {
-    clearInterval(smartSyncIntervalId);
-    smartSyncIntervalId = null;
-  }
+  detachDoctorVisibilityListener();
+  clearAllDoctorPolls();
   smartSyncInitialized = false;
   doctorDashboardInitialized = false;
   if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
