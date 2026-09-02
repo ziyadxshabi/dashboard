@@ -6,16 +6,28 @@
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
 
-const BASE_API = 'https://api.baserow.io';
-const DEFAULT_TABLE_ID = '1039940';
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const CACHE_TTL_SEC = 20;
 const PAGE_SIZE = 200;
 const PHONE_RE = /^(\+212\s?|0)[5-7]\d{8}$/;
 const ALLOWED_PRIORITIES = new Set(['Haute', 'Normale', 'Basse']);
 
-function waitlistTableId() {
-  return String(process.env.BASEROW_WAITLIST_TABLE_ID || DEFAULT_TABLE_ID).trim() || DEFAULT_TABLE_ID;
+function resolveBaserowConfig() {
+  const baserowApiUrl = String(process.env.BASEROW_API_URL || '').trim().replace(/\/+$/, '');
+  const tableId = String(
+    process.env.BASEROW_WAITLIST_TABLE_ID || process.env.BASEROW_TABLE_ID || ''
+  ).trim();
+  const token = String(process.env.BASEROW_API_TOKEN || process.env.BASEROW_TOKEN || '').trim();
+
+  if (!baserowApiUrl || !tableId || !token) {
+    return {
+      ok: false,
+      error: 'Baserow configuration missing on server',
+      code: 'CONFIG_MISSING',
+    };
+  }
+
+  return { ok: true, baserowApiUrl, tableId, token };
 }
 
 function fieldVal(v) {
@@ -72,10 +84,9 @@ async function fetchWithTimeout(url, options) {
   }
 }
 
-async function fetchWaitlistRows(token) {
-  const tableId = waitlistTableId();
+async function fetchWaitlistRows({ baserowApiUrl, tableId, token }) {
   const rows = [];
-  let url = `${BASE_API}/api/database/rows/table/${tableId}/?user_field_names=true&size=${PAGE_SIZE}`;
+  let url = `${baserowApiUrl}/api/database/rows/table/${tableId}/?user_field_names=true&size=${PAGE_SIZE}`;
 
   while (url) {
     const res = await fetchWithTimeout(url, {
@@ -100,10 +111,9 @@ async function fetchWaitlistRows(token) {
   return rows.map(unwrapRow);
 }
 
-async function createWaitlistRow(token, { nom, telephone, priorite }) {
-  const tableId = waitlistTableId();
+async function createWaitlistRow({ baserowApiUrl, tableId, token }, { nom, telephone, priorite }) {
   const res = await fetchWithTimeout(
-    `${BASE_API}/api/database/rows/table/${tableId}/?user_field_names=true`,
+    `${baserowApiUrl}/api/database/rows/table/${tableId}/?user_field_names=true`,
     {
       method: 'POST',
       headers: {
@@ -147,17 +157,13 @@ async function handler(req, res) {
     }
     req.dfCache = 'miss';
 
-    const token = String(process.env.BASEROW_API_TOKEN || '').trim();
-    if (!token) {
-      return res.status(503).json({
-        ok: false,
-        error: 'Baserow API token not configured',
-        code: 'SERVER_ERROR',
-      });
+    const config = resolveBaserowConfig();
+    if (!config.ok) {
+      return res.status(503).json(config);
     }
 
     try {
-      const rows = await fetchWaitlistRows(token);
+      const rows = await fetchWaitlistRows(config);
       const payload = { ok: true, data: rows };
       await cacheSet(key, payload, CACHE_TTL_SEC);
       return res.status(200).json(payload);
@@ -178,13 +184,9 @@ async function handler(req, res) {
   const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
   if (!session) return;
 
-  const token = String(process.env.BASEROW_API_TOKEN || '').trim();
-  if (!token) {
-    return res.status(503).json({
-      ok: false,
-      error: 'Baserow API token not configured',
-      code: 'SERVER_ERROR',
-    });
+  const config = resolveBaserowConfig();
+  if (!config.ok) {
+    return res.status(503).json(config);
   }
 
   const body = req.body ?? {};
@@ -200,7 +202,7 @@ async function handler(req, res) {
   }
 
   try {
-    await createWaitlistRow(token, { nom, telephone, priorite });
+    await createWaitlistRow(config, { nom, telephone, priorite });
     return res.status(200).json({
       ok: true,
       message: "Patient ajouté à la liste d'attente.",
