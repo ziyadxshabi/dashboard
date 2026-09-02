@@ -5,11 +5,25 @@
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
 
-const BASE_API = 'https://api.baserow.io';
-const TABLE_ID = '1017856';
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const CACHE_TTL_SEC = 30;
 const PAGE_SIZE = 200;
+
+function resolveBaserowConfig() {
+  const baserowApiUrl = String(process.env.BASEROW_API_URL || '').trim().replace(/\/+$/, '');
+  const tableId = String(process.env.BASEROW_TABLE_ID || '').trim();
+  const token = String(process.env.BASEROW_API_TOKEN || process.env.BASEROW_TOKEN || '').trim();
+
+  if (!baserowApiUrl || !tableId || !token) {
+    return {
+      ok: false,
+      error: 'Baserow configuration missing on server',
+      code: 'CONFIG_MISSING',
+    };
+  }
+
+  return { ok: true, baserowApiUrl, tableId, token };
+}
 
 function fieldVal(v) {
   if (v == null) return '';
@@ -56,9 +70,9 @@ function unwrapRow(row) {
   return out;
 }
 
-async function fetchBaserowRows(token) {
+async function fetchBaserowRows({ baserowApiUrl, tableId, token }) {
   const rows = [];
-  let url = `${BASE_API}/api/database/rows/table/${TABLE_ID}/?user_field_names=true&size=${PAGE_SIZE}`;
+  let url = `${baserowApiUrl}/api/database/rows/table/${tableId}/?user_field_names=true&size=${PAGE_SIZE}`;
 
   while (url) {
     const abortController = new AbortController();
@@ -92,13 +106,15 @@ async function fetchBaserowRows(token) {
 }
 
 async function fetchTodayAppointments() {
-  const token = String(process.env.BASEROW_API_TOKEN || '').trim();
-  if (!token) {
-    return { ok: false, error: 'Baserow API token not configured', code: 'SERVER_ERROR' };
+  const config = resolveBaserowConfig();
+  if (!config.ok) {
+    return config;
   }
 
+  const { baserowApiUrl, tableId, token } = config;
+
   try {
-    const allRows = await fetchBaserowRows(token);
+    const allRows = await fetchBaserowRows({ baserowApiUrl, tableId, token });
     const todayStr = casablancaYmd();
     const todayAppts = allRows
       .filter((row) => rowDateKey(row['Date & Heure du RDV'] || row.Date || row.date) === todayStr)
