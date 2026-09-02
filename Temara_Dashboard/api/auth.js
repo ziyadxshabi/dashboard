@@ -28,6 +28,7 @@ const {
   verifyPassword,
   withRequestLog,
 } = require('./_lib/auth-crypto');
+const { sanitizeString, validateRequired, createApiError } = require('./_lib/validation');
 
 function resolveAuthRoute(req) {
   const raw = String(req.url || '');
@@ -84,43 +85,78 @@ function handleLogout(req, res) {
 async function handleLogin(req, res) {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
-    return res.status(503).json({ ok: false, error: 'Auth not configured' });
+    return res.status(503).json(
+      createApiError('CONFIG_MISSING', 'Authentication service misconfigured')
+    );
   }
 
   const rate = await checkLoginRateLimit(req);
 
   if (rate.blocked) {
     res.setHeader('Retry-After', String(rate.retryAfterSec));
-    return res.status(429).json({
-      ok: false,
-      error: 'Too Many Requests',
-      message: 'Trop de tentatives. Réessayez dans quelques minutes.',
-      retryAfterSec: rate.retryAfterSec,
-    });
+    return res.status(429).json(
+      createApiError(
+        'RATE_LIMIT_EXCEEDED',
+        'Too many login attempts. Please try again later.',
+        { retryAfter: rate.retryAfterSec }
+      )
+    );
   }
 
-  const { role, username, password } = req.body ?? {};
-  const normalizedRole = typeof role === 'string' ? role.trim().toLowerCase() : '';
-  const normalizedUsername = typeof username === 'string' ? username.trim() : '';
-  const normalizedPassword = typeof password === 'string' ? password : '';
+  const body = req.body ?? {};
+  const usernameRaw = body.username ?? body.user;
+  const passwordRaw = body.password ?? body.pass;
+  const required = validateRequired(
+    { username: usernameRaw, password: passwordRaw },
+    ['username', 'password']
+  );
+  if (!required.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Username and password are required', {
+        missing: required.missing,
+      })
+    );
+  }
 
-  if (!normalizedRole || !normalizedUsername || !normalizedPassword) {
+  const username = sanitizeString(usernameRaw, 100);
+  if (!username) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Username and password are required', {
+        missing: ['username'],
+      })
+    );
+  }
+
+  const password = typeof passwordRaw === 'string' ? passwordRaw : String(passwordRaw);
+  const normalizedRole = typeof body.role === 'string' ? body.role.trim().toLowerCase() : '';
+
+  if (!normalizedRole) {
     await recordLoginFailure();
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(createApiError('UNAUTHORIZED', 'Invalid username or password'));
   }
 
   const creds = getRoleCredentials(normalizedRole);
   if (!creds.username || !creds.passwordHash) {
-    return res.status(503).json({ ok: false, error: 'Role credentials not configured' });
+    return res.status(503).json(
+      createApiError('CONFIG_MISSING', 'Authentication service misconfigured')
+    );
   }
 
   const usernameMatch =
-    normalizedUsername.toLowerCase() === String(creds.username).trim().toLowerCase();
-  const passwordMatch = verifyPassword(normalizedPassword, creds.passwordHash);
+    username.toLowerCase() === String(creds.username).trim().toLowerCase();
+
+  let passwordMatch;
+  try {
+    passwordMatch = verifyPassword(password, creds.passwordHash);
+  } catch {
+    return res.status(500).json(
+      createApiError('SERVER_ERROR', 'Authentication failed due to internal error')
+    );
+  }
 
   if (!usernameMatch || !passwordMatch) {
     await recordLoginFailure();
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(createApiError('UNAUTHORIZED', 'Invalid username or password'));
   }
 
   await resetLoginFailures(req);
@@ -128,7 +164,7 @@ async function handleLogin(req, res) {
   const token = signJwt(
     {
       role: normalizedRole,
-      sub: normalizedUsername,
+      sub: username,
     },
     jwtSecret
   );
@@ -139,6 +175,7 @@ async function handleLogin(req, res) {
   return res.status(200).json({
     ok: true,
     role: normalizedRole,
+    username,
     expiresInSec: 8 * 60 * 60,
   });
 }
@@ -150,7 +187,7 @@ async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const route = resolveAuthRoute(req);
