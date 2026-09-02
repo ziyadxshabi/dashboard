@@ -63,7 +63,7 @@
         "to": "={{ $json.Phone }}",
         "message": "=Bonjour {{ $json.Nom }}, nous vous rappelons votre consultation demain à la Clinique Dentaire Témara Mall. Pour gérer, modifier ou reporter votre visite, cliquez sur ce lien sécurisé : {{ $json.Link }}",
         "options": {
-          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": "={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "type": "n8n-nodes-base.twilio",

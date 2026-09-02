@@ -104,7 +104,7 @@
         "to": "={{ $json.Phone }}",
         "message": "=Bonjour {{ $json.Nom }}, ceci est un message du cabinet dentaire. Veuillez nous contacter si besoin.",
         "options": {
-          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": "={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "id": "6a3e020f-43da-4bb0-8329-c0f4e3a8eea4",

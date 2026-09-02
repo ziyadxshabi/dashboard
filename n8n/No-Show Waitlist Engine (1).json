@@ -231,7 +231,7 @@
         "to": "={{ $json['Téléphone (WhatsApp)'] }}",
         "message": "=Bonjour {{ $json.Nom }}, un créneau d'urgence vient de se libérer à la Clinique Dentaire Témara Mall. Réservez rapidement votre place ici : https://sites.google.com/view/portail-temara-mall/accueil",
         "options": {
-          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": "={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "name": "Twilio - Send SMS",

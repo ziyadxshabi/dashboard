@@ -173,7 +173,7 @@
         "to": "={{ $('Validate & Rate-Limit Request').item.json.fromPhone }}",
         "message": "=={{ $('Validate & Rate-Limit Request').item.json.isOptedOut ? null : 'Bonjour ! 🦷\\n\\nVoici votre portail patient sécurisé pour réserver ou gérer votre consultation à la clinique :\\nhttps://sites.google.com/view/portail-temara-mall/accueil\\n\\nRépondez STOP pour ne plus recevoir de SMS.' }}",
         "options": {
-          "statusCallback": " https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": " ={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "type": "n8n-nodes-base.twilio",

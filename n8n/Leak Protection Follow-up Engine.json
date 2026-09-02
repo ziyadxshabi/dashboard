@@ -74,7 +74,7 @@
         "to": "={{ $json.Phone }}",
         "message": "={{ $json.SmsMessage }}",
         "options": {
-          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": "={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "type": "n8n-nodes-base.twilio",

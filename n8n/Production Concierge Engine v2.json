@@ -1245,7 +1245,7 @@
         "to": "={{ $json.Phone }}",
         "message": "=Bonjour {{ $json.Nom }}, un créneau vient de se libérer aujourd'hui à la Clinique Dentaire Témara Mall. Cliquez rapidement ici pour réserver l'emplacement : {{ $json.Booking_URL }}",
         "options": {
-          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": "={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "type": "n8n-nodes-base.twilio",
@@ -1316,7 +1316,7 @@
         "to": "={{ $json.Phone }}",
         "message": "=Le créneau d'urgence du jour a été comblé, mais vous pouvez planifier une autre date directement via notre portail patient : {{ $json.Portal_URL }}",
         "options": {
-          "statusCallback": "https://glade-rigor-perennial.ngrok-free.dev/webhook/twilio-sms-status"
+          "statusCallback": "={{ \.N8N_WEBHOOK_BASE_URL ?? \.N8N_WEBHOOK_BASE_URL }}/webhook/twilio-sms-status"
         }
       },
       "type": "n8n-nodes-base.twilio",
