@@ -4,6 +4,7 @@
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
+const { createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const CACHE_TTL_SEC = 30;
@@ -15,11 +16,7 @@ function resolveBaserowConfig() {
   const token = String(process.env.BASEROW_API_TOKEN || process.env.BASEROW_TOKEN || '').trim();
 
   if (!baserowApiUrl || !tableId || !token) {
-    return {
-      ok: false,
-      error: 'Baserow configuration missing on server',
-      code: 'CONFIG_MISSING',
-    };
+    return createApiError('CONFIG_MISSING', 'Baserow configuration missing on server');
   }
 
   return { ok: true, baserowApiUrl, tableId, token };
@@ -91,13 +88,28 @@ async function fetchBaserowRows({ baserowApiUrl, tableId, token }) {
       clearTimeout(timeoutId);
     }
 
+    const rawText = await res.text();
+
     if (!res.ok) {
-      const err = new Error(`Baserow error: ${res.status}`);
-      err.status = res.status;
+      const err = new Error('Upstream Baserow request failed');
+      err.apiError = createApiError('UPSTREAM_ERROR', 'Upstream Baserow request failed', {
+        status: res.status,
+        text: rawText?.slice(0, 500) || `HTTP ${res.status}`,
+      });
       throw err;
     }
 
-    const data = await res.json();
+    let data;
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      const err = new Error('Invalid JSON received from Baserow');
+      err.apiError = createApiError('UPSTREAM_ERROR', 'Invalid JSON received from Baserow', {
+        preview: rawText.slice(0, 200),
+      });
+      throw err;
+    }
+
     if (Array.isArray(data.results)) rows.push(...data.results);
     url = data.next || null;
   }
@@ -122,12 +134,10 @@ async function fetchTodayAppointments() {
 
     return { ok: true, data: todayAppts };
   } catch (err) {
-    const isTimeout = err?.name === 'AbortError';
-    return {
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : (err?.message || 'Baserow unavailable'),
-      code: 'SERVER_ERROR',
-    };
+    if (err?.apiError) return err.apiError;
+    return createApiError('UPSTREAM_ERROR', 'Upstream Baserow fetch failed or timed out', {
+      message: err?.message || 'Unknown proxy error',
+    });
   }
 }
 
@@ -138,7 +148,7 @@ async function handler(req, res) {
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const session = requireBearerSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
@@ -154,7 +164,8 @@ async function handler(req, res) {
 
   const payload = await fetchTodayAppointments();
   if (!payload.ok) {
-    return res.status(503).json(payload);
+    const status = payload.code === 'CONFIG_MISSING' ? 503 : 502;
+    return res.status(status).json(payload);
   }
 
   await cacheSet(rosterCacheKey, payload, CACHE_TTL_SEC);
