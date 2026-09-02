@@ -3,6 +3,7 @@
  * GET /api/health — Redis, Baserow, n8n in parallel (3s each).
  */
 const { applyCors } = require('./_lib/auth-crypto');
+const { createApiError } = require('./_lib/validation');
 
 const PING_MS = 3000;
 
@@ -81,6 +82,21 @@ async function pingN8n() {
   }
 }
 
+function classifyService(probe) {
+  const httpStatus = typeof probe.status === 'number' ? probe.status : undefined;
+  const unconfigured =
+    probe.status === 'unconfigured' ||
+    /not configured/i.test(String(probe.error || ''));
+
+  let status = 'down';
+  if (probe.ok) status = 'healthy';
+  else if (unconfigured) status = 'unconfigured';
+
+  const report = { ...probe, status };
+  if (httpStatus != null) report.httpStatus = httpStatus;
+  return report;
+}
+
 async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'GET, OPTIONS');
@@ -90,22 +106,40 @@ async function handler(req, res) {
   applyCors(res, 'GET, OPTIONS');
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
-  const [redis, baserow, n8n] = await Promise.all([
+  const [redisProbe, baserowProbe, n8nProbe] = await Promise.all([
     pingRedis(),
     pingBaserow(),
     pingN8n(),
   ]);
 
-  const allHealthy = redis.ok && baserow.ok && n8n.ok;
+  const redis = classifyService(redisProbe);
+  const baserow = classifyService(baserowProbe);
+  const n8n = classifyService(n8nProbe);
 
-  return res.status(allHealthy ? 200 : 503).json({
-    status: allHealthy ? 'healthy' : 'degraded',
-    timestamp: new Date().toISOString(),
-    checks: { redis, baserow, n8n },
-    version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev',
+  const services = { redis, baserow, n8n };
+  const allHealthy = redis.status === 'healthy' && baserow.status === 'healthy' && n8n.status === 'healthy';
+  const timestamp = new Date().toISOString();
+  const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev';
+
+  if (allHealthy) {
+    return res.status(200).json({
+      ok: true,
+      status: 'healthy',
+      services,
+      timestamp,
+      version,
+    });
+  }
+
+  return res.status(503).json({
+    ok: false,
+    status: 'degraded',
+    services,
+    timestamp,
+    version,
   });
 }
 
