@@ -75,14 +75,7 @@ function respondUpstreamFailure(res, rawText, error = 'Upstream Error', meta = {
   });
 }
 
-async function fetchUpstreamOnce(webhookUrl, authKey, attemptIndex) {
-  const bypassVariants = [
-    { 'ngrok-skip-browser-warning': '69420' },
-    { 'ngrok-skip-browser-warning': 'true', cookie: 'ngrok-skip-browser-warning=true' },
-    { 'ngrok-skip-browser-warning': '1', 'user-agent': 'DentaFlow-Vercel-Proxy/1.0' },
-  ];
-  const bypass = bypassVariants[attemptIndex] ?? bypassVariants[0];
-
+async function fetchUpstreamOnce(webhookUrl, authKey) {
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
 
@@ -94,7 +87,6 @@ async function fetchUpstreamOnce(webhookUrl, authKey, attemptIndex) {
         'content-type': 'application/json',
         'user-agent': 'DentaFlow-Vercel-Proxy/1.0',
         'x-agency-auth': authKey,
-        ...bypass,
       },
       signal: abortController.signal,
       redirect: 'follow',
@@ -105,7 +97,7 @@ async function fetchUpstreamOnce(webhookUrl, authKey, attemptIndex) {
     const contentType = (response.headers.get('content-type') || '(none)').toLowerCase();
     const rawText = await response.text();
 
-    return { response, contentType, rawText, attemptIndex, bypassKey: Object.keys(bypass).join(',') };
+    return { response, contentType, rawText };
   } catch (err) {
     clearTimeout(timeoutId);
     throw err;
@@ -113,19 +105,9 @@ async function fetchUpstreamOnce(webhookUrl, authKey, attemptIndex) {
 }
 
 async function fetchUpstreamWithRetry(webhookUrl, authKey) {
-  const maxAttempts = 3;
-  let lastResult = null;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const result = await fetchUpstreamOnce(webhookUrl, authKey, attempt);
-    lastResult = result;
-
-    if (!isHtmlPayload(result.rawText, result.contentType)) {
-      return { ...result, attemptsUsed: attempt + 1 };
-    }
-  }
-
-  return { ...lastResult, attemptsUsed: maxAttempts, allHtml: true };
+  const result = await fetchUpstreamOnce(webhookUrl, authKey);
+  const allHtml = isHtmlPayload(result.rawText, result.contentType);
+  return { ...result, attemptsUsed: 1, allHtml };
 }
 
 async function handleProxy(req, res) {
@@ -158,10 +140,10 @@ async function handleProxy(req, res) {
   const host = webhookHost(webhookUrl);
 
   try {
-    const { response, contentType, rawText, attemptsUsed, allHtml, bypassKey } =
+    const { response, contentType, rawText, attemptsUsed, allHtml } =
       await fetchUpstreamWithRetry(webhookUrl, authKey);
 
-    const meta = { host, contentType, upstreamStatus: response.status, attemptsUsed, bypassKey };
+    const meta = { host, contentType, upstreamStatus: response.status, attemptsUsed };
 
     if (!response.ok) {
       return respondUpstreamFailure(
@@ -239,7 +221,6 @@ async function handleDelayAlert(req, res) {
   const headers = {
     accept: 'application/json',
     'content-type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
     'user-agent': 'DentaFlow-Assistant-Proxy/1.0',
     'x-agency-auth': authKey,
   };

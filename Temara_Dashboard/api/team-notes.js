@@ -9,7 +9,6 @@ const UPSTREAM_TIMEOUT_MS = 8_000;
 function upstreamHeaders(authKey, includeJson = false) {
   const headers = {
     accept: 'application/json',
-    'ngrok-skip-browser-warning': 'true',
     'user-agent': 'DentaFlow-TeamNotes-Proxy/1.0',
     'x-agency-auth': authKey,
   };
