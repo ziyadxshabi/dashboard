@@ -37,7 +37,6 @@ async function handler(req, res) {
   const headers = {
     accept: 'application/json',
     'content-type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
     'user-agent': 'DentaFlow-Doctor-Proxy/1.0',
     'x-agency-auth': authKey,
   };
