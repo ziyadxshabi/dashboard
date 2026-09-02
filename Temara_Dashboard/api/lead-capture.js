@@ -6,6 +6,23 @@ const { applyCors, withRequestLog } = require('./_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
+function resolveLeadCaptureConfig() {
+  const webhookUrl = String(
+    process.env.N8N_WEBHOOK_LEAD_CAPTURE || process.env.N8N_WEBHOOK_BASE_URL || ''
+  ).trim();
+  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
+
+  if (!webhookUrl || !authKey) {
+    return {
+      ok: false,
+      error: 'Lead capture configuration missing on server',
+      code: 'CONFIG_MISSING',
+    };
+  }
+
+  return { ok: true, webhookUrl, authKey };
+}
+
 function upstreamHeaders(authKey) {
   return {
     accept: 'application/json',
@@ -25,12 +42,6 @@ async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
-  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
-  if (!authKey) {
-    console.error('[lead-capture] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
-  }
-
   const body = req.body ?? {};
   const nom = typeof body.nom === 'string' ? body.nom.trim() : '';
   const telephone = typeof body.telephone === 'string' ? body.telephone.trim() : '';
@@ -39,10 +50,13 @@ async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'nom and telephone are required' });
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_LEAD_CAPTURE;
-  if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  const config = resolveLeadCaptureConfig();
+  if (!config.ok) {
+    console.error('[lead-capture] Configuration missing');
+    return res.status(503).json(config);
   }
+
+  const { webhookUrl, authKey } = config;
   const payload = { nom, telephone };
 
   const abortController = new AbortController();
