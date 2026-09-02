@@ -4,6 +4,7 @@
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
+const { createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -14,7 +15,7 @@ async function handler(req, res) {
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const session = requireBearerSession(req, res, { allowedRoles: ['doctor'] });
@@ -30,12 +31,16 @@ async function handler(req, res) {
 
   const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD;
   if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+    return res.status(503).json(
+      createApiError('CONFIG_MISSING', 'Dashboard webhook or server auth not configured')
+    );
   }
   const authKey = String(process.env.DASHBOARD_AUTH_KEY ?? process.env.N8N_AUTH_KEY ?? '').trim();
   if (!authKey) {
     console.error('[dashboard-data] DASHBOARD_AUTH_KEY is not configured');
-    return res.status(500).json({ error: 'Server misconfiguration' });
+    return res.status(503).json(
+      createApiError('CONFIG_MISSING', 'Dashboard webhook or server auth not configured')
+    );
   }
 
   const abortController = new AbortController();
@@ -62,14 +67,20 @@ async function handler(req, res) {
     try {
       payload = rawText ? JSON.parse(rawText) : null;
     } catch {
-      return res.status(500).json({ error: 'Invalid JSON response from upstream' });
+      return res.status(502).json(
+        createApiError('UPSTREAM_ERROR', 'Invalid JSON received from upstream webhook', {
+          preview: rawText.slice(0, 200),
+        })
+      );
     }
 
     if (!response.ok) {
-      return res.status(500).json({
-        error: 'Upstream request failed',
-        details: rawText?.slice(0, 500) || `HTTP ${response.status}`,
-      });
+      return res.status(502).json(
+        createApiError('UPSTREAM_ERROR', 'Upstream dashboard webhook error', {
+          status: response.status,
+          text: rawText?.slice(0, 500) || `HTTP ${response.status}`,
+        })
+      );
     }
 
     await cacheSet(dashKey, payload, 30);
@@ -77,7 +88,11 @@ async function handler(req, res) {
   } catch (err) {
     clearTimeout(timeoutId);
     console.error('[dashboard-data] Upstream fetch failed:', err);
-    return res.status(500).json({ error: 'n8n unreachable' });
+    return res.status(502).json(
+      createApiError('UPSTREAM_ERROR', 'Dashboard upstream request failed or timed out', {
+        message: err?.message || 'Unknown proxy error',
+      })
+    );
   }
 }
 
