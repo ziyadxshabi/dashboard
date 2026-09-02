@@ -3,6 +3,7 @@
  * Set N8N_WEBHOOK_LEAD_CAPTURE + N8N_AUTH_KEY in Vercel env.
  */
 const { applyCors, withRequestLog } = require('./_lib/auth-crypto');
+const { sanitizeString, validatePhone, validateRequired, createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -13,11 +14,7 @@ function resolveLeadCaptureConfig() {
   const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
 
   if (!webhookUrl || !authKey) {
-    return {
-      ok: false,
-      error: 'Lead capture configuration missing on server',
-      code: 'CONFIG_MISSING',
-    };
+    return createApiError('CONFIG_MISSING', 'Lead capture configuration missing on server');
   }
 
   return { ok: true, webhookUrl, authKey };
@@ -39,25 +36,49 @@ async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const body = req.body ?? {};
-  const nom = typeof body.nom === 'string' ? body.nom.trim() : '';
-  const telephone = typeof body.telephone === 'string' ? body.telephone.trim() : '';
+  const nomRaw = body.nom ?? body.name;
+  const telephoneRaw = body.telephone ?? body.phone;
 
-  if (!nom || !telephone) {
-    return res.status(400).json({ ok: false, error: 'nom and telephone are required' });
+  const required = validateRequired({ nom: nomRaw, telephone: telephoneRaw }, ['nom', 'telephone']);
+  if (!required.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Name and phone number are required', {
+        missing: required.missing,
+      })
+    );
+  }
+
+  const nom = sanitizeString(nomRaw, 100);
+  if (nom.length < 2) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Name must be at least 2 characters', { field: 'nom' })
+    );
+  }
+
+  const phoneValidation = validatePhone(telephoneRaw);
+  if (!phoneValidation.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', phoneValidation.error, {
+        field: 'telephone',
+        received: telephoneRaw,
+      })
+    );
   }
 
   const config = resolveLeadCaptureConfig();
   if (!config.ok) {
     console.error('[lead-capture] Configuration missing');
-    return res.status(503).json(config);
+    return res.status(503).json(
+      createApiError('CONFIG_MISSING', 'Lead capture configuration missing on server')
+    );
   }
 
   const { webhookUrl, authKey } = config;
-  const payload = { nom, telephone };
+  const payload = { nom, telephone: phoneValidation.normalized };
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
@@ -81,11 +102,9 @@ async function handler(req, res) {
         const parsed = rawText ? JSON.parse(rawText) : null;
         if (parsed?.message) details = String(parsed.message);
       } catch { /* keep raw slice */ }
-      return res.status(response.status).json({
-        ok: false,
-        error: 'Upstream request failed',
-        details,
-      });
+      return res.status(502).json(
+        createApiError('UPSTREAM_ERROR', 'Upstream lead capture request failed', details)
+      );
     }
 
     res.setHeader('Content-Type', contentType);
@@ -93,12 +112,11 @@ async function handler(req, res) {
   } catch (err) {
     clearTimeout(timeoutId);
     console.error('[lead-capture] Upstream fetch failed:', err);
-    const isTimeout = err?.name === 'AbortError';
-    return res.status(502).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return res.status(502).json(
+      createApiError('UPSTREAM_ERROR', 'Lead capture upstream request failed or timed out', {
+        message: err?.message || 'Unknown proxy error',
+      })
+    );
   }
 }
 
