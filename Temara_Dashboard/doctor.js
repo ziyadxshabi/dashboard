@@ -812,6 +812,40 @@ const SECURITY_PWD_KEYS = {
   asst: 'df_pwd_asst',
 };
 
+const LEGACY_PASSWORD_STORAGE_KEYS = [
+  SECURITY_PWD_KEYS.doc,
+  SECURITY_PWD_KEYS.asst,
+  'settings_password',
+  'admin_password',
+  'clinic_pin',
+];
+
+const ephemeralSecurityPasswords = {
+  doc: '',
+  asst: '',
+};
+
+function purgeLegacyPasswordStorage() {
+  LEGACY_PASSWORD_STORAGE_KEYS.forEach((key) => {
+    try { localStorage.removeItem(key); } catch { /* private browsing / disabled storage */ }
+    try { sessionStorage.removeItem(key); } catch { /* private browsing / disabled storage */ }
+  });
+}
+
+function setEphemeralSecurityPassword(accountKey, password) {
+  ephemeralSecurityPasswords[accountKey] = String(password || '');
+}
+
+function getEphemeralSecurityPassword(accountKey) {
+  return ephemeralSecurityPasswords[accountKey] || '';
+}
+
+function clearEphemeralSecurityPasswords() {
+  ephemeralSecurityPasswords.doc = '';
+  ephemeralSecurityPasswords.asst = '';
+  purgeLegacyPasswordStorage();
+}
+
 const SECURITY_ACCOUNT_LABELS = {
   doc: 'Compte Docteur (Admin)',
   asst: 'Compte Assistante (Staff)',
@@ -920,6 +954,7 @@ function initSecurityManagement() {
   if (!form || form.dataset.securityBound === 'true') return;
   form.dataset.securityBound = 'true';
 
+  purgeLegacyPasswordStorage();
   initSecurityAccountSelect();
 
   form.addEventListener('submit', (event) => {
@@ -949,13 +984,12 @@ function initSecurityManagement() {
     }
 
     const accountKey = accountInput.value === 'asst' ? 'asst' : 'doc';
-    const storageKey = SECURITY_PWD_KEYS[accountKey];
     const roleName = SECURITY_TOAST_NAMES[accountKey];
 
     if (submitBtn) submitBtn.disabled = true;
 
     try {
-      localStorage.setItem(storageKey, newPassword);
+      setEphemeralSecurityPassword(accountKey, newPassword);
       passwordNew.value = '';
       passwordConfirm.value = '';
       showDashboardToast(`Mot de passe ${roleName} mis à jour avec succès.`, 'success');
@@ -3632,6 +3666,7 @@ function initSmartSync() {
 }
 
 window.DentaFlowAuth?.registerLogoutTeardown?.(async function teardownDoctorSession() {
+  clearEphemeralSecurityPasswords();
   if (teamNotesRefreshTimer) {
     clearInterval(teamNotesRefreshTimer);
     teamNotesRefreshTimer = null;
