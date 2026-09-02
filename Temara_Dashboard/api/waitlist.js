@@ -5,11 +5,11 @@
  */
 const { applyCors, requireBearerSession, withRequestLog } = require('./_lib/auth-crypto');
 const { cacheGet, cacheSet, cacheKey } = require('./_lib/redis');
+const { sanitizeString, validatePhone, validateRequired, createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const CACHE_TTL_SEC = 20;
 const PAGE_SIZE = 200;
-const PHONE_RE = /^(\+212\s?|0)[5-7]\d{8}$/;
 const ALLOWED_PRIORITIES = new Set(['Haute', 'Normale', 'Basse']);
 
 function resolveBaserowConfig() {
@@ -51,20 +51,6 @@ function unwrapRow(row) {
     }
   }
   return out;
-}
-
-function compactPhone(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  const compact = raw.replace(/[\s.\-]/g, '');
-  if (compact.indexOf('+212') === 0) {
-    return `+212${compact.slice(4)}`;
-  }
-  return compact;
-}
-
-function isValidMoroccanPhone(value) {
-  return PHONE_RE.test(compactPhone(value));
 }
 
 function normalizePriority(raw) {
@@ -159,7 +145,7 @@ async function handler(req, res) {
 
     const config = resolveBaserowConfig();
     if (!config.ok) {
-      return res.status(503).json(config);
+      return res.status(503).json(createApiError('CONFIG_MISSING', 'Baserow configuration missing on server'));
     }
 
     try {
@@ -169,16 +155,18 @@ async function handler(req, res) {
       return res.status(200).json(payload);
     } catch (err) {
       const isTimeout = err?.name === 'AbortError';
-      return res.status(503).json({
-        ok: false,
-        error: isTimeout ? 'Upstream Timeout' : (err?.message || 'Baserow unavailable'),
-        code: 'SERVER_ERROR',
-      });
+      return res.status(502).json(
+        createApiError(
+          'UPSTREAM_ERROR',
+          'Upstream Baserow request failed',
+          isTimeout ? 'Upstream Timeout' : (err?.message || 'Baserow unavailable')
+        )
+      );
     }
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED', 'Method not allowed'));
   }
 
   const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
@@ -186,34 +174,71 @@ async function handler(req, res) {
 
   const config = resolveBaserowConfig();
   if (!config.ok) {
-    return res.status(503).json(config);
+    return res.status(503).json(createApiError('CONFIG_MISSING', 'Baserow configuration missing on server'));
   }
 
   const body = req.body ?? {};
-  const nom = String(body.nom ?? body.name ?? '').trim();
-  const telephone = String(body.telephone ?? body.phone ?? '').trim();
-  const priorite = normalizePriority(body.priorite ?? body.priority);
+  const patientNameRaw = body.patientName ?? body.name ?? body.nom;
+  const phoneRaw = body.phone ?? body.telephone;
+  const reasonRaw = body.reason ?? body.motif;
+  const urgencyRaw = body.urgency ?? body.priority ?? body.priorite;
+  const notesRaw = body.notes;
 
-  if (nom.length < 2) {
-    return res.status(400).json({ ok: false, error: 'nom and telephone are required' });
+  const required = validateRequired(
+    { patientName: patientNameRaw, phone: phoneRaw },
+    ['patientName', 'phone']
+  );
+  if (!required.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Patient name and phone number are required', {
+        missing: required.missing,
+      })
+    );
   }
-  if (!isValidMoroccanPhone(telephone)) {
-    return res.status(400).json({ ok: false, error: 'nom and telephone are required' });
+
+  const patientName = sanitizeString(patientNameRaw, 100);
+  if (patientName.length < 2) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', 'Patient name must be at least 2 characters', {
+        field: 'patientName',
+      })
+    );
   }
+
+  const phoneValidation = validatePhone(phoneRaw);
+  if (!phoneValidation.valid) {
+    return res.status(400).json(
+      createApiError('VALIDATION_ERROR', phoneValidation.error, {
+        field: 'phone',
+        received: phoneRaw,
+      })
+    );
+  }
+
+  const reason = sanitizeString(reasonRaw, 255);
+  const urgency = sanitizeString(urgencyRaw, 50);
+  const notes = sanitizeString(notesRaw, 1000);
+  const priorite = normalizePriority(urgency || urgencyRaw);
 
   try {
-    await createWaitlistRow(config, { nom, telephone, priorite });
+    await createWaitlistRow(config, {
+      nom: patientName,
+      telephone: phoneValidation.normalized,
+      priorite,
+    });
     return res.status(200).json({
       ok: true,
       message: "Patient ajouté à la liste d'attente.",
     });
   } catch (err) {
     const isTimeout = err?.name === 'AbortError';
-    return res.status(503).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : (err?.message || 'Baserow unavailable'),
-      code: 'SERVER_ERROR',
-    });
+    return res.status(502).json(
+      createApiError(
+        'UPSTREAM_ERROR',
+        'Upstream Baserow request failed',
+        isTimeout ? 'Upstream Timeout' : (err?.message || 'Baserow unavailable')
+      )
+    );
   }
 }
 
