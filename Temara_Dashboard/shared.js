@@ -30,6 +30,20 @@ function assertAuthorizedResponse(response) {
   return response;
 }
 
+async function apiFetch(url, options = {}) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const extraHeaders = opts.headers || {};
+  const response = await fetch(url, {
+    ...opts,
+    credentials: opts.credentials != null ? opts.credentials : 'include',
+    headers: getApiAuthHeaders(extraHeaders),
+  });
+  return assertAuthorizedResponse(response);
+}
+
+const authorizedFetch = apiFetch;
+const requestWithAuth = apiFetch;
+
 function isUnauthorizedError(error) {
   if (typeof window.DentaFlowAuth?.isUnauthorizedError === 'function') {
     return window.DentaFlowAuth.isUnauthorizedError(error);
@@ -81,6 +95,10 @@ function unlockDashboard({ skipDashboardFetch = false } = {}) {
 }
 
 window.unlockDashboard = unlockDashboard;
+window.apiFetch = apiFetch;
+window.authorizedFetch = authorizedFetch;
+window.requestWithAuth = requestWithAuth;
+window.assertAuthorizedResponse = assertAuthorizedResponse;
 
 /* ── Theme & preferences (from dashboard_app.js:154-215) ── */
 const DEFAULT_THEME = 'oak-lounge';
