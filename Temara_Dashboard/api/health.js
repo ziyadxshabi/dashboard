@@ -43,13 +43,14 @@ async function pingRedis() {
 }
 
 async function pingBaserow() {
-  const token = String(process.env.BASEROW_API_TOKEN || '').trim();
-  if (!token) {
-    return { ok: false, error: 'BASEROW_API_TOKEN not configured' };
+  const baserowApiUrl = String(process.env.BASEROW_API_URL || '').trim().replace(/\/+$/, '');
+  const token = String(process.env.BASEROW_API_TOKEN || process.env.BASEROW_TOKEN || '').trim();
+  if (!baserowApiUrl || !token) {
+    return { ok: false, error: 'Baserow not configured', status: 'unconfigured' };
   }
 
   try {
-    const res = await fetch('https://api.baserow.io/api/database/databases/', {
+    const res = await fetch(`${baserowApiUrl}/api/database/databases/`, {
       method: 'GET',
       headers: {
         Authorization: `Token ${token}`,
