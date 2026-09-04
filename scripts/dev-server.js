@@ -78,22 +78,63 @@ function loadEnvFile(file) {
 loadEnvFile(path.join(ROOT, '.env.local'));
 loadEnvFile(path.join(ROOT, '.env'));
 
-/** Load exact-match rewrites from vercel.json so /api/auth/me → /api/auth?action=me works. */
+/** Load vercel.json rewrites, including `/book/:slug` style params. */
+function compileRewrite(source, destination) {
+  const names = [];
+  const regexSource = source
+    .split(/(:[A-Za-z_][A-Za-z0-9_]*)/)
+    .map((part) => {
+      if (part.startsWith(':')) {
+        names.push(part.slice(1));
+        return '([^/]+)';
+      }
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    })
+    .join('');
+  return {
+    regex: new RegExp(`^${regexSource}$`),
+    names,
+    destination,
+  };
+}
+
 function loadRewrites() {
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
-    const map = new Map();
-    for (const r of cfg.rewrites || []) {
-      if (r && typeof r.source === 'string' && typeof r.destination === 'string') {
-        map.set(r.source, r.destination);
-      }
-    }
-    return map;
+    return (cfg.rewrites || [])
+      .filter((r) => r && typeof r.source === 'string' && typeof r.destination === 'string')
+      .map((r) => compileRewrite(r.source, r.destination));
   } catch {
-    return new Map();
+    return [];
   }
 }
+
 const REWRITES = loadRewrites();
+
+function applyRewrite(pathname, incomingSearch) {
+  for (const rule of REWRITES) {
+    const match = pathname.match(rule.regex);
+    if (!match) continue;
+
+    let dest = rule.destination;
+    const captured = {};
+    rule.names.forEach((name, index) => {
+      const value = decodeURIComponent(match[index + 1] || '');
+      captured[name] = value;
+      dest = dest.split(`:${name}`).join(encodeURIComponent(value));
+    });
+
+    const destUrl = new URL(dest, 'http://localhost');
+    const searchParams = new URLSearchParams(destUrl.search);
+    for (const [key, value] of incomingSearch) searchParams.set(key, value);
+    for (const [key, value] of Object.entries(captured)) {
+      if (!searchParams.has(key)) searchParams.set(key, value);
+    }
+
+    return { pathname: destUrl.pathname, searchParams };
+  }
+  return { pathname, searchParams: incomingSearch };
+}
 
 function decorateResponse(res) {
   res.status = (code) => {
@@ -163,28 +204,16 @@ function resolveApiHandlerPath(pathname) {
   return fs.existsSync(resolved) ? resolved : null;
 }
 
-async function handleApi(req, res, urlObj) {
-  // Apply exact-match rewrites (vercel.json). Search params are merged.
-  let effectivePath = urlObj.pathname;
-  let searchParams = urlObj.searchParams;
-  if (REWRITES.has(urlObj.pathname)) {
-    const dest = REWRITES.get(urlObj.pathname);
-    const destUrl = new URL(dest, 'http://localhost');
-    effectivePath = destUrl.pathname;
-    // Merge rewrite destination params with any incoming query params.
-    searchParams = new URLSearchParams(destUrl.search);
-    for (const [k, v] of urlObj.searchParams) searchParams.set(k, v);
-  }
-
-  const handlerPath = resolveApiHandlerPath(effectivePath);
+async function handleApi(req, res, pathname, searchParams) {
+  const handlerPath = resolveApiHandlerPath(pathname);
   if (!handlerPath) {
-    res.status(404).json({ ok: false, error: 'Not Found', path: effectivePath });
+    res.status(404).json({ ok: false, error: 'Not Found', path: pathname });
     return;
   }
 
   // Vercel-style request augmentation.
   const search = searchParams.toString();
-  req.url = effectivePath + (search ? `?${search}` : '');
+  req.url = pathname + (search ? `?${search}` : '');
   req.query = Object.fromEntries(searchParams);
 
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
@@ -205,15 +234,14 @@ async function handleApi(req, res, urlObj) {
   try {
     await handler(req, res);
   } catch (err) {
-    console.error(`[api] handler threw for ${effectivePath}:`, err);
+    console.error(`[api] handler threw for ${pathname}:`, err);
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: 'Internal Server Error', details: String(err && err.message) });
     }
   }
 }
 
-async function handleStatic(req, res, urlObj) {
-  let pathname = decodeURIComponent(urlObj.pathname);
+async function handleStatic(req, res, pathname) {
   if (pathname === '/' || pathname === '') pathname = '/index.html';
 
   const resolved = path.resolve(path.join(ROOT, pathname));
@@ -251,10 +279,11 @@ const server = http.createServer(async (req, res) => {
   });
 
   try {
-    if (urlObj.pathname.startsWith('/api/')) {
-      await handleApi(req, res, urlObj);
+    const rewritten = applyRewrite(urlObj.pathname, urlObj.searchParams);
+    if (rewritten.pathname.startsWith('/api/')) {
+      await handleApi(req, res, rewritten.pathname, rewritten.searchParams);
     } else {
-      await handleStatic(req, res, urlObj);
+      await handleStatic(req, res, rewritten.pathname);
     }
   } catch (err) {
     console.error('[server] unhandled error:', err);
