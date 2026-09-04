@@ -3,6 +3,7 @@
  * Set JWT_SECRET, N8N_WEBHOOK_BULK_SMS + N8N_AUTH_KEY in Vercel env.
  */
 const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+const { createApiError } = require('./_lib/validation');
 
 const UPSTREAM_TIMEOUT_MS = 12_000;
 
@@ -22,6 +23,16 @@ module.exports = async function handler(req, res) {
   const customMessage = String(req.body?.customMessage ?? '').trim();
   if (!customMessage) {
     return res.status(400).json({ ok: false, error: 'customMessage is required' });
+  }
+
+  const recipients = req.body?.recipients;
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    return res.status(400).json(
+      Object.assign(
+        createApiError('VALIDATION_ERROR', 'Recipient list cannot be empty'),
+        { field: 'recipients' }
+      )
+    );
   }
 
   const webhookUrl = process.env.N8N_WEBHOOK_BULK_SMS;
@@ -49,7 +60,7 @@ module.exports = async function handler(req, res) {
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ customMessage }),
+      body: JSON.stringify({ customMessage, recipients }),
       signal: abortController.signal,
     });
 

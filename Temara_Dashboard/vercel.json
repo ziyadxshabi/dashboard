@@ -3,7 +3,8 @@
     { "source": "/api/auth/me", "destination": "/api/auth?action=me" },
     { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" },
     { "source": "/book/:slug", "destination": "/book.html" },
-    { "source": "/api/public/clinic/:slug", "destination": "/api/public/clinic?slug=:slug" }
+    { "source": "/api/public/clinic/:slug", "destination": "/api/public/clinic?slug=:slug" },
+    { "source": "/api/webhooks/cal", "destination": "/api/webhooks/cal" }
   ],
   "headers": [
     {
