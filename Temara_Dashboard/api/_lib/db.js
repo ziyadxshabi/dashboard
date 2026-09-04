@@ -32,6 +32,7 @@ function getPool() {
     max: 5,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 8_000,
+    // Local Postgres has no TLS; Supabase pooler requires SSL.
     ssl: isLocalConnection(connectionString) ? false : { rejectUnauthorized: false },
   });
 
@@ -43,7 +44,16 @@ async function query(text, params = []) {
   return result;
 }
 
+function withClinic(clinicId) {
+  return {
+    clinicId,
+    query: (sql, params) => query(sql, params),
+    scoped: (sql, extraParams = []) => query(sql, [clinicId, ...extraParams]),
+  };
+}
+
 module.exports = {
   query,
   getPool,
+  withClinic,
 };

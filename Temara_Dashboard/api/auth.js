@@ -1,24 +1,19 @@
 /**
- * Role + username/password authentication for DentaFlow OS.
+ * DentaFlow OS — staff_users login against PostgreSQL.
  *
- * Routes (single serverless function):
+ * Routes (single serverless function, plus rewrite fallbacks):
  *   POST /api/auth         → login
- *   POST /api/auth/me      → session probe
+ *   POST /api/auth/me      → session probe (also Temara_Dashboard/api/auth/me.js)
  *   POST /api/auth/logout  → clear httpOnly cookie
  *
- * Vercel env (required):
- *   JWT_SECRET
- *   DOCTOR_USERNAME, DOCTOR_PASSWORD_HASH
- *   ASSISTANT_USERNAME, ASSISTANT_PASSWORD_HASH
- *
- * Hash generator:
- *   node -e "const c=require('./api/_lib/auth-crypto');console.log(c.hashPassword('your-password'))"
+ * JWT is stored in a single httpOnly cookie: dentaflow_session.
  */
+'use strict';
+
 const {
   applyCors,
   checkLoginRateLimit,
   clearAuthCookie,
-  getRoleCredentials,
   getTokenFromRequest,
   recordLoginFailure,
   resetLoginFailures,
@@ -27,6 +22,26 @@ const {
   verifyJwt,
   verifyPassword,
 } = require('./_lib/auth-crypto');
+const { query } = require('./_lib/db');
+
+const DEFAULT_CLINIC_SLUG = 'temara';
+
+const STAFF_LOOKUP_SQL = `
+  SELECT
+    su.id,
+    su.clinic_id,
+    su.username,
+    su.password_hash,
+    su.role::text AS role,
+    su.display_name,
+    c.slug,
+    c.name AS clinic_name
+  FROM staff_users su
+  INNER JOIN clinics c ON c.id = su.clinic_id
+  WHERE lower(su.username) = lower($1)
+    AND c.slug = $2
+  LIMIT 1
+`;
 
 function resolveAuthRoute(req) {
   const raw = String(req.url || '');
@@ -51,23 +66,33 @@ function resolveAuthRoute(req) {
   return 'login';
 }
 
+function sessionUserFromPayload(payload) {
+  return {
+    sub: payload.sub,
+    role: payload.role,
+    clinic_id: payload.clinic_id,
+    slug: payload.slug,
+  };
+}
+
 async function handleMe(req, res) {
   applyCors(res, 'POST, OPTIONS');
 
-  const expectedRole = req.body?.expectedRole || req.headers['x-expected-role'];
-  const token = getTokenFromRequest(req, expectedRole);
-
-  if (!token) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return res.status(503).json({ ok: false, code: 'UNAUTHORIZED' });
   }
 
-  const payload = verifyJwt(token, process.env.JWT_SECRET);
-  if (!payload) {
-    return res.status(401).json({ ok: false, error: 'Session expired' });
+  const token = getTokenFromRequest(req);
+  const payload = verifyJwt(token, secret);
+  if (!payload?.sub || !payload?.role || !payload?.clinic_id) {
+    return res.status(401).json({ ok: false, code: 'UNAUTHORIZED' });
   }
 
   return res.status(200).json({
     ok: true,
+    authenticated: true,
+    user: sessionUserFromPayload(payload),
     role: payload.role,
     sub: payload.sub,
   });
@@ -77,6 +102,12 @@ function handleLogout(req, res) {
   applyCors(res, 'POST, OPTIONS');
   clearAuthCookie(res);
   return res.status(200).json({ ok: true });
+}
+
+function resolveClinicSlug(body) {
+  const raw = body?.slug ?? body?.clinicSlug ?? body?.clinic_slug ?? body?.clinic;
+  const slug = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return slug || DEFAULT_CLINIC_SLUG;
 }
 
 async function handleLogin(req, res) {
@@ -97,26 +128,38 @@ async function handleLogin(req, res) {
     });
   }
 
-  const { role, username, password } = req.body ?? {};
-  const normalizedRole = typeof role === 'string' ? role.trim().toLowerCase() : '';
-  const normalizedUsername = typeof username === 'string' ? username.trim() : '';
-  const normalizedPassword = typeof password === 'string' ? password : '';
+  const body = req.body ?? {};
+  const requestedRole = typeof body.role === 'string' ? body.role.trim().toLowerCase() : '';
+  const normalizedUsername = typeof body.username === 'string' ? body.username.trim() : '';
+  const normalizedPassword = typeof body.password === 'string' ? body.password : '';
+  const clinicSlug = resolveClinicSlug(body);
 
-  if (!normalizedRole || !normalizedUsername || !normalizedPassword) {
+  if (!normalizedUsername || !normalizedPassword) {
     await recordLoginFailure();
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
 
-  const creds = getRoleCredentials(normalizedRole);
-  if (!creds.username || !creds.passwordHash) {
-    return res.status(503).json({ ok: false, error: 'Role credentials not configured' });
+  let staffRow;
+  try {
+    const result = await query(STAFF_LOOKUP_SQL, [normalizedUsername, clinicSlug]);
+    staffRow = result.rows[0];
+  } catch (err) {
+    console.error('[auth] staff_users lookup failed:', err?.message || err);
+    return res.status(503).json({ ok: false, error: 'Auth not configured' });
   }
 
-  const usernameMatch =
-    normalizedUsername.toLowerCase() === String(creds.username).trim().toLowerCase();
-  const passwordMatch = verifyPassword(normalizedPassword, creds.passwordHash);
+  if (!staffRow) {
+    await recordLoginFailure();
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
 
-  if (!usernameMatch || !passwordMatch) {
+  if (requestedRole && requestedRole !== staffRow.role) {
+    await recordLoginFailure();
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+
+  const passwordMatch = verifyPassword(normalizedPassword, staffRow.password_hash);
+  if (!passwordMatch) {
     await recordLoginFailure();
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
@@ -125,9 +168,10 @@ async function handleLogin(req, res) {
 
   const token = signJwt(
     {
-      role: normalizedRole,
-      sub: normalizedUsername,
-      clinic_id: process.env.CLINIC_ID || undefined,
+      sub: staffRow.id,
+      role: staffRow.role,
+      clinic_id: staffRow.clinic_id,
+      slug: staffRow.slug,
     },
     jwtSecret
   );
@@ -136,8 +180,13 @@ async function handleLogin(req, res) {
 
   return res.status(200).json({
     ok: true,
-    role: normalizedRole,
-    expiresInSec: 8 * 60 * 60,
+    user: {
+      username: staffRow.username,
+      role: staffRow.role,
+      displayName: staffRow.display_name,
+      clinicSlug: staffRow.slug,
+      clinicName: staffRow.clinic_name,
+    },
   });
 }
 
