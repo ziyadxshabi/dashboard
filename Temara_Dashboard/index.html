@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DentaFlow OS — Clinique Dentaire Témara Mall</title>
+  <title>DentaFlow OS</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%231A1A1F%22/><text x=%2250%22 y=%2250%22 font-family=%22sans-serif%22 font-size=%2250%22 fill=%22%23D5FF00%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>D</text></svg>">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DentaFlow">
@@ -58,7 +58,7 @@
       </div>
       <div class="login-viewport-brand-text">
         <span class="login-viewport-brand-name">DentaFlow OS</span>
-        <span class="login-viewport-brand-sub">Clinique Dentaire Témara Mall</span>
+        <span class="login-viewport-brand-sub" data-clinic-name>DentaFlow OS</span>
       </div>
     </header>
 
@@ -149,7 +149,7 @@
         </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
-          <span class="sidebar-brand-sub">Témara Mall</span>
+          <span class="sidebar-brand-sub clinic-name-display" id="clinic-title" data-clinic-name>DentaFlow OS</span>
         </div>
       </div>
 
@@ -189,7 +189,7 @@
     <header class="doctor-mobile-bar" aria-label="En-tête mobile">
       <div class="doctor-mobile-bar__brand">
         <span class="doctor-mobile-bar__title">DentaFlow OS</span>
-        <span class="doctor-mobile-bar__sub">Témara Mall</span>
+        <span class="doctor-mobile-bar__sub clinic-name-display" data-clinic-name>DentaFlow OS</span>
       </div>
       <button
         type="button"
@@ -223,9 +223,9 @@
     <div class="doctor-account-dock">
       <div class="account-card" data-popover-root>
         <div class="account-card__body">
-          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">DT</div>
+          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">DF</div>
           <div class="account-card__info">
-            <span class="account-card__name kinetic-label" id="profile-name">Dr. Tazi</span>
+            <span class="account-card__name kinetic-label" id="profile-name" data-staff-name>Équipe</span>
             <span class="account-card__role" id="profile-role">Chirurgien-dentiste</span>
           </div>
         </div>
@@ -313,7 +313,7 @@
         <header class="hero-header">
           <div class="hero-header__primary">
             <div class="hero-text">
-              <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name">Dr. Tazi</span></h1>
+              <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name" data-staff-name>Équipe</span></h1>
               <p class="hero-date" id="hero-date">—</p>
             </div>
             <span class="dentaflow-os-watermark" aria-hidden="true">DENTAFLOW OS</span>
@@ -624,7 +624,7 @@
         <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
           <div class="calendar-embed-header">
             <div class="chart-title">Planning Hebdomadaire</div>
-            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
+            <div class="chart-sub"><span data-clinic-name>DentaFlow OS</span> — vue staff</div>
           </div>
           <div id="dashboard-cal-inline"></div>
         </article>
@@ -858,7 +858,7 @@
                 name="message"
                 rows="6"
                 maxlength="320"
-                placeholder="Bonjour, la Clinique Dentaire Témara Mall vous informe que…"
+                placeholder="Bonjour, la clinique vous informe que…"
                 required
                 aria-required="true"
               ></textarea>
@@ -895,7 +895,9 @@
                 type="text"
                 id="settings-profile-name"
                 name="profile_name"
-                value="Dr. Tazi"
+                value=""
+                data-staff-name
+                placeholder="Nom complet"
                 autocomplete="name"
               />
             </div>
@@ -1208,6 +1210,7 @@
   <script src="confirm-dialog.js"></script>
   <script src="auth.js"></script>
   <script src="dashboard_app.js"></script>
+  <script src="shared.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
