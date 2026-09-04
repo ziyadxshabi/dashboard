@@ -1,0 +1,16 @@
+{
+  "name": "DentaFlow OS",
+  "install": "bash scripts/setup-dev-env.sh",
+  "terminals": [
+    {
+      "name": "dev-server",
+      "command": "node scripts/dev-server.js"
+    }
+  ],
+  "ports": [
+    {
+      "name": "DentaFlow dashboard",
+      "port": 3000
+    }
+  ]
+}
