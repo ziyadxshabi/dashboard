@@ -1,10 +1,32 @@
 /**
- * Doctor dashboard data proxy — JWT-gated bridge to n8n dashboard webhook.
- * Set JWT_SECRET, N8N_WEBHOOK_DASHBOARD, and DASHBOARD_AUTH_KEY in Vercel env.
+ * Doctor dashboard KPIs — clinic-scoped aggregations on today's bookings.
+ * Auth: dentaflow_session cookie → clinic_id.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+'use strict';
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const { applyCors } = require('./_lib/auth-crypto');
+const { query } = require('./_lib/db');
+const { createApiError, requireClinicSession, sendDbError } = require('./_lib/validation');
+
+const DASHBOARD_KPI_SQL = `
+  SELECT
+    COUNT(*) FILTER (WHERE status NOT IN ('Annule', 'Annulé'))::int AS patients_today,
+    COUNT(*) FILTER (
+      WHERE status IN (
+        'Confirme',
+        'Confirmé',
+        'En salle d''attente',
+        'En soin',
+        'Termine',
+        'Terminé'
+      )
+    )::int AS accepted_plans,
+    COUNT(*) FILTER (WHERE status = 'En attente')::int AS pending_plans,
+    COUNT(*) FILTER (WHERE status IN ('No-show', 'No-Show'))::int AS no_shows
+  FROM bookings
+  WHERE clinic_id = $1
+    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+`;
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -12,62 +34,28 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
+  applyCors(res, 'GET, OPTIONS');
+
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireBearerSession(req, res, { allowedRoles: ['doctor'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['doctor', 'assistant'] });
   if (!session) return;
 
-  const webhookUrl = process.env.N8N_WEBHOOK_DASHBOARD;
-  if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
-  }
-  const authKey = String(process.env.DASHBOARD_AUTH_KEY ?? process.env.N8N_AUTH_KEY ?? '').trim();
-  if (!authKey) {
-    console.error('[dashboard-data] DASHBOARD_AUTH_KEY is not configured');
-    return res.status(500).json({ error: 'Server misconfiguration' });
-  }
-
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
-
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        'content-type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-        'user-agent': 'DentaFlow-Doctor-Proxy/1.0',
-        'x-agency-auth': authKey,
+    const result = await query(DASHBOARD_KPI_SQL, [session.clinic_id]);
+    const row = result.rows[0] || {};
+    return res.status(200).json({
+      ok: true,
+      data: {
+        patients_today: Number(row.patients_today) || 0,
+        accepted_plans: Number(row.accepted_plans) || 0,
+        pending_plans: Number(row.pending_plans) || 0,
+        no_shows: Number(row.no_shows) || 0,
       },
-      signal: abortController.signal,
-      redirect: 'follow',
     });
-
-    clearTimeout(timeoutId);
-
-    const rawText = await response.text();
-    let payload;
-
-    try {
-      payload = rawText ? JSON.parse(rawText) : null;
-    } catch {
-      return res.status(500).json({ error: 'Invalid JSON response from upstream' });
-    }
-
-    if (!response.ok) {
-      return res.status(500).json({
-        error: 'Upstream request failed',
-        details: rawText?.slice(0, 500) || `HTTP ${response.status}`,
-      });
-    }
-
-    return res.status(200).json(payload);
   } catch (err) {
-    clearTimeout(timeoutId);
-    console.error('[dashboard-data] Upstream fetch failed:', err);
-    return res.status(500).json({ error: 'n8n unreachable' });
+    return sendDbError(res, err);
   }
 };

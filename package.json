@@ -17,9 +17,9 @@
     "lodash.isstring": "^4.0.1",
     "lodash.once": "^4.1.1",
     "ms": "^2.1.3",
+    "pg": "^8.23.0",
     "safe-buffer": "^5.2.1"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

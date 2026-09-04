@@ -127,6 +127,7 @@ async function handleLogin(req, res) {
     {
       role: normalizedRole,
       sub: normalizedUsername,
+      clinic_id: process.env.CLINIC_ID || undefined,
     },
     jwtSecret
   );

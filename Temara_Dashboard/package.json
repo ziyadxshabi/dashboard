@@ -1,0 +1,7 @@
+{
+  "name": "temara-dashboard",
+  "private": true,
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

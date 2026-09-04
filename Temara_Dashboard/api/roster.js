@@ -1,45 +1,63 @@
 /**
- * Assistant roster proxy — same-origin bridge to n8n webhook assistant-data.
- * Set JWT_SECRET, N8N_WEBHOOK_ROSTER + optional N8N_AUTH_KEY in Vercel env.
+ * Today's roster — clinic-scoped bookings from PostgreSQL.
+ * Auth: dentaflow_session cookie → clinic_id.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+'use strict';
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const { applyCors } = require('./_lib/auth-crypto');
+const { query } = require('./_lib/db');
+const { createApiError, requireClinicSession, sendDbError } = require('./_lib/validation');
 
-function isHtmlPayload(text, contentType) {
-  const trimmed = (text ?? '').trim().toLowerCase();
-  return (
-    contentType.includes('text/html') ||
-    trimmed.startsWith('<!doctype') ||
-    trimmed.startsWith('<html')
-  );
+const ROSTER_SQL = `
+  SELECT id, cal_booking_uid, patient_name, patient_phone, treatment_name, status, starts_at, duration_min, notes
+  FROM bookings
+  WHERE clinic_id = $1
+    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+  ORDER BY starts_at ASC
+`;
+
+function formatCasablancaHm(startsAt) {
+  if (startsAt == null || startsAt === '') return '';
+  const parsed = startsAt instanceof Date ? startsAt : new Date(startsAt);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Casablanca',
+  });
 }
 
-function looksLikeRosterRecord(obj) {
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
-  return (
-    Object.prototype.hasOwnProperty.call(obj, 'id') ||
-    Object.prototype.hasOwnProperty.call(obj, 'Patient (Nom Complet)') ||
-    Object.prototype.hasOwnProperty.call(obj, 'Date & Heure du RDV') ||
-    Object.prototype.hasOwnProperty.call(obj, 'Clean_Name')
-  );
-}
+function mapRosterRow(row) {
+  const patientName = row.patient_name || '';
+  const patientPhone = row.patient_phone || '';
+  const treatmentName = row.treatment_name || '';
+  const time = formatCasablancaHm(row.starts_at);
 
-/** Always return an array of row objects for the frontend parser. */
-function normalizeUpstreamRosterRows(parsed) {
-  if (Array.isArray(parsed)) return parsed;
-  if (!parsed || typeof parsed !== 'object') return [];
-
-  if (Array.isArray(parsed.data)) return parsed.data;
-  if (Array.isArray(parsed.results)) return parsed.results;
-  if (Array.isArray(parsed.items)) return parsed.items;
-  if (Array.isArray(parsed.json)) return parsed.json;
-
-  if (looksLikeRosterRecord(parsed)) return [parsed];
-  if (looksLikeRosterRecord(parsed.data)) return [parsed.data];
-  if (looksLikeRosterRecord(parsed.json)) return [parsed.json];
-
-  return [];
+  return {
+    id: row.id,
+    name: patientName,
+    patient_name: patientName,
+    phone: patientPhone,
+    patient_phone: patientPhone,
+    motif: treatmentName,
+    treatment_name: treatmentName,
+    treatment: treatmentName,
+    status: row.status,
+    time,
+    duration_min: row.duration_min,
+    cal_booking_uid: row.cal_booking_uid,
+    calBookingId: row.cal_booking_uid,
+    notes: row.notes || '',
+    starts_at: row.starts_at,
+    startTime: row.starts_at,
+    'Patient (Nom Complet)': patientName,
+    'Téléphone (WhatsApp)': patientPhone,
+    'Motif de Consultation': treatmentName,
+    'Statut du RDV': row.status,
+    'Cal Booking ID': row.cal_booking_uid,
+    'Date & Heure du RDV': row.starts_at,
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -48,100 +66,20 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
+  applyCors(res, 'GET, OPTIONS');
+
   if (req.method !== 'GET') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireBearerSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
   if (!session) return;
 
-  const webhookUrl = process.env.N8N_WEBHOOK_ROSTER;
-  if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
-  }
-  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
-  if (!authKey) {
-    console.error('[roster] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
-  }
-
-  const headers = {
-    accept: 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-    'user-agent': 'DentaFlow-Assistant-Proxy/1.0',
-    'x-agency-auth': authKey,
-  };
-
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
-
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'GET',
-      headers,
-      signal: abortController.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    const contentType = (response.headers.get('content-type') || '').toLowerCase();
-    const rawText = await response.text();
-
-    if (!response.ok) {
-      return res.status(200).json({
-        ok: false,
-        error: 'Upstream HTTP Error',
-        details: rawText || `HTTP ${response.status}`,
-        upstreamStatus: response.status,
-      });
-    }
-
-    if (!rawText?.trim()) {
-      return res.status(200).json({
-        ok: false,
-        error: 'Upstream Error',
-        details: 'Réponse vide — vérifiez le nœud Respond to Webhook dans n8n.',
-      });
-    }
-
-    if (isHtmlPayload(rawText, contentType)) {
-      return res.status(200).json({
-        ok: false,
-        error: 'Upstream Error',
-        details: rawText.slice(0, 500),
-        ngrokInterstitial: true,
-      });
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      return res.status(200).json({
-        ok: false,
-        error: 'Upstream Error',
-        details: rawText.slice(0, 500),
-      });
-    }
-
-    if (parsed?.code === 404 && String(parsed?.message || '').includes('webhook')) {
-      return res.status(200).json({
-        ok: false,
-        error: 'Webhook Not Registered',
-        details: parsed.message,
-        hint: parsed.hint,
-      });
-    }
-
-    const rows = normalizeUpstreamRosterRows(parsed);
-    return res.status(200).json({ ok: true, data: rows });
+    const result = await query(ROSTER_SQL, [session.clinic_id]);
+    const appointments = (result.rows || []).map(mapRosterRow);
+    return res.status(200).json({ ok: true, data: appointments });
   } catch (err) {
-    clearTimeout(timeoutId);
-    const isTimeout = err?.name === 'AbortError';
-    return res.status(200).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return sendDbError(res, err);
   }
 };

@@ -1,10 +1,25 @@
 /**
- * Roster status update proxy — POST bridge to n8n webhook update-status.
- * Set JWT_SECRET, N8N_WEBHOOK_UPDATE_STATUS + optional N8N_AUTH_KEY in Vercel env.
+ * Appointment status update — clinic-scoped PostgreSQL write.
+ * Auth: dentaflow_session cookie → clinic_id.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+'use strict';
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const { applyCors } = require('./_lib/auth-crypto');
+const { query } = require('./_lib/db');
+const {
+  createApiError,
+  requireClinicSession,
+  sendDbError,
+  validateStatusUpdate,
+} = require('./_lib/validation');
+
+const UPDATE_STATUS_SQL = `
+  UPDATE bookings
+  SET status = $1
+  WHERE clinic_id = $2
+    AND (id::text = $3 OR cal_booking_uid = $3)
+  RETURNING id, cal_booking_uid, status
+`;
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -12,73 +27,32 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
+  applyCors(res, 'POST, OPTIONS');
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireBearerSession(req, res);
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
   if (!session) return;
 
-  if (!['assistant', 'doctor'].includes(session.role)) {
-    return res.status(403).json({ error: 'Accès refusé: Rôle non autorisé.' });
+  const parsed = validateStatusUpdate(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(400).json(parsed.error);
   }
-
-  const webhookUrl = process.env.N8N_WEBHOOK_UPDATE_STATUS;
-  if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
-  }
-  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
-  if (!authKey) {
-    console.error('[update-status] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
-  }
-  const { bookingId, newStatus } = req.body ?? {};
-
-  const headers = {
-    'content-type': 'application/json',
-    accept: 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-    'user-agent': 'DentaFlow-Assistant-Proxy/1.0',
-    'x-agency-auth': authKey,
-  };
-
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ bookingId, newStatus }),
-      signal: abortController.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    const rawText = await response.text();
-    let parsed = null;
-    try {
-      parsed = rawText ? JSON.parse(rawText) : null;
-    } catch {
-      parsed = rawText;
+    const result = await query(UPDATE_STATUS_SQL, [
+      parsed.value.newStatus,
+      session.clinic_id,
+      parsed.value.bookingId,
+    ]);
+    const updatedRow = result.rows[0];
+    if (!updatedRow) {
+      return res.status(404).json(createApiError('NOT_FOUND', 'Appointment not found'));
     }
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        ok: false,
-        error: 'Upstream HTTP Error',
-        details: rawText || `HTTP ${response.status}`,
-      });
-    }
-
-    return res.status(200).json({ ok: true, data: parsed });
+    return res.status(200).json({ ok: true, data: updatedRow });
   } catch (err) {
-    clearTimeout(timeoutId);
-    const isTimeout = err?.name === 'AbortError';
-    return res.status(502).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return sendDbError(res, err);
   }
 };
