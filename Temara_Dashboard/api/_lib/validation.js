@@ -164,6 +164,105 @@ function validateWaitlistInput(body = {}) {
   };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SLOT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SLOT_TIME_RE = /^\d{2}:\d{2}$/;
+
+function casablancaDateTimeParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Casablanca',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value || '';
+  return {
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    time: `${get('hour')}:${get('minute')}`,
+  };
+}
+
+function validatePhone(value) {
+  const phone = compactPhone(value);
+  if (!PHONE_RE.test(phone)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'Téléphone invalide'),
+    };
+  }
+  return { ok: true, value: phone };
+}
+
+function validateTeamNoteInput(body = {}) {
+  const note = String(body.note ?? body.text ?? body.content ?? '').trim();
+  const patientName = String(body.patientName ?? body.patient_name ?? '').trim();
+  const bookingRaw = String(body.bookingId ?? body.booking_id ?? '').trim();
+  const author = String(body.author ?? body.author_name ?? '').trim();
+
+  if (!note) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'note is required'),
+    };
+  }
+  if (note.length > 2000) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'note must be at most 2000 characters'),
+    };
+  }
+  if (patientName.length > 200) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'patientName is too long'),
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      note,
+      patientName: patientName || null,
+      bookingId: UUID_RE.test(bookingRaw) ? bookingRaw : null,
+      author,
+    },
+  };
+}
+
+function validateFillGapInput(body = {}) {
+  const defaults = casablancaDateTimeParts();
+  const slotDate = String(body.slotDate ?? body.date ?? '').trim() || defaults.date;
+  const slotTime = String(body.slotTime ?? body.time ?? '').trim() || defaults.time;
+  const reason = String(body.reason ?? body.motif ?? '').trim();
+
+  if (!SLOT_DATE_RE.test(slotDate)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'slotDate must be YYYY-MM-DD'),
+    };
+  }
+  if (!SLOT_TIME_RE.test(slotTime)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'slotTime must be HH:MM'),
+    };
+  }
+  if (reason.length > 500) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'reason is too long'),
+    };
+  }
+
+  return {
+    ok: true,
+    value: { slotDate, slotTime, reason },
+  };
+}
+
 function validateStatusUpdate(body = {}) {
   const bookingId = String(body.bookingId ?? body.id ?? body.cal_booking_uid ?? '').trim();
   const rawStatus = body.newStatus ?? body.status;
@@ -203,6 +302,9 @@ module.exports = {
   sendDbError,
   validateWaitlistInput,
   validateStatusUpdate,
+  validatePhone,
+  validateTeamNoteInput,
+  validateFillGapInput,
   canonicalizeAppointmentStatus,
   compactPhone,
 };

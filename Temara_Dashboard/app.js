@@ -525,7 +525,7 @@ let handoffNotes = [];
       console.error('[Handoff] Load failed:', error?.message || error);
       handoffNotes = [];
       renderHandoffBoard({
-        errorMessage: 'Impossible de charger les transmissions — vérifiez la connexion n8n.',
+        errorMessage: 'Impossible de charger les transmissions — erreur de synchronisation avec la base de données.',
       });
     }
   }
@@ -1522,7 +1522,7 @@ let handoffNotes = [];
   function getN8nWebhookErrorMessage(payload) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
     if (payload.code === 404 && String(payload.message || '').toLowerCase().includes('webhook')) {
-      return 'Webhook n8n inactif — activez « Workflow 1 - Load Dashboard » dans n8n, puis réessayez.';
+      return 'Erreur de synchronisation avec la base de données';
     }
     if (payload.code && payload.message) {
       return String(payload.message);
@@ -2074,7 +2074,7 @@ let handoffNotes = [];
       clearBulkSelection();
       if (cancelResult?.status === 'partial_success') {
         showToast(
-          'Annulation Partielle : La base de données a été mise à jour, mais la synchronisation avec Google Sheets a échoué. Veuillez vérifier le fichier.',
+          'Erreur de synchronisation avec la base de données',
           'warning'
         );
       } else {
@@ -2206,10 +2206,10 @@ let handoffNotes = [];
       return PLANNING_UPSTREAM_ERROR_MESSAGE;
     }
     if (msg.includes('not registered') || msg.includes('Webhook n8n inactif')) {
-      return 'Webhook n8n inactif — activez « Workflow 1 - Load Dashboard » dans n8n, puis réessayez.';
+      return 'Erreur de synchronisation avec la base de données';
     }
     if (/^HTTP 404\b/.test(msg) || msg.includes('HTTP 404')) {
-      return 'Endpoint introuvable (HTTP 404) — le workflow n8n doit être publié et actif.';
+      return 'Erreur de synchronisation avec la base de données';
     }
     if (/^HTTP 5\d{2}\b/.test(msg)) {
       return PLANNING_UPSTREAM_ERROR_MESSAGE;

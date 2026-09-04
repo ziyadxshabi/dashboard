@@ -1,19 +1,30 @@
 /**
- * Patient lead capture proxy — public POST bridge to n8n lead-capture webhook.
- * Set N8N_WEBHOOK_LEAD_CAPTURE + N8N_AUTH_KEY in Vercel env.
+ * Public web lead capture — inserts an active waitlist row scoped by clinic slug.
  */
+'use strict';
+
 const { applyCors } = require('./_lib/auth-crypto');
+const { query } = require('./_lib/db');
+const { createApiError, sendDbError, validatePhone } = require('./_lib/validation');
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const DEFAULT_CLINIC_SLUG = 'temara';
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-function upstreamHeaders(authKey) {
-  return {
-    accept: 'application/json',
-    'content-type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-    'user-agent': 'DentaFlow-LeadCapture-Proxy/1.0',
-    'x-agency-auth': authKey,
-  };
+const CLINIC_LOOKUP_SQL = `
+  SELECT id FROM clinics WHERE slug = $1 LIMIT 1
+`;
+
+const WAITLIST_LEAD_INSERT_SQL = `
+  INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status)
+  VALUES ($1, $2, $3, 'Moyenne', 'Lead Web Capture', 'active')
+  RETURNING id
+`;
+
+function sanitizeClinicSlug(raw) {
+  const slug = String(raw ?? '').trim().toLowerCase();
+  if (!slug) return DEFAULT_CLINIC_SLUG;
+  if (!SLUG_RE.test(slug) || slug.length > 64) return null;
+  return slug;
 }
 
 module.exports = async function handler(req, res) {
@@ -22,69 +33,44 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
-  }
+  applyCors(res, 'POST, OPTIONS');
 
-  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
-  if (!authKey) {
-    console.error('[lead-capture] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
+  if (req.method !== 'POST') {
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
   const body = req.body ?? {};
-  const nom = typeof body.nom === 'string' ? body.nom.trim() : '';
-  const telephone = typeof body.telephone === 'string' ? body.telephone.trim() : '';
+  const nom = String(body.nom ?? body.name ?? '').trim();
+  const telephoneRaw = String(body.telephone ?? body.phone ?? '').trim();
+  const clinicSlug = sanitizeClinicSlug(body.clinicSlug ?? body.clinic_slug ?? body.slug);
 
-  if (!nom || !telephone) {
-    return res.status(400).json({ ok: false, error: 'nom and telephone are required' });
+  if (!clinicSlug) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'clinicSlug invalide'));
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_LEAD_CAPTURE;
-  if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
+  if (nom.length < 2) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'nom is required (min 2 characters)'));
   }
-  const payload = { nom, telephone };
 
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
+  const phoneResult = validatePhone(telephoneRaw);
+  if (!phoneResult.ok) {
+    return res.status(400).json(phoneResult.error);
+  }
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: upstreamHeaders(authKey),
-      body: JSON.stringify(payload),
-      signal: abortController.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    const rawText = await response.text();
-    const contentType = response.headers.get('content-type') || 'application/json';
-
-    if (!response.ok) {
-      let details = rawText?.slice(0, 500) || `HTTP ${response.status}`;
-      try {
-        const parsed = rawText ? JSON.parse(rawText) : null;
-        if (parsed?.message) details = String(parsed.message);
-      } catch { /* keep raw slice */ }
-      return res.status(response.status).json({
-        ok: false,
-        error: 'Upstream request failed',
-        details,
-      });
+    const clinicResult = await query(CLINIC_LOOKUP_SQL, [clinicSlug]);
+    const clinicId = clinicResult.rows?.[0]?.id;
+    if (!clinicId) {
+      return res.status(404).json(createApiError('NOT_FOUND', 'Clinic not found'));
     }
 
-    res.setHeader('Content-Type', contentType);
-    return res.status(200).send(rawText || JSON.stringify({ ok: true, message: 'Lead captured' }));
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.error('[lead-capture] Upstream fetch failed:', err);
-    const isTimeout = err?.name === 'AbortError';
-    return res.status(502).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
+    await query(WAITLIST_LEAD_INSERT_SQL, [clinicId, nom, phoneResult.value]);
+
+    return res.status(200).json({
+      ok: true,
+      message: 'Demande enregistrée avec succès',
     });
+  } catch (err) {
+    return sendDbError(res, err);
   }
 };

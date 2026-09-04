@@ -1718,13 +1718,13 @@ async function parseDashboardJson(response) {
   const text = await response.text();
 
   if (!text || !text.trim()) {
-    throw new Error('Réponse vide du serveur — le workflow n8n n\'a renvoyé aucune donnée.');
+    throw new Error('Erreur de synchronisation avec la base de données');
   }
 
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error('Réponse JSON invalide — vérifiez la sortie du webhook n8n.');
+    throw new Error('Erreur de synchronisation avec la base de données');
   }
 }
 
@@ -1758,9 +1758,9 @@ async function loadDashboard(isSilentSync = false) {
       try {
         const errBody = await response.clone().json();
         if (typeof errBody?.details === 'string' && errBody.details.trim()) {
-          msg = `Erreur n8n — ${errBody.details.slice(0, 160)}`;
+          msg = `Erreur de synchronisation avec la base de données — ${errBody.details.slice(0, 160)}`;
         } else if (typeof errBody?.error === 'string' && errBody.error.trim()) {
-          msg = `Erreur n8n — ${errBody.error}`;
+          msg = `Erreur de synchronisation avec la base de données — ${errBody.error}`;
         }
       } catch { /* keep generic status message */ }
       throw new Error(msg);
@@ -1775,7 +1775,7 @@ async function loadDashboard(isSilentSync = false) {
     if (raw && raw.ok === false) {
       const detail = typeof raw.details === 'string' ? raw.details.slice(0, 160) : '';
 
-      throw new Error(detail ? `Erreur n8n — ${detail}` : (raw.error || 'Erreur amont'));
+      throw new Error(detail ? `Erreur de synchronisation avec la base de données — ${detail}` : (raw.error || 'Erreur de synchronisation avec la base de données'));
     }
 
     const data = normaliseData(raw);
@@ -4052,7 +4052,7 @@ async function loadTeamNotes() {
       if (syncEl) syncEl.textContent = 'Sync partielle';
     } else {
       renderTeamNotesList([], {
-        errorMessage: 'Impossible de charger les messages — vérifiez la connexion n8n.',
+        errorMessage: 'Impossible de charger les messages — erreur de synchronisation avec la base de données.',
       });
     }
   }

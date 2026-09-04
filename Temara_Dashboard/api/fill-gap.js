@@ -1,10 +1,52 @@
 /**
- * Fill-gap / waitlist blast proxy — POST bridge to n8n webhook fill-gap.
- * Set JWT_SECRET, N8N_WEBHOOK_FILL_GAP + N8N_AUTH_KEY in Vercel env.
+ * Fill-gap — clinic-scoped waitlist candidates from PostgreSQL.
+ * Optionally fans out to N8N_WEBHOOK_FILL_GAP without blocking the response.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+'use strict';
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const { applyCors } = require('./_lib/auth-crypto');
+const { query } = require('./_lib/db');
+const {
+  createApiError,
+  requireClinicSession,
+  sendDbError,
+  validateFillGapInput,
+} = require('./_lib/validation');
+
+const FILL_GAP_CANDIDATES_SQL = `
+  SELECT id, patient_name, patient_phone, priority
+  FROM waitlist
+  WHERE clinic_id = $1 AND status = 'active'
+  ORDER BY CASE priority
+    WHEN 'Urgent' THEN 1
+    WHEN 'Haute' THEN 2
+    WHEN 'Moyenne' THEN 3
+    ELSE 4
+  END, created_at ASC
+  LIMIT 10
+`;
+
+function enqueueFillGapWebhook(payload) {
+  const webhookUrl = String(process.env.N8N_WEBHOOK_FILL_GAP || '').trim();
+  if (!webhookUrl) return;
+
+  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
+  const headers = {
+    accept: 'application/json',
+    'content-type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+    'user-agent': 'DentaFlow-FillGap/1.0',
+  };
+  if (authKey) headers['x-agency-auth'] = authKey;
+
+  void fetch(webhookUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  }).catch((err) => {
+    console.error('[fill-gap] SMS webhook failed:', err?.message || err);
+  });
+}
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -12,69 +54,36 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
+  applyCors(res, 'POST, OPTIONS');
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireBearerSession(req, res, { allowedRoles: ['assistant'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
   if (!session) return;
 
-  const webhookUrl = process.env.N8N_WEBHOOK_FILL_GAP;
-  if (!webhookUrl) {
-    return res.status(503).json({ ok: false, error: 'Webhook not configured' });
-  }
-  const authKey = String(process.env.N8N_AUTH_KEY ?? process.env.DASHBOARD_AUTH_KEY ?? '').trim();
-  if (!authKey) {
-    console.error('[fill-gap] N8N_AUTH_KEY is not configured');
-    return res.status(500).json({ ok: false, error: 'Server misconfiguration' });
+  const parsed = validateFillGapInput(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(400).json(parsed.error);
   }
 
-  const headers = {
-    accept: 'application/json',
-    'content-type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-    'user-agent': 'DentaFlow-Assistant-Proxy/1.0',
-    'x-agency-auth': authKey,
-  };
-
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), UPSTREAM_TIMEOUT_MS);
+  const { slotDate, slotTime, reason } = parsed.value;
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(req.body ?? {}),
-      signal: abortController.signal,
+    const result = await query(FILL_GAP_CANDIDATES_SQL, [session.clinic_id]);
+    const candidates = result.rows || [];
+
+    enqueueFillGapWebhook({
+      clinic_id: session.clinic_id,
+      slotDate,
+      slotTime,
+      reason,
+      candidates,
     });
 
-    clearTimeout(timeoutId);
-
-    const rawText = await response.text();
-    let parsed = null;
-    try {
-      parsed = rawText ? JSON.parse(rawText) : null;
-    } catch {
-      parsed = rawText;
-    }
-
-    if (!response.ok) {
-      return res.status(200).json({
-        ok: false,
-        error: 'Upstream HTTP Error',
-        details: rawText || `HTTP ${response.status}`,
-        upstreamStatus: response.status,
-      });
-    }
-
-    return res.status(200).json({ ok: true, data: parsed });
+    return res.status(200).json({ ok: true, slotDate, slotTime, candidates });
   } catch (err) {
-    clearTimeout(timeoutId);
-    const isTimeout = err?.name === 'AbortError';
-    return res.status(200).json({
-      ok: false,
-      error: isTimeout ? 'Upstream Timeout' : 'Proxy Request Failed',
-      details: err?.message || 'Unknown proxy error',
-    });
+    return sendDbError(res, err);
   }
 };
