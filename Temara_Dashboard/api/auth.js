@@ -26,6 +26,23 @@ const { query } = require('./_lib/db');
 
 const DEFAULT_CLINIC_SLUG = 'temara';
 
+const SESSION_HYDRATE_SQL = `
+  SELECT
+    su.id,
+    su.clinic_id,
+    su.role::text AS role,
+    su.display_name,
+    c.slug,
+    c.name AS clinic_name,
+    c.theme_preset,
+    c.theme_tokens
+  FROM staff_users su
+  INNER JOIN clinics c ON c.id = su.clinic_id
+  WHERE su.id = $1
+    AND su.clinic_id = $2
+  LIMIT 1
+`;
+
 const STAFF_LOOKUP_SQL = `
   SELECT
     su.id,
@@ -35,7 +52,9 @@ const STAFF_LOOKUP_SQL = `
     su.role::text AS role,
     su.display_name,
     c.slug,
-    c.name AS clinic_name
+    c.name AS clinic_name,
+    c.theme_preset,
+    c.theme_tokens
   FROM staff_users su
   INNER JOIN clinics c ON c.id = su.clinic_id
   WHERE lower(su.username) = lower($1)
@@ -66,12 +85,32 @@ function resolveAuthRoute(req) {
   return 'login';
 }
 
-function sessionUserFromPayload(payload) {
+function parseThemeTokens(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function toVerifiedUser(row, payload) {
+  const slug = String(row?.slug || payload?.slug || '');
   return {
-    sub: payload.sub,
-    role: payload.role,
-    clinic_id: payload.clinic_id,
-    slug: payload.slug,
+    sub: row?.id || payload?.sub,
+    role: String(row?.role || payload?.role || ''),
+    clinic_id: row?.clinic_id || payload?.clinic_id,
+    slug,
+    displayName: String(row?.display_name || '').trim(),
+    clinicName: String(row?.clinic_name || '').trim(),
+    clinicSlug: slug,
+    themePreset: String(row?.theme_preset || '').trim(),
+    themeTokens: parseThemeTokens(row?.theme_tokens),
   };
 }
 
@@ -89,12 +128,21 @@ async function handleMe(req, res) {
     return res.status(401).json({ ok: false, code: 'UNAUTHORIZED' });
   }
 
+  let row = null;
+  try {
+    const result = await query(SESSION_HYDRATE_SQL, [payload.sub, payload.clinic_id]);
+    row = result.rows[0] || null;
+  } catch (err) {
+    console.error('[auth] session hydrate failed:', err?.message || err);
+  }
+
+  const user = toVerifiedUser(row, payload);
   return res.status(200).json({
     ok: true,
     authenticated: true,
-    user: sessionUserFromPayload(payload),
-    role: payload.role,
-    sub: payload.sub,
+    user,
+    role: user.role,
+    sub: user.sub,
   });
 }
 
@@ -186,6 +234,8 @@ async function handleLogin(req, res) {
       displayName: staffRow.display_name,
       clinicSlug: staffRow.slug,
       clinicName: staffRow.clinic_name,
+      themePreset: String(staffRow.theme_preset || '').trim(),
+      themeTokens: parseThemeTokens(staffRow.theme_tokens),
     },
   });
 }

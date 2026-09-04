@@ -89,9 +89,9 @@
 
       <div class="account-card" data-popover-root>
         <div class="account-card__body">
-          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">SA</div>
+          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">DF</div>
           <div class="account-card__info">
-            <span class="account-card__name kinetic-label" id="profile-name">Sanae Amrani</span>
+            <span class="account-card__name kinetic-label" id="profile-name" data-staff-name>Équipe</span>
             <span class="account-card__role" id="profile-role">Assistante dentaire</span>
           </div>
         </div>
@@ -156,7 +156,7 @@
 
         <header class="assistant-header">
           <div>
-            <h1 class="assistant-header__title kinetic-title">Bonjour, <span id="hero-profile-name">Sanae</span></h1>
+            <h1 class="assistant-header__title kinetic-title">Bonjour, <span id="hero-profile-name" data-staff-name>Équipe</span></h1>
             <p class="assistant-header__sub" id="assistant-date">—</p>
           </div>
           <div class="assistant-header__meta">
@@ -345,7 +345,7 @@
         <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
           <div class="calendar-embed-header">
             <div class="chart-title">Planning Hebdomadaire</div>
-            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
+            <div class="chart-sub"><span data-clinic-name>DentaFlow OS</span> — vue staff</div>
           </div>
           <div id="dashboard-cal-inline"></div>
         </article>
@@ -589,7 +589,9 @@
                 type="text"
                 id="settings-profile-name"
                 name="profile_name"
-                value="Sanae Amrani"
+                value=""
+                data-staff-name
+                placeholder="Nom complet"
                 autocomplete="name"
               />
             </div>

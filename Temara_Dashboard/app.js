@@ -1,6 +1,6 @@
 /**
- * Assistant Command Center — n8n live data pipeline
- * Clinique Dentaire Témara Mall · DentaFlow OS
+ * Assistant Command Center — live clinic operations
+ * DentaFlow OS
  */
 
 (function () {
@@ -1043,15 +1043,24 @@ let handoffNotes = [];
 
     const nameEl = $('settings-profile-name');
     const roleEl = $('settings-profile-specialty');
-    const defaults = isAssistant ? DEFAULT_SETTINGS : {
-      profileName: 'Dr. Tazi',
-      profileSpecialty: 'Chirurgien-dentiste',
-    };
+    const session = window.DentaFlowSession?.getUser?.();
+    const defaults = isAssistant
+      ? {
+          profileName: resolveProfileName('', session) || 'Équipe',
+          profileSpecialty: DEFAULT_SETTINGS.profileSpecialty,
+        }
+      : {
+          profileName: resolveProfileName('', session) || 'Médecin',
+          profileSpecialty: 'Chirurgien-dentiste',
+        };
 
     if (nameEl) {
       const storedName = demoStorageGet(nameKey, '');
-      if (storedName) nameEl.value = storedName;
-      else if (!nameEl.value) nameEl.value = defaults.profileName;
+      if (storedName && !window.DentaFlowSession?.isLegacyStaffName?.(storedName)) {
+        nameEl.value = storedName;
+      } else if (!nameEl.value || window.DentaFlowSession?.isLegacyStaffName?.(nameEl.value)) {
+        nameEl.value = defaults.profileName;
+      }
     }
     if (roleEl) {
       const storedRole = demoStorageGet(roleKey, '');
@@ -1811,7 +1820,7 @@ let handoffNotes = [];
       calBookingId: row?.dataset?.calBookingId || record.calBookingId || '',
       scheduleDate: String(row?.dataset?.scheduleDate ?? formatScheduleDate(record.rawDate)).trim(),
       startTime: String(row?.dataset?.startTime ?? record.time ?? '').trim(),
-      practitioner: String(row?.dataset?.practitioner ?? record.practitioner ?? 'Dr. Tazi').trim(),
+      practitioner: String(row?.dataset?.practitioner ?? record.practitioner ?? (getSessionDisplayName() || 'Praticien')).trim(),
     };
   }
 
@@ -2315,7 +2324,7 @@ let handoffNotes = [];
       item['Praticien Assigné'] ??
       item['Praticien'] ??
       item.practitioner ??
-      'Dr. Tazi'
+      (getSessionDisplayName() || 'Praticien')
     ).trim();
 
     const baserowRowId = parseBaserowRowId(
@@ -4474,11 +4483,32 @@ let handoffNotes = [];
 
   const DEFAULT_SETTINGS = {
     theme: 'oak-lounge',
-    profileName: 'Sanae Amrani',
+    profileName: '',
     profileSpecialty: 'Assistante dentaire',
     smsReminders: true,
     emailReminders: true,
   };
+
+  function getSessionUser() {
+    return window.DentaFlowSession?.getUser?.() || null;
+  }
+
+  function getSessionDisplayName() {
+    return String(getSessionUser()?.displayName || '').trim();
+  }
+
+  function getSessionClinicName() {
+    return String(getSessionUser()?.clinicName || '').trim() || 'DentaFlow OS';
+  }
+
+  function resolveProfileName(savedName, session) {
+    const sessionName = String(session?.displayName || getSessionDisplayName()).trim();
+    const saved = String(savedName || '').trim();
+    if (!saved || window.DentaFlowSession?.isLegacyStaffName?.(saved)) {
+      return sessionName;
+    }
+    return saved;
+  }
 
   let volatileSettings = { ...DEFAULT_SETTINGS };
 
@@ -4861,7 +4891,7 @@ let handoffNotes = [];
   }
 
   function applyUserProfile(name, specialty) {
-    const displayName = (name ?? '').trim() || DEFAULT_SETTINGS.profileName;
+    const displayName = (name ?? '').trim() || getSessionDisplayName() || 'Équipe';
     const displayRole = (specialty ?? '').trim() || DEFAULT_SETTINGS.profileSpecialty;
     const initials = extractInitials(displayName);
     const firstName = displayName.split(/\s+/)[0] || displayName;
@@ -4877,13 +4907,13 @@ let handoffNotes = [];
     if (heroEl) heroEl.textContent = firstName;
   }
 
-  function initUserProfile() {
+  function initUserProfile(session) {
     const saved = loadSettings();
     const nameEl = $('settings-profile-name');
     const specialtyEl = $('settings-profile-specialty');
 
-    const profileName = saved.profileName ?? DEFAULT_SETTINGS.profileName;
-    const profileSpecialty = saved.profileSpecialty ?? DEFAULT_SETTINGS.profileSpecialty;
+    const profileName = resolveProfileName(saved.profileName, session);
+    const profileSpecialty = saved.profileSpecialty || DEFAULT_SETTINGS.profileSpecialty;
 
     if (nameEl) nameEl.value = profileName;
     if (specialtyEl) specialtyEl.value = profileSpecialty;
@@ -5429,8 +5459,15 @@ let handoffNotes = [];
     });
   }
 
-  function init() {
+  async function init() {
     bindCoreDelegation();
+
+    let session = null;
+    try {
+      session = await window.DentaFlowSession?.initAuthenticatedSession?.();
+    } catch (error) {
+      console.warn('[DentaFlow] session hydration failed:', error?.message || error);
+    }
 
     const runInitStep = (label, fn) => {
       try {
@@ -5442,7 +5479,11 @@ let handoffNotes = [];
 
     runInitStep('settings', () => {
       loadSettings();
-      applyTheme(volatileSettings.theme);
+      const theme = session?.themePreset || volatileSettings.theme;
+      applyTheme(theme);
+      if (session?.themeTokens) {
+        window.DentaFlowSession?.applyThemeTokens?.(session.themeTokens);
+      }
     });
     runInitStep('header', () => setHeaderDate());
     runInitStep('navigation', () => {
@@ -5475,7 +5516,7 @@ let handoffNotes = [];
       renderWaitlistPanel();
     });
     runInitStep('profile', () => {
-      initUserProfile();
+      initUserProfile(session);
       initAccountCardMenu();
     });
     runInitStep('settingsUI', () => {
@@ -5508,7 +5549,7 @@ let handoffNotes = [];
 
   let assistantDashboardInitialized = false;
 
-  function initializeAssistantDashboard() {
+  async function initializeAssistantDashboard() {
     if (assistantDashboardInitialized) return;
     if (
       typeof window.DentaFlowAuth?.enforceRouteGuard === 'function' &&
@@ -5524,7 +5565,7 @@ let handoffNotes = [];
       return;
     }
     assistantDashboardInitialized = true;
-    init();
+    await init();
   }
 
   window.initializeAssistantDashboard = initializeAssistantDashboard;
