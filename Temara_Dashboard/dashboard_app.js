@@ -88,11 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
  * ─────────────────────────────────────────────────────────────────────────────
  * ARCHITECTURE OVERVIEW
  *
- * This file has exactly one responsibility: fetch data from Google Sheets
- * via an n8n webhook and paint the four KPI cards + two charts.
+ * This file has exactly one responsibility: fetch clinic KPI data
+ * from PostgreSQL and paint the four KPI cards + two charts.
  *
  * DATA FLOW:
- *   Google Sheets (published CSV via n8n) 
+ *   PostgreSQL (dashboard-data API) 
  *     → fetchPatientData()
  *       → computeKPIs()
  *         → renderKPICards()
@@ -234,59 +234,8 @@ function lockSubmitButton(btn, processingLabel = 'Traitement...') {
   };
 }
 
-/* ── GOOGLE SHEETS SETUP GUIDE ─────────────────────────────────────────────
- *
- * SHEET 1 — "Feuille 1" (already exists, populated by n8n Concierge Engine):
- *   Columns A–N:
- *   A: Patient (Nom Complet)     H: Statut Facturation
- *   B: Email Contact             I: Montant (MAD)
- *   C: Téléphone (WhatsApp)      J: Couverture Médicale
- *   D: Date & Heure du RDV       K: N° d'Assurance
- *   E: Motif de Consultation     L: Cal Booking ID
- *   F: Observations Médicales    M: Nouveau Patient ?
- *   G: Statut du RDV             N: Médecin Traitant
- *
- * SHEET 2 — "Calculs" (CREATE THIS TAB):
- *   This is your pre-computed KPI layer. Softr reads from here.
- *   Cell A1: "Metric"              Cell B1: "Valeur"
- *
- *   A2: patients_today
- *   B2: =COUNTIFS('Feuille 1'!D:D,">="&TODAY(),'Feuille 1'!D:D,"<"&(TODAY()+1))
- *
- *   A3: no_shows
- *   B3: =COUNTIFS('Feuille 1'!G:G,"Annulé",'Feuille 1'!D:D,">="&TODAY(),'Feuille 1'!D:D,"<"&(TODAY()+1))
- *        +COUNTIFS('Feuille 1'!G:G,"No-Show",'Feuille 1'!D:D,">="&TODAY(),'Feuille 1'!D:D,"<"&(TODAY()+1))
- *
- *   A4: revenue_today
- *   B4: =SUMIFS('Feuille 1'!I:I,'Feuille 1'!D:D,">="&TODAY(),'Feuille 1'!D:D,"<"&(TODAY()+1))
- *
- *   A5: new_patients
- *   B5: =COUNTIFS('Feuille 1'!M:M,"Oui",'Feuille 1'!D:D,">="&TODAY(),'Feuille 1'!D:D,"<"&(TODAY()+1))
- *
- *   A6: accepted_plans
- *   B6: =COUNTIF('Feuille 1'!G:G,"Confirmé")
- *
- *   A7: pending_plans
- *   B7: =COUNTIF('Feuille 1'!G:G,"En attente")
- *
- *   A8-A16 (hour distribution): one row per hour 8–18
- *   A8:  hour_08
- *   B8:  =COUNTIFS('Feuille 1'!D:D,">="&(TODAY()+TIME(8,0,0)),'Feuille 1'!D:D,"<"&(TODAY()+TIME(9,0,0)))
- *   ... (repeat for 09, 10, 11, 12, 13, 14, 15, 16, 17, 18)
- *
- * N8N WEBHOOK FLOW — "Dashboard Data Endpoint":
- *   Trigger: Webhook (GET /webhook/dashboard-data)
- *   Node 1:  Google Sheets → "Get Many Rows" from "Calculs" sheet, all rows
- *   Node 2:  Code node — transform to { metric: value } object
- *   Node 3:  Respond to Webhook — return JSON body
- *
- *   Code node (Node 2) example:
- *     const rows = $input.all();
- *     const result = {};
- *     for (const r of rows) {
- *       result[r.json['Metric']] = r.json['Valeur'];
- *     }
- *     return [{ json: result }];
+/* ── DASHBOARD DATA ────────────────────────────────────────────────────────
+ * GET /api/dashboard-data returns clinic-scoped KPI aggregates from PostgreSQL.
  */
 
 /* ── CHART INSTANCES (module-level so we can destroy on refresh) ─────────── */

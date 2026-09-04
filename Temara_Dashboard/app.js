@@ -332,7 +332,7 @@ let handoffNotes = [];
     if (isSystem) {
       const systemIcon = document.createElement('span');
       systemIcon.className = 'handoff-note__system-icon';
-      systemIcon.title = 'Événement système (n8n)';
+      systemIcon.title = 'Événement système';
       systemIcon.setAttribute('aria-label', 'Événement système');
       systemIcon.innerHTML = SYSTEM_NOTE_SVG;
       meta.appendChild(systemIcon);
@@ -2667,7 +2667,7 @@ let handoffNotes = [];
           $('waitlist-name')?.focus();
         }),
         createPopoverMenuItem('Envoyer un SMS', ROW_ACTION_SVG.sms, () => {
-          showToast('Notification SMS planifiée via n8n.', 'info');
+          showToast('Notification SMS planifiée.', 'info');
         }),
         createPopoverMenuItem('Copier le numéro', ROW_ACTION_SVG.copy, () => {
           copyTextToClipboard(phone);
