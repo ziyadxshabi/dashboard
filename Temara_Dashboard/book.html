@@ -23,7 +23,7 @@
       color-scheme: light;
     }
 
-    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
     body {
       margin: 0;
@@ -195,10 +195,13 @@
 
     .book-error {
       min-height: 70dvh;
-      display: grid;
       place-items: center;
       padding: 2rem 1rem;
       text-align: center;
+    }
+
+    .book-error:not([hidden]) {
+      display: grid;
     }
 
     .book-error h1 {
