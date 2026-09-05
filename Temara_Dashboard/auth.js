@@ -13,6 +13,8 @@
   let authInitialized = false;
   let isSubmitting = false;
   let isLoggingOut = false;
+  let sessionValidated = false;
+  let sessionUser = null;
   const logoutTeardowns = [];
 
   function initLoginReveal() {
@@ -216,7 +218,7 @@
         return;
       }
 
-      sessionStorage.setItem(SESSION_ROLE_KEY, payload.role || payload.user?.role || selectedRole);
+      markSessionValidated(payload);
 
       if (passwordInput) passwordInput.value = '';
 
@@ -373,6 +375,17 @@
     }
   }
 
+  function markSessionValidated(payload) {
+    sessionValidated = true;
+    sessionUser = payload?.user && typeof payload.user === 'object' ? payload.user : null;
+    const role = payload?.role || payload?.user?.role || selectedRole || '';
+    if (role) {
+      try {
+        sessionStorage.setItem(SESSION_ROLE_KEY, role);
+      } catch { /* private browsing / disabled storage */ }
+    }
+  }
+
   async function tryRestoreSession() {
     const session = await validateSession();
     if (!session?.ok) {
@@ -380,8 +393,9 @@
       showLoginGate();
       return;
     }
+    markSessionValidated(session);
     applySessionClinic(session.clinic);
-    handleAuthSuccess(session.role || session.user?.role);
+    await handleAuthSuccess(session.role || session.user?.role);
   }
 
   async function initAuthGate() {
@@ -421,7 +435,11 @@
   }
 
   function isAuthenticated() {
-    return Boolean(getStoredRole());
+    return sessionValidated && Boolean(getStoredRole());
+  }
+
+  function getSessionUser() {
+    return sessionUser;
   }
 
   /** Alias used by dashboard modules for explicit session probes. */
@@ -442,6 +460,8 @@
   }
 
   function clearSession() {
+    sessionValidated = false;
+    sessionUser = null;
     try {
       sessionStorage.removeItem(SESSION_ROLE_KEY);
       sessionStorage.removeItem(SESSION_TOKEN_KEY);
@@ -573,6 +593,7 @@
     SESSION_ROLE_KEY,
     SESSION_TOKEN_KEY,
     getRole: getStoredRole,
+    getSessionUser,
     getToken: getBearerToken,
     getAuthHeaders: buildAuthHeaders,
     isAuthenticated,

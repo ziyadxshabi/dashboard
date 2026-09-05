@@ -84,37 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
 /* --- END SECURITY --- */
 
 /**
- * Daily Pulse Dashboard — app.js
- * ─────────────────────────────────────────────────────────────────────────────
- * ARCHITECTURE OVERVIEW
+ * Daily Pulse Dashboard — doctor shell
+ * Clinique Dentaire Témara Mall · DentaFlow OS
  *
- * This file has exactly one responsibility: fetch clinic KPI data
- * from PostgreSQL and paint the four KPI cards + two charts.
- *
- * DATA FLOW:
- *   PostgreSQL (dashboard-data API) 
- *     → fetchPatientData()
- *       → computeKPIs()
- *         → renderKPICards()
- *         → renderCharts()
- *
- * WHERE TO INJECT IN SOFTR:
- *   • This entire <script src="app.js"> + <link rel="stylesheet" href="style.css">
- *     goes into Softr → Settings → Custom Code → Footer Code.
- *   • The HTML block (topbar + kpi-row + charts-row) goes into a Softr
- *     "Custom Code" block on your Home page. Place it as the first block.
- *   • The .topbar CSS position:sticky assumes Softr's own navbar is hidden
- *     for logged-in dentist view (use Softr → Pages → visibility rules).
- *
- * SOFTR FREE-TIER BYPASS STRATEGY:
- *   Softr's free "Big Number" blocks only accept static text; they cannot
- *   run JavaScript or react to data. We bypass this entirely by using a
- *   Softr "Custom Code" block (available on all tiers) and injecting our
- *   own DOM. The CSS variables override Softr's default palette via higher
- *   specificity — no !important abuse needed because we own the container.
- *
- * GOOGLE SHEETS BACKEND SETUP (see GOOGLE_SHEETS_SETUP section below):
- *   Your Sheet has 14 columns. We need a second "Calculations" tab.
+ * Fetches clinic KPIs from PostgreSQL via GET /api/dashboard-data
+ * and paints the doctor hub, KPI cards, and operational charts.
  */
 
 'use strict';
@@ -146,14 +120,9 @@ function doctorQueryAll(selector) {
 }
 
 /* ── CONFIG ─────────────────────────────────────────────────────────────────
- * Update these values in your deployment.
- *
- * DATA_URL: Vercel serverless proxy endpoint. Secrets live server-side in
- *           N8N_WEBHOOK_URL and N8N_AUTH_KEY (see api/n8n-proxy.js).
- *
+ * DATA_URL: GET /api/dashboard-data (clinic-scoped Postgres KPIs).
  * DAILY_GOAL_MAD: Daily revenue target in Moroccan Dirham.
- *
- * REFRESH_INTERVAL_MS: Auto-refresh every N milliseconds. 300000 = 5 minutes.
+ * REFRESH_INTERVAL_MS: Auto-refresh interval (300000 = 5 minutes).
  */
 const DEFAULT_THEME = 'oak-lounge';
 const STORAGE_KEYS = {
@@ -330,95 +299,43 @@ function apptTagModifier(tagClass) {
 }
 
 function extractPatientInitials(fullName) {
-  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '??';
-  return parts
-    .slice(0, 2)
-    .map((part) => part.replace(/\./g, '')[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || '??';
+  return window.DentaFlowRowUI?.extractInitials
+    ? window.DentaFlowRowUI.extractInitials(fullName)
+    : '??';
 }
 
 function getMatteChipModifier(label) {
-  const n = (label ?? '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-  if (n.includes('urgence')) return 'urgence';
-  if (n.includes('confirm')) return 'confirmé';
-  if (n.includes('annul') || n.includes('no-show')) return 'annulé';
-  if (n.includes('attente') || n.includes('soin')) return 'attente';
-  if (n.includes('termin')) return 'confirmé';
-  return 'attente';
+  return window.DentaFlowRowUI?.getMatteChipModifier
+    ? window.DentaFlowRowUI.getMatteChipModifier(label)
+    : 'attente';
 }
 
 function createMatteChip(label) {
-  const chip = document.createElement('span');
-  chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
-  chip.textContent = label || '—';
-  return chip;
+  return window.DentaFlowRowUI.createMatteChip(label);
 }
 
 function createStatusDot(label) {
-  const dot = document.createElement('span');
-  dot.className = `status-dot status-dot--${getMatteChipModifier(label)}`;
-  dot.title = label;
-  dot.setAttribute('aria-label', label);
-  return dot;
+  return window.DentaFlowRowUI.createStatusDot(label);
 }
 
 function createStatusIndicator(label) {
-  const wrap = document.createElement('span');
-  wrap.className = 'status-indicator';
-  wrap.appendChild(createStatusDot(label));
-  const text = document.createElement('span');
-  text.className = 'status-indicator__label kinetic-label';
-  text.textContent = label;
-  wrap.appendChild(text);
-  return wrap;
+  return window.DentaFlowRowUI.createPriorityIndicator(label);
 }
 
 function createPatientAvatar(name) {
-  const avatar = document.createElement('span');
-  avatar.className = 'patient-avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  avatar.textContent = extractPatientInitials(name);
-  return avatar;
+  return window.DentaFlowRowUI.createPatientAvatar(name);
 }
 
 function createPatientIdentity(name) {
-  const wrap = document.createElement('div');
-  wrap.className = 'patient-identity';
-  wrap.appendChild(createPatientAvatar(name));
-  const nameEl = document.createElement('span');
-  nameEl.className = 'patient-identity__name';
-  nameEl.textContent = name || '';
-  wrap.appendChild(nameEl);
-  return wrap;
+  return window.DentaFlowRowUI.createPatientIdentity(name);
 }
 
 function getWaitlistPriorityLabel(appt) {
-  if (appt.statusLabel) return appt.statusLabel;
-  const treatment = String(appt.treatment ?? appt.priorite ?? '').toLowerCase();
-  if (appt.tagClass === 'urgence' || treatment === 'haute') return 'Urgence';
-  return 'En attente';
+  return window.DentaFlowRowUI.getWaitlistPriorityLabel(appt);
 }
 
 function createWaitlistTableRow(appt) {
-  if (window.DentaFlowRowUI?.createWaitlistTableRow) {
-    return window.DentaFlowRowUI.createWaitlistTableRow(appt);
-  }
-
-  const tr = document.createElement('tr');
-  tr.className = 'waitlist-row';
-  tr.dataset.rowInteractive = 'true';
-  const patientTd = document.createElement('td');
-  patientTd.textContent = appt.name || '';
-  const phoneTd = document.createElement('td');
-  phoneTd.className = 'col-numeric';
-  phoneTd.textContent = appt.phone || '—';
-  const priorityTd = document.createElement('td');
-  priorityTd.textContent = appt.treatment || '';
-  tr.append(patientTd, phoneTd, priorityTd);
-  return tr;
+  return window.DentaFlowRowUI.createWaitlistTableRow(appt);
 }
 
 function createApptCardElement(appt) {
@@ -850,9 +767,12 @@ const volatileSettings = {
 };
 
 function applyTheme(theme) {
-  const resolved = theme === 'pearl-clinic' || theme === 'light' ? 'pearl-clinic' : 'oak-lounge';
-
-  document.documentElement.setAttribute('data-theme', resolved);
+  const resolved = window.DentaFlowTheme?.applyTheme
+    ? window.DentaFlowTheme.applyTheme(theme)
+    : (theme === 'pearl-clinic' || theme === 'light' ? 'pearl-clinic' : 'oak-lounge');
+  if (!window.DentaFlowTheme?.applyTheme) {
+    document.documentElement.setAttribute('data-theme', resolved);
+  }
   volatileSettings.theme = resolved;
   updateThemeSwitcherUI(resolved);
 
@@ -930,25 +850,23 @@ function initThemeSwitcher() {
   });
 }
 
-const PROFILE_DEFAULTS = {
-  profileName:      'Dr. Tazi',
-  profileSpecialty: 'Chirurgien-dentiste',
-};
+function getProfileDefaults() {
+  return {
+    profileName: window.DentaFlowTheme?.getSessionDisplayName?.() || 'Praticien',
+    profileSpecialty: window.DentaFlowTheme?.getSessionRoleLabel?.('doctor') || 'Chirurgien-dentiste',
+  };
+}
 
 function extractInitials(fullName) {
-  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '??';
-  return parts
-    .slice(0, 2)
-    .map(part => part.replace(/\./g, '')[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || '??';
+  return window.DentaFlowRowUI?.extractInitials
+    ? window.DentaFlowRowUI.extractInitials(fullName)
+    : extractPatientInitials(fullName);
 }
 
 function applyUserProfile(name, specialty) {
-  const displayName = (name ?? '').trim() || PROFILE_DEFAULTS.profileName;
-  const displayRole = (specialty ?? '').trim() || PROFILE_DEFAULTS.profileSpecialty;
+  const defaults = getProfileDefaults();
+  const displayName = (name ?? '').trim() || defaults.profileName;
+  const displayRole = (specialty ?? '').trim() || defaults.profileSpecialty;
   const initials    = extractInitials(displayName);
 
   const avatarEl = doctorEl('profile-avatar');
@@ -967,8 +885,9 @@ function initUserProfile() {
   const nameEl      = doctorEl('settings-profile-name');
   const specialtyEl = doctorEl('settings-profile-specialty');
 
-  const profileName      = saved.profileName      ?? PROFILE_DEFAULTS.profileName;
-  const profileSpecialty = saved.profileSpecialty ?? PROFILE_DEFAULTS.profileSpecialty;
+  const defaults = getProfileDefaults();
+  const profileName      = saved.profileName      ?? defaults.profileName;
+  const profileSpecialty = saved.profileSpecialty ?? defaults.profileSpecialty;
 
   if (nameEl)      nameEl.value      = profileName;
   if (specialtyEl) specialtyEl.value = profileSpecialty;
@@ -1062,81 +981,15 @@ function showDashboardToast(message, type = 'info') {
 }
 
 function initSecurityAccountSelect() {
-  const root = doctorEl('security-account-root');
-  const hidden = doctorEl('security-account-input');
-  const trigger = doctorEl('security-account-trigger');
-  const list = doctorEl('security-account-list');
-  const label = doctorEl('security-account-value');
-  if (!root || !hidden || !trigger || !list) return null;
-
-  const options = Array.from(list.querySelectorAll('.ghost-select__option'));
-
-  function setValue(value) {
-    const resolved = value === 'asst' ? 'asst' : 'doc';
-    hidden.value = resolved;
-    if (label) label.textContent = SECURITY_ACCOUNT_LABELS[resolved];
-    options.forEach((option) => {
-      const selected = option.dataset.value === resolved;
-      option.classList.toggle('is-selected', selected);
-      option.setAttribute('aria-selected', selected ? 'true' : 'false');
-    });
-  }
-
-  function closeList() {
-    list.hidden = true;
-    trigger.setAttribute('aria-expanded', 'false');
-    options.forEach((option) => option.classList.remove('is-focused'));
-  }
-
-  function openList() {
-    list.hidden = false;
-    trigger.setAttribute('aria-expanded', 'true');
-  }
-
-  trigger.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (list.hidden) openList();
-    else closeList();
+  return window.DentaFlowSelect?.init?.({
+    root: doctorEl('security-account-root'),
+    hidden: doctorEl('security-account-input'),
+    trigger: doctorEl('security-account-trigger'),
+    list: doctorEl('security-account-list'),
+    label: doctorEl('security-account-value'),
+    defaultValue: 'doc',
+    once: true,
   });
-
-  options.forEach((option) => {
-    option.addEventListener('click', () => {
-      setValue(option.dataset.value || 'doc');
-      closeList();
-      trigger.focus();
-    });
-  });
-
-  document.addEventListener('click', (event) => {
-    if (!root.contains(event.target)) closeList();
-  });
-
-  trigger.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      closeList();
-      return;
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (list.hidden) openList();
-      const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      const nextIndex = (currentIndex + delta + options.length) % options.length;
-      options.forEach((option) => option.classList.remove('is-focused'));
-      options[nextIndex]?.classList.add('is-focused');
-    }
-    if (event.key === 'Enter' || event.key === ' ') {
-      const focused = options.find((option) => option.classList.contains('is-focused'));
-      if (focused && !list.hidden) {
-        event.preventDefault();
-        setValue(focused.dataset.value || 'doc');
-        closeList();
-      }
-    }
-  });
-
-  return setValue;
 }
 
 function initSecurityManagement() {
@@ -1563,15 +1416,8 @@ function getEmptyDashboardData() {
   return {
     patients_today:  0,
     no_shows:        0,
-    revenue_today:   0,
-    new_patients:    0,
     accepted_plans:  0,
     pending_plans:   0,
-    hour_08: 0, hour_09: 0, hour_10: 0, hour_11: 0,
-    hour_12: 0, hour_13: 0, hour_14: 0, hour_15: 0,
-    hour_16: 0, hour_17: 0, hour_18: 0,
-    patients_recovered: 0,
-    reclaimed_revenue: 0,
   };
 }
 
@@ -1702,13 +1548,10 @@ async function loadDashboard(isSilentSync = false) {
 
 /* ── NORMALISE RAW RESPONSE ─────────────────────────────────────────────── */
 function normaliseData(raw) {
-  // raw may be an array (n8n default output) or an object
   if (Array.isArray(raw) && raw.length > 0) {
-    // n8n returns [{ json: {...} }] or just [{ metric: val, ... }]
     raw = raw[0]?.json ?? raw[0];
   }
 
-  // New secure payload format: { ok: true, data: { ...metrics } }
   if (raw && typeof raw === 'object' && raw.ok === true) {
     raw = raw.data ?? raw.metrics ?? {};
   }
@@ -1717,6 +1560,8 @@ function normaliseData(raw) {
   for (const [k, v] of Object.entries(raw ?? {})) {
     if (typeof v === 'number' && Number.isFinite(v)) {
       out[k] = v;
+    } else if (Array.isArray(v)) {
+      out[k] = v.map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : asMetric(item)));
     } else if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
       out[k] = Number(v);
     } else if (typeof v === 'boolean') {
@@ -1907,7 +1752,7 @@ function animatePulseCharts(scope) {
 function bindKpiMicroCharts(data = {}) {
   const patientsToday = asMetric(data.patients_today);
   const noShows = asMetric(data.no_shows);
-  const newPatients = asMetric(data.new_patients);
+  const newPatients = asMetric(data.pending_plans);
 
   const trendPatientsSvg = doctorQuery('#trend-patients svg');
   updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
@@ -1961,40 +1806,34 @@ function getLast7DayLabels() {
 
 function buildSevenDayTrendFromData(data = {}) {
   const labels = getLast7DayLabels();
-
-  if (Array.isArray(data.week_patients) && data.week_patients.length >= 7) {
-    return labels.map((label, index) => ({
-      label,
-      value: asMetric(data.week_patients[index]),
-    }));
+  if (!Array.isArray(data.week_patients) || data.week_patients.length < 7) {
+    return null;
   }
-
-  const dayKeys = ['day_6', 'day_5', 'day_4', 'day_3', 'day_2', 'day_1', 'day_0'];
-  if (dayKeys.some((key) => data[key] != null)) {
-    return labels.map((label, index) => ({
-      label,
-      value: asMetric(data[dayKeys[index]]),
-    }));
-  }
-
-  const base = asMetric(data.patients_today, 0);
-  const shape = [0.72, 0.85, 0.9, 1, 0.95, 0.65, 0.4];
   return labels.map((label, index) => ({
     label,
-    value: index === 6
-      ? Math.max(base, 0)
-      : Math.max(0, Math.round(base * shape[index])),
+    value: asMetric(data.week_patients[index]),
   }));
 }
 
 function normalizeChartSeries(data) {
   if (Array.isArray(data)) {
+    if (data.length < 7) return null;
     return data.slice(0, 7).map((point, index) => ({
       label: String(point?.label ?? getLast7DayLabels()[index] ?? ''),
       value: asMetric(point?.value),
     }));
   }
   return buildSevenDayTrendFromData(data);
+}
+
+function renderChartEmptyState(container, message) {
+  if (!container) return;
+  container.replaceChildren();
+  container.classList.add('is-chart-empty');
+  const empty = document.createElement('p');
+  empty.className = 'chart-empty';
+  empty.textContent = message || 'Données insuffisantes';
+  container.appendChild(empty);
 }
 
 function positionOakChartTooltip(tooltip, bar, container) {
@@ -2072,6 +1911,11 @@ function renderDynamicChart(data, containerId, options = {}) {
   if (!container) return;
 
   const series = normalizeChartSeries(data);
+  if (!series || !series.length) {
+    renderChartEmptyState(container, 'Données insuffisantes');
+    return;
+  }
+  container.classList.remove('is-chart-empty');
   const unitLabel = options.unit === 'revenue' ? 'MAD' : 'patients';
   const maxVal = Math.max(...series.map((point) => point.value), 1);
   const peakIndex = series.reduce(
@@ -2161,52 +2005,46 @@ function renderKPICards(data) {
   lastKpiPayload = data;
   const patients_today    = asMetric(data?.patients_today);
   const no_shows          = asMetric(data?.no_shows);
-  const patients_recovered = asMetric(data?.patients_recovered ?? data?.reclaimed_patients);
-  const new_patients      = asMetric(data?.new_patients);
+  const pending_plans     = asMetric(data?.pending_plans ?? data?.pending_quotes);
 
   setKpiTrend('trend-patients', buildSparklineSvg(null, { tone: 'gold' }));
   setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
   setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
 
-  const pendingQuotes = asMetric(data?.pending_plans ?? data?.pending_quotes);
   const revenueToday = asMetric(data?.revenue_today);
 
   renderDoctorHubCharts(data);
   bindKpiMicroCharts(data);
 
   setKPINumber('hub-val-patients', patients_today, true);
-  setKPINumber('hub-val-pending', pendingQuotes, true);
+  setKPINumber('hub-val-pending', pending_plans, true);
   setKPINumber('hub-val-noshows', no_shows, true);
   const hubProductionEl = doctorEl('hub-val-production');
   if (hubProductionEl) hubProductionEl.textContent = formatHubProductionMad(revenueToday);
 
   setText('hub-delta-patients', patients_today > 0 ? 'Aujourd\'hui' : 'Aucun RDV');
-  setText('hub-delta-pending', pendingQuotes > 0
-    ? `${pendingQuotes} devis à valider`
-    : 'Devis à valider');
+  setText('hub-delta-pending', pending_plans > 0
+    ? `${pending_plans} en attente`
+    : 'Aucun en attente');
   setText('hub-delta-noshows', no_shows > 0
     ? `${no_shows} créneau${no_shows > 1 ? 'x' : ''} libre${no_shows > 1 ? 's' : ''}`
     : 'Aucune absence');
   setText('hub-delta-production', 'MAD facturés');
 
-  // Recovery hero banner — patients recovered + estimated revenue range
-  updateRecoveryMetrics(patients_recovered);
+  updateRecoveryMetrics(null);
   refreshOperationalCharts(data);
 
-  // Card 1: Patients today
   setKPINumber('val-patients', patients_today, true);
   setText('sub-patients', `Rendez-vous confirmés`);
 
-  // Card 2: No-shows / cancellations — danger state if > 0
   const noshowCard = doctorEl('card-noshows');
   if (noshowCard) {
     if (no_shows > 0) {
       noshowCard.classList.add('kpi-card--danger');
-      // Danger number appears instantly — no animation
       const el = doctorEl('val-noshows');
       if (el) {
         el.textContent = no_shows;
-        el.style.color = ''; // inherits danger card color via CSS
+        el.style.color = '';
       }
       setText('sub-noshows', no_shows === 1
         ? '1 créneau à combler d\'urgence'
@@ -2219,12 +2057,11 @@ function renderKPICards(data) {
     }
   }
 
-  // Card 3: New patients
-  setKPINumber('val-new', new_patients, true);
+  setKPINumber('val-new', pending_plans, true);
   setText('sub-new',
-    new_patients === 0
-      ? 'Aucun formulaire en attente'
-      : `${new_patients} formulaire${new_patients > 1 ? 's' : ''} d'entrée requis`
+    pending_plans === 0
+      ? 'Aucun rendez-vous en attente'
+      : `${pending_plans} rendez-vous en attente`
   );
 }
 
@@ -2263,44 +2100,38 @@ function applyChartJsDefaults() {
 }
 
 function buildOperationalChartPayload(data = {}) {
-  const patientsToday = asMetric(data.patients_today);
-  const newPatients = asMetric(data.new_patients);
+  const accepted = asMetric(data.accepted_plans);
+  const pending = asMetric(data.pending_plans);
   const noShows = asMetric(data.no_shows);
-  const hasLiveData = patientsToday > 0 || newPatients > 0 || noShows > 0;
-
-  const recovery = {
-    labels: ['Semaine 1', 'Semaine 2', 'Semaine 3', 'Semaine 4'],
-    cancellations: [12, 8, 15, 9],
-    recovered: [10, 7, 14, 8],
-  };
-
-  if (hasLiveData) {
-    const factor = Math.max(noShows / 12, 0.65);
-    recovery.cancellations = recovery.cancellations.map((v) => Math.max(1, Math.round(v * factor)));
-    recovery.recovered = recovery.recovered.map((v) => Math.max(1, Math.round(v * factor * 0.92)));
-  }
-
-  let flowValues = [65, 25, 10];
-  if (hasLiveData) {
-    const recurring = Math.max(patientsToday - newPatients, 0);
-    const urgences = Math.max(noShows, 0);
-    const total = recurring + newPatients + urgences;
-    if (total > 0) {
-      flowValues = [
-        Math.round((recurring / total) * 100),
-        Math.round((newPatients / total) * 100),
-        Math.round((urgences / total) * 100),
-      ];
-    }
-  }
-
   return {
-    recovery,
+    recovery: null,
     flow: {
-      labels: ['Patients Récurrents', 'Nouveaux Patients', 'Urgences'],
-      values: flowValues,
+      labels: ['Confirmés', 'En attente', 'No-show'],
+      values: [accepted, pending, noShows],
     },
   };
+}
+
+function setCanvasChartEmpty(canvasEl, message) {
+  const wrap = canvasEl?.closest('.chart-canvas-wrap') || canvasEl?.parentElement;
+  if (!wrap) return;
+  wrap.classList.add('is-empty');
+  let empty = wrap.querySelector('.chart-empty');
+  if (!empty) {
+    empty = document.createElement('p');
+    empty.className = 'chart-empty';
+    wrap.appendChild(empty);
+  }
+  empty.hidden = false;
+  empty.textContent = message || 'Données insuffisantes';
+}
+
+function clearCanvasChartEmpty(canvasEl) {
+  const wrap = canvasEl?.closest('.chart-canvas-wrap') || canvasEl?.parentElement;
+  if (!wrap) return;
+  wrap.classList.remove('is-empty');
+  const empty = wrap.querySelector('.chart-empty');
+  if (empty) empty.hidden = true;
 }
 
 function createRecoveryAreaGradient(canvas) {
@@ -2328,81 +2159,7 @@ function initOperationalCharts(data = {}) {
       recoveryOpChart.destroy();
       recoveryOpChart = null;
     }
-
-    const recoveryGradient = createRecoveryAreaGradient(recoveryCtx);
-
-    recoveryOpChart = new Chart(recoveryCtx, {
-      type: 'bar',
-      data: {
-        labels: payload.recovery.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Annulations',
-            data: payload.recovery.cancellations,
-            backgroundColor: OPERATIONAL_CHART_MUTED_BAR,
-            borderWidth: 0,
-            borderRadius: 6,
-            order: 2,
-          },
-          {
-            type: 'line',
-            label: 'Créneaux Récupérés',
-            data: payload.recovery.recovered,
-            borderColor: OPERATIONAL_CHART_GOLD,
-            backgroundColor: recoveryGradient,
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: OPERATIONAL_CHART_GOLD,
-            pointHoverBorderColor: '#1A1A1F',
-            pointHoverBorderWidth: 2,
-            tension: 0.4,
-            fill: true,
-            order: 1,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: {
-            position: 'top',
-            align: 'end',
-            labels: {
-              boxWidth: 10,
-              boxHeight: 10,
-              usePointStyle: true,
-              color: OPERATIONAL_CHART_TICK,
-              font: { family: 'Inter, sans-serif', size: 11 },
-            },
-          },
-          tooltip: getOperationalChartTooltipOptions(),
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            border: { display: false },
-            ticks: getOperationalChartTickStyle(),
-          },
-          y: {
-            beginAtZero: true,
-            grid: {
-              display: true,
-              color: OPERATIONAL_CHART_GRID,
-              drawTicks: false,
-            },
-            border: { display: false },
-            ticks: {
-              ...getOperationalChartTickStyle(),
-              precision: 0,
-            },
-          },
-        },
-      },
-    });
+    setCanvasChartEmpty(recoveryCtx, 'Aucune série de créneaux récupérés n\'est enregistrée.');
   }
 
   const flowCtx = doctorEl('flowChart');
@@ -2411,6 +2168,7 @@ function initOperationalCharts(data = {}) {
       flowOpChart.destroy();
       flowOpChart = null;
     }
+    clearCanvasChartEmpty(flowCtx);
 
     flowOpChart = new Chart(flowCtx, {
       type: 'bar',
@@ -2434,14 +2192,13 @@ function initOperationalCharts(data = {}) {
           tooltip: {
             ...getOperationalChartTooltipOptions(),
             callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${ctx.parsed.x}%`,
+              label: (ctx) => ` ${ctx.label}: ${ctx.parsed.x}`,
             },
           },
         },
         scales: {
           x: {
             beginAtZero: true,
-            max: 100,
             grid: {
               display: true,
               color: OPERATIONAL_CHART_GRID,
@@ -2450,7 +2207,7 @@ function initOperationalCharts(data = {}) {
             border: { display: false },
             ticks: {
               ...getOperationalChartTickStyle(),
-              callback: (value) => `${value}%`,
+              precision: 0,
             },
           },
           y: {
@@ -2465,26 +2222,19 @@ function initOperationalCharts(data = {}) {
 }
 
 function refreshOperationalCharts(data = {}) {
-  if (!recoveryOpChart && !flowOpChart) {
+  if (!flowOpChart) {
     initOperationalCharts(data);
     return;
   }
 
   const payload = buildOperationalChartPayload(data);
+  const recoveryCtx = doctorEl('recoveryChart');
+  if (recoveryCtx) setCanvasChartEmpty(recoveryCtx, 'Aucune série de créneaux récupérés n\'est enregistrée.');
 
-  if (recoveryOpChart) {
-    recoveryOpChart.data.labels = payload.recovery.labels;
-    recoveryOpChart.data.datasets[0].data = payload.recovery.cancellations;
-    recoveryOpChart.data.datasets[1].data = payload.recovery.recovered;
-    recoveryOpChart.update('none');
-  }
-
-  if (flowOpChart) {
-    flowOpChart.data.labels = payload.flow.labels;
-    flowOpChart.data.datasets[0].data = payload.flow.values;
-    flowOpChart.data.datasets[0].backgroundColor = getFlowBarColors();
-    flowOpChart.update('none');
-  }
+  flowOpChart.data.labels = payload.flow.labels;
+  flowOpChart.data.datasets[0].data = payload.flow.values;
+  flowOpChart.data.datasets[0].backgroundColor = getFlowBarColors();
+  flowOpChart.update('none');
 }
 
 /* ── CHARTS ─────────────────────────────────────────────────────────────── */
@@ -2499,6 +2249,16 @@ function renderHoursChart(data) {
   const hours  = ['08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h'];
   const keys   = ['hour_08','hour_09','hour_10','hour_11','hour_12',
                   'hour_13','hour_14','hour_15','hour_16','hour_17','hour_18'];
+  const ctx = doctorEl('chart-hours');
+  if (!ctx) return;
+
+  const hasHours = keys.some((key) => data?.[key] != null);
+  if (!hasHours) {
+    if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
+    setCanvasChartEmpty(ctx, 'Données insuffisantes');
+    return;
+  }
+  clearCanvasChartEmpty(ctx);
   const values = keys.map(k => asMetric(data?.[k]));
   const maxVal = Math.max(...values, 1);
 
@@ -2511,9 +2271,6 @@ function renderHoursChart(data) {
       ? 'rgba(184, 150, 90, 0.65)'   // moderate
       : 'rgba(184, 150, 90, 0.25)';  // quiet
   });
-
-  const ctx = doctorEl('chart-hours');
-  if (!ctx) return;
 
   if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
 
@@ -2742,26 +2499,17 @@ function formatThousandsFR(value) {
  * Updates the hero recovery banner: patient count + estimated MAD revenue range.
  * @param {number} patientCount
  */
-function updateRecoveryMetrics(patientCount) {
-  const count = asMetric(patientCount);
+function updateRecoveryMetrics() {
   const patientsEl = doctorEl('patients-recovered-count');
   const revenueEl = doctorEl('estimated-revenue-range');
-
   if (patientsEl) {
-    patientsEl.textContent = formatThousandsFR(count);
+    patientsEl.textContent = '—';
     patientsEl.classList.remove('skeleton', 'kpi-metric--error');
   }
-
-  if (!revenueEl) return;
-
-  if (count === 0) {
-    revenueEl.textContent = '0 MAD';
-  } else {
-    const minRevenue = count * 800;
-    const maxRevenue = count * 1500;
-    revenueEl.textContent = `${formatThousandsFR(minRevenue)} - ${formatThousandsFR(maxRevenue)} MAD`;
+  if (revenueEl) {
+    revenueEl.textContent = 'Données non disponibles';
+    revenueEl.classList.remove('skeleton', 'kpi-metric--error');
   }
-  revenueEl.classList.remove('skeleton', 'kpi-metric--error');
 }
 
 function formatMADShort(amount) {
@@ -2971,19 +2719,6 @@ function initClientBooking() {
       });
     }
 
-    /*
-     * n8n webhook hook — POST final booking payload:
-     *   fetch('/webhook/final-booking-engine-v2', {
-     *     method: 'POST',
-     *     headers: { 'Content-Type': 'application/json' },
-     *     body: JSON.stringify({
-     *       service: BOOKING_STATE.serviceId,
-     *       serviceLabel: BOOKING_STATE.serviceLabel,
-     *       slot: BOOKING_STATE.slotLabel,
-     *       clinic: 'temara-mall',
-     *     }),
-     *   });
-     */
     if (successEl) {
       successEl.hidden = false;
       btnConfirm.disabled = true;
@@ -3117,75 +2852,66 @@ function normalizeDoctorAppointment(raw) {
 
   if (!item || typeof item !== 'object') return null;
 
-  const statusRaw =
-    item['Statut du RDV'] ??
-    item.statut ??
-    item.status;
+  const firstPresent = (...values) => {
+    for (const value of values) {
+      if (value == null || value === '') continue;
+      return value;
+    }
+    return undefined;
+  };
 
-  const rawDate =
-    item['Date & Heure du RDV'] ??
-    item.startTime ??
-    item.start_time ??
-    item.datetime ??
-    item.date;
+  const statusRaw = firstPresent(item.status, item.statut, item['Statut du RDV']);
+  const rawDate = firstPresent(
+    item.starts_at,
+    item.startTime,
+    item.start_time,
+    item.datetime,
+    item.date,
+    item['Date & Heure du RDV']
+  );
 
-  const baserowRowId = parseBaserowRowId(item.id ?? item.ID ?? item.row_id ?? item.rowId);
+  const bookingId = String(item.id ?? item.ID ?? item.row_id ?? item.rowId ?? '').trim() || null;
 
-  const patientName =
-    item['Patient (Nom Complet)'] ??
-    item.Clean_Name ??
-    item.Nom ??
-    item.nom ??
-    item.name ??
-    'Non spécifié';
+  const patientName = firstPresent(
+    item.patient_name,
+    item.name,
+    item.Nom,
+    item.nom,
+    item.Clean_Name,
+    item['Patient (Nom Complet)']
+  ) ?? 'Non spécifié';
 
-  const treatment =
-    item['Motif de Consultation'] ??
-    item.motif ??
-    item.treatment ??
-    'Consultation';
+  const treatment = firstPresent(
+    item.treatment_name,
+    item.treatment,
+    item.motif,
+    item['Motif de Consultation']
+  ) ?? 'Consultation';
 
   const phone = String(
-    item['Téléphone (WhatsApp)'] ??
-    item.Clean_Phone ??
-    item.telephone ??
-    item.phone ??
-    ''
+    firstPresent(item.patient_phone, item.phone, item.telephone, item['Téléphone (WhatsApp)']) || ''
   ).trim();
 
-  const email = String(
-    item['Email Contact'] ??
-    item.email ??
-    ''
-  ).trim();
+  const email = String(firstPresent(item.email, item['Email Contact']) || '').trim();
 
   const observations = String(
-    item['Observations Médicales'] ??
-    item.observations ??
-    ''
+    firstPresent(item.notes, item.observations, item['Observations Médicales']) || ''
   ).trim();
 
   const insurance = String(
-    item['N° d\'Assurance'] ??
-    item['Couverture Médicale'] ??
-    item.insurance ??
-    '—'
+    firstPresent(item.coverage, item.insurance, item['Couverture Médicale']) || '—'
   ).trim();
 
-  const amountRaw =
-    item['Montant (MAD)'] ??
-    item.amount ??
-    item.montant ??
-    0;
+  const amountRaw = firstPresent(item.amount, item.montant, item['Montant (MAD)']) ?? 0;
   const amount = Number(amountRaw);
   const safeAmount = Number.isFinite(amount) ? amount : 0;
 
   return {
-    id: baserowRowId ?? item.id,
-    rowId: baserowRowId,
+    id: bookingId ?? item.id,
+    rowId: bookingId,
     name: String(patientName).trim() || 'Non spécifié',
     treatment: String(treatment).trim() || 'Consultation',
-    status: String(extractBaserowFieldValue(statusRaw) || 'Confirmé').trim(),
+    status: String(statusRaw || 'Confirmé').trim(),
     rawDate,
     time: formatDoctorAppointmentTime(rawDate),
     phone,
@@ -3709,6 +3435,9 @@ let teamNotesCache = [];
 let teamNotesRefreshTimer = null;
 
 function escapeHtml(value) {
+  if (typeof window.DentaFlowDom?.escapeHtml === 'function') {
+    return window.DentaFlowDom.escapeHtml(value);
+  }
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -3717,88 +3446,24 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function extractBaserowFieldValue(field) {
-  if (field == null) return '';
-  if (typeof field === 'string' || typeof field === 'number') return String(field);
-  if (typeof field === 'boolean') return field;
-  if (typeof field === 'object' && field.value != null) return field.value;
-  return field;
-}
-
 function parseTeamNotesResponse(payload) {
-  if (payload == null) return [];
-  if (Array.isArray(payload)) return payload;
-  if (typeof payload !== 'object') return [];
-
-  if (payload.Message != null || payload.message != null || payload.text != null) {
-    return [payload];
-  }
-
-  const arrayKeys = ['data', 'results', 'items', 'records', 'notes', 'body', 'json'];
-  for (const key of arrayKeys) {
-    if (Array.isArray(payload[key])) return payload[key];
-  }
-
-  if (payload.json && typeof payload.json === 'object' && !Array.isArray(payload.json)) {
-    return [payload.json];
-  }
-
-  return [];
+  return window.DentaFlowNotes?.parseNotesResponse?.(payload) || [];
 }
 
 function normalizeTeamNote(raw) {
-  const item = raw?.json && typeof raw.json === 'object' && !Array.isArray(raw.json)
-    ? raw.json
-    : raw;
-
-  if (!item || typeof item !== 'object') return null;
-
-  const text = String(item.Message ?? item.message ?? item.text ?? '').trim();
-  if (!text) return null;
-
-  const categoryRaw = item['Catégorie'] ?? item.Categorie ?? item.category ?? 'Info';
-  const category = String(extractBaserowFieldValue(categoryRaw) || 'Info').trim() || 'Info';
-
-  const authorRaw = item.Auteur ?? item.author;
-  const author = String(extractBaserowFieldValue(authorRaw) || '').trim();
-
-  const pinnedRaw = item['Épinglé'] ?? item.Epingle ?? item.pinned ?? false;
-  const pinnedValue = extractBaserowFieldValue(pinnedRaw);
-  const pinned =
-    pinnedRaw === true ||
-    pinnedValue === true ||
-    pinnedValue === 1 ||
-    String(pinnedValue).toLowerCase() === 'true' ||
-    String(pinnedValue).toLowerCase() === 'oui';
-
-  const timeRaw = item.Heure ?? item.time ?? item.heure ?? '';
-  let time = String(extractBaserowFieldValue(timeRaw) || '').trim();
-  if (time.includes('T')) {
-    const parsed = new Date(time);
-    if (!Number.isNaN(parsed.getTime())) {
-      time = parsed.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-    }
-  }
-
-  const id = item.id ?? item.ID ?? `note-${String(text).slice(0, 24)}-${time || Date.now()}`;
-
-  return { id, text, category, author, pinned, time };
+  return window.DentaFlowNotes?.normalizeNote?.(raw) || null;
 }
 
 function parseTeamNoteTime(time) {
-  const [hours, minutes] = String(time || '00:00').split(':').map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
+  return window.DentaFlowNotes?.parseNoteMinutes
+    ? window.DentaFlowNotes.parseNoteMinutes(time)
+    : 0;
 }
 
 function sortTeamNotes(notes) {
-  return [...notes].sort((a, b) => {
-    if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
-    return parseTeamNoteTime(b.time) - parseTeamNoteTime(a.time);
-  });
+  return window.DentaFlowNotes?.sortNotes
+    ? window.DentaFlowNotes.sortNotes(notes)
+    : [...notes];
 }
 
 function isUrgentTeamNote(note) {

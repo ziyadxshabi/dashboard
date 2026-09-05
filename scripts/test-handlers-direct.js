@@ -254,6 +254,15 @@ async function run() {
   ok('GET /api/roster authenticated returns 200', roster.statusCode === 200, `status=${roster.statusCode}`);
   ok('GET /api/roster ok:true', roster.body?.ok === true);
   ok('GET /api/roster data is an array', Array.isArray(roster.body?.data));
+  ok(
+    'GET /api/roster rows use patient_name',
+    (roster.body?.data || []).every((row) => row && typeof row === 'object' && 'patient_name' in row)
+      || (roster.body?.data || []).length === 0
+  );
+  ok(
+    'GET /api/roster does not emit French Patient (Nom Complet)',
+    (roster.body?.data || []).every((row) => !Object.prototype.hasOwnProperty.call(row, 'Patient (Nom Complet)'))
+  );
 
   // ── Status updates (Postgres bookings) ─────────────────────────────────
   console.log('\n[update-status]');
@@ -398,8 +407,6 @@ async function run() {
 
   // ── Team notes (Postgres) ──────────────────────────────────────────────
   console.log('\n[team-notes]');
-  await query(`ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`);
-  await query(`ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'general'`);
 
   const notesGet = await invoke(
     handleTeamNotes,
@@ -646,6 +653,15 @@ async function run() {
       typeof dash.body?.data?.pending_plans === 'number' &&
       typeof dash.body?.data?.no_shows === 'number',
     JSON.stringify(dash.body)
+  );
+  ok(
+    'GET /api/dashboard-data week_patients has 7 counts',
+    Array.isArray(dash.body?.data?.week_patients) && dash.body.data.week_patients.length === 7,
+    JSON.stringify(dash.body?.data?.week_patients)
+  );
+  ok(
+    'GET /api/dashboard-data week_patients are numbers',
+    (dash.body?.data?.week_patients || []).every((n) => typeof n === 'number' && Number.isFinite(n))
   );
 
   // ── Public clinic ──────────────────────────────────────────────────────

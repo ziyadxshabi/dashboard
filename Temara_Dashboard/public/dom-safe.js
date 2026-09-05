@@ -51,6 +51,15 @@
     return pill;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function lucideIcon(name, className = '') {
     const cls = className ? ` class="${className}"` : '';
     return `<i data-lucide="${name}"${cls} aria-hidden="true"></i>`;
@@ -78,6 +87,7 @@
     setStatusPill,
     appendParagraph,
     createStatusPill,
+    escapeHtml,
   };
   window.refreshLucideIcons = refreshLucideIcons;
   window.lucideIcon = lucideIcon;

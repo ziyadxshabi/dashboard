@@ -32,11 +32,7 @@
   <link rel="stylesheet" href="./Fonts/duotone/style.css" />
   <link rel="stylesheet" href="./Fonts/fill/style.css" />
   <link rel="stylesheet" href="./Fonts/light/style.css" />
-  <script>
-    (function () {
-      document.documentElement.setAttribute('data-theme', 'oak-lounge');
-    })();
-  </script>
+  <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="dashboard_style.css" />
   <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.23/dist/lenis.css" />
@@ -223,9 +219,9 @@
     <div class="doctor-account-dock">
       <div class="account-card" data-popover-root>
         <div class="account-card__body">
-          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">DT</div>
-          <div class="account-card__info">
-            <span class="account-card__name kinetic-label" id="profile-name">Dr. Tazi</span>
+            <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">??</div>
+            <div class="account-card__info">
+            <span class="account-card__name kinetic-label" id="profile-name"></span>
             <span class="account-card__role" id="profile-role">Chirurgien-dentiste</span>
           </div>
         </div>
@@ -313,7 +309,7 @@
         <header class="hero-header">
           <div class="hero-header__primary">
             <div class="hero-text">
-              <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name">Dr. Tazi</span></h1>
+              <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name"></span></h1>
               <p class="hero-date" id="hero-date">—</p>
             </div>
             <span class="dentaflow-os-watermark" aria-hidden="true">DENTAFLOW OS</span>
@@ -331,12 +327,12 @@
               <div class="hero-split-block hero-split-block--primary">
                 <p class="hero-split-subtitle kinetic-label">PATIENTS RÉCUPÉRÉS PAR DENTAFLOW</p>
                 <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
-                <p class="hero-split-helper">Rattrapage automatique des annulations et liste d'attente</p>
+                <p class="hero-split-helper">Aucune série de créneaux récupérés n'est enregistrée.</p>
               </div>
               <div class="hero-split-block hero-split-block--secondary">
                 <p class="hero-split-subtitle kinetic-label">REVENU ESTIMÉ GÉNÉRÉ</p>
-                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">0 MAD</div>
-                <p class="hero-split-helper">Basé sur un panier moyen de 800 à 1 500 MAD par patient</p>
+                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">—</div>
+                <p class="hero-split-helper">Non calculé — pas de table de créneaux récupérés</p>
               </div>
             </div>
           </div>
@@ -370,11 +366,11 @@
 
           <article class="kpi-card kpi-card--matte" id="card-new">
             <div class="kpi-card__head">
-              <div class="kpi-label kinetic-label" data-tooltip="Premières visites nécessitant un formulaire d'entrée">Nouveaux</div>
+              <div class="kpi-label kinetic-label" data-tooltip="Rendez-vous au statut En attente aujourd'hui">En attente</div>
               <div class="kpi-trend" id="trend-new" aria-hidden="true"></div>
             </div>
             <div class="kpi-number kinetic-value" id="val-new" data-target="0" aria-live="polite">—</div>
-            <div class="kpi-sub" id="sub-new">Formulaires d'entrée requis</div>
+            <div class="kpi-sub" id="sub-new">Rendez-vous en attente</div>
           </article>
 
           </div>
@@ -522,7 +518,7 @@
               ></textarea>
               <div class="doctor-custom-sms-meta">
                 <p class="doctor-custom-sms-helper" id="doctor-custom-sms-helper">
-                  Diffusion globale — message validé avant envoi par le moteur n8n.
+                  Diffusion globale — journal d'audit SMS (aucun envoi automatique).
                 </p>
                 <span class="doctor-custom-sms-counter" id="doctor-custom-sms-count" aria-live="polite">0 / 320</span>
               </div>
@@ -820,18 +816,18 @@
 
         <div class="charts-grid">
           <article class="chart-card chart-card--analytics chart-card--wide">
-            <h3 class="chart-title">Efficacité du Rattrapage (30 Jours)</h3>
-            <p class="chart-sub">Annulations vs créneaux récupérés — tendance hebdomadaire</p>
+            <h3 class="chart-title">Créneaux récupérés</h3>
+            <p class="chart-sub">Aucune table de rattrapage n'est branchée sur Postgres</p>
             <div class="chart-canvas-wrap chart-canvas-wrap--tall">
-              <canvas id="recoveryChart" role="img" aria-label="Graphique d'efficacité du rattrapage sur 30 jours"></canvas>
+              <canvas id="recoveryChart" role="img" aria-label="Créneaux récupérés — données non disponibles"></canvas>
             </div>
           </article>
 
           <article class="chart-card chart-card--analytics chart-card--square">
-            <h3 class="chart-title">Répartition des Flux</h3>
-            <p class="chart-sub">Typologie des patients — récurrents, nouveaux, urgences</p>
+            <h3 class="chart-title">Répartition du jour</h3>
+            <p class="chart-sub">Confirmés, en attente et no-shows — mix réel d'aujourd'hui</p>
             <div class="chart-canvas-wrap chart-canvas-wrap--flow-bars">
-              <canvas id="flowChart" role="img" aria-label="Graphique en barres horizontales de répartition des flux patients"></canvas>
+              <canvas id="flowChart" role="img" aria-label="Répartition des statuts du jour"></canvas>
             </div>
           </article>
         </div>
@@ -895,7 +891,7 @@
                 type="text"
                 id="settings-profile-name"
                 name="profile_name"
-                value="Dr. Tazi"
+                value=""
                 autocomplete="name"
               />
             </div>
@@ -1215,11 +1211,15 @@
     Impossible de charger les données. Erreur de synchronisation avec la base de données.
   </div>
 
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@0.469.0"></script>
   <script src="dom-safe.js"></script>
   <script src="form-validators.js"></script>
   <script src="confirm-dialog.js"></script>
   <script src="auth.js"></script>
+  <script src="theme.js"></script>
+  <script src="row-ui.js"></script>
+  <script src="notes.js"></script>
+  <script src="ghost-select.js"></script>
   <script src="dashboard_app.js"></script>
   <script src="shared.js"></script>
   <script src="app.js"></script>

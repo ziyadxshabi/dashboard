@@ -28,6 +28,28 @@ const DASHBOARD_KPI_SQL = `
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
 `;
 
+const WEEK_PATIENTS_SQL = `
+  WITH days AS (
+    SELECT (NOW() AT TIME ZONE 'Africa/Casablanca')::date - s.i AS day
+    FROM generate_series(6, 0, -1) AS s(i)
+  )
+  SELECT
+    d.day,
+    COALESCE(b.patients, 0)::int AS patients
+  FROM days d
+  LEFT JOIN (
+    SELECT
+      (starts_at AT TIME ZONE 'Africa/Casablanca')::date AS day,
+      COUNT(*) FILTER (WHERE status::text NOT IN ('Annule', 'Annulé'))::int AS patients
+    FROM bookings
+    WHERE clinic_id = $1
+      AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+        >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
+    GROUP BY 1
+  ) b ON b.day = d.day
+  ORDER BY d.day
+`;
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'GET, OPTIONS');
@@ -44,8 +66,13 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   try {
-    const result = await query(DASHBOARD_KPI_SQL, [session.clinic_id]);
-    const row = result.rows[0] || {};
+    const [kpiResult, weekResult] = await Promise.all([
+      query(DASHBOARD_KPI_SQL, [session.clinic_id]),
+      query(WEEK_PATIENTS_SQL, [session.clinic_id]),
+    ]);
+    const row = kpiResult.rows[0] || {};
+    const weekPatients = (weekResult.rows || []).map((entry) => Number(entry.patients) || 0);
+    while (weekPatients.length < 7) weekPatients.unshift(0);
     return res.status(200).json({
       ok: true,
       data: {
@@ -53,6 +80,7 @@ module.exports = async function handler(req, res) {
         accepted_plans: Number(row.accepted_plans) || 0,
         pending_plans: Number(row.pending_plans) || 0,
         no_shows: Number(row.no_shows) || 0,
+        week_patients: weekPatients.slice(-7),
       },
     });
   } catch (err) {

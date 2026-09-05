@@ -7118,6 +7118,28 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   height: 100% !important;
 }
 
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+  margin: 0;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-muted, #7A8899);
+  font-size: 0.875rem;
+}
+
+.chart-canvas-wrap.is-empty canvas,
+.is-chart-empty canvas {
+  display: none !important;
+}
+
+.oak-chart.is-chart-empty,
+#doctor-weekly-trend-chart.is-chart-empty {
+  min-height: 12rem;
+}
+
 #view-analytics .chart-canvas-wrap--tall {
   min-height: 300px;
   flex: 1;

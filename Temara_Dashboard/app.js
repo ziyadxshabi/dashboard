@@ -1,5 +1,5 @@
 /**
- * Assistant Command Center — n8n live data pipeline
+ * Assistant Command Center — Postgres roster, waitlist, and team notes.
  * Clinique Dentaire Témara Mall · DentaFlow OS
  */
 
@@ -8,29 +8,16 @@
 
 const CONFIG = {
   ROSTER_PROXY: '/api/roster',
-  DELAY_ALERT_PROXY: '/api/n8n-delay-alert',
   UPDATE_STATUS_PROXY: '/api/update-status',
   FILL_GAP_PROXY: '/api/fill-gap',
   TEAM_NOTES_PROXY: '/api/team-notes',
-  PROXY: '/api/proxy',
   ENDPOINTS: {
     GET_ROSTER: '/api/roster',
     UPDATE_STATUS: '/api/update-status',
-    EXPORT_DAILY: '/api/proxy',
-    DELAY_ALERT: '/api/n8n-delay-alert',
-    FORCE_REMINDERS: '/api/proxy',
     GET_NOTES: '/api/team-notes',
     POST_NOTE: '/api/team-notes',
     WAITLIST_ADD: '/api/waitlist',
-    BULK_CONFIRM: '/api/proxy',
-    BULK_CANCEL: '/api/proxy',
     BULK_SMS: '/api/bulk-sms',
-  },
-  PROXY_TARGETS: {
-    EXPORT_DAILY: 'daily-report-export',
-    FORCE_REMINDERS: 'force-reminders',
-    BULK_CONFIRM: 'bulk-confirm',
-    BULK_CANCEL: 'bulk-cancel',
   },
 };
 
@@ -75,6 +62,73 @@ const PIN_BADGE_SVG = lucideIcon('pin', 'icon-sm');
 
 const PLANNING_UPSTREAM_ERROR_MESSAGE =
   'Erreur de connexion au serveur (503). Veuillez rafraîchir la page ou contacter le support.';
+
+  const RowUI = window.DentaFlowRowUI || {};
+
+  function getMatteChipModifier(label) {
+    return RowUI.getMatteChipModifier ? RowUI.getMatteChipModifier(label) : 'attente';
+  }
+
+  function createStatusDot(label) {
+    return RowUI.createStatusDot(label);
+  }
+
+  function createPriorityIndicator(label) {
+    return RowUI.createPriorityIndicator(label);
+  }
+
+  function createMatteChip(label) {
+    return RowUI.createMatteChip(label);
+  }
+
+  function createPatientAvatar(name) {
+    return RowUI.createPatientAvatar(name);
+  }
+
+  function createPatientIdentity(name, options) {
+    return RowUI.createPatientIdentity(name, options);
+  }
+
+  function getWaitlistPriorityLabel(appt) {
+    return RowUI.getWaitlistPriorityLabel(appt);
+  }
+
+  function isWaitlistUrgent(appt) {
+    return RowUI.isWaitlistUrgent(appt);
+  }
+
+  function createCopyableSpan(value, displayLabel) {
+    return RowUI.createCopyableSpan(value, displayLabel);
+  }
+
+  function createWaitlistTableRow(appt) {
+    return RowUI.createWaitlistTableRow(appt);
+  }
+
+  function createEmptyState(options) {
+    return RowUI.createEmptyState(options);
+  }
+
+  function mountEmptyState(hostId, options) {
+    return RowUI.mountEmptyState(hostId, options);
+  }
+
+  function clearEmptyState(hostId) {
+    return RowUI.clearEmptyState(hostId);
+  }
+
+  function initEmptyStatePulse(emptyStateEl) {
+    return RowUI.initEmptyStatePulse?.(emptyStateEl);
+  }
+
+  function extractInitials(fullName) {
+    return RowUI.extractInitials ? RowUI.extractInitials(fullName) : '??';
+  }
+
+  const EMPTY_STATE_DEFAULT_MESSAGE = RowUI.EMPTY_STATE_DEFAULT_MESSAGE
+    || 'Aucun rendez-vous. En attente de nouvelles réservations.';
+  const EMPTY_STATE_SVG_CALENDAR = RowUI.EMPTY_STATE_SVG_CALENDAR || lucideIcon('calendar-clock', 'icon-lg');
+  const EMPTY_STATE_SVG_INBOX = RowUI.EMPTY_STATE_SVG_INBOX || lucideIcon('inbox', 'icon-lg');
 
 function normalizePulseStatus(status) {
   return String(status || '')
@@ -256,15 +310,16 @@ let handoffNotes = [];
   }
 
   function parseHandoffTime(time) {
-    const [hours, minutes] = String(time || '00:00').split(':').map(Number);
-    return (hours || 0) * 60 + (minutes || 0);
+    return window.DentaFlowNotes?.parseNoteMinutes?.(time)
+      ?? String(time || '00:00').split(':').map(Number).reduce((h, m, i) => (i === 0 ? (h || 0) * 60 : h + (m || 0)), 0);
   }
 
   function sortHandoffNotes(notes) {
+    if (typeof window.DentaFlowNotes?.sortNotes === 'function') {
+      return window.DentaFlowNotes.sortNotes(notes);
+    }
     return [...notes].sort((a, b) => {
-      if (Boolean(a.pinned) !== Boolean(b.pinned)) {
-        return a.pinned ? -1 : 1;
-      }
+      if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
       return parseHandoffTime(b.time) - parseHandoffTime(a.time);
     });
   }
@@ -277,6 +332,9 @@ let handoffNotes = [];
   }
 
   function escapeHtml(value) {
+    if (typeof window.DentaFlowDom?.escapeHtml === 'function') {
+      return window.DentaFlowDom.escapeHtml(value);
+    }
     return String(value ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -411,79 +469,19 @@ let handoffNotes = [];
   }
 
   function parseHandoffResponse(payload) {
+    if (typeof window.DentaFlowNotes?.parseNotesResponse === 'function') {
+      return window.DentaFlowNotes.parseNotesResponse(payload);
+    }
     if (payload == null) return [];
     if (Array.isArray(payload)) return payload;
-    if (typeof payload !== 'object') return [];
-
-    if (payload.Message != null || payload.message != null || payload.text != null) {
-      return [payload];
-    }
-
-    const arrayKeys = ['data', 'results', 'items', 'records', 'notes', 'body', 'json'];
-    for (const key of arrayKeys) {
-      if (Array.isArray(payload[key])) return payload[key];
-    }
-
-    if (payload.json && typeof payload.json === 'object' && !Array.isArray(payload.json)) {
-      return [payload.json];
-    }
-
     return [];
   }
 
   function normalizeHandoffRecord(raw) {
-    const item = raw?.json && typeof raw.json === 'object' && !Array.isArray(raw.json)
-      ? raw.json
-      : raw;
-
-    if (!item || typeof item !== 'object') return null;
-
-    const text = String(item.Message ?? item.message ?? item.text ?? '').trim();
-    if (!text) return null;
-
-    const categoryRaw = item['Catégorie'] ?? item.Categorie ?? item.category ?? 'Info';
-    const category = String(extractBaserowFieldValue(categoryRaw) || 'Info').trim() || 'Info';
-
-    const authorRaw = item.Auteur ?? item.author;
-    const author = String(extractBaserowFieldValue(authorRaw) || '').trim();
-
-    const pinnedRaw = item['Épinglé'] ?? item.Epingle ?? item.pinned ?? false;
-    const pinnedValue = extractBaserowFieldValue(pinnedRaw);
-    const pinned =
-      pinnedRaw === true ||
-      pinnedValue === true ||
-      pinnedValue === 1 ||
-      String(pinnedValue).toLowerCase() === 'true' ||
-      String(pinnedValue).toLowerCase() === 'oui';
-
-    const timeRaw = item.Heure ?? item.time ?? item.heure ?? '';
-    let time = String(extractBaserowFieldValue(timeRaw) || '').trim();
-    if (time.includes('T')) {
-      const parsed = new Date(time);
-      if (!Number.isNaN(parsed.getTime())) {
-        time = parsed.toLocaleTimeString('fr-FR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        });
-      }
+    if (typeof window.DentaFlowNotes?.normalizeNote === 'function') {
+      return window.DentaFlowNotes.normalizeNote(raw);
     }
-
-    const id =
-      item.id ??
-      item.ID ??
-      `note-${String(text).slice(0, 24)}-${String(time || Date.now())}`;
-
-    return {
-      id,
-      text,
-      type: author ? 'manual' : 'system',
-      category,
-      pinned,
-      author: author || undefined,
-      time,
-      readBy: Array.isArray(item.readBy) ? item.readBy : [],
-    };
+    return null;
   }
 
   async function loadHandoffNotes() {
@@ -612,80 +610,15 @@ let handoffNotes = [];
   let setWaitlistPriorityValue = null;
 
   function initHandoffCategorySelect() {
-    const root = $('handoff-category-root');
-    const hidden = $('handoff-category');
-    const trigger = $('handoff-category-trigger');
-    const list = $('handoff-category-list');
-    const label = $('handoff-category-label');
-    if (!root || !hidden || !trigger || !list) return;
-
-    const options = Array.from(list.querySelectorAll('.ghost-select__option'));
-
-    function setValue(value) {
-      hidden.value = value;
-      if (label) label.textContent = value;
-      options.forEach((option) => {
-        const selected = option.dataset.value === value;
-        option.classList.toggle('is-selected', selected);
-        option.setAttribute('aria-selected', selected ? 'true' : 'false');
-      });
-    }
-
-    function closeList() {
-      list.hidden = true;
-      trigger.setAttribute('aria-expanded', 'false');
-      options.forEach((option) => option.classList.remove('is-focused'));
-    }
-
-    function openList() {
-      list.hidden = false;
-      trigger.setAttribute('aria-expanded', 'true');
-    }
-
-    resetHandoffCategorySelect = () => setValue('Info');
-
-    trigger.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (list.hidden) openList();
-      else closeList();
+    const api = window.DentaFlowSelect?.init?.({
+      root: $('handoff-category-root'),
+      hidden: $('handoff-category'),
+      trigger: $('handoff-category-trigger'),
+      list: $('handoff-category-list'),
+      label: $('handoff-category-label'),
+      defaultValue: 'Info',
     });
-
-    options.forEach((option) => {
-      option.addEventListener('click', () => {
-        setValue(option.dataset.value || 'Info');
-        closeList();
-        trigger.focus();
-      });
-    });
-
-    document.addEventListener('click', (event) => {
-      if (!root.contains(event.target)) closeList();
-    });
-
-    trigger.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        closeList();
-        return;
-      }
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        if (list.hidden) openList();
-        const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
-        const delta = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = (currentIndex + delta + options.length) % options.length;
-        options.forEach((option) => option.classList.remove('is-focused'));
-        options[nextIndex]?.classList.add('is-focused');
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        const focused = options.find((option) => option.classList.contains('is-focused'));
-        if (focused && !list.hidden) {
-          event.preventDefault();
-          setValue(focused.dataset.value || 'Info');
-          closeList();
-        }
-      }
-    });
+    resetHandoffCategorySelect = api ? () => api.setValue('Info') : null;
   }
 
   function getWaitlistPriorityInput() {
@@ -693,81 +626,15 @@ let handoffNotes = [];
   }
 
   function initWaitlistPrioritySelect() {
-    const root = $('waitlist-priority-root');
-    const hidden = $('waitlist-priority-input');
-    const trigger = $('waitlist-priority-trigger');
-    const list = $('waitlist-priority-list');
-    const label = $('waitlist-priority-value');
-    if (!root || !hidden || !trigger || !list) return;
-
-    const options = Array.from(list.querySelectorAll('.ghost-select__option'));
-
-    function setValue(value) {
-      const resolved = value || 'Normale';
-      hidden.value = resolved;
-      if (label) label.textContent = resolved;
-      options.forEach((option) => {
-        const selected = option.dataset.value === resolved;
-        option.classList.toggle('is-selected', selected);
-        option.setAttribute('aria-selected', selected ? 'true' : 'false');
-      });
-    }
-
-    function closeList() {
-      list.hidden = true;
-      trigger.setAttribute('aria-expanded', 'false');
-      options.forEach((option) => option.classList.remove('is-focused'));
-    }
-
-    function openList() {
-      list.hidden = false;
-      trigger.setAttribute('aria-expanded', 'true');
-    }
-
-    setWaitlistPriorityValue = setValue;
-
-    trigger.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (list.hidden) openList();
-      else closeList();
+    const api = window.DentaFlowSelect?.init?.({
+      root: $('waitlist-priority-root'),
+      hidden: $('waitlist-priority-input'),
+      trigger: $('waitlist-priority-trigger'),
+      list: $('waitlist-priority-list'),
+      label: $('waitlist-priority-value'),
+      defaultValue: 'Normale',
     });
-
-    options.forEach((option) => {
-      option.addEventListener('click', () => {
-        setValue(option.dataset.value || 'Normale');
-        closeList();
-        trigger.focus();
-      });
-    });
-
-    document.addEventListener('click', (event) => {
-      if (!root.contains(event.target)) closeList();
-    });
-
-    trigger.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        closeList();
-        return;
-      }
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        if (list.hidden) openList();
-        const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
-        const delta = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = (currentIndex + delta + options.length) % options.length;
-        options.forEach((option) => option.classList.remove('is-focused'));
-        options[nextIndex]?.classList.add('is-focused');
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        const focused = options.find((option) => option.classList.contains('is-focused'));
-        if (focused && !list.hidden) {
-          event.preventDefault();
-          setValue(focused.dataset.value || 'Normale');
-          closeList();
-        }
-      }
-    });
+    setWaitlistPriorityValue = api ? (value) => api.setValue(value || 'Normale') : null;
   }
 
   function initHandoffForm() {
@@ -940,89 +807,21 @@ let handoffNotes = [];
     defaultValue,
     onPersist,
   }) {
-    const root = $(rootId);
-    const hidden = $(hiddenId);
-    const trigger = $(triggerId);
-    const list = $(listId);
-    const label = $(labelId);
-    if (!root || !hidden || !trigger || !list || root.dataset.demoBound === 'true') return;
-    root.dataset.demoBound = 'true';
-
-    const options = Array.from(list.querySelectorAll('.ghost-select__option'));
-
-    function setValue(value, labelText) {
-      const resolved = value || defaultValue;
-      hidden.value = resolved;
-      if (label) {
-        label.textContent = labelText
-          || options.find((option) => option.dataset.value === resolved)?.dataset.label
-          || resolved;
-      }
-      options.forEach((option) => {
-        const selected = option.dataset.value === resolved;
-        option.classList.toggle('is-selected', selected);
-        option.setAttribute('aria-selected', selected ? 'true' : 'false');
-      });
-    }
-
-    function closeList() {
-      list.hidden = true;
-      trigger.setAttribute('aria-expanded', 'false');
-      options.forEach((option) => option.classList.remove('is-focused'));
-    }
-
-    function openList() {
-      list.hidden = false;
-      trigger.setAttribute('aria-expanded', 'true');
-    }
-
     const stored = demoStorageGet(storageKey, defaultValue);
-    setValue(stored);
-
-    trigger.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (list.hidden) openList();
-      else closeList();
-    });
-
-    options.forEach((option) => {
-      option.addEventListener('click', () => {
-        const value = option.dataset.value || defaultValue;
-        setValue(value, option.dataset.label || option.textContent.trim());
-        closeList();
+    window.DentaFlowSelect?.init?.({
+      rootId,
+      hiddenId,
+      triggerId,
+      listId,
+      labelId,
+      defaultValue,
+      initialValue: stored,
+      once: true,
+      onSelect: (value) => {
         demoStorageSet(storageKey, value);
         onPersist?.(value);
         schedulePreferencesSavedToast();
-        trigger.focus();
-      });
-    });
-
-    document.addEventListener('click', (event) => {
-      if (!root.contains(event.target)) closeList();
-    });
-
-    trigger.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        closeList();
-        return;
-      }
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        if (list.hidden) openList();
-        const currentIndex = options.findIndex((option) => option.classList.contains('is-selected'));
-        const delta = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = (currentIndex + delta + options.length) % options.length;
-        options.forEach((option) => option.classList.remove('is-focused'));
-        options[nextIndex]?.classList.add('is-focused');
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        const focused = options.find((option) => option.classList.contains('is-focused'));
-        if (focused && !list.hidden) {
-          event.preventDefault();
-          focused.click();
-        }
-      }
+      },
     });
   }
 
@@ -1044,8 +843,8 @@ let handoffNotes = [];
     const nameEl = $('settings-profile-name');
     const roleEl = $('settings-profile-specialty');
     const defaults = isAssistant ? DEFAULT_SETTINGS : {
-      profileName: 'Dr. Tazi',
-      profileSpecialty: 'Chirurgien-dentiste',
+      profileName: window.DentaFlowTheme?.getSessionDisplayName?.() || 'Praticien',
+      profileSpecialty: window.DentaFlowTheme?.getSessionRoleLabel?.('doctor') || 'Chirurgien-dentiste',
     };
 
     if (nameEl) {
@@ -1192,6 +991,10 @@ let handoffNotes = [];
       toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
       tooltip: 'Blocage de créneau bientôt disponible',
     },
+    delayAlert: {
+      toast: 'Cette fonctionnalité est en cours de déploiement et sera disponible prochainement.',
+      tooltip: 'Alerte retard bientôt disponible',
+    },
   };
 
   function wireDeployingFeatureButton(button, notice) {
@@ -1212,6 +1015,9 @@ let handoffNotes = [];
   function guardDeployingFeatureButtons() {
     wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
     wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
+    wireDeployingFeatureButton($('btn-force-sms'), DEPLOYING_FEATURE_NOTICES.forceReminders);
+    wireDeployingFeatureButton($('btn-block-slot'), DEPLOYING_FEATURE_NOTICES.blockSlot);
+    wireDeployingFeatureButton($('btn-alerte-retard'), DEPLOYING_FEATURE_NOTICES.delayAlert);
     wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
   }
 
@@ -1310,80 +1116,14 @@ let handoffNotes = [];
     );
   }
 
-  async function simulateWebhookAction(buttonId, originalText, loadingText, toastMessage) {
-    const selector = String(buttonId).startsWith('#') ? buttonId : `#${buttonId}`;
-    const btn = document.querySelector(selector);
-    if (!btn || btn.dataset.superBusy === 'true') return;
-
-    const labelEl = btn.querySelector('.btn-super__label');
-    btn.dataset.superBusy = 'true';
-    const prevOpacity = btn.style.opacity;
-    const prevPointerEvents = btn.style.pointerEvents;
-
-    btn.style.opacity = '0.7';
-    btn.style.pointerEvents = 'none';
-    if (labelEl) labelEl.textContent = loadingText;
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    if (labelEl) labelEl.textContent = originalText;
-    btn.style.opacity = prevOpacity;
-    btn.style.pointerEvents = prevPointerEvents;
-    delete btn.dataset.superBusy;
-
-    showToast(toastMessage, 'success');
-  }
-
   function initSuperpouvoirs() {
     const exportBtn = $('btn-export-excel');
-    const forceSmsBtn = $('btn-force-sms');
-    const blockSlotBtn = $('btn-block-slot');
-    const fillSlotBtn = $('btn-fill-slot');
 
     if (exportBtn && exportBtn.dataset.superWired !== 'true') {
       exportBtn.dataset.superWired = 'true';
       exportBtn.addEventListener('click', (event) => {
         event.preventDefault();
         generateDailyReport();
-      });
-    }
-
-    if (forceSmsBtn && forceSmsBtn.dataset.superWired !== 'true') {
-      forceSmsBtn.dataset.superWired = 'true';
-      forceSmsBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        simulateWebhookAction(
-          '#btn-force-sms',
-          'Forcer Rappels',
-          'Envoi en cours...',
-          'Rappels SMS envoyés avec succès.'
-        );
-      });
-    }
-
-    if (blockSlotBtn && blockSlotBtn.dataset.superWired !== 'true') {
-      blockSlotBtn.dataset.superWired = 'true';
-      blockSlotBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        simulateWebhookAction(
-          '#btn-block-slot',
-          'Bloquer Créneau Urgence',
-          'Verrouillage...',
-          'Créneau d\'urgence bloqué sur Cal.com.'
-        );
-      });
-    }
-
-    if (fillSlotBtn && fillSlotBtn.dataset.superWired !== 'true') {
-      fillSlotBtn.dataset.superWired = 'true';
-      fillSlotBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        simulateWebhookAction(
-          '#btn-fill-slot',
-          'Remplir un Créneau Vide',
-          'Recherche...',
-          'Notification envoyée aux patients prioritaires.'
-        );
       });
     }
   }
@@ -1494,11 +1234,12 @@ let handoffNotes = [];
     return payload;
   }
 
-  /** Baserow single-select / lookup fields arrive as { id, value, color }. */
-  function extractBaserowFieldValue(field) {
+  /** Scalar passthrough — Postgres fields are plain strings, not Baserow objects. */
+  function extractScalarValue(field) {
     if (field == null) return '';
-    if (typeof field === 'string' || typeof field === 'number') return String(field);
-    if (typeof field === 'object' && field.value != null) return String(field.value);
+    if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+      return String(field);
+    }
     return '';
   }
 
@@ -1566,15 +1307,22 @@ let handoffNotes = [];
     return String(status || '').trim().toLowerCase() === BULK_PENDING_STATUS.toLowerCase();
   }
 
-  function parseBaserowRowId(raw) {
+  function parseBookingRowId(raw) {
     if (raw == null || raw === '') return null;
-    const numericId = Number(raw);
-    return Number.isFinite(numericId) ? numericId : null;
+    const text = String(raw).trim();
+    if (!text) return null;
+    const numericId = Number(text);
+    if (Number.isFinite(numericId) && String(numericId) === text) return numericId;
+    return text;
+  }
+
+  function parseBaserowRowId(raw) {
+    return parseBookingRowId(raw);
   }
 
   function extractBaserowRowId(record) {
     const id = record?.rowId ?? record?.id;
-    return parseBaserowRowId(id);
+    return parseBookingRowId(id);
   }
 
   function gatherTomorrowPendingRecords(records) {
@@ -1811,28 +1559,27 @@ let handoffNotes = [];
       calBookingId: row?.dataset?.calBookingId || record.calBookingId || '',
       scheduleDate: String(row?.dataset?.scheduleDate ?? formatScheduleDate(record.rawDate)).trim(),
       startTime: String(row?.dataset?.startTime ?? record.time ?? '').trim(),
-      practitioner: String(row?.dataset?.practitioner ?? record.practitioner ?? 'Dr. Tazi').trim(),
+      practitioner: String(row?.dataset?.practitioner ?? record.practitioner ?? '').trim() || 'Non assigné',
     };
+  }
+
+  function getBookingIdForApi(record) {
+    return String(record?.id || record?.calBookingId || record?.cal_booking_uid || '').trim();
   }
 
   function getSelectedBulkCancelPayload(ids = selectedPatientIds) {
     const records = getRecordsForSelectedIds(ids);
-    const appointments = records
-      .map(extractCancelMetadataFromRecord)
-      .filter((entry) => entry.rowId != null);
-
+    const appointments = records.map(extractCancelMetadataFromRecord);
     return {
-      rowIds: appointments.map((entry) => entry.rowId),
+      records,
+      rowIds: appointments.map((entry) => entry.rowId).filter((id) => id != null),
       calBookingIds: appointments.map((entry) => entry.calBookingId || ''),
-      appointments: appointments.map((entry) => ({
-        ...entry,
-        calBookingId: entry.calBookingId || '',
-      })),
+      appointments,
     };
   }
 
   function isSameRowId(a, b) {
-    return Number(a) === Number(b);
+    return String(a) === String(b);
   }
 
   function restoreBulkSelection(ids) {
@@ -1886,6 +1633,25 @@ let handoffNotes = [];
     }
 
     return parsed ?? { success: true, message: rawText || 'OK' };
+  }
+
+  async function postBulkStatusUpdates(records, newStatus) {
+    const rows = Array.isArray(records) ? records : [];
+    if (!rows.length) {
+      throw new Error('Aucun identifiant de rendez-vous valide.');
+    }
+    const results = [];
+    for (const record of rows) {
+      const bookingId = getBookingIdForApi(record);
+      if (!bookingId) {
+        throw new Error('Aucun identifiant de rendez-vous valide.');
+      }
+      results.push(await postBulkAction(CONFIG.ENDPOINTS.UPDATE_STATUS, {
+        bookingId,
+        newStatus,
+      }));
+    }
+    return { ok: true, results };
   }
 
   function updateBulkBarUI() {
@@ -2013,15 +1779,10 @@ let handoffNotes = [];
 
     const ids = [...selectedPatientIds];
     const records = getRecordsForSelectedIds(ids);
-    const confirmPayload = getSelectedBulkCancelPayload(ids);
     const optimisticSnapshots = applyOptimisticBulkConfirm(records);
 
     try {
-      await postBulkAction(CONFIG.ENDPOINTS.BULK_CONFIRM, {
-        target: CONFIG.PROXY_TARGETS.BULK_CONFIRM,
-        rowIds: confirmPayload.rowIds,
-        calBookingIds: confirmPayload.calBookingIds,
-      });
+      await postBulkStatusUpdates(records, 'Confirmé');
 
       selectedPatientIds = [];
       document.querySelectorAll('#planning-timeline .row-checkbox, #roster-tbody .row-checkbox').forEach((checkbox) => {
@@ -2055,16 +1816,12 @@ let handoffNotes = [];
     );
     if (!confirmed) return;
 
-    const cancelPayload = getSelectedBulkCancelPayload(ids);
     const optimisticSnapshots = applyOptimisticBulkCancel(records);
 
     try {
-      console.log('[Bulk Cancel] Dispatch | RowIDs: ' + (cancelPayload.rowIds?.length || 0));
+      console.log('[Bulk Cancel] Dispatch | count: ' + records.length);
       const [cancelResult] = await Promise.all([
-        postBulkAction(CONFIG.ENDPOINTS.BULK_CANCEL, {
-          target: CONFIG.PROXY_TARGETS.BULK_CANCEL,
-          ...cancelPayload,
-        }),
+        postBulkStatusUpdates(records, 'Annulé'),
         animateRowsVaporize(ids),
       ]);
 
@@ -2230,8 +1987,16 @@ let handoffNotes = [];
   }
 
   /**
-   * Normalize one roster row from Baserow/n8n — supports exact DB keys and aliases.
+   * Normalize one roster row — Postgres snake_case first, legacy aliases last.
    */
+  function firstPresent(...values) {
+    for (const value of values) {
+      if (value == null || value === '') continue;
+      return value;
+    }
+    return undefined;
+  }
+
   function normalizeRosterRecord(raw) {
     const item = raw?.json && typeof raw.json === 'object' && !Array.isArray(raw.json)
       ? raw.json
@@ -2239,94 +2004,82 @@ let handoffNotes = [];
 
     if (!item || typeof item !== 'object') return null;
 
-    const patientName =
-      item['Patient (Nom Complet)'] ??
-      item.Clean_Name ??
-      item.Nom ??
-      item.nom ??
-      item.name ??
-      'Non spécifié';
+    const patientName = firstPresent(
+      item.patient_name,
+      item.name,
+      item.Nom,
+      item.nom,
+      item.Clean_Name,
+      item['Patient (Nom Complet)']
+    ) ?? 'Non spécifié';
 
-    const rawDate =
-      item['Date & Heure du RDV'] ??
-      item.startTime ??
-      item.start_time ??
-      item.datetime ??
-      item.date;
+    const rawDate = firstPresent(
+      item.starts_at,
+      item.startTime,
+      item.start_time,
+      item.datetime,
+      item.date,
+      item['Date & Heure du RDV']
+    );
 
-    const treatment =
-      item['Motif de Consultation'] ??
-      item.motif ??
-      item.treatment ??
-      'Consultation';
+    const treatment = firstPresent(
+      item.treatment_name,
+      item.treatment,
+      item.motif,
+      item['Motif de Consultation']
+    ) ?? 'Consultation';
 
-    const statusRaw =
-      item['Statut du RDV'] ??
-      item.statut ??
-      item.status;
-    const statusValue = extractBaserowFieldValue(statusRaw);
-    const status = statusValue || 'Confirmé';
+    const statusRaw = firstPresent(
+      item.status,
+      item.statut,
+      item['Statut du RDV']
+    );
+    const status = String(statusRaw || 'Confirmé').trim() || 'Confirmé';
 
-    const calBookingId = String(item['Cal Booking ID'] ?? item.calBookingId ?? '').trim();
+    const calBookingId = String(
+      firstPresent(item.cal_booking_uid, item.calBookingId, item['Cal Booking ID']) || ''
+    ).trim();
 
     const phone = String(
-      item['Téléphone (WhatsApp)'] ??
-      item.telephone ??
-      item.phone ??
-      ''
+      firstPresent(item.patient_phone, item.phone, item.telephone, item['Téléphone (WhatsApp)']) || ''
     ).trim();
 
-    const email = String(
-      item['Email Contact'] ??
-      item.email ??
-      ''
-    ).trim();
+    const email = String(firstPresent(item.email, item['Email Contact']) || '').trim();
 
     const observations = String(
-      item['Observations Médicales'] ??
-      item.observations ??
-      ''
+      firstPresent(item.notes, item.observations, item['Observations Médicales']) || ''
     ).trim();
 
     const coverage = String(
-      item['Couverture Médicale'] ??
-      item.coverage ??
-      item.insurance ??
-      ''
+      firstPresent(item.coverage, item.insurance, item['Couverture Médicale']) || ''
     ).trim();
 
-    const billingStatusRaw =
-      item['Statut Facturation'] ??
-      item.billingStatus ??
-      item.statutFacturation ??
-      '';
     const billingStatus = String(
-      extractBaserowFieldValue(billingStatusRaw) || billingStatusRaw || ''
+      firstPresent(item.billingStatus, item.statutFacturation, item['Statut Facturation']) || ''
     ).trim();
 
     const isNewPatient = parseNewPatientFlag(
-      item['Nouveau Patient ?'] ??
-      item['Nouveau Patient'] ??
-      item.isNewPatient ??
-      item.newPatient
+      firstPresent(
+        item.isNewPatient,
+        item.newPatient,
+        item['Nouveau Patient ?'],
+        item['Nouveau Patient']
+      )
     );
 
     const practitioner = String(
-      item['Praticien Assigné'] ??
-      item['Praticien'] ??
-      item.practitioner ??
-      'Dr. Tazi'
+      firstPresent(item.practitioner, item['Praticien Assigné'], item['Praticien']) || ''
     ).trim();
 
-    const baserowRowId = parseBaserowRowId(
+    const bookingId = parseBookingRowId(
       item.id ?? item.ID ?? item.row_id ?? item.rowId
     );
 
-    const id = baserowRowId ?? `row-${String(patientName)}-${String(rawDate ?? '')}`;
+    const id = bookingId ?? `row-${String(patientName)}-${String(rawDate ?? '')}`;
 
     return {
       id,
-      rowId: baserowRowId,
+      rowId: bookingId,
       name: String(patientName).trim() || 'Non spécifié',
       treatment: String(treatment).trim() || 'Consultation',
       status,
@@ -2342,9 +2095,9 @@ let handoffNotes = [];
       time: formatAppointmentTime(rawDate),
       rawDate,
       noShow: Boolean(
+        item.noShow ??
         item['Historique No-Show'] ??
-        item['Historique de no-shows'] ??
-        item.noShow
+        item['Historique de no-shows']
       ),
     };
   }
@@ -2366,38 +2119,9 @@ let handoffNotes = [];
     return `<span class="roster-noshow-flag" title="Historique de no-shows — vigilance recommandée" aria-label="Historique de no-shows">${NOSHOW_SVG}</span>`;
   }
 
-  function getMatteChipModifier(label) {
-    const n = (label ?? '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-    if (n.includes('urgence')) return 'urgence';
-    if (n.includes('confirm')) return 'confirmé';
-    if (n.includes('annul') || n.includes('no-show')) return 'annulé';
-    if (n.includes('attente') || n.includes('soin')) return 'attente';
-    if (n.includes('termin')) return 'confirmé';
-    return 'attente';
-  }
-
   function applyMatteSelectSkin(selectEl, status) {
     if (!selectEl) return;
     selectEl.dataset.matte = getMatteChipModifier(status ?? selectEl.value);
-  }
-
-  function createStatusDot(label) {
-    const dot = document.createElement('span');
-    dot.className = `status-dot status-dot--${getMatteChipModifier(label)}`;
-    dot.title = label;
-    dot.setAttribute('aria-label', label);
-    return dot;
-  }
-
-  function createPriorityIndicator(label) {
-    const wrap = document.createElement('span');
-    wrap.className = 'status-indicator';
-    wrap.appendChild(createStatusDot(label));
-    const text = document.createElement('span');
-    text.className = 'status-indicator__label kinetic-label';
-    text.textContent = label;
-    wrap.appendChild(text);
-    return wrap;
   }
 
   function updateStatusDotForSelect(selectEl) {
@@ -2409,24 +2133,9 @@ let handoffNotes = [];
     dot.setAttribute('aria-label', selectEl.value);
   }
 
-  function createMatteChip(label) {
-    const chip = document.createElement('span');
-    chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
-    chip.textContent = label || '—';
-    return chip;
-  }
-
-  function createPatientAvatar(name) {
-    const avatar = document.createElement('span');
-    avatar.className = 'patient-avatar';
-    avatar.setAttribute('aria-hidden', 'true');
-    avatar.textContent = extractInitials(name);
-    return avatar;
-  }
-
   function parseNewPatientFlag(raw) {
     if (raw === true || raw === 1) return true;
-    const value = extractBaserowFieldValue(raw) ?? raw;
+    const value = extractScalarValue(raw) || raw;
     const normalized = String(value ?? '')
       .trim()
       .toLowerCase()
@@ -2464,61 +2173,6 @@ let handoffNotes = [];
     return 'status-pill--neutral';
   }
 
-  function createPatientIdentity(name, options = {}) {
-    const { showNoShow = false, hasNotes = false, isNewPatient = false } = options;
-    const wrap = document.createElement('div');
-    wrap.className = 'patient-identity';
-
-    wrap.appendChild(createPatientAvatar(name));
-
-    const labelWrap = document.createElement('span');
-    labelWrap.className = 'patient-identity__name';
-
-    if (showNoShow) {
-      const flagSpan = document.createElement('span');
-      flagSpan.className = 'roster-noshow-flag';
-      flagSpan.dataset.tooltip = 'Historique de no-shows — vigilance recommandée';
-      flagSpan.setAttribute('aria-label', 'Historique de no-shows');
-      flagSpan.innerHTML = NOSHOW_SVG;
-      labelWrap.appendChild(flagSpan);
-      labelWrap.appendChild(document.createTextNode(' '));
-    }
-
-    const nameText = document.createElement('span');
-    nameText.textContent = name || '';
-    if (name) {
-      nameText.classList.add('cell-truncate');
-      nameText.dataset.tooltip = name;
-    }
-    labelWrap.appendChild(nameText);
-
-    if (isNewPatient) {
-      const badge = document.createElement('span');
-      badge.className = 'patient-new-badge';
-      badge.setAttribute('aria-label', 'Nouveau patient');
-      const dot = document.createElement('span');
-      dot.className = 'patient-new-badge__dot';
-      dot.setAttribute('aria-hidden', 'true');
-      const label = document.createElement('span');
-      label.className = 'patient-new-badge__label';
-      label.textContent = 'Nouveau Patient';
-      badge.append(dot, label);
-      labelWrap.appendChild(badge);
-    }
-
-    if (hasNotes) {
-      labelWrap.classList.add('has-notes');
-      const indicator = document.createElement('span');
-      indicator.className = 'notes-indicator';
-      indicator.setAttribute('aria-hidden', 'true');
-      indicator.dataset.tooltip = 'Notes internes disponibles';
-      labelWrap.appendChild(indicator);
-    }
-
-    wrap.appendChild(labelWrap);
-    return wrap;
-  }
-
   function parseAppointmentMinutes(timeStr) {
     const match = String(timeStr || '').match(/^(\d{1,2}):(\d{2})/);
     if (!match) return null;
@@ -2533,26 +2187,12 @@ let handoffNotes = [];
     return appointmentMins < nowMins;
   }
 
-  function getWaitlistPriorityLabel(appt) {
-    if (appt.statusLabel) return appt.statusLabel;
-    const treatment = String(appt.treatment ?? appt.priorite ?? '').toLowerCase();
-    if (appt.tagClass === 'urgence' || treatment === 'haute') return 'Urgence';
-    return 'En attente';
-  }
-
   const ROW_ACTION_SVG = {
     edit: lucideIcon('pencil', 'icon-sm'),
     sms: lucideIcon('message-square', 'icon-sm'),
     copy: lucideIcon('copy', 'icon-sm'),
     menu: lucideIcon('ellipsis-vertical', 'icon-sm'),
   };
-
-  const EMPTY_STATE_SVG_CALENDAR = lucideIcon('calendar-clock', 'icon-lg');
-  const EMPTY_STATE_SVG_INBOX = lucideIcon('inbox', 'icon-lg');
-
-  const EMPTY_STATE_DEFAULT_MESSAGE = 'Aucun rendez-vous. En attente de nouvelles réservations.';
-
-  const emptyStatePulseTweens = new WeakMap();
 
   function createRowActionButton(action, label, svgMarkup, onClick) {
     const btn = document.createElement('button');
@@ -2702,70 +2342,8 @@ let handoffNotes = [];
     return createRowActionsMenu(context);
   }
 
-  function createEmptyState(options = {}) {
-    const {
-      message = EMPTY_STATE_DEFAULT_MESSAGE,
-      iconSvg = EMPTY_STATE_SVG_CALENDAR,
-    } = options;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'empty-state';
-
-    const icon = document.createElement('div');
-    icon.className = 'empty-state__icon';
-    icon.innerHTML = iconSvg;
-    window.refreshLucideIcons?.(icon);
-
-    const text = document.createElement('p');
-    text.className = 'empty-state__text';
-    text.textContent = message;
-
-    wrap.append(icon, text);
-    return wrap;
-  }
-
-  function mountEmptyState(hostId, options = {}) {
-    const host = $(hostId);
-    if (!host) return null;
-
-    host.replaceChildren();
-    const state = createEmptyState(options);
-    host.appendChild(state);
-    host.hidden = false;
-    initEmptyStatePulse(state);
-    return state;
-  }
-
-  function clearEmptyState(hostId) {
-    const host = $(hostId);
-    if (!host) return;
-    const icon = host.querySelector('.empty-state__icon');
-    if (icon && typeof gsap !== 'undefined') {
-      gsap.killTweensOf(icon);
-    }
-    host.replaceChildren();
-    host.hidden = true;
-  }
-
-  function initEmptyStatePulse(emptyStateEl) {
-    if (!emptyStateEl || typeof gsap === 'undefined') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const icon = emptyStateEl.querySelector('.empty-state__icon');
-    if (!icon) return;
-
-    const existing = emptyStatePulseTweens.get(icon);
-    if (existing) existing.kill();
-
-    gsap.set(icon, { opacity: 0.1 });
-    const tween = gsap.to(icon, {
-      opacity: 0.3,
-      duration: 1.5,
-      ease: 'sine.inOut',
-      yoyo: true,
-      repeat: -1,
-    });
-    emptyStatePulseTweens.set(icon, tween);
+  if (window.DentaFlowRowUI) {
+    window.DentaFlowRowUI.createRowActionGroup = createRowActionGroup;
   }
 
   let progressiveDisclosureInitialized = false;
@@ -3051,9 +2629,9 @@ let handoffNotes = [];
         assertAuthorizedResponse(response);
         const payload = await response.json();
         if (!response.ok || payload?.ok === false) throw new Error(payload?.error || `HTTP ${response.status}`);
-        showToast('Blast SMS envoyé à la liste d\'attente.', 'success');
+        toastFillGapResult(payload);
       } catch {
-        showToast('Échec de l\'envoi SMS — réessayez.', 'error');
+        showToast('Impossible de consulter la liste d\'attente — réessayez.', 'error');
       } finally {
         fillBtn.disabled = false;
       }
@@ -3191,19 +2769,6 @@ let handoffNotes = [];
     document.addEventListener('focusout', (event) => {
       if (event.target.closest('[data-tooltip]')) hideGlobalTooltip();
     });
-  }
-
-  function createCopyableSpan(value, displayLabel) {
-    const span = document.createElement('span');
-    const raw = String(value || '').trim();
-    span.className = 'copyable';
-    span.dataset.value = raw;
-    span.textContent = displayLabel ?? (raw || '—');
-    span.setAttribute('role', 'button');
-    span.setAttribute('tabindex', '0');
-    span.setAttribute('aria-label', `Copier ${span.textContent}`);
-    if (raw) span.dataset.tooltip = 'Cliquer pour copier';
-    return span;
   }
 
   function setCopyableField(elementId, value, fallback = '—') {
@@ -3528,7 +3093,7 @@ let handoffNotes = [];
     const options = STATUS_OPTIONS.map(opt =>
       `<option value="${escapeHtml(opt)}"${opt === currentStatus ? ' selected' : ''}>${escapeHtml(opt)}</option>`
     ).join('');
-    return `<select class="status-select" aria-label="Modifier le statut" data-booking-id="${escapeHtml(record.calBookingId || '')}">${options}</select>`;
+    return `<select class="status-select" aria-label="Modifier le statut" data-booking-id="${escapeHtml(getBookingIdForApi(record) || '')}">${options}</select>`;
   }
 
   function createStatusSelectElement(record) {
@@ -3541,8 +3106,9 @@ let handoffNotes = [];
     const select = document.createElement('select');
     select.className = 'status-select status-select--ghost';
     select.setAttribute('aria-label', 'Modifier le statut');
-    if (record.calBookingId) {
-      select.dataset.bookingId = String(record.calBookingId);
+    const recordId = getBookingIdForApi(record);
+    if (recordId) {
+      select.dataset.bookingId = recordId;
     }
     STATUS_OPTIONS.forEach((opt) => {
       const option = document.createElement('option');
@@ -3730,61 +3296,6 @@ let handoffNotes = [];
     main.appendChild(meta);
     article.append(timeSpan, main, createStatusSelectElement(record));
     return article;
-  }
-
-  function isWaitlistUrgent(appt) {
-    if (appt.priority === 1) return true;
-    if (appt.tagClass === 'urgence') return true;
-    const treatment = String(appt.treatment ?? appt.priorite ?? '')
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '');
-    return treatment === 'haute' || treatment.includes('urgence');
-  }
-
-  function createWaitlistTableRow(appt) {
-    const tr = document.createElement('tr');
-    tr.className = 'waitlist-row';
-    tr.dataset.rowInteractive = 'true';
-    tr.dataset.priority = String(appt.priority ?? (isWaitlistUrgent(appt) ? 1 : 2));
-    if (isWaitlistUrgent(appt)) tr.dataset.urgent = 'true';
-
-    const patientTd = document.createElement('td');
-    patientTd.colSpan = 1;
-
-    const rowInner = document.createElement('div');
-    rowInner.className = 'waitlist-row__inner';
-
-    const main = document.createElement('div');
-    main.className = 'waitlist-row__main';
-    main.appendChild(createPatientIdentity(appt.name));
-
-    rowInner.append(
-      main,
-      createRowActionGroup({
-        kind: 'waitlist',
-        appt,
-        phone: appt.phone || appt.telephone,
-        priorite: appt.priorite || appt.treatment,
-      })
-    );
-    patientTd.appendChild(rowInner);
-
-    const phoneTd = document.createElement('td');
-    phoneTd.className = 'col-numeric';
-    const phoneValue = String(appt.phone || appt.telephone || '').trim();
-    if (phoneValue) {
-      phoneTd.appendChild(createCopyableSpan(phoneValue));
-    } else {
-      phoneTd.textContent = '—';
-    }
-
-    const priorityTd = document.createElement('td');
-    priorityTd.appendChild(createPriorityIndicator(getWaitlistPriorityLabel(appt)));
-
-    tr.append(patientTd, phoneTd, priorityTd);
-    return tr;
   }
 
   function createOverviewTimelineCard(record) {
@@ -4474,7 +3985,7 @@ let handoffNotes = [];
 
   const DEFAULT_SETTINGS = {
     theme: 'oak-lounge',
-    profileName: 'Sanae Amrani',
+    profileName: '',
     profileSpecialty: 'Assistante dentaire',
     smsReminders: true,
     emailReminders: true,
@@ -4821,8 +4332,12 @@ let handoffNotes = [];
   }
 
   function applyTheme(theme) {
-    const resolved = normalizeTheme(theme);
-    document.documentElement.setAttribute('data-theme', resolved);
+    const resolved = window.DentaFlowTheme?.applyTheme
+      ? window.DentaFlowTheme.applyTheme(theme)
+      : normalizeTheme(theme);
+    if (!window.DentaFlowTheme?.applyTheme) {
+      document.documentElement.setAttribute('data-theme', resolved);
+    }
     volatileSettings.theme = resolved;
     updateThemeSwitcherUI(resolved);
     saveSettings({ theme: resolved });
@@ -4849,19 +4364,11 @@ let handoffNotes = [];
     pearlBtn?.addEventListener('click', () => applyTheme('pearl-clinic'));
   }
 
-  function extractInitials(fullName) {
-    const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return '??';
-    return parts
-      .slice(0, 2)
-      .map(part => part.replace(/\./g, '')[0] ?? '')
-      .join('')
-      .toUpperCase()
-      .slice(0, 2) || '??';
-  }
-
   function applyUserProfile(name, specialty) {
-    const displayName = (name ?? '').trim() || DEFAULT_SETTINGS.profileName;
+    const displayName = (name ?? '').trim()
+      || window.DentaFlowTheme?.getSessionDisplayName?.()
+      || DEFAULT_SETTINGS.profileName
+      || 'Assistante';
     const displayRole = (specialty ?? '').trim() || DEFAULT_SETTINGS.profileSpecialty;
     const initials = extractInitials(displayName);
     const firstName = displayName.split(/\s+/)[0] || displayName;
@@ -5242,6 +4749,23 @@ let handoffNotes = [];
     });
   }
 
+  function toastFillGapResult(payload) {
+    const booking = payload?.data?.booking;
+    const candidates = Array.isArray(payload?.data?.candidates) ? payload.data.candidates : [];
+    if (booking) {
+      showToast('Créneau comblé depuis la liste d\'attente.', 'success');
+      return;
+    }
+    if (candidates.length) {
+      const label = candidates.length === 1
+        ? '1 patient prioritaire disponible sur la liste d\'attente.'
+        : `${candidates.length} patients prioritaires disponibles sur la liste d'attente.`;
+      showToast(label, 'success');
+      return;
+    }
+    showToast('Aucun patient prioritaire sur la liste d\'attente.', 'info');
+  }
+
   function wireFillGapButton(button) {
     if (!button || button.dataset.fillGapWired === 'true') return;
     button.dataset.fillGapWired = 'true';
@@ -5263,9 +4787,9 @@ let handoffNotes = [];
         }
 
         button.classList.add('is-success');
-        showToast('Blast SMS envoyé à la liste d\'attente.', 'success');
+        toastFillGapResult(payload);
       } catch {
-        showToast('Échec de l\'envoi SMS — réessayez.', 'error');
+        showToast('Impossible de consulter la liste d\'attente — réessayez.', 'error');
       } finally {
         button.classList.remove('is-loading');
         button.disabled = false;
@@ -5281,69 +4805,7 @@ let handoffNotes = [];
 
   function initQuickActions() {
     guardDeployingFeatureButtons();
-
     wireFillGapButtons();
-
-    const btnDelay = $('btn-alerte-retard');
-
-    btnDelay?.addEventListener('click', async () => {
-      console.log('Alerte Retard button clicked');
-
-      const labelEl = btnDelay.querySelector('.btn-super__label');
-      const defaultLabel = labelEl?.textContent?.trim() || btnDelay.textContent?.trim() || 'Alerte Retard Praticien';
-      const successLabel = 'Alerte Envoyée ✓';
-      const feedbackMs = 3000;
-
-      btnDelay.disabled = true;
-      btnDelay.classList.add('is-loading');
-
-      try {
-        const response = await fetch(CONFIG.DELAY_ALERT_PROXY, {
-          method: 'POST',
-          credentials: 'include',
-          headers: apiHeaders(),
-        });
-
-        assertAuthorizedResponse(response);
-
-        const responseText = await response.text();
-        let responsePayload = responseText;
-        try {
-          responsePayload = responseText ? JSON.parse(responseText) : null;
-        } catch {
-          // keep raw text for logging
-        }
-        console.log('[Delay Alert] Success | HTTP: ' + response.status + ' | OK: ' + response.ok);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${String(responseText).slice(0, 200)}`);
-        }
-
-        if (labelEl) labelEl.textContent = successLabel;
-        else btnDelay.textContent = successLabel;
-        btnDelay.classList.remove('is-loading');
-        btnDelay.classList.add('is-success');
-        showToast('Alerte SMS envoyée avec succès.', 'success');
-
-        setTimeout(() => {
-          if (labelEl) labelEl.textContent = defaultLabel;
-          else btnDelay.textContent = defaultLabel;
-          btnDelay.disabled = false;
-          btnDelay.classList.remove('is-success');
-        }, feedbackMs);
-      } catch (error) {
-        if (isFetchAborted(error)) {
-          console.warn('[Sync] Fetch safely aborted by lifecycle controller. Suppressing UI error injection.');
-          btnDelay.disabled = false;
-          btnDelay.classList.remove('is-loading', 'is-success');
-          return;
-        }
-        console.error('[Delay Alert] Request failed:', error?.message || error);
-        btnDelay.disabled = false;
-        btnDelay.classList.remove('is-loading', 'is-success');
-        showToast('Échec de l\'alerte retard — réessayez.', 'error');
-      }
-    });
   }
 
   function isTypingField(element) {
@@ -5539,17 +5001,9 @@ let handoffNotes = [];
 
   bindCoreDelegation();
 
-  window.DentaFlowRowUI = {
-    createRowActionGroup,
-    createWaitlistTableRow,
-    createCopyableSpan,
-    createEmptyState,
-    mountEmptyState,
-    clearEmptyState,
-    initEmptyStatePulse,
-    EMPTY_STATE_DEFAULT_MESSAGE,
-    EMPTY_STATE_SVG_INBOX,
-  };
+  if (window.DentaFlowRowUI) {
+    window.DentaFlowRowUI.createRowActionGroup = createRowActionGroup;
+  }
 
   window.DentaFlowAuth?.registerLogoutTeardown?.(async function teardownAssistantSession() {
     assistantDashboardInitialized = false;

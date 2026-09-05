@@ -41,7 +41,6 @@ function mapRosterRow(row) {
     patient_name: patientName,
     phone: patientPhone,
     patient_phone: patientPhone,
-    motif: treatmentName,
     treatment_name: treatmentName,
     treatment: treatmentName,
     status: row.status,
@@ -52,12 +51,6 @@ function mapRosterRow(row) {
     notes: row.notes || '',
     starts_at: row.starts_at,
     startTime: row.starts_at,
-    'Patient (Nom Complet)': patientName,
-    'Téléphone (WhatsApp)': patientPhone,
-    'Motif de Consultation': treatmentName,
-    'Statut du RDV': row.status,
-    'Cal Booking ID': row.cal_booking_uid,
-    'Date & Heure du RDV': row.starts_at,
   };
 }
 

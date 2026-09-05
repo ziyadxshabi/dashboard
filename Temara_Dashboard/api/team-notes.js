@@ -50,21 +50,6 @@ const STAFF_DISPLAY_NAME_SQL = `
   LIMIT 1
 `;
 
-let schemaReady = false;
-
-async function ensureTeamNotesSchema() {
-  if (schemaReady) return;
-  await query(`
-    ALTER TABLE team_notes
-      ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false
-  `);
-  await query(`
-    ALTER TABLE team_notes
-      ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'general'
-  `);
-  schemaReady = true;
-}
-
 function mapTeamNoteRow(row) {
   const message = row.message;
   const postedAt = row.posted_at;
@@ -141,7 +126,6 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   try {
-    await ensureTeamNotesSchema();
     if (req.method === 'GET') {
       return await handleGet(req, res, session);
     }
