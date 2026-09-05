@@ -15,20 +15,81 @@
           "value": "max-age=63072000; includeSubDomains; preload"
         },
         {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
         },
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
         {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://app.cal.com https://cal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://app.cal.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https: wss:; frame-src https://cal.com https://app.cal.com;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://app.cal.com https://cal.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://app.cal.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.pooler.supabase.com https://app.cal.com https://cal.com; frame-src 'self' https://app.cal.com https://cal.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    },
+    {
+      "source": "/assistant-shell.html",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    },
+    {
+      "source": "/book.html",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://app.cal.com https://cal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.pooler.supabase.com https://app.cal.com https://cal.com; frame-src 'self' https://app.cal.com https://cal.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/book/:slug",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://app.cal.com https://cal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.pooler.supabase.com https://app.cal.com https://cal.com; frame-src 'self' https://app.cal.com https://cal.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
         }
       ]
     }
