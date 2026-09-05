@@ -112,6 +112,23 @@ function loadRewrites() {
 
 const REWRITES = loadRewrites();
 
+function loadHeaderRules() {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
+    return (cfg.headers || []).flatMap((rule) => rule.headers || []);
+  } catch {
+    return [];
+  }
+}
+
+const HEADER_RULES = loadHeaderRules();
+
+function applyConfiguredHeaders(res) {
+  for (const header of HEADER_RULES) {
+    if (header?.key && header?.value) res.setHeader(header.key, header.value);
+  }
+}
+
 function applyRewrite(pathname, incomingSearch) {
   for (const rule of REWRITES) {
     const match = pathname.match(rule.regex);
@@ -289,6 +306,7 @@ async function handleStatic(req, res, pathname) {
 
 const server = http.createServer(async (req, res) => {
   decorateResponse(res);
+  applyConfiguredHeaders(res);
   const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const started = Date.now();
   res.on('finish', () => {
