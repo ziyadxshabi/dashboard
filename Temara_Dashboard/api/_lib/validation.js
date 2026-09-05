@@ -21,7 +21,7 @@ const APPOINTMENT_STATUSES = Object.freeze([
   'Annule',
 ]);
 
-const WAITLIST_PRIORITIES = Object.freeze(['Haute', 'Normale', 'Basse', 'Urgent']);
+const WAITLIST_PRIORITIES = Object.freeze(['Faible', 'Moyenne', 'Haute', 'Urgent']);
 
 const ERROR_DEFAULTS = {
   UNAUTHORIZED: 'Unauthorized',
@@ -132,10 +132,13 @@ function validateWaitlistInput(body = {}) {
   const notes = String(body.notes ?? body.motif ?? body.reason ?? '').trim();
 
   let priority = String(
-    body.urgency ?? body.priority ?? body.priorite ?? body.priorité ?? 'Normale'
+    body.urgency ?? body.priority ?? body.priorite ?? body.priorité ?? 'Moyenne'
   ).trim();
   if (/^urgent/i.test(priority)) priority = 'Urgent';
-  if (!WAITLIST_PRIORITIES.includes(priority)) priority = 'Normale';
+  if (/^(normale|moyenne)$/i.test(priority)) priority = 'Moyenne';
+  if (/^(basse|faible)$/i.test(priority)) priority = 'Faible';
+  if (/^haute$/i.test(priority)) priority = 'Haute';
+  if (!WAITLIST_PRIORITIES.includes(priority)) priority = 'Moyenne';
 
   const errors = [];
   if (patientName.length < 2 || patientName.length > 100 || !NAME_RE.test(patientName)) {

@@ -226,7 +226,7 @@ async function run() {
   ok('GET /api/waitlist authenticated returns 200', waitlistGet.statusCode === 200, `status=${waitlistGet.statusCode}`);
   ok('GET /api/waitlist data is an array', Array.isArray(waitlistGet.body?.data));
 
-  const patientName = `Wave3 Handler ${Date.now()}`;
+  const patientName = 'Patient Test Wave Handler';
   const waitlistPost = await invoke(
     handleWaitlist,
     createReq({

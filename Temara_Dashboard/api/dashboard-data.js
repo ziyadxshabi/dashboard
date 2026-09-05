@@ -10,9 +10,9 @@ const { createApiError, requireClinicSession, sendDbError } = require('./_lib/va
 
 const DASHBOARD_KPI_SQL = `
   SELECT
-    COUNT(*) FILTER (WHERE status NOT IN ('Annule', 'Annulé'))::int AS patients_today,
+    COUNT(*) FILTER (WHERE status::text NOT IN ('Annule', 'Annulé'))::int AS patients_today,
     COUNT(*) FILTER (
-      WHERE status IN (
+      WHERE status::text IN (
         'Confirme',
         'Confirmé',
         'En salle d''attente',
@@ -21,8 +21,8 @@ const DASHBOARD_KPI_SQL = `
         'Terminé'
       )
     )::int AS accepted_plans,
-    COUNT(*) FILTER (WHERE status = 'En attente')::int AS pending_plans,
-    COUNT(*) FILTER (WHERE status IN ('No-show', 'No-Show'))::int AS no_shows
+    COUNT(*) FILTER (WHERE status::text = 'En attente')::int AS pending_plans,
+    COUNT(*) FILTER (WHERE status::text IN ('No-show', 'No-Show'))::int AS no_shows
   FROM bookings
   WHERE clinic_id = $1
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date

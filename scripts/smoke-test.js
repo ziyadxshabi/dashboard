@@ -219,7 +219,7 @@ async function run() {
   ok('GET /api/waitlist authenticated returns 200', waitlistGet.status === 200, `status=${waitlistGet.status}`);
   ok('GET /api/waitlist data is an array', Array.isArray(waitlistGet.json?.data));
 
-  const patientName = `Wave3 Smoke ${Date.now()}`;
+  const patientName = 'Patient Test Wave Smoke';
   const waitlistPost = await request('/api/waitlist', {
     method: 'POST',
     jar: assistantJar,
