@@ -5481,6 +5481,7 @@ let handoffNotes = [];
     runInitStep('settingsUI', () => {
       initSettings();
       initSettingsDemoState();
+      window.DentaFlowAuth?.bindPasswordForm?.(assistantRoot());
     });
     runInitStep('theme', () => initThemeSwitcher());
     runInitStep('crm', () => {

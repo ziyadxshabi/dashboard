@@ -1041,19 +1041,9 @@ function saveSettings(partial) {
   Object.assign(volatileSettings, partial);
 }
 
-const SECURITY_PWD_KEYS = {
-  doc: 'df_pwd_doc',
-  asst: 'df_pwd_asst',
-};
-
 const SECURITY_ACCOUNT_LABELS = {
   doc: 'Compte Docteur (Admin)',
   asst: 'Compte Assistante (Staff)',
-};
-
-const SECURITY_TOAST_NAMES = {
-  doc: 'Docteur',
-  asst: 'Assistante',
 };
 
 let securityToastTimer = null;
@@ -1151,55 +1141,11 @@ function initSecurityAccountSelect() {
 
 function initSecurityManagement() {
   const form = doctorEl('security-access-form');
-  if (!form || form.dataset.securityBound === 'true') return;
-  form.dataset.securityBound = 'true';
-
+  if (!form) return;
   initSecurityAccountSelect();
-
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-
-    const accountInput = doctorEl('security-account-input');
-    const passwordNew = doctorEl('security-password-new');
-    const passwordConfirm = doctorEl('security-password-confirm');
-    const submitBtn = doctorEl('security-submit-btn');
-
-    if (!accountInput || !passwordNew || !passwordConfirm) return;
-
-    const newPassword = passwordNew.value;
-    const confirmPassword = passwordConfirm.value;
-
-    if (!newPassword || !confirmPassword) {
-      showDashboardToast('Veuillez renseigner les deux champs de mot de passe.', 'warning');
-      if (!newPassword) passwordNew.focus();
-      else passwordConfirm.focus();
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      showDashboardToast('Les mots de passe ne correspondent pas.', 'error');
-      passwordConfirm.focus();
-      return;
-    }
-
-    const accountKey = accountInput.value === 'asst' ? 'asst' : 'doc';
-    const storageKey = SECURITY_PWD_KEYS[accountKey];
-    const roleName = SECURITY_TOAST_NAMES[accountKey];
-
-    if (submitBtn) submitBtn.disabled = true;
-
-    try {
-      localStorage.setItem(storageKey, newPassword);
-      passwordNew.value = '';
-      passwordConfirm.value = '';
-      showDashboardToast(`Mot de passe ${roleName} mis à jour avec succès.`, 'success');
-    } catch (error) {
-      console.error('[Security] Password save failed:', error?.message || error);
-      showDashboardToast('Impossible d\'enregistrer le mot de passe — réessayez.', 'error');
-    } finally {
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  });
+  if (typeof window.DentaFlowAuth?.bindPasswordForm === 'function') {
+    window.DentaFlowAuth.bindPasswordForm(document);
+  }
 }
 
 /* ── CRM PATIENT SEARCH ──────────────────────────────────────────────────── */

@@ -1061,7 +1061,7 @@
             <h3 class="settings-card-title">Sécurité</h3>
             <p class="settings-card-desc">Contrôle d'accès — rotation des identifiants Docteur et Assistante.</p>
 
-            <form id="security-access-form" class="security-form" novalidate>
+            <form id="security-access-form" class="security-form" data-password-change="true" novalidate>
               <div class="settings-field">
                 <span class="settings-label" id="security-account-label">Compte à modifier</span>
                 <div class="ghost-select" id="security-account-root" data-ghost-select>
@@ -1083,6 +1083,19 @@
                     <li class="ghost-select__option" role="option" data-value="asst" aria-selected="false" tabindex="-1">Compte Assistante (Staff)</li>
                   </ul>
                 </div>
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label" for="security-password-current">Mot de passe actuel</label>
+                <input
+                  type="password"
+                  class="waitlist-input settings-input"
+                  id="security-password-current"
+                  name="currentPassword"
+                  autocomplete="current-password"
+                  required
+                  aria-required="true"
+                />
               </div>
 
               <div class="settings-field">
@@ -1208,6 +1221,7 @@
   <script src="confirm-dialog.js"></script>
   <script src="auth.js"></script>
   <script src="dashboard_app.js"></script>
+  <script src="shared.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
