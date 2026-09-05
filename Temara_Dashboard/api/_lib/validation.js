@@ -263,6 +263,40 @@ function validateFillGapInput(body = {}) {
   };
 }
 
+function validatePasswordChange(body = {}) {
+  const currentPassword = String(body.currentPassword ?? body.oldPassword ?? '');
+  const newPassword = String(body.newPassword ?? '');
+
+  if (!currentPassword) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'Le mot de passe actuel est requis'),
+    };
+  }
+
+  if (!newPassword) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'Le nouveau mot de passe est requis'),
+    };
+  }
+
+  if (newPassword.length < 8) {
+    return {
+      ok: false,
+      error: createApiError(
+        'VALIDATION_ERROR',
+        'Le nouveau mot de passe doit contenir au moins 8 caractères'
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    value: { currentPassword, newPassword },
+  };
+}
+
 function validateStatusUpdate(body = {}) {
   const bookingId = String(body.bookingId ?? body.id ?? body.cal_booking_uid ?? '').trim();
   const rawStatus = body.newStatus ?? body.status;
@@ -301,6 +335,7 @@ module.exports = {
   requireClinicSession,
   sendDbError,
   validateWaitlistInput,
+  validatePasswordChange,
   validateStatusUpdate,
   validatePhone,
   validateTeamNoteInput,

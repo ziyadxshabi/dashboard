@@ -2,9 +2,10 @@
  * DentaFlow OS — staff_users login against PostgreSQL.
  *
  * Routes (single serverless function, plus rewrite fallbacks):
- *   POST /api/auth         → login
- *   POST /api/auth/me      → session probe (also Temara_Dashboard/api/auth/me.js)
- *   POST /api/auth/logout  → clear httpOnly cookie
+ *   POST /api/auth            → login
+ *   POST /api/auth/me         → session probe (also Temara_Dashboard/api/auth/me.js)
+ *   POST /api/auth/logout     → clear httpOnly cookie
+ *   POST /api/auth/password   → update staff_users.password_hash (also api/auth/password.js)
  *
  * JWT is stored in a single httpOnly cookie: dentaflow_session.
  */
@@ -23,6 +24,7 @@ const {
   verifyPassword,
 } = require('./_lib/auth-crypto');
 const { query } = require('./_lib/db');
+const handlePasswordChange = require('./auth/password');
 
 const DEFAULT_CLINIC_SLUG = 'temara';
 
@@ -63,6 +65,7 @@ function resolveAuthRoute(req) {
 
   if (combined.includes('/me') || action === 'me') return 'me';
   if (combined.includes('/logout') || action === 'logout') return 'logout';
+  if (combined.includes('/password') || action === 'password') return 'password';
   return 'login';
 }
 
@@ -203,5 +206,6 @@ module.exports = async function handler(req, res) {
   const route = resolveAuthRoute(req);
   if (route === 'me') return handleMe(req, res);
   if (route === 'logout') return handleLogout(req, res);
+  if (route === 'password') return handlePasswordChange(req, res);
   return handleLogin(req, res);
 };

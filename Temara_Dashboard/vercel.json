@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/api/auth/me", "destination": "/api/auth?action=me" },
     { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" },
+    { "source": "/api/auth/password", "destination": "/api/auth?action=password" },
     { "source": "/book/:slug", "destination": "/book.html" },
     { "source": "/api/public/clinic/:slug", "destination": "/api/public/clinic?slug=:slug" }
   ],
