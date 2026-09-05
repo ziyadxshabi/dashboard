@@ -102,6 +102,7 @@ const SESSION_ME_SQL = `
     s.id,
     s.username,
     s.role::text AS role,
+    s.display_name,
     c.id AS clinic_id,
     c.slug,
     c.name AS clinic_name,
@@ -154,6 +155,7 @@ async function handleMe(req, res) {
       id: row.id,
       username: row.username,
       role: row.role,
+      displayName: row.display_name || '',
     };
     const clinic = clinicFromRow(row);
 

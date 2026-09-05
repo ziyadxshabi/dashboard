@@ -697,6 +697,10 @@ async function run() {
   ok('GET /api/auth/me ok:true', meGet.body?.ok === true);
   ok('GET /api/auth/me user.role is assistant', meGet.body?.user?.role === 'assistant');
   ok('GET /api/auth/me user.username is present', Boolean(meGet.body?.user?.username));
+  ok(
+    'GET /api/auth/me user.displayName is present',
+    typeof meGet.body?.user?.displayName === 'string' && meGet.body.user.displayName.length > 0
+  );
   ok('GET /api/auth/me clinic.slug is temara', meGet.body?.clinic?.slug === CLINIC_SLUG);
   ok('GET /api/auth/me clinic.name is present', Boolean(meGet.body?.clinic?.name));
   ok(
