@@ -11,6 +11,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const ROOT = path.join(__dirname, '..');
 const DASHBOARD = path.join(ROOT, 'Temara_Dashboard');
@@ -129,6 +130,17 @@ function extractSessionCookie(res) {
 
 function cookieHeader(token) {
   return token ? `dentaflow_session=${encodeURIComponent(token)}` : '';
+}
+
+function calWebhookHeaders(body) {
+  const headers = { 'content-type': 'application/json' };
+  const secret = String(process.env.CALCOM_WEBHOOK_SECRET || '').trim();
+  if (!secret) return headers;
+  headers['x-cal-signature-256'] = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(body), 'utf8')
+    .digest('hex');
+  return headers;
 }
 
 function ok(name, condition, detail) {
@@ -515,33 +527,144 @@ async function run() {
 
   // ── Cal.com webhook ────────────────────────────────────────────────────
   console.log('\n[webhooks/cal]');
-  const calPath = path.join(DASHBOARD, 'api/webhooks/cal.js');
-  if (fs.existsSync(calPath)) {
-    const handleCal = require(calPath);
-    const ping = await invoke(
-      handleCal,
-      createReq({
-        method: 'POST',
-        url: '/api/webhooks/cal',
-        headers: { 'content-type': 'application/json' },
-        body: { triggerEvent: 'PING' },
-      })
-    );
-    ok('POST /api/webhooks/cal PING returns 200', ping.statusCode === 200, `status=${ping.statusCode}`);
-    ok('Cal webhook ok:true', ping.body?.ok === true);
+  const handleCal = require(path.join(DASHBOARD, 'api/webhooks/cal.js'));
+  const calUid = `cal-wave2-${Date.now()}`;
+  const createdStart = '2026-09-10T09:00:00.000Z';
+  const rescheduledStart = '2026-09-10T11:30:00.000Z';
 
-    const missingUid = await invoke(
+  const pingBody = { triggerEvent: 'PING' };
+  const ping = await invoke(
+    handleCal,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/cal',
+      headers: calWebhookHeaders(pingBody),
+      body: pingBody,
+    })
+  );
+  ok('POST /api/webhooks/cal PING returns 200', ping.statusCode === 200, `status=${ping.statusCode}`);
+  ok('Cal webhook PING ok:true', ping.body?.ok === true);
+
+  const missingUidBody = { triggerEvent: 'BOOKING_CREATED' };
+  const missingUid = await invoke(
+    handleCal,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/cal',
+      headers: calWebhookHeaders(missingUidBody),
+      body: missingUidBody,
+    })
+  );
+  ok('POST /api/webhooks/cal BOOKING_CREATED without uid returns 400', missingUid.statusCode === 400);
+
+  try {
+    const createdBody = {
+      triggerEvent: 'BOOKING_CREATED',
+      payload: {
+        uid: calUid,
+        startTime: createdStart,
+        title: 'Consultation',
+        organizer: { name: 'Dr. Shabi' },
+        responses: {
+          name: { value: 'Patient Cal Wave2' },
+          email: { value: 'patient.cal@example.com' },
+          phone: { value: '0612345678' },
+        },
+        attendees: [
+          {
+            name: 'Patient Cal Wave2',
+            email: 'patient.cal@example.com',
+            phoneNumber: '0612345678',
+          },
+        ],
+      },
+    };
+    const created = await invoke(
       handleCal,
       createReq({
         method: 'POST',
         url: '/api/webhooks/cal',
-        headers: { 'content-type': 'application/json' },
-        body: { triggerEvent: 'BOOKING_CREATED' },
+        headers: calWebhookHeaders(createdBody),
+        body: createdBody,
       })
     );
-    ok('POST /api/webhooks/cal BOOKING_CREATED without uid returns 400', missingUid.statusCode === 400);
-  } else {
-    skip('POST /api/webhooks/cal', 'handler not present on this branch (Wave 2)');
+    ok(
+      'POST /api/webhooks/cal BOOKING_CREATED returns 200',
+      created.statusCode === 200,
+      `status=${created.statusCode} body=${JSON.stringify(created.body)}`
+    );
+    ok('BOOKING_CREATED ok:true', created.body?.ok === true);
+    ok('BOOKING_CREATED action is BOOKING_CREATED', created.body?.action === 'BOOKING_CREATED');
+    ok('BOOKING_CREATED returns bookingId', Boolean(created.body?.bookingId));
+
+    const createdRow = await query(
+      `SELECT id, patient_name, patient_phone, treatment_name, status::text AS status, starts_at
+       FROM bookings WHERE cal_booking_uid = $1 LIMIT 1`,
+      [calUid]
+    );
+    const inserted = createdRow.rows[0];
+    ok('BOOKING_CREATED inserted a bookings row', Boolean(inserted));
+    ok('BOOKING_CREATED patient_name is stored', inserted?.patient_name === 'Patient Cal Wave2');
+    ok('BOOKING_CREATED status is Confirme', inserted?.status === 'Confirme');
+    ok(
+      'BOOKING_CREATED starts_at matches payload',
+      inserted && new Date(inserted.starts_at).toISOString() === createdStart,
+      `starts_at=${inserted?.starts_at}`
+    );
+
+    const rescheduledBody = {
+      type: 'BOOKING_RESCHEDULED',
+      payload: {
+        uid: calUid,
+        startTime: rescheduledStart,
+      },
+    };
+    const rescheduled = await invoke(
+      handleCal,
+      createReq({
+        method: 'POST',
+        url: '/api/webhooks/cal',
+        headers: calWebhookHeaders(rescheduledBody),
+        body: rescheduledBody,
+      })
+    );
+    ok('POST /api/webhooks/cal BOOKING_RESCHEDULED returns 200', rescheduled.statusCode === 200);
+    ok('BOOKING_RESCHEDULED action is BOOKING_RESCHEDULED', rescheduled.body?.action === 'BOOKING_RESCHEDULED');
+
+    const moved = await query(
+      `SELECT status::text AS status, starts_at FROM bookings WHERE cal_booking_uid = $1 LIMIT 1`,
+      [calUid]
+    );
+    ok(
+      'BOOKING_RESCHEDULED updates starts_at',
+      moved.rows[0] && new Date(moved.rows[0].starts_at).toISOString() === rescheduledStart,
+      `starts_at=${moved.rows[0]?.starts_at}`
+    );
+    ok('BOOKING_RESCHEDULED keeps status Confirme', moved.rows[0]?.status === 'Confirme');
+
+    const cancelledBody = {
+      triggerEvent: 'BOOKING_CANCELLED',
+      payload: { uid: calUid },
+    };
+    const cancelled = await invoke(
+      handleCal,
+      createReq({
+        method: 'POST',
+        url: '/api/webhooks/cal',
+        headers: calWebhookHeaders(cancelledBody),
+        body: cancelledBody,
+      })
+    );
+    ok('POST /api/webhooks/cal BOOKING_CANCELLED returns 200', cancelled.statusCode === 200);
+    ok('BOOKING_CANCELLED action is BOOKING_CANCELLED', cancelled.body?.action === 'BOOKING_CANCELLED');
+
+    const cancelledRow = await query(
+      `SELECT status::text AS status FROM bookings WHERE cal_booking_uid = $1 LIMIT 1`,
+      [calUid]
+    );
+    ok('BOOKING_CANCELLED status is Annule', cancelledRow.rows[0]?.status === 'Annule');
+  } finally {
+    await query('DELETE FROM bookings WHERE cal_booking_uid = $1', [calUid]);
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────
