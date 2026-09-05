@@ -21,7 +21,6 @@
     "safe-buffer": "^5.2.1"
   },
   "scripts": {
-    "build": "echo 'ok'",
     "test": "node scripts/test-handlers-direct.js && node scripts/smoke-test.js",
     "test:handlers": "node scripts/test-handlers-direct.js",
     "test:smoke": "node scripts/smoke-test.js"
