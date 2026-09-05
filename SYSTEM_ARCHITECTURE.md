@@ -69,7 +69,7 @@ The PIN-era assistant app lives in `_attic/Temara_Assistant_Dashboard/` and is *
 
 ### 2.2 Public patient booking — `GET /book/:slug`
 
-`Temara_Dashboard/vercel.json` rewrites `/book` and `/book/:slug` to `book.html`.
+`Temara_Dashboard/vercel.json` rewrites `/book` and `/book/:path*` to `/book.html` (`cleanUrls` is off so the `.html` destination is not collapsed). Same file is mirrored at the repo root `vercel.json`.
 
 1. `book.js` extracts the slug (`/book/temara` → `temara`, default `temara`).
 2. `GET /api/public/clinic/:slug` returns name, phone, theme, `calEmbedUrl` — **no clinic UUID, no Twilio, no hashes**.

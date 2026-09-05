@@ -78,15 +78,16 @@ function loadEnvFile(file) {
 loadEnvFile(path.join(ROOT, '.env.local'));
 loadEnvFile(path.join(ROOT, '.env'));
 
-/** Load vercel.json rewrites, including `/book/:slug` style params. */
+/** Load vercel.json rewrites, including `/book/:slug` and `/book/:path*` params. */
 function compileRewrite(source, destination) {
   const names = [];
   const regexSource = source
-    .split(/(:[A-Za-z_][A-Za-z0-9_]*)/)
+    .split(/(:[A-Za-z_][A-Za-z0-9_]*\*?)/)
     .map((part) => {
-      if (part.startsWith(':')) {
-        names.push(part.slice(1));
-        return '([^/]+)';
+      const token = part.match(/^:([A-Za-z_][A-Za-z0-9_]*)(\*)?$/);
+      if (token) {
+        names.push(token[1]);
+        return token[2] ? '(.*)' : '([^/]+)';
       }
       return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     })
