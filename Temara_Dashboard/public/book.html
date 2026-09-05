@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="oak-lounge">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prise de rendez-vous en ligne</title>
+  <meta name="description" content="Réservez une consultation en ligne.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/dentaflow-shared.css">
+  <style>
+    :root {
+      --book-max: 72rem;
+      --book-embed-min: 40rem;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    html[data-theme="pearl-clinic"] {
+      color-scheme: light;
+    }
+
+    [hidden] { display: none !important; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: var(--font-sans, Inter, system-ui, sans-serif);
+      font-size: 1rem;
+      line-height: 1.55;
+      background: var(--bg-main, #141211);
+      color: var(--text-main, #F4F1EE);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -3rem;
+      z-index: 100;
+      padding: 0.75rem 1rem;
+      background: var(--accent-primary, #D96B27);
+      color: #141211;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 0.5rem;
+    }
+
+    .skip-link:focus {
+      top: 1rem;
+      outline: 3px solid var(--accent-gold, #E3C18F);
+      outline-offset: 2px;
+    }
+
+    .book-shell {
+      width: min(100%, var(--book-max));
+      margin: 0 auto;
+      padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    }
+
+    .book-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.5rem 0 1.25rem;
+      border-bottom: 1px solid var(--border-color, rgba(227, 193, 143, 0.15));
+    }
+
+    .book-brand {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+
+    .book-brand__eyebrow {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted, #9E948C);
+      font-weight: 600;
+    }
+
+    .book-brand__name {
+      font-size: 1.05rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: var(--text-main, #F4F1EE);
+    }
+
+    .book-call {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0.55rem 1rem;
+      border-radius: 999px;
+      border: 1px solid var(--border-color, rgba(227, 193, 143, 0.22));
+      color: var(--accent-gold, #E3C18F);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .book-call:hover {
+      background: var(--accent-dim, rgba(217, 107, 39, 0.1));
+    }
+
+    .book-call:focus-visible {
+      outline: 3px solid var(--accent-primary, #D96B27);
+      outline-offset: 2px;
+    }
+
+    .book-hero {
+      padding: 1.75rem 0 1.25rem;
+      max-width: 40rem;
+    }
+
+    .book-hero h1 {
+      margin: 0 0 0.6rem;
+      font-size: clamp(1.6rem, 4vw, 2.25rem);
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+      font-weight: 650;
+    }
+
+    .book-hero p {
+      margin: 0;
+      color: var(--text-muted, #9E948C);
+      font-size: 1.05rem;
+    }
+
+    .book-calendar {
+      margin-top: 0.5rem;
+      border: 1px solid var(--border-color, rgba(227, 193, 143, 0.15));
+      border-radius: 1rem;
+      background: var(--bg-card, rgba(34, 30, 28, 0.65));
+      overflow: hidden;
+      min-height: var(--book-embed-min);
+    }
+
+    .book-calendar__label {
+      margin: 0;
+      padding: 0.85rem 1rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--text-muted, #9E948C);
+      border-bottom: 1px solid var(--border-color, rgba(227, 193, 143, 0.12));
+    }
+
+    #cal-embed {
+      min-height: var(--book-embed-min);
+      width: 100%;
+    }
+
+    #cal-embed iframe {
+      display: block;
+      width: 100%;
+      min-height: var(--book-embed-min);
+      height: 46rem;
+      border: 0;
+      background: transparent;
+    }
+
+    .book-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color, rgba(227, 193, 143, 0.15));
+      color: var(--text-muted, #9E948C);
+      font-size: 0.9rem;
+    }
+
+    .book-footer a {
+      color: inherit;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .book-footer a:focus-visible {
+      outline: 3px solid var(--accent-primary, #D96B27);
+      outline-offset: 2px;
+    }
+
+    .book-error {
+      min-height: 70dvh;
+      place-items: center;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    .book-error:not([hidden]) {
+      display: grid;
+    }
+
+    .book-error h1 {
+      margin: 0 0 0.75rem;
+      font-size: 1.5rem;
+      line-height: 1.3;
+      max-width: 28rem;
+    }
+
+    .book-error p {
+      margin: 0;
+      color: var(--text-muted, #9E948C);
+      max-width: 28rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#calendrier">Aller au calendrier</a>
+
+  <div id="book-page" class="book-shell">
+    <header class="book-header">
+      <div class="book-brand">
+        <span class="book-brand__eyebrow">Portail patient</span>
+        <span class="book-brand__name" id="book-clinic-name">Chargement…</span>
+      </div>
+      <a class="book-call" id="book-header-phone" hidden href="#"></a>
+    </header>
+
+    <main>
+      <section class="book-hero" aria-labelledby="book-title">
+        <h1 id="book-title">Prenez rendez-vous en ligne</h1>
+        <p>
+          Choisissez un créneau pour
+          <span id="book-hero-clinic">votre clinique</span>.
+          Confirmation immédiate par SMS.
+        </p>
+      </section>
+
+      <section class="book-calendar" id="calendrier" aria-labelledby="calendrier-label">
+        <p class="book-calendar__label" id="calendrier-label">Calendrier</p>
+        <div id="cal-embed" role="region" aria-label="Calendrier de réservation"></div>
+      </section>
+    </main>
+
+    <footer class="book-footer">
+      <span id="book-clinic-name-footer"></span>
+      <a id="book-footer-phone" hidden href="#"></a>
+    </footer>
+  </div>
+
+  <div id="book-error" class="book-error" hidden>
+    <div>
+      <h1 id="book-error-text">Clinique introuvable ou service momentanément indisponible</h1>
+      <p>Réessayez dans quelques instants, ou contactez la clinique par téléphone.</p>
+    </div>
+  </div>
+
+  <script src="/book.js" defer></script>
+</body>
+</html>

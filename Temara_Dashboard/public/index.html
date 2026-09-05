@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="oak-lounge">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DentaFlow OS — Clinique Dentaire Témara Mall</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%231A1A1F%22/><text x=%2250%22 y=%2250%22 font-family=%22sans-serif%22 font-size=%2250%22 fill=%22%23D5FF00%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>D</text></svg>">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DentaFlow">
+  <!-- DentaFlow Apple Touch Icon — polished gold monogram -->
+  <svg id="dentaflow-apple-touch-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none">
+    <defs>
+      <linearGradient id="df-touch-gold" x1="48" y1="32" x2="132" y2="148" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#e8c97a"/>
+        <stop offset="0.5" stop-color="#b8965a"/>
+        <stop offset="1" stop-color="#8a6d3b"/>
+      </linearGradient>
+      <linearGradient id="df-touch-shine" x1="70" y1="50" x2="110" y2="90" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <rect width="180" height="180" rx="40" fill="#0C0F14"/>
+    <path fill="url(#df-touch-gold)" d="M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z"/>
+    <path fill="url(#df-touch-shine)" d="M78 70c8-6 18-8 28-6 6 1 11 4 14 8-10 2-20 6-28 12-6 5-10 11-12 18-2-10 0-22 8-32z" opacity="0.6"/>
+  </svg>
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='48' y1='32' x2='132' y2='148' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23e8c97a'/%3E%3Cstop offset='0.5' stop-color='%23b8965a'/%3E%3Cstop offset='1' stop-color='%238a6d3b'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x1='70' y1='50' x2='110' y2='90' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23ffffff' stop-opacity='0.35'/%3E%3Cstop offset='1' stop-color='%23ffffff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='40' fill='%230C0F14'/%3E%3Cpath fill='url(%23g)' d='M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z'/%3E%3Cpath fill='url(%23s)' d='M78 70c8-6 18-8 28-6 6 1 11 4 14 8-10 2-20 6-28 12-6 5-10 11-12 18-2-10 0-22 8-32z' opacity='0.6'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./Fonts/bold/style.css" />
+  <link rel="stylesheet" href="./Fonts/duotone/style.css" />
+  <link rel="stylesheet" href="./Fonts/fill/style.css" />
+  <link rel="stylesheet" href="./Fonts/light/style.css" />
+  <script>
+    (function () {
+      document.documentElement.setAttribute('data-theme', 'oak-lounge');
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="dashboard_style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.23/dist/lenis.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.3.23/dist/lenis.min.js"></script>
+</head>
+<body class="os-boot-pending auth-gate-active">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Secure credential gateway — Oak Lounge -->
+  <div id="login-overlay" class="login-overlay is-visible">
+    <header class="login-viewport-brand login-coalesce-item" data-coalesce="brand" aria-label="DentaFlow OS">
+      <div class="login-viewport-brand-mark" aria-hidden="true">
+        <span class="login-mark-icon">
+          <i data-lucide="smile" class="icon-sm" aria-hidden="true"></i>
+        </span>
+      </div>
+      <div class="login-viewport-brand-text">
+        <span class="login-viewport-brand-name">DentaFlow OS</span>
+        <span class="login-viewport-brand-sub">Clinique Dentaire Témara Mall</span>
+      </div>
+    </header>
+
+    <div class="login-stage">
+      <div class="login-coalesce" id="login-card">
+        <div class="login-panel-front">
+          <form id="login-form" class="login-credentials login-coalesce-item" data-coalesce="credentials" novalidate>
+            <div class="login-role-toggle" role="group" aria-label="Choisir le profil">
+              <span class="login-role-toggle__thumb" aria-hidden="true"></span>
+              <button type="button" class="login-role-btn is-active" id="role-btn-doctor" aria-pressed="true">Médecin</button>
+              <button type="button" class="login-role-btn" id="role-btn-assistant" aria-pressed="false">Assistant(e)</button>
+            </div>
+
+            <div class="login-field">
+              <label class="login-field-label" for="login-username">Identifiant</label>
+              <input
+                class="login-input"
+                type="text"
+                id="login-username"
+                name="username"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
+                required
+                aria-required="true"
+                placeholder="nom.utilisateur"
+                aria-describedby="login-username-error"
+              />
+              <p class="login-error" id="login-username-error" role="alert" hidden></p>
+            </div>
+
+            <div class="login-field login-field--password">
+              <label class="login-field-label" for="login-password">Mot de passe</label>
+              <div class="login-password-wrap">
+                <input
+                  class="login-input"
+                  type="password"
+                  id="login-password"
+                  name="password"
+                  autocomplete="current-password"
+                  required
+                  aria-required="true"
+                  placeholder="••••••••"
+                  aria-describedby="login-password-error"
+                />
+                <button
+                  type="button"
+                  class="login-password-toggle"
+                  id="login-password-toggle"
+                  aria-label="Afficher le mot de passe"
+                  aria-pressed="false"
+                >
+                  <i data-lucide="eye" id="login-password-toggle-icon" class="icon-sm" aria-hidden="true"></i>
+                </button>
+              </div>
+              <p class="login-error" id="login-password-error" role="alert" hidden></p>
+            </div>
+
+            <button type="submit" class="login-submit" id="login-submit">
+              <span class="login-submit__label">Se connecter</span>
+              <span class="login-submit__spinner" aria-hidden="true"></span>
+            </button>
+
+            <p class="login-error" id="login-error" role="alert" hidden></p>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <footer class="login-enterprise-footer login-coalesce-item" data-coalesce="footer" aria-label="Informations légales et support">
+      <ul class="login-enterprise-footer-list">
+        <li><span class="login-enterprise-footer-copy">DentaFlow OS © 2026</span></li>
+        <li><a href="#" class="login-enterprise-footer-link">Conditions d'utilisation</a></li>
+        <li><a href="#" class="login-enterprise-footer-link">Politique de confidentialité</a></li>
+        <li><a href="#" class="login-enterprise-footer-link">Directives cliniques</a></li>
+        <li><a href="#" class="login-enterprise-footer-link">Support Technique</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <div id="doctor-shell" class="app-shell" style="display: none;">
+
+    <!-- ── SIDEBAR (desktop) ─────────────────────────────────────────────── -->
+    <aside class="sidebar desktop-nav" aria-label="Navigation principale">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-icon" aria-hidden="true">
+          <i data-lucide="smile" class="nav-icon" aria-hidden="true"></i>
+        </span>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-name">DentaFlow OS</span>
+          <span class="sidebar-brand-sub">Témara Mall</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale" data-lenis-prevent>
+        <a href="#overview" class="nav-link is-active" data-nav="overview" aria-current="page">
+          <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
+          <span>Vue d'ensemble</span>
+        </a>
+        <a href="#doctor-hub" class="nav-link" data-nav="doctor-hub">
+          <i data-lucide="activity" class="nav-icon" aria-hidden="true"></i>
+          <span>Cabinet Live</span>
+        </a>
+        <a href="#calendar" class="nav-link" data-nav="calendar">
+          <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
+          <span>Calendrier</span>
+        </a>
+        <a href="#waitlist" class="nav-link" data-nav="waitlist">
+          <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
+          <span>Liste d'attente</span>
+        </a>
+        <a href="#crm" class="nav-link" data-nav="crm">
+          <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
+          <span>Dossiers Patients</span>
+        </a>
+        <a href="#analytics" class="nav-link" data-nav="analytics">
+          <i data-lucide="bar-chart-2" class="nav-icon" aria-hidden="true"></i>
+          <span>Performances</span>
+        </a>
+        <a href="#sms" class="nav-link" data-nav="sms">
+          <i data-lucide="messages-square" class="nav-icon" aria-hidden="true"></i>
+          <span>Campagnes SMS</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ── MOBILE TOP BAR (phones) ───────────────────────────────────────── -->
+    <header class="doctor-mobile-bar" aria-label="En-tête mobile">
+      <div class="doctor-mobile-bar__brand">
+        <span class="doctor-mobile-bar__title">DentaFlow OS</span>
+        <span class="doctor-mobile-bar__sub">Témara Mall</span>
+      </div>
+      <button
+        type="button"
+        id="mobile-menu-btn"
+        class="mobile-only mobile-menu-btn"
+        aria-label="Ouvrir le menu"
+        aria-expanded="false"
+        aria-controls="mobile-drawer"
+      >
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
+    </header>
+
+    <div id="mobile-drawer" class="mobile-drawer" aria-hidden="true">
+      <button type="button" id="mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
+      <nav class="mobile-drawer__nav" role="navigation" aria-label="Navigation">
+        <a href="#overview" class="nav-link" data-nav="overview">Vue d'ensemble</a>
+        <a href="#doctor-hub" class="nav-link" data-nav="doctor-hub">Cabinet Live</a>
+        <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
+        <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
+        <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
+        <a href="#analytics" class="nav-link" data-nav="analytics">Performances</a>
+        <a href="#sms" class="nav-link" data-nav="sms">Campagnes SMS</a>
+        <a href="#settings" class="nav-link" data-nav="settings">Paramètres</a>
+      </nav>
+    </div>
+
+    <!-- Account dock — sidebar bottom on desktop, top bar on mobile -->
+    <div class="doctor-account-dock">
+      <div class="account-card" data-popover-root>
+        <div class="account-card__body">
+          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">DT</div>
+          <div class="account-card__info">
+            <span class="account-card__name kinetic-label" id="profile-name">Dr. Tazi</span>
+            <span class="account-card__role" id="profile-role">Chirurgien-dentiste</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn-account-menu"
+          id="account-menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="account-menu-popover"
+          aria-label="Menu compte"
+        >
+          <i data-lucide="ellipsis-vertical" aria-hidden="true"></i>
+        </button>
+        <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
+          <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
+            <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
+            Paramètres
+          </button>
+          <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
+            <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
+            Facturation
+          </button>
+          <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
+            <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
+            Déconnexion
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MOBILE BOTTOM TAB BAR — horizontal swipe ribbon (8 items) ─────── -->
+    <nav class="mobile-tabbar" role="navigation" aria-label="Navigation mobile" data-lenis-prevent>
+      <a href="#overview" class="tab-link is-active" data-nav="overview" aria-current="page" aria-label="Vue d'ensemble">
+        <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
+        <span>Vue d'ensemble</span>
+      </a>
+      <a href="#doctor-hub" class="tab-link" data-nav="doctor-hub" aria-label="Cabinet Live">
+        <i data-lucide="activity" class="tab-icon" aria-hidden="true"></i>
+        <span>Cabinet Live</span>
+      </a>
+      <a href="#calendar" class="tab-link" data-nav="calendar" aria-label="Calendrier">
+        <i data-lucide="calendar-clock" class="tab-icon" aria-hidden="true"></i>
+        <span>Calendrier</span>
+      </a>
+      <a href="#waitlist" class="tab-link" data-nav="waitlist" aria-label="Liste d'attente">
+        <i data-lucide="users" class="tab-icon" aria-hidden="true"></i>
+        <span>Liste d'attente</span>
+      </a>
+      <a href="#crm" class="tab-link" data-nav="crm" aria-label="Dossiers Patients">
+        <i data-lucide="clipboard-list" class="tab-icon" aria-hidden="true"></i>
+        <span>Dossiers Patients</span>
+      </a>
+      <a href="#analytics" class="tab-link" data-nav="analytics" aria-label="Performances">
+        <i data-lucide="bar-chart-2" class="tab-icon" aria-hidden="true"></i>
+        <span>Performances</span>
+      </a>
+      <a href="#sms" class="tab-link" data-nav="sms" aria-label="Campagnes SMS">
+        <i data-lucide="messages-square" class="tab-icon" aria-hidden="true"></i>
+        <span>Campagnes SMS</span>
+      </a>
+      <a href="#settings" class="tab-link" data-nav="settings" aria-label="Paramètres">
+        <i data-lucide="settings" class="tab-icon" aria-hidden="true"></i>
+        <span>Paramètres</span>
+      </a>
+    </nav>
+
+    <div class="mobile-logout-dock" aria-label="Session">
+      <button
+        type="button"
+        class="mobile-logout-btn"
+        id="mobile-logout-btn"
+        aria-label="Déconnexion"
+      >
+        <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
+        <span class="mobile-logout-btn__label">Déconnexion</span>
+      </button>
+    </div>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────────────── -->
+    <main class="main" id="main-content">
+
+      <section id="view-overview" class="dashboard-view active view-enter-ready" aria-label="Vue d'ensemble">
+
+        <header class="hero-header">
+          <div class="hero-header__primary">
+            <div class="hero-text">
+              <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name">Dr. Tazi</span></h1>
+              <p class="hero-date" id="hero-date">—</p>
+            </div>
+            <span class="dentaflow-os-watermark" aria-hidden="true">DENTAFLOW OS</span>
+          </div>
+          <div class="hero-sync">
+            <span class="sync-dot" id="sync-dot"></span>
+            <span class="sync-label" id="sync-label">Chargement…</span>
+          </div>
+        </header>
+
+        <section class="reclaimed-banner" aria-label="Impact DentaFlow — patients récupérés et revenu estimé">
+          <div class="reclaimed-banner__glow" aria-hidden="true"></div>
+          <div class="reclaimed-banner__content">
+            <div class="hero-split-layout">
+              <div class="hero-split-block hero-split-block--primary">
+                <p class="hero-split-subtitle kinetic-label">PATIENTS RÉCUPÉRÉS PAR DENTAFLOW</p>
+                <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
+                <p class="hero-split-helper">Rattrapage automatique des annulations et liste d'attente</p>
+              </div>
+              <div class="hero-split-block hero-split-block--secondary">
+                <p class="hero-split-subtitle kinetic-label">REVENU ESTIMÉ GÉNÉRÉ</p>
+                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">0 MAD</div>
+                <p class="hero-split-helper">Basé sur un panier moyen de 800 à 1 500 MAD par patient</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="stats-container" aria-label="Indicateurs clés du jour">
+          <div class="skeleton-wrapper kpi-row" id="stats-skeleton">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+          <div id="stats-content" class="kpi-row" hidden>
+
+          <article class="kpi-card kpi-card--matte" id="card-patients">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Flux patients</div>
+              <div class="kpi-trend" id="trend-patients" aria-hidden="true"></div>
+            </div>
+            <div class="kpi-number kinetic-value" id="val-patients" data-target="0" aria-live="polite">—</div>
+            <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
+          </article>
+
+          <article class="kpi-card kpi-card--matte" id="card-noshows">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Créneaux libérés ou patients absents sans préavis">Absences</div>
+              <div class="kpi-trend" id="trend-noshows" aria-hidden="true"></div>
+            </div>
+            <div class="kpi-number kinetic-value" id="val-noshows" data-target="0" aria-live="assertive">—</div>
+            <div class="kpi-sub" id="sub-noshows">Créneaux à combler</div>
+          </article>
+
+          <article class="kpi-card kpi-card--matte" id="card-new">
+            <div class="kpi-card__head">
+              <div class="kpi-label kinetic-label" data-tooltip="Premières visites nécessitant un formulaire d'entrée">Nouveaux</div>
+              <div class="kpi-trend" id="trend-new" aria-hidden="true"></div>
+            </div>
+            <div class="kpi-number kinetic-value" id="val-new" data-target="0" aria-live="polite">—</div>
+            <div class="kpi-sub" id="sub-new">Formulaires d'entrée requis</div>
+          </article>
+
+          </div>
+        </section>
+
+        <section class="team-messages-panel" aria-label="Messages de l'équipe">
+          <article class="team-messages-card">
+            <header class="team-messages-header">
+              <div>
+                <h3 class="chart-title">Messages de l'équipe</h3>
+                <p class="chart-sub">Transmissions assistante — synchronisation automatique</p>
+              </div>
+              <span class="team-messages-sync" id="team-notes-sync" aria-live="polite">Chargement…</span>
+            </header>
+            <div class="team-messages-list" id="team-notes-list" data-lenis-prevent role="feed" aria-busy="true">
+              <p class="team-messages-empty">Chargement des messages…</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="dashboard-grid" aria-label="Analyses et planning">
+
+          <article class="chart-card chart-card--main">
+            <div class="chart-header">
+              <div class="chart-header-top">
+                <div>
+                  <div class="chart-title">Affluence Horaire</div>
+                  <div class="chart-sub">Patients par heure — identifiez les créneaux chargés</div>
+                </div>
+                <div class="chart-toggle" id="chart-toggle" role="group" aria-label="Période d'affichage">
+                  <div class="chart-toggle-slider" id="chart-toggle-slider" aria-hidden="true"></div>
+                  <button type="button" class="chart-toggle-btn is-active" data-period="today">Aujourd'hui</button>
+                  <button type="button" class="chart-toggle-btn" data-period="week">Semaine</button>
+                  <button type="button" class="chart-toggle-btn" data-period="month">Mois</button>
+                </div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="chart-hours" role="img" aria-label="Graphique d'affluence horaire"></canvas>
+            </div>
+          </article>
+
+          <article class="schedule-widget schedule-widget--wide" aria-label="Prochains rendez-vous">
+            <div class="schedule-header">
+              <div class="chart-title">Prochains Rendez-vous</div>
+              <div class="chart-sub">Aujourd'hui — ordre chronologique</div>
+            </div>
+            <div id="roster-container">
+              <div class="skeleton-wrapper" id="roster-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+              </div>
+              <div id="roster-content" hidden>
+                <div class="schedule-list" id="appointments-list" data-lenis-prevent>
+                  <!-- populated by renderAppointmentsList() -->
+                </div>
+              </div>
+            </div>
+          </article>
+
+        </section>
+
+      </section>
+
+      <!-- ── DOCTOR HUB — snappy efficiency view (GSAP) ─────────────────── -->
+      <section id="view-doctor-hub" class="dashboard-view" aria-label="Cabinet live" aria-hidden="true">
+
+        <header class="view-page-header">
+          <h2 class="view-page-title kinetic-title">Cabinet Live</h2>
+          <p class="view-page-sub">Vue opérationnelle — patients du jour et notes cliniques</p>
+        </header>
+
+        <div class="doctor-metrics" id="doctor-metrics">
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="patients">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">Patients</span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-patients">—</span>
+            <span class="doctor-metric-delta doctor-metric-delta--up" id="hub-delta-patients">Aujourd'hui</span>
+          </article>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="pending">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">En attente</span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-pending">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-pending">Devis à valider</span>
+          </article>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">No-shows</span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">—</span>
+            <span class="doctor-metric-delta doctor-metric-delta--warn" id="hub-delta-noshows">Créneaux libres</span>
+          </article>
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="production">
+            <div class="doctor-metric-card__head">
+              <span class="doctor-metric-label kinetic-label">Production</span>
+            </div>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-production">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-production">MAD facturés</span>
+          </article>
+        </div>
+
+        <article class="chart-card chart-card--doctor-trend" aria-label="Tendance patients sur 7 jours">
+          <header class="chart-header">
+            <div>
+              <h3 class="chart-title">Tendance 7 jours</h3>
+              <p class="chart-sub">Patients par jour — flux hebdomadaire du cabinet</p>
+            </div>
+          </header>
+          <div
+            id="doctor-weekly-trend-chart"
+            class="oak-dynamic-chart"
+            role="img"
+            aria-label="Graphique en barres — patients sur les 7 derniers jours"
+          ></div>
+        </article>
+
+        <section class="doctor-bento-row" aria-label="Superpouvoir — message sur-mesure">
+          <article class="superpower-bento-card superpower-bento-card--doctor-custom" aria-labelledby="doctor-custom-sms-title">
+            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
+            <header class="superpower-bento-card__head">
+              <div class="superpower-bento-card__icon" aria-hidden="true">
+                <i data-lucide="message-square-share" aria-hidden="true"></i>
+              </div>
+              <div class="superpower-bento-card__copy">
+                <p class="superpower-bento-card__eyebrow">Superpouvoir · Diffusion</p>
+                <h2 class="superpower-bento-card__title" id="doctor-custom-sms-title">Message Sur-Mesure</h2>
+                <p class="superpower-bento-card__desc">
+                  Rédigez un SMS personnalisé et diffusez-le à votre base patients active. Idéal pour annonces, rappels ciblés ou communications premium du cabinet.
+                </p>
+              </div>
+            </header>
+            <div class="doctor-custom-sms-compose">
+              <label class="doctor-custom-sms-label" for="doctor-custom-sms-text">Message personnalisé</label>
+              <textarea
+                id="doctor-custom-sms-text"
+                class="doctor-custom-sms-textarea"
+                rows="3"
+                maxlength="320"
+                placeholder="Écrivez votre message personnalisé ici..."
+                aria-describedby="doctor-custom-sms-helper doctor-custom-sms-count"
+              ></textarea>
+              <div class="doctor-custom-sms-meta">
+                <p class="doctor-custom-sms-helper" id="doctor-custom-sms-helper">
+                  Diffusion globale — message validé avant envoi par le moteur n8n.
+                </p>
+                <span class="doctor-custom-sms-counter" id="doctor-custom-sms-count" aria-live="polite">0 / 320</span>
+              </div>
+              <button type="button" id="btn-doctor-custom-sms" class="btn btn-primary doctor-custom-sms-submit">
+                Envoyer le message
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <div id="triage-container">
+          <div class="skeleton-wrapper" id="triage-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="triage-content" class="brutalist-triage-grid" aria-label="Centre de triage" hidden>
+          <article class="brutalist-triage-panel" aria-label="Salle d'attente">
+            <header class="brutalist-triage-panel__header">
+              <h3 class="brutalist-triage-panel__title">Salle d'Attente</h3>
+              <p class="brutalist-triage-panel__sub">Patients confirmés — ordre chronologique</p>
+            </header>
+            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Salle d'attente" tabindex="0">
+              <table class="brutalist-triage-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Heure</th>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Motif</th>
+                    <th scope="col">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="doctor-waiting-room-body">
+                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="brutalist-triage-panel" aria-label="Urgences">
+            <header class="brutalist-triage-panel__header">
+              <h3 class="brutalist-triage-panel__title">Urgences</h3>
+              <p class="brutalist-triage-panel__sub">Cas prioritaires — traitement immédiat</p>
+            </header>
+            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Urgences" tabindex="0">
+              <table class="brutalist-triage-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Heure</th>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Motif</th>
+                    <th scope="col">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="doctor-emergencies-body">
+                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+          </div>
+        </div>
+
+        <div class="brutalist-digest-container">
+          <h3 class="digest-title">SYNTHÈSE DE FIN DE JOURNÉE</h3>
+          <div class="digest-grid">
+            <div class="digest-metric">
+              <span class="metric-label">Patients Vus</span>
+              <span class="metric-value" id="digest-patients-vus">0</span>
+            </div>
+            <div class="digest-metric">
+              <span class="metric-label">Annulations</span>
+              <span class="metric-value metric-red" id="digest-annulations">0</span>
+            </div>
+            <div class="digest-metric digest-revenue">
+              <div class="rev-header">
+                <span class="metric-label">Objectif Journalier</span>
+                <span class="metric-value" id="digest-revenue">0 MAD</span>
+              </div>
+              <div class="rev-progress-bar">
+                <div class="rev-progress-fill" id="digest-progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Calendrier Clinique</h2>
+          <p class="view-page-sub">Agenda de gestion — consultations et créneaux de la semaine</p>
+        </header>
+
+        <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
+          <div class="calendar-embed-header">
+            <div class="chart-title">Planning Hebdomadaire</div>
+            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
+          </div>
+          <div id="dashboard-cal-inline"></div>
+        </article>
+      </section>
+
+      <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title kinetic-title">Gestion de la Liste d'Attente</h2>
+          <p class="view-page-sub">No-Show Recovery — inscrivez les patients pour le prochain créneau libéré</p>
+        </header>
+
+        <div class="waitlist-layout">
+
+          <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
+            <div class="waitlist-form-header">
+              <div class="chart-title">Nouveau Patient</div>
+              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+            </div>
+
+            <form id="waitlist-form" class="waitlist-form" novalidate>
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-name">Nom du patient</label>
+                <input
+                  class="waitlist-input"
+                  type="text"
+                  id="waitlist-name"
+                  name="nom"
+                  placeholder="Nom et prénom"
+                  autocomplete="name"
+                  required
+                  aria-required="true"
+                  aria-describedby="waitlist-name-error"
+                />
+                <p class="login-error" id="waitlist-name-error" role="alert" hidden></p>
+              </div>
+
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-phone">Numéro de téléphone</label>
+                <input
+                  class="waitlist-input"
+                  type="tel"
+                  id="waitlist-phone"
+                  name="telephone"
+                  placeholder="+212 6XX XXX XXX"
+                  autocomplete="tel"
+                  inputmode="tel"
+                  required
+                  aria-required="true"
+                  aria-describedby="waitlist-phone-error"
+                />
+                <p class="login-error" id="waitlist-phone-error" role="alert" hidden></p>
+              </div>
+
+              <div class="waitlist-field">
+                <label class="waitlist-label" for="waitlist-priority">Priorité</label>
+                <select class="waitlist-select" id="waitlist-priority" name="priorite" required aria-required="true">
+                  <option value="Haute">Haute</option>
+                  <option value="Normale" selected>Normale</option>
+                </select>
+              </div>
+
+              <div class="form-consent-row">
+                <label class="form-consent-label" for="waitlist-sms-consent">
+                  <input
+                    type="checkbox"
+                    id="waitlist-sms-consent"
+                    class="form-consent-checkbox"
+                    name="sms_consent"
+                    required
+                    aria-required="true"
+                  />
+                  <span class="form-consent-text">J'accepte de recevoir des notifications par SMS concernant mon rendez-vous (Loi 09-08).</span>
+                </label>
+              </div>
+
+              <button type="submit" class="waitlist-submit-btn btn-matte-primary" id="waitlist-submit-btn">
+                Ajouter à la liste
+              </button>
+            </form>
+          </article>
+
+          <article class="schedule-widget schedule-widget--full" aria-label="Liste d'attente complète">
+            <div class="schedule-header schedule-header--with-actions">
+              <div>
+                <div class="chart-title">Patients Prioritaires</div>
+                <div class="chart-sub">Classés par urgence — synchronisé avec la base de données</div>
+              </div>
+              <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="waitlist-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="waitlist-admin-popover"
+                  aria-label="Actions administratives de la liste d'attente"
+                >
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
+                </button>
+                <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
+                    Remplir un Créneau Vide
+                  </button>
+                  <button type="button" class="actions-popover__item v-disabled" id="waitlist-popover-export" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
+                    Générer Rapport Journalier
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container" role="region" aria-label="Patients en liste d'attente" tabindex="0">
+              <div class="skeleton-wrapper" id="waitlist-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+              </div>
+              <div id="waitlist-content" hidden>
+              <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
+              <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
+                <thead>
+                  <tr>
+                    <th scope="col">Patient</th>
+                    <th scope="col" class="col-numeric">Téléphone</th>
+                    <th scope="col">Priorité</th>
+                  </tr>
+                </thead>
+                <tbody id="waitlist-panel-list">
+                  <!-- populated by renderWaitlistPanel() -->
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
+        <header class="view-page-header view-page-header--row">
+          <div>
+            <h2 class="view-page-title">Dossiers Patients</h2>
+            <p class="view-page-sub">CRM clinique — fiches et coordonnées patients</p>
+          </div>
+          <div class="crm-search-wrap">
+            <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
+            <input
+              class="waitlist-input crm-search-input"
+              type="search"
+              id="crm-search"
+              placeholder="Rechercher par nom, téléphone ou email…"
+              autocomplete="off"
+            />
+          </div>
+        </header>
+
+        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
+          <div class="skeleton-wrapper" id="crm-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="crm-content" hidden>
+          <div class="crm-table-scroll" data-lenis-prevent role="region" aria-label="Tableau des dossiers patients" tabindex="0">
+            <table class="crm-table" id="crm-patient-table">
+              <thead>
+                <tr>
+                  <th scope="col">Nom</th>
+                  <th scope="col">Téléphone</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Motif</th>
+                </tr>
+              </thead>
+              <tbody id="crm-table-body">
+                <tr class="crm-table-empty">
+                  <td colspan="4">Aucun patient trouvé</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-analytics" class="dashboard-view" aria-label="Performances opérationnelles" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Intelligence Opérationnelle</h2>
+          <p class="view-page-sub">Analyse des flux patients et efficacité du moteur DentaFlow.</p>
+        </header>
+
+        <div class="charts-grid">
+          <article class="chart-card chart-card--analytics chart-card--wide">
+            <h3 class="chart-title">Efficacité du Rattrapage (30 Jours)</h3>
+            <p class="chart-sub">Annulations vs créneaux récupérés — tendance hebdomadaire</p>
+            <div class="chart-canvas-wrap chart-canvas-wrap--tall">
+              <canvas id="recoveryChart" role="img" aria-label="Graphique d'efficacité du rattrapage sur 30 jours"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-card chart-card--analytics chart-card--square">
+            <h3 class="chart-title">Répartition des Flux</h3>
+            <p class="chart-sub">Typologie des patients — récurrents, nouveaux, urgences</p>
+            <div class="chart-canvas-wrap chart-canvas-wrap--flow-bars">
+              <canvas id="flowChart" role="img" aria-label="Graphique en barres horizontales de répartition des flux patients"></canvas>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-sms" class="dashboard-view" aria-label="Campagnes SMS" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Campagnes SMS</h2>
+          <p class="view-page-sub">Diffusion globale — rappels et communications patients</p>
+        </header>
+
+        <article class="sms-campaign-panel" aria-label="Composer une campagne SMS">
+          <div class="sms-campaign-header">
+            <div class="chart-title">Nouvelle Campagne</div>
+            <div class="chart-sub">Message diffusé à l'ensemble de la base patients active</div>
+          </div>
+
+          <form id="sms-campaign-form" class="sms-campaign-form" novalidate>
+            <div class="settings-field">
+              <label class="settings-label" for="sms-campaign-body">Corps du message</label>
+              <textarea
+                class="waitlist-input sms-textarea"
+                id="sms-campaign-body"
+                name="message"
+                rows="6"
+                maxlength="320"
+                placeholder="Bonjour, la Clinique Dentaire Témara Mall vous informe que…"
+                required
+                aria-required="true"
+              ></textarea>
+              <div class="sms-char-counter">
+                <span id="sms-char-count">0</span> / 320 caractères
+              </div>
+            </div>
+            <button type="submit" class="btn-gold" id="sms-campaign-submit">
+              Envoyer la Campagne (Diffusion globale)
+            </button>
+          </form>
+        </article>
+      </section>
+
+      <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Paramètres du Système</h2>
+          <p class="view-page-sub">Configuration de la clinique, notifications et règles opérationnelles</p>
+        </header>
+
+        <div class="settings-grid">
+
+          <!-- Card 0: Profil Utilisateur -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="user" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Profil Utilisateur</h3>
+            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du tableau de bord.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-name">Nom Complet</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-name"
+                name="profile_name"
+                value="Dr. Tazi"
+                autocomplete="name"
+              />
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-specialty">Spécialité</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-specialty"
+                name="profile_specialty"
+                value="Chirurgien-dentiste"
+              />
+            </div>
+          </article>
+
+          <!-- Card: Apparence -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="sun" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Apparence</h3>
+            <p class="settings-card-desc">Choisissez le thème visuel du tableau de bord clinique.</p>
+            <div class="theme-switcher" role="group" aria-label="Thème de l'application">
+              <button
+                type="button"
+                class="theme-switch-btn is-active"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
+                aria-pressed="true"
+              >Oak Lounge</button>
+              <button
+                type="button"
+                class="theme-switch-btn"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
+                aria-pressed="false"
+              >Pearl Clinic</button>
+            </div>
+          </article>
+
+          <!-- Card 1: Objectif & Clinique -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="circle-dollar-sign" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Objectif &amp; Clinique</h3>
+            <p class="settings-card-desc">Définissez l'objectif de production journalier affiché sur le tableau de bord.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-daily-goal">Objectif Journalier (MAD)</label>
+              <input
+                class="waitlist-input settings-input"
+                type="number"
+                id="settings-daily-goal"
+                name="daily_goal"
+                value="15000"
+                min="1000"
+                step="500"
+                inputmode="numeric"
+              />
+            </div>
+          </article>
+
+          <!-- Card 2: Notifications -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="bell" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Notifications</h3>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels SMS</span>
+                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sms-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels Email</span>
+                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-email-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </article>
+
+          <!-- Card: Horaires d'Ouverture -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="clock" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Horaires d'Ouverture</h3>
+            <p class="settings-card-desc">Plage horaire affichée sur le planning et les créneaux réservables.</p>
+            <div class="settings-time-fields">
+              <div class="settings-field">
+                <label class="settings-label" for="settings-day-start">Début de journée</label>
+                <input
+                  class="waitlist-input settings-input"
+                  type="time"
+                  id="settings-day-start"
+                  name="day_start"
+                  value="09:00"
+                />
+              </div>
+              <div class="settings-field">
+                <label class="settings-label" for="settings-day-end">Fin de journée</label>
+                <input
+                  class="waitlist-input settings-input"
+                  type="time"
+                  id="settings-day-end"
+                  name="day_end"
+                  value="18:00"
+                />
+              </div>
+            </div>
+          </article>
+
+          <!-- Card: Gestion des Urgences -->
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="triangle-alert" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Gestion des Urgences</h3>
+            <p class="settings-card-desc">Réservez une capacité tampon pour les cas urgents du jour.</p>
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Garder des créneaux d'urgence</span>
+                <span class="settings-toggle-hint">Slots protégés non réservables en ligne</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-emergency-buffer-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-emergency-slots">Nombre de slots par jour</label>
+              <input
+                class="waitlist-input settings-input"
+                type="number"
+                id="settings-emergency-slots"
+                name="emergency_slots"
+                value="2"
+                min="0"
+                max="10"
+                step="1"
+                inputmode="numeric"
+              />
+            </div>
+          </article>
+
+          <!-- Card 3: Sécurité -->
+          <article class="settings-card settings-card--security">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="lock" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Sécurité</h3>
+            <p class="settings-card-desc">Contrôle d'accès — rotation des identifiants Docteur et Assistante.</p>
+
+            <form id="security-access-form" class="security-form" data-password-change="true" novalidate>
+              <div class="settings-field">
+                <span class="settings-label" id="security-account-label">Compte à modifier</span>
+                <div class="ghost-select" id="security-account-root" data-ghost-select>
+                  <input type="hidden" id="security-account-input" name="account" value="doc" />
+                  <button
+                    type="button"
+                    class="ghost-select__trigger"
+                    id="security-account-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="security-account-list"
+                    aria-labelledby="security-account-label security-account-value"
+                  >
+                    <span class="ghost-select__value" id="security-account-value">Compte Docteur (Admin)</span>
+                    <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                  </button>
+                  <ul class="ghost-select__list" id="security-account-list" role="listbox" aria-labelledby="security-account-label" hidden>
+                    <li class="ghost-select__option is-selected" role="option" data-value="doc" aria-selected="true" tabindex="-1">Compte Docteur (Admin)</li>
+                    <li class="ghost-select__option" role="option" data-value="asst" aria-selected="false" tabindex="-1">Compte Assistante (Staff)</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label" for="security-password-current">Mot de passe actuel</label>
+                <input
+                  type="password"
+                  class="waitlist-input settings-input"
+                  id="security-password-current"
+                  name="currentPassword"
+                  autocomplete="current-password"
+                  required
+                  aria-required="true"
+                />
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label" for="security-password-new">Nouveau mot de passe</label>
+                <input
+                  type="password"
+                  class="waitlist-input settings-input"
+                  id="security-password-new"
+                  name="password-new"
+                  autocomplete="new-password"
+                  required
+                  aria-required="true"
+                />
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label" for="security-password-confirm">Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  class="waitlist-input settings-input"
+                  id="security-password-confirm"
+                  name="password-confirm"
+                  autocomplete="new-password"
+                  required
+                  aria-required="true"
+                />
+              </div>
+
+              <button type="submit" class="security-form__submit btn-matte-primary" id="security-submit-btn">
+                Mettre à jour l'accès
+              </button>
+            </form>
+          </article>
+
+          <!-- Card: Sauvegarde & Synchronisation -->
+          <article class="settings-card settings-card--wide">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="cloud" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Sauvegarde &amp; Synchronisation</h3>
+            <p class="settings-card-desc">État de la connexion entre le cabinet et l'infrastructure DentaFlow Cloud.</p>
+            <div class="settings-sync-status" role="status" aria-live="polite">
+              <span class="sync-dot ok settings-sync-status__dot" aria-hidden="true"></span>
+              <div class="settings-sync-status__text">
+                <span class="settings-sync-status__label">Statut de la base de données</span>
+                <span class="settings-sync-status__value">Connecté au Cloud</span>
+              </div>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- CRM — Dossier Patient slide-over panel -->
+  <div id="crm-side-panel" class="crm-side-panel-root crm-modal-root" aria-hidden="true">
+    <div class="crm-side-panel-overlay crm-modal-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
+    <aside
+      class="crm-side-panel crm-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crm-panel-name"
+      aria-describedby="crm-panel-subtitle"
+    >
+      <button type="button" class="crm-side-panel-close crm-modal-close" id="crm-side-panel-close" aria-label="Fermer le dossier">
+        <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
+      </button>
+
+      <header class="crm-side-panel-header">
+        <p class="crm-side-panel-eyebrow">Dossier Patient</p>
+        <h2 class="crm-side-panel-name" id="crm-panel-name">—</h2>
+        <p class="crm-side-panel-subtitle" id="crm-panel-subtitle"></p>
+        <span class="crm-side-panel-statut crm-tag" id="crm-panel-statut">—</span>
+      </header>
+
+      <div class="crm-side-panel-body" data-lenis-prevent>
+        <section class="crm-side-panel-section" aria-label="Détails financiers">
+          <h3 class="crm-side-panel-section-title">Détails Financiers</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Montant</dt>
+              <dd id="crm-panel-amount" data-tooltip="Montant facturé pour la dernière visite">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Couverture Médicale</dt>
+              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Notes cliniques">
+          <h3 class="crm-side-panel-section-title">Notes Cliniques</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Motif de Consultation</dt>
+              <dd id="crm-panel-motif">—</dd>
+            </div>
+            <div class="crm-side-panel-field crm-side-panel-field--block">
+              <dt>Observations Médicales</dt>
+              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <div id="assistant-shell" class="assistant-app-root" style="display: none;">
+    <div id="assistant-mount"></div>
+  </div>
+
+  <div class="assistant-toast" id="assistant-toast" role="status" aria-live="polite"></div>
+
+  <div class="error-banner" id="error-banner" hidden>
+    Impossible de charger les données. Erreur de synchronisation avec la base de données.
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="dom-safe.js"></script>
+  <script src="form-validators.js"></script>
+  <script src="confirm-dialog.js"></script>
+  <script src="auth.js"></script>
+  <script src="dashboard_app.js"></script>
+  <script src="shared.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

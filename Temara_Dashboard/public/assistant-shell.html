@@ -1,0 +1,847 @@
+﻿  <!-- Phosphor icon packs (local) — also linked in index.html <head> when embedded -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./Fonts/bold/style.css" />
+  <link rel="stylesheet" href="./Fonts/duotone/style.css" />
+  <link rel="stylesheet" href="./Fonts/fill/style.css" />
+  <link rel="stylesheet" href="./Fonts/light/style.css" />
+
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+  <div class="app-shell">
+
+    <aside class="sidebar assistant-sidebar desktop-nav" aria-label="Navigation assistante">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-icon" aria-hidden="true">
+          <i data-lucide="smile" class="nav-icon" aria-hidden="true"></i>
+        </span>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-name">DentaFlow OS</span>
+          <span class="sidebar-brand-sub">Command Center</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale">
+        <a href="#" class="nav-link is-active" data-nav="overview" aria-current="page">
+          <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
+          <span>Vue du jour</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="calendar">
+          <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
+          <span>Calendrier</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="waitlist">
+          <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
+          <span>Liste d'attente</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="crm">
+          <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
+          <span>Dossiers Patients</span>
+        </a>
+
+        <div class="sidebar-superpouvoirs" id="superpouvoirs-panel">
+          <div
+            id="superpouvoirs-header"
+            class="nav-accordion-header"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            aria-controls="superpouvoirs-accordion"
+          >
+            <span class="nav-accordion-header__label" id="actions-title">Superpouvoirs</span>
+            <i data-lucide="chevron-down" class="nav-accordion-header__chevron icon-xs" aria-hidden="true"></i>
+          </div>
+          <div class="superpouvoirs-accordion" id="superpouvoirs-accordion">
+            <div class="superpouvoirs-content">
+              <div class="superpowers-grid" id="superpowers-grid">
+            <button type="button" class="btn-super btn-super--compact" id="btn-export-excel">
+              <span class="btn-super__icon" aria-hidden="true">
+                <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Générer Rapport Journalier</span>
+                <span class="btn-super__hint">Export Excel de la journée</span>
+              </span>
+            </button>
+            <button type="button" class="btn-super btn-super--compact" id="btn-force-sms">
+              <span class="btn-super__icon" aria-hidden="true">
+                <i data-lucide="bell-ring" aria-hidden="true"></i>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Forcer Rappels</span>
+                <span class="btn-super__hint">SMS patients de demain</span>
+              </span>
+            </button>
+            <button type="button" class="btn-super btn-super--compact" id="btn-block-slot">
+              <span class="btn-super__icon" aria-hidden="true">
+                <i data-lucide="calendar-x-2" aria-hidden="true"></i>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Bloquer Créneau Urgence</span>
+                <span class="btn-super__hint">Réserver un slot prioritaire</span>
+              </span>
+            </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="account-card" data-popover-root>
+        <div class="account-card__body">
+          <div class="account-card__avatar" id="profile-avatar" aria-hidden="true">SA</div>
+          <div class="account-card__info">
+            <span class="account-card__name kinetic-label" id="profile-name">Sanae Amrani</span>
+            <span class="account-card__role" id="profile-role">Assistante dentaire</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn-account-menu"
+          id="account-menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="account-menu-popover"
+          aria-label="Menu compte"
+        >
+          <i data-lucide="ellipsis-vertical" aria-hidden="true"></i>
+        </button>
+        <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
+          <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
+            <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
+            Paramètres
+          </button>
+          <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
+            <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
+            Facturation
+          </button>
+          <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
+            <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
+            Déconnexion
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="assistant-main" id="main-content">
+
+      <header class="assistant-mobile-bar" aria-label="En-tête mobile">
+        <span class="assistant-mobile-bar__brand">Command Center</span>
+        <button
+          type="button"
+          id="asst-mobile-menu-btn"
+          class="mobile-only mobile-menu-btn"
+          aria-label="Ouvrir le menu"
+          aria-expanded="false"
+          aria-controls="asst-mobile-drawer"
+        >
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+        </button>
+      </header>
+
+      <div id="asst-mobile-drawer" class="mobile-drawer" aria-hidden="true">
+        <button type="button" id="asst-mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
+        <nav class="mobile-drawer__nav" role="navigation" aria-label="Navigation">
+          <a href="#overview" class="nav-link" data-nav="overview">Vue du jour</a>
+          <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
+          <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
+          <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
+          <a href="#settings" class="nav-link" data-nav="settings">Paramètres</a>
+        </nav>
+      </div>
+
+      <section id="view-overview" class="dashboard-view active" aria-label="Vue du jour">
+
+        <header class="assistant-header">
+          <div>
+            <h1 class="assistant-header__title kinetic-title">Bonjour, <span id="hero-profile-name">Sanae</span></h1>
+            <p class="assistant-header__sub" id="assistant-date">—</p>
+          </div>
+          <div class="assistant-header__meta">
+            <div class="hero-sync">
+              <span class="sync-dot ok" aria-hidden="true"></span>
+              <span class="sync-label">Synchronisé · Typebot actif</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="assistant-pulse" aria-label="Indicateurs opérationnels du jour">
+          <div class="assistant-pulse-grid" id="assistant-pulse-grid">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        <section class="overview-timeline-section" aria-label="Planning d'aujourd'hui">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title">Planning d'Aujourd'hui</h3>
+            <span class="live-indicator-dot" aria-hidden="true"></span>
+          </div>
+          <div id="overview-timeline-container" class="timeline-scroll-axis" role="list">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        <section class="assistant-bento-row" aria-label="Superpouvoir — combler un créneau">
+          <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
+            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
+            <header class="superpower-bento-card__head">
+              <div class="superpower-bento-card__icon" aria-hidden="true">
+                <i data-lucide="zap" aria-hidden="true"></i>
+              </div>
+              <div class="superpower-bento-card__copy">
+                <p class="superpower-bento-card__eyebrow">Superpouvoir · Récupération</p>
+                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Campagne de Récupération</h2>
+                <p class="superpower-bento-card__desc">
+                  Envoie un SMS intelligent et personnalisé à tous les patients en liste d'attente pour combler les créneaux vides instantanément. À utiliser en cas d'annulation de dernière minute.
+                </p>
+              </div>
+            </header>
+            <button type="button" class="btn-super superpower-bento-card__cta" id="btn-super-fill-gap">
+              <span class="btn-super__icon" aria-hidden="true">
+                <i data-lucide="zap" aria-hidden="true"></i>
+              </span>
+              <span class="btn-super__text">
+                <span class="btn-super__label">Combler le créneau vide</span>
+                <span class="btn-super__hint">1 clic · liste d'attente</span>
+              </span>
+            </button>
+          </article>
+        </section>
+
+        <div class="assistant-grid">
+
+        <section class="assistant-panel assistant-panel--roster" aria-labelledby="roster-title">
+          <div class="assistant-panel__head">
+            <div>
+              <h2 class="assistant-panel__title" id="roster-title">Planning du Jour</h2>
+              <p class="assistant-panel__desc">Vue prioritaire — ordre chronologique des rendez-vous</p>
+            </div>
+            <div class="roster-panel-controls">
+              <span class="assistant-panel__badge">Priorité</span>
+              <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="roster-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="roster-admin-popover"
+                  aria-label="Actions administratives du planning"
+                >
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
+                </button>
+                <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item v-disabled" id="btn-daily-report" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
+                    Générer Rapport Journalier
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-alerte-retard" data-action="doctor-delayed" role="menuitem">
+                    Alerte Retard Praticien
+                  </button>
+                  <button type="button" class="actions-popover__item v-disabled" id="btn-force-reminders" role="menuitem" disabled aria-disabled="true" title="Rappels automatiques bientôt disponibles" data-tooltip="Rappels automatiques bientôt disponibles">
+                    Forcer Rappels (Demain)
+                  </button>
+                  <div class="actions-popover__divider" role="separator"></div>
+                  <button type="button" class="actions-popover__item actions-popover__item--danger" id="btn-bulk-cancel" role="menuitem">
+                    Annuler la sélection
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-bulk-sms" role="menuitem">
+                    Envoyer SMS groupé
+                  </button>
+                  <p role="note" style="display:flex;align-items:flex-start;gap:6px;margin:8px 12px 4px;padding:0;font-size:11px;line-height:1.45;color:#8C8C9A;">
+                    <i data-lucide="info" class="icon-xs" aria-hidden="true" style="flex-shrink:0;margin-top:1px;opacity:0.85"></i>
+                    <span>Remarque&nbsp;: En cas d'annulation multiple, la synchronisation avec la base de données peut accuser un léger retard.</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="planning-timeline-wrap" data-lenis-prevent id="roster-container" role="region" aria-label="Planning du jour" tabindex="0">
+            <div class="skeleton-wrapper" id="roster-skeleton">
+              <div class="skeleton skeleton-text"></div>
+              <div class="skeleton skeleton-text short"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-table-row"></div>
+              <div class="skeleton skeleton-table-row"></div>
+            </div>
+            <div id="roster-content" hidden>
+            <div id="planning-empty-state" class="empty-state-host" hidden></div>
+            <div class="planning-timeline" id="planning-timeline" aria-labelledby="roster-title" role="list">
+              <!-- rendered by app.js — vertical chronological timeline -->
+            </div>
+            <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
+              <!-- rendered by app.js -->
+            </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="assistant-panel assistant-panel--handoff" aria-labelledby="handoff-title">
+          <div class="assistant-panel__head">
+            <div>
+              <h2 class="assistant-panel__title" id="handoff-title">Tableau de Transmission</h2>
+              <p class="assistant-panel__desc">Notes d'équipe et événements système pour la relève</p>
+            </div>
+          </div>
+
+          <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
+            <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
+            <input
+              type="text"
+              class="handoff-compose__input"
+              id="handoff-input"
+              name="handoff-text"
+              placeholder="Ajouter une note d'équipe..."
+              autocomplete="off"
+              maxlength="280"
+              required
+              aria-required="true"
+            />
+            <div class="ghost-select" id="handoff-category-root" data-ghost-select>
+              <input type="hidden" id="handoff-category" name="handoff-category" value="Info" />
+              <button
+                type="button"
+                class="ghost-select__trigger"
+                id="handoff-category-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="handoff-category-list"
+                aria-label="Catégorie de la note"
+              >
+                <span class="ghost-select__value" id="handoff-category-label">Info</span>
+                <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+              </button>
+              <ul class="ghost-select__list" id="handoff-category-list" role="listbox" aria-label="Catégories" hidden>
+                <li class="ghost-select__option is-selected" role="option" data-value="Info" aria-selected="true" tabindex="-1">Info</li>
+                <li class="ghost-select__option" role="option" data-value="Urgent" aria-selected="false" tabindex="-1">Urgent</li>
+                <li class="ghost-select__option" role="option" data-value="Planning" aria-selected="false" tabindex="-1">Planning</li>
+              </ul>
+            </div>
+            <label class="handoff-compose__pin">
+              <input type="checkbox" id="handoff-pin" name="handoff-pin" />
+              <span>Pin</span>
+            </label>
+            <button type="submit" class="handoff-compose__submit btn-matte-primary">Publier</button>
+          </form>
+
+          <div class="handoff-feed" id="handoff-feed" role="feed" aria-labelledby="handoff-title">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        </div>
+
+      </section>
+
+      <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Calendrier</h2>
+          <p class="view-page-sub">Agenda du cabinet — vue hebdomadaire et créneaux disponibles</p>
+        </header>
+
+        <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
+          <div class="calendar-embed-header">
+            <div class="chart-title">Planning Hebdomadaire</div>
+            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
+          </div>
+          <div id="dashboard-cal-inline"></div>
+        </article>
+      </section>
+
+      <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Liste d'attente</h2>
+          <p class="view-page-sub">Gestion des urgences et patients en attente de créneau</p>
+        </header>
+
+        <div class="waitlist-layout">
+          <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
+            <div class="waitlist-form-header">
+              <div class="chart-title">Nouveau Patient</div>
+              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+            </div>
+
+            <form id="waitlist-form" class="waitlist-form" novalidate>
+              <div class="waitlist-form__strip">
+                <div class="waitlist-field">
+                  <label class="waitlist-label" for="waitlist-name">Nom du patient</label>
+                  <input
+                    class="waitlist-input"
+                    type="text"
+                    id="waitlist-name"
+                    name="nom"
+                    placeholder="Nom et prénom"
+                    autocomplete="name"
+                    required
+                    aria-describedby="waitlist-name-error"
+                  />
+                  <p class="login-error" id="waitlist-name-error" role="alert" hidden></p>
+                </div>
+
+                <div class="waitlist-field">
+                  <label class="waitlist-label" for="waitlist-phone">Numéro de téléphone</label>
+                  <input
+                    class="waitlist-input"
+                    type="tel"
+                    id="waitlist-phone"
+                    name="telephone"
+                    placeholder="+212 6XX XXX XXX"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    required
+                    aria-describedby="waitlist-phone-error"
+                  />
+                  <p class="login-error" id="waitlist-phone-error" role="alert" hidden></p>
+                </div>
+
+                <div class="waitlist-field waitlist-field--priority">
+                  <span class="waitlist-label" id="waitlist-priority-label">Priorité</span>
+                  <div class="ghost-select" id="waitlist-priority-root" data-ghost-select>
+                    <input type="hidden" id="waitlist-priority-input" name="priorite" value="Normale" />
+                    <button
+                      type="button"
+                      class="ghost-select__trigger"
+                      id="waitlist-priority-trigger"
+                      aria-haspopup="listbox"
+                      aria-expanded="false"
+                      aria-controls="waitlist-priority-list"
+                      aria-labelledby="waitlist-priority-label waitlist-priority-value"
+                    >
+                      <span class="ghost-select__value" id="waitlist-priority-value">Normale</span>
+                      <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                    </button>
+                    <ul class="ghost-select__list" id="waitlist-priority-list" role="listbox" aria-labelledby="waitlist-priority-label" hidden>
+                      <li class="ghost-select__option is-selected" role="option" data-value="Normale" aria-selected="true" tabindex="-1">Normale</li>
+                      <li class="ghost-select__option" role="option" data-value="Haute" aria-selected="false" tabindex="-1">Haute</li>
+                      <li class="ghost-select__option" role="option" data-value="Urgence" aria-selected="false" tabindex="-1">Urgence</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <button type="submit" class="waitlist-submit-btn btn-matte-primary" id="waitlist-submit-btn">
+                  Ajouter à la liste
+                </button>
+              </div>
+
+              <div class="form-consent-row">
+                <label class="form-consent-label" for="waitlist-sms-consent">
+                  <input
+                    type="checkbox"
+                    id="waitlist-sms-consent"
+                    class="form-consent-checkbox"
+                    name="sms_consent"
+                    required
+                  />
+                  <span class="form-consent-text">J'accepte de recevoir des notifications par SMS concernant mon rendez-vous (Loi 09-08).</span>
+                </label>
+              </div>
+            </form>
+          </article>
+
+          <article class="schedule-widget schedule-widget--full" aria-label="Liste d'attente complète">
+            <div class="schedule-header schedule-header--with-actions">
+              <div>
+                <div class="chart-title">Patients Prioritaires</div>
+                <div class="chart-sub">Classés par urgence — synchronisé avec la base de données</div>
+              </div>
+              <div class="waitlist-header-actions">
+                <button
+                  type="button"
+                  class="filter-toggle"
+                  id="waitlist-urgent-toggle"
+                  aria-pressed="false"
+                  aria-label="Afficher uniquement les patients urgents"
+                >
+                  <span class="filter-toggle__track" aria-hidden="true">
+                    <span class="filter-toggle__thumb"></span>
+                  </span>
+                  <span class="filter-toggle__label">Urgence uniquement</span>
+                </button>
+                <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="waitlist-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="waitlist-admin-popover"
+                  aria-label="Actions administratives de la liste d'attente"
+                >
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
+                </button>
+                <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
+                    Remplir un Créneau Vide
+                  </button>
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-export" role="menuitem">
+                    Générer Rapport Journalier
+                  </button>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container" role="region" aria-label="Patients en liste d'attente" tabindex="0">
+              <div class="skeleton-wrapper" id="waitlist-skeleton">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+                <div class="skeleton skeleton-table-row"></div>
+              </div>
+              <div id="waitlist-content" hidden>
+              <div id="waitlist-empty-state" class="empty-state-host" hidden></div>
+              <table class="waitlist-table data-table" aria-label="Patients en liste d'attente">
+                <thead>
+                  <tr>
+                    <th scope="col">Patient</th>
+                    <th scope="col" class="col-numeric">Téléphone</th>
+                    <th scope="col">Priorité</th>
+                  </tr>
+                </thead>
+                <tbody id="waitlist-panel-list">
+                  <!-- populated by renderWaitlistPanel() -->
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
+        <header class="view-page-header view-page-header--row">
+          <div>
+            <h2 class="view-page-title">Dossiers Patients</h2>
+            <p class="view-page-sub">Coordonnées patients et statut des rendez-vous</p>
+          </div>
+          <div class="crm-search-wrap">
+            <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
+            <input
+              class="waitlist-input crm-search-input"
+              type="search"
+              id="crm-search"
+              placeholder="Rechercher par nom, téléphone ou email…"
+              autocomplete="off"
+            />
+          </div>
+        </header>
+
+        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
+          <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
+            <button
+              type="button"
+              class="filter-chip"
+              id="crm-filter-unpaid"
+              aria-pressed="false"
+            >
+              Non payé
+            </button>
+          </div>
+          <div class="skeleton-wrapper" id="crm-skeleton">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+            <div class="skeleton skeleton-table-row"></div>
+          </div>
+          <div id="crm-content" hidden>
+          <div class="crm-table-scroll" role="region" aria-label="Tableau des dossiers patients" tabindex="0">
+            <table class="crm-table" id="crm-patient-table">
+              <thead>
+                <tr>
+                  <th scope="col">Nom</th>
+                  <th scope="col">Téléphone</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Motif</th>
+                  <th scope="col">Facturation</th>
+                  <th scope="col">Statut</th>
+                </tr>
+              </thead>
+              <tbody id="crm-table-body">
+                <!-- populated by renderCRMTable() from Vue du jour data -->
+              </tbody>
+            </table>
+          </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Paramètres</h2>
+          <p class="view-page-sub">Préférences assistante, ergonomie du poste et alertes locales</p>
+        </header>
+
+        <div class="settings-grid">
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="user" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Profil Utilisateur</h3>
+            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du command center.</p>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-name">Nom Complet</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-name"
+                name="profile_name"
+                value="Sanae Amrani"
+                autocomplete="name"
+              />
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="settings-profile-specialty">Fonction</label>
+              <input
+                class="waitlist-input settings-input"
+                type="text"
+                id="settings-profile-specialty"
+                name="profile_specialty"
+                value="Assistante dentaire"
+              />
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="sun" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Apparence</h3>
+            <p class="settings-card-desc">Choisissez le thème visuel du command center.</p>
+            <div class="theme-switcher" role="group" aria-label="Thème de l'application">
+              <button
+                type="button"
+                class="theme-switch-btn is-active"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
+                aria-pressed="true"
+              >Oak Lounge</button>
+              <button
+                type="button"
+                class="theme-switch-btn"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
+                aria-pressed="false"
+              >Pearl Clinic</button>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="bell" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Notifications</h3>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels SMS</span>
+                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sms-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Rappels Email</span>
+                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-email-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="calendar-clock" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Ergonomie du Planning</h3>
+            <p class="settings-card-desc">Vue par défaut du planning du jour à l'ouverture du command center.</p>
+            <div class="settings-field">
+              <span class="settings-label" id="settings-planning-view-label">Vue par défaut</span>
+              <div class="ghost-select" id="settings-planning-view-root" data-ghost-select>
+                <input type="hidden" id="settings-planning-view" name="planning_view" value="chronologique" />
+                <button
+                  type="button"
+                  class="ghost-select__trigger"
+                  id="settings-planning-view-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="settings-planning-view-list"
+                  aria-labelledby="settings-planning-view-label"
+                >
+                  <span class="ghost-select__value" id="settings-planning-view-label-value">Chronologique</span>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                </button>
+                <ul class="ghost-select__list" id="settings-planning-view-list" role="listbox" aria-label="Vue du planning" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="chronologique" data-label="Chronologique" aria-selected="true" tabindex="-1">Vue par défaut : Chronologique</li>
+                  <li class="ghost-select__option" role="option" data-value="priorite" data-label="Priorité" aria-selected="false" tabindex="-1">Vue par défaut : Priorité</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="volume-2" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Alertes Sonores</h3>
+            <p class="settings-card-desc">Signaux discrets sur le poste assistante — sans notification patient.</p>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Nouveau message d'équipe</span>
+                <span class="settings-toggle-hint">Tableau de transmission</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sound-team-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Arrivée d'un patient</span>
+                <span class="settings-toggle-hint">Passage en salle d'attente</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="settings-sound-arrival-toggle" checked />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="keyboard" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Raccourcis Clavier</h3>
+            <p class="settings-card-desc">Commandes rapides du command center — lecture seule.</p>
+            <ul class="settings-shortcuts" aria-label="Raccourcis clavier">
+              <li><span>Rechercher un patient</span><kbd>Espace</kbd></li>
+              <li><span>Aller au planning</span><kbd>G</kbd></li>
+              <li><span>Publier une note d'équipe</span><kbd>Ctrl</kbd><span class="settings-shortcuts__plus">+</span><kbd>Entrée</kbd></li>
+              <li><span>Ouvrir les dossiers patients</span><kbd>Ctrl</kbd><span class="settings-shortcuts__plus">+</span><kbd>K</kbd></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+    </main>
+
+    <div class="mobile-logout-dock" aria-label="Session">
+      <button
+        type="button"
+        class="mobile-logout-btn"
+        id="mobile-logout-btn"
+        aria-label="Déconnexion"
+      >
+        <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
+        <span class="mobile-logout-btn__label">Déconnexion</span>
+      </button>
+    </div>
+
+    <nav class="mobile-bottom-nav" role="navigation" aria-label="Navigation mobile" data-lenis-prevent>
+      <a href="#" class="tab-link is-active" data-nav="overview" aria-label="Vue d'ensemble">
+        <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
+        <span>Vue d'ensemble</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="planning" aria-label="Planning du jour">
+        <i data-lucide="calendar-clock" class="tab-icon" aria-hidden="true"></i>
+        <span>Planning</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="transmission" aria-label="Tableau de transmission">
+        <i data-lucide="message-square-dashed" class="tab-icon" aria-hidden="true"></i>
+        <span>Transmission</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="waitlist" aria-label="Listes d'attente">
+        <i data-lucide="users" class="tab-icon" aria-hidden="true"></i>
+        <span>Listes</span>
+      </a>
+      <a href="#" class="tab-link" data-nav="settings" aria-label="Paramètres">
+        <i data-lucide="settings" class="tab-icon" aria-hidden="true"></i>
+        <span>Paramètres</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="assistant-toast" id="assistant-toast" role="status" aria-live="polite"></div>
+
+  <div id="crm-side-panel" class="crm-side-panel-root crm-modal-root" aria-hidden="true">
+    <div class="crm-side-panel-overlay crm-modal-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
+    <aside
+      class="crm-side-panel crm-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crm-panel-name"
+      aria-describedby="crm-panel-subtitle"
+    >
+      <button type="button" class="crm-side-panel-close crm-modal-close" id="crm-side-panel-close" aria-label="Fermer le dossier">
+        <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
+      </button>
+
+      <header class="crm-side-panel-header">
+        <p class="crm-side-panel-eyebrow">Dossier Patient</p>
+        <h2 class="crm-side-panel-name" id="crm-panel-name">—</h2>
+        <p class="crm-side-panel-subtitle" id="crm-panel-subtitle"></p>
+        <span class="crm-side-panel-statut crm-tag" id="crm-panel-status">—</span>
+      </header>
+
+      <div class="crm-side-panel-body">
+        <section class="crm-side-panel-section" aria-label="Coordonnées">
+          <h3 class="crm-side-panel-section-title">Coordonnées</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Téléphone</dt>
+              <dd id="crm-panel-phone">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Email</dt>
+              <dd id="crm-panel-email">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Couverture médicale">
+          <h3 class="crm-side-panel-section-title">Couverture</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field crm-side-panel-field--coverage">
+              <dt>Couverture Médicale</dt>
+              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Rendez-vous">
+          <h3 class="crm-side-panel-section-title">Rendez-vous</h3>
+          <dl class="crm-side-panel-dl">
+            <div class="crm-side-panel-field">
+              <dt>Date du rendez-vous</dt>
+              <dd id="crm-panel-last-visit">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Motif de Consultation</dt>
+              <dd id="crm-panel-motif">—</dd>
+            </div>
+            <div class="crm-side-panel-field crm-side-panel-field--block">
+              <dt>Notes</dt>
+              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <div id="bulk-action-bar" class="bulk-bar-hidden">
+    <span id="bulk-selection-count" class="bulk-text"></span>
+    <button type="button" id="btn-bulk-confirm" class="btn-matte-primary">Confirmer</button>
+  </div>
