@@ -111,6 +111,19 @@ CREATE INDEX IF NOT EXISTS idx_team_notes_clinic_created
 CREATE INDEX IF NOT EXISTS idx_team_notes_clinic_pinned_posted
   ON team_notes (clinic_id, pinned DESC, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS sms_dispatch_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  staff_id UUID REFERENCES staff_users(id) ON DELETE SET NULL,
+  message TEXT NOT NULL,
+  recipient_count INT NOT NULL,
+  recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sms_dispatch_log_clinic_created
+  ON sms_dispatch_log (clinic_id, created_at DESC);
+
 -- Seed: Clinique Dentaire Témara Mall
 INSERT INTO clinics (slug, name)
 VALUES ('temara', 'Clinique Dentaire Témara Mall')

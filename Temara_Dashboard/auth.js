@@ -216,11 +216,12 @@
         return;
       }
 
-      sessionStorage.setItem(SESSION_ROLE_KEY, payload.role || selectedRole);
+      sessionStorage.setItem(SESSION_ROLE_KEY, payload.role || payload.user?.role || selectedRole);
 
       if (passwordInput) passwordInput.value = '';
 
-      await handleAuthSuccess(payload.role || selectedRole);
+      applySessionClinic(payload.clinic);
+      await handleAuthSuccess(payload.role || payload.user?.role || selectedRole);
     } catch {
       showLoginError('Connexion impossible. Vérifiez le réseau.');
     } finally {
@@ -324,6 +325,35 @@
     setupLoginForm();
   }
 
+  function applySessionClinic(clinic) {
+    if (!clinic || typeof clinic !== 'object') return;
+
+    const name = String(clinic.name || '').trim();
+    if (name) {
+      document.querySelectorAll('.login-viewport-brand-sub, #doctor-shell .sidebar-brand-sub').forEach((el) => {
+        el.textContent = name;
+      });
+    }
+
+    const preset = String(clinic.theme_preset || clinic.themePreset || '').trim();
+    if (preset) {
+      document.documentElement.setAttribute('data-theme', preset);
+    }
+
+    const tokens = clinic.theme_tokens || clinic.themeTokens;
+    if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) return;
+    const root = document.documentElement.style;
+    const nameRe = /^--[a-zA-Z0-9-]+$/;
+    const unsafeRe = /url\s*\(|expression\s*\(|javascript:|@import/i;
+    Object.keys(tokens).forEach((key) => {
+      const cssName = key.indexOf('--') === 0 ? key : `--${key}`;
+      if (!nameRe.test(cssName)) return;
+      const value = String(tokens[key] ?? '').trim();
+      if (!value || unsafeRe.test(value)) return;
+      root.setProperty(cssName, value);
+    });
+  }
+
   async function validateSession() {
     try {
       const role = getStoredRole();
@@ -350,7 +380,8 @@
       showLoginGate();
       return;
     }
-    handleAuthSuccess(session.role);
+    applySessionClinic(session.clinic);
+    handleAuthSuccess(session.role || session.user?.role);
   }
 
   async function initAuthGate() {

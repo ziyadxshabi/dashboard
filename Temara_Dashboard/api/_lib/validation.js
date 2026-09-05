@@ -289,7 +289,10 @@ function validateFillGapInput(body = {}) {
   const defaults = casablancaDateTimeParts();
   const slotDate = String(body.slotDate ?? body.date ?? '').trim() || defaults.date;
   const slotTime = String(body.slotTime ?? body.time ?? '').trim() || defaults.time;
-  const reason = String(body.reason ?? body.motif ?? '').trim();
+  const reason = sanitizeString(body.reason ?? body.motif, 500);
+  const candidateRaw = String(
+    body.candidateId ?? body.candidate_id ?? body.waitlistId ?? body.waitlist_id ?? body.selectedId ?? ''
+  ).trim();
 
   if (!SLOT_DATE_RE.test(slotDate)) {
     return {
@@ -303,16 +306,60 @@ function validateFillGapInput(body = {}) {
       error: createApiError('VALIDATION_ERROR', 'slotTime must be HH:MM'),
     };
   }
-  if (reason.length > 500) {
+
+  return {
+    ok: true,
+    value: {
+      slotDate,
+      slotTime,
+      reason,
+      candidateId: UUID_RE.test(candidateRaw) ? candidateRaw : null,
+    },
+  };
+}
+
+function validateBulkSmsInput(body = {}) {
+  const message = sanitizeString(body.customMessage ?? body.message ?? body.text, 500);
+  if (message.length < 3) {
     return {
       ok: false,
-      error: createApiError('VALIDATION_ERROR', 'reason is too long'),
+      error: createApiError('VALIDATION_ERROR', 'customMessage must be at least 3 characters'),
+    };
+  }
+
+  const raw = body.recipients ?? body.rowIds ?? body.ids;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'recipients is required'),
+    };
+  }
+
+  const recipients = [];
+  for (const item of raw) {
+    if (item == null) continue;
+    if (typeof item === 'object' && !Array.isArray(item)) {
+      const nested = sanitizeString(item.id ?? item.phone ?? item.patient_phone ?? item.telephone, 64);
+      if (nested) recipients.push(nested);
+      continue;
+    }
+    const value = sanitizeString(item, 64);
+    if (value) recipients.push(value);
+  }
+
+  if (!recipients.length) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'recipients is required'),
     };
   }
 
   return {
     ok: true,
-    value: { slotDate, slotTime, reason },
+    value: {
+      message,
+      recipients: recipients.slice(0, 200),
+    },
   };
 }
 
@@ -401,6 +448,7 @@ module.exports = {
   sanitizeString,
   validateTeamNoteInput,
   validateFillGapInput,
+  validateBulkSmsInput,
   canonicalizeAppointmentStatus,
   resolveBookingStatus,
   compactPhone,

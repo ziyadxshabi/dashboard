@@ -82,17 +82,19 @@ Operational handlers in `Temara_Dashboard/api/` use `api/_lib/db.js` (`pg` Pool,
 | Route | Role |
 | --- | --- |
 | `POST /api/auth` | Login against `staff_users` + `clinics.slug` |
-| `POST /api/auth/me` | Session probe |
+| `GET`/`POST /api/auth/me` | Session probe + clinic theme hydration |
 | `POST /api/auth/logout` | Clear `dentaflow_session` |
 | `POST /api/auth/password` | scrypt rotate `staff_users.password_hash` |
 | `GET /api/roster` | Today's `bookings` for the clinic |
 | `GET`/`POST /api/waitlist` | Clinic waitlist |
+| `POST /api/fill-gap` | Waitlist candidates + optional `bookings` insert |
+| `POST /api/bulk-sms` | `sms_dispatch_log` audit (no n8n) |
 | `GET /api/dashboard-data` | KPI aggregations on today's `bookings` |
 | `GET /api/public/clinic/:slug` | Public theme + Cal.com event type (no secrets) |
 | `POST /api/webhooks/cal` | Cal.com → `bookings` upsert/cancel |
 | `GET /api/health` | `SELECT 1` liveness, sanitized JSON |
 
-Remaining `N8N_WEBHOOK_*` proxies (`/api/n8n-proxy`, `/api/bulk-sms`, `/api/proxy`, …) are **legacy bridges**. They are non-blocking: missing n8n env must not take down Postgres-backed ops.
+Remaining `N8N_WEBHOOK_*` proxies (`/api/n8n-proxy`, `/api/n8n-delay-alert`, …) are **legacy bridges**. Fill-gap and bulk-sms are Postgres-backed.
 
 ### 2.3 Primary database — Supabase PostgreSQL
 

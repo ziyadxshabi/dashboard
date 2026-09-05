@@ -52,6 +52,8 @@ const handleDashboard = require(path.join(DASHBOARD, 'api/dashboard-data.js'));
 const handlePublicClinic = require(path.join(DASHBOARD, 'api/public/clinic/[slug].js'));
 const handleUpdateStatus = require(path.join(DASHBOARD, 'api/update-status.js'));
 const handleTeamNotes = require(path.join(DASHBOARD, 'api/team-notes.js'));
+const handleFillGap = require(path.join(DASHBOARD, 'api/fill-gap.js'));
+const handleBulkSms = require(path.join(DASHBOARD, 'api/bulk-sms.js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 
@@ -233,6 +235,15 @@ async function run() {
 
   const notesAnon = await invoke(handleTeamNotes, createReq({ method: 'GET', url: '/api/team-notes', headers: {} }));
   ok('GET /api/team-notes without cookie returns 401', notesAnon.statusCode === 401);
+
+  const fillGapAnon = await invoke(handleFillGap, createReq({ method: 'POST', url: '/api/fill-gap', headers: {}, body: {} }));
+  ok('POST /api/fill-gap without cookie returns 401', fillGapAnon.statusCode === 401);
+
+  const bulkSmsAnon = await invoke(handleBulkSms, createReq({ method: 'POST', url: '/api/bulk-sms', headers: {}, body: {} }));
+  ok('POST /api/bulk-sms without cookie returns 401', bulkSmsAnon.statusCode === 401);
+
+  const meAnon = await invoke(handleAuth, createReq({ method: 'GET', url: '/api/auth/me', headers: {} }));
+  ok('GET /api/auth/me without cookie returns 401', meAnon.statusCode === 401);
 
   // ── Roster (Postgres) ──────────────────────────────────────────────────
   console.log('\n[roster]');
@@ -472,6 +483,154 @@ async function run() {
   );
   ok('POST /api/waitlist rejects invalid input with 400', waitlistBadPhone.statusCode === 400);
 
+  // ── Fill-gap (Postgres waitlist → bookings) ────────────────────────────
+  console.log('\n[fill-gap]');
+  const fillGapName = `FillGap ${Date.now()}`;
+  let fillGapWaitlistId = null;
+  let fillGapBookingId = null;
+  try {
+    const wl = await query(
+      `INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status)
+       VALUES ($1, $2, $3, 'Urgent'::waitlist_priority, $4, 'active')
+       RETURNING id`,
+      [clinicId, fillGapName, '0612345678', 'wave3-fill-gap']
+    );
+    fillGapWaitlistId = wl.rows[0]?.id;
+    ok('inserted Urgent waitlist candidate for fill-gap', Boolean(fillGapWaitlistId));
+
+    const fillList = await invoke(
+      handleFillGap,
+      createReq({
+        method: 'POST',
+        url: '/api/fill-gap',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { slotDate: '2026-09-12', slotTime: '10:30', reason: 'Trou dans le planning' },
+      })
+    );
+    ok(
+      'POST /api/fill-gap returns 200',
+      fillList.statusCode === 200,
+      `status=${fillList.statusCode} body=${JSON.stringify(fillList.body)}`
+    );
+    ok('POST /api/fill-gap ok:true', fillList.body?.ok === true);
+    ok('POST /api/fill-gap data.candidates is an array', Array.isArray(fillList.body?.data?.candidates));
+    ok(
+      'POST /api/fill-gap lists the waitlist candidate',
+      (fillList.body?.data?.candidates || []).some((row) => row.id === fillGapWaitlistId || row.patient_name === fillGapName)
+    );
+    ok('POST /api/fill-gap booking is null until a candidate is selected', fillList.body?.data?.booking == null);
+
+    const fillBook = await invoke(
+      handleFillGap,
+      createReq({
+        method: 'POST',
+        url: '/api/fill-gap',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: {
+          slotDate: '2026-09-12',
+          slotTime: '10:30',
+          reason: 'Trou dans le planning',
+          candidateId: fillGapWaitlistId,
+        },
+      })
+    );
+    ok(
+      'POST /api/fill-gap with candidateId returns 200',
+      fillBook.statusCode === 200,
+      `status=${fillBook.statusCode} body=${JSON.stringify(fillBook.body)}`
+    );
+    ok('POST /api/fill-gap inserts a booking', Boolean(fillBook.body?.data?.booking?.id));
+    ok('POST /api/fill-gap booking status is en_attente', fillBook.body?.data?.booking?.status === 'en_attente');
+    fillGapBookingId = fillBook.body?.data?.booking?.id || null;
+
+    if (fillGapBookingId) {
+      const booked = await query(
+        `SELECT patient_name, status::text AS status FROM bookings WHERE id = $1`,
+        [fillGapBookingId]
+      );
+      ok('fill-gap booking persisted in bookings', booked.rows[0]?.patient_name === fillGapName);
+      ok('fill-gap booking DB status is En attente', booked.rows[0]?.status === 'En attente');
+    }
+  } finally {
+    if (fillGapBookingId) await query('DELETE FROM bookings WHERE id = $1', [fillGapBookingId]);
+    if (fillGapWaitlistId) await query('DELETE FROM waitlist WHERE id = $1', [fillGapWaitlistId]);
+  }
+
+  const fillGapBadDate = await invoke(
+    handleFillGap,
+    createReq({
+      method: 'POST',
+      url: '/api/fill-gap',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: { slotDate: 'not-a-date', slotTime: '10:30' },
+    })
+  );
+  ok('POST /api/fill-gap rejects invalid slotDate with 400', fillGapBadDate.statusCode === 400);
+
+  // ── Bulk SMS audit (Postgres) ──────────────────────────────────────────
+  console.log('\n[bulk-sms]');
+  const bulkEmpty = await invoke(
+    handleBulkSms,
+    createReq({
+      method: 'POST',
+      url: '/api/bulk-sms',
+      headers: { ...doctorCookie, 'content-type': 'application/json' },
+      body: { customMessage: 'Rappel de rendez-vous demain.' },
+    })
+  );
+  ok('POST /api/bulk-sms empty recipients returns 400', bulkEmpty.statusCode === 400);
+  ok('POST /api/bulk-sms empty recipients uses VALIDATION_ERROR', bulkEmpty.body?.code === 'VALIDATION_ERROR');
+
+  const bulkShort = await invoke(
+    handleBulkSms,
+    createReq({
+      method: 'POST',
+      url: '/api/bulk-sms',
+      headers: { ...doctorCookie, 'content-type': 'application/json' },
+      body: { customMessage: 'ab', recipients: ['0612345678'] },
+    })
+  );
+  ok('POST /api/bulk-sms short message returns 400', bulkShort.statusCode === 400);
+
+  let bulkAuditId = null;
+  try {
+    const bulkOk = await invoke(
+      handleBulkSms,
+      createReq({
+        method: 'POST',
+        url: '/api/bulk-sms',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          customMessage: 'Rappel: rendez-vous demain a 10h.',
+          recipients: ['0612345678', '0612987654'],
+        },
+      })
+    );
+    ok(
+      'POST /api/bulk-sms valid array returns 200',
+      bulkOk.statusCode === 200,
+      `status=${bulkOk.statusCode} body=${JSON.stringify(bulkOk.body)}`
+    );
+    ok('POST /api/bulk-sms ok:true', bulkOk.body?.ok === true);
+    ok('POST /api/bulk-sms dispatchedCount is 2', bulkOk.body?.dispatchedCount === 2);
+    ok(
+      'POST /api/bulk-sms returns sanitized message',
+      typeof bulkOk.body?.message === 'string' && bulkOk.body.message.length >= 3
+    );
+
+    const audit = await query(
+      `SELECT id, recipient_count FROM sms_dispatch_log
+       WHERE clinic_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [clinicId]
+    );
+    bulkAuditId = audit.rows[0]?.id || null;
+    ok('sms_dispatch_log row persisted', Boolean(bulkAuditId) && audit.rows[0]?.recipient_count === 2);
+  } finally {
+    if (bulkAuditId) await query('DELETE FROM sms_dispatch_log WHERE id = $1', [bulkAuditId]);
+  }
+
   // ── Dashboard KPIs ─────────────────────────────────────────────────────
   console.log('\n[dashboard-data]');
   const dash = await invoke(
@@ -511,6 +670,34 @@ async function run() {
     'public clinic exposes themeTokens object',
     clinic.body?.clinic?.themeTokens != null && typeof clinic.body.clinic.themeTokens === 'object'
   );
+
+  // ── Session hydration ──────────────────────────────────────────────────
+  console.log('\n[auth me]');
+  const meGet = await invoke(
+    handleAuth,
+    createReq({ method: 'GET', url: '/api/auth/me', headers: assistantCookie })
+  );
+  ok('GET /api/auth/me authenticated returns 200', meGet.statusCode === 200, `status=${meGet.statusCode} body=${JSON.stringify(meGet.body)}`);
+  ok('GET /api/auth/me ok:true', meGet.body?.ok === true);
+  ok('GET /api/auth/me user.role is assistant', meGet.body?.user?.role === 'assistant');
+  ok('GET /api/auth/me user.username is present', Boolean(meGet.body?.user?.username));
+  ok('GET /api/auth/me clinic.slug is temara', meGet.body?.clinic?.slug === CLINIC_SLUG);
+  ok('GET /api/auth/me clinic.name is present', Boolean(meGet.body?.clinic?.name));
+  ok(
+    'GET /api/auth/me clinic.theme_preset is present',
+    typeof meGet.body?.clinic?.theme_preset === 'string' && meGet.body.clinic.theme_preset.length > 0
+  );
+  ok(
+    'GET /api/auth/me clinic.theme_tokens is an object',
+    meGet.body?.clinic?.theme_tokens != null && typeof meGet.body.clinic.theme_tokens === 'object'
+  );
+
+  const meDoctor = await invoke(
+    handleAuth,
+    createReq({ method: 'GET', url: '/api/auth/me', headers: doctorCookie })
+  );
+  ok('GET /api/auth/me as doctor returns 200', meDoctor.statusCode === 200);
+  ok('GET /api/auth/me doctor clinic id matches session', Boolean(meDoctor.body?.clinic?.id));
 
   // ── Password change (scrypt + staff_users) ─────────────────────────────
   console.log('\n[auth password]');

@@ -15,16 +15,15 @@ const {
   applyCors,
   checkLoginRateLimit,
   clearAuthCookie,
-  getTokenFromRequest,
   recordLoginFailure,
   resetLoginFailures,
   setAuthCookie,
   signJwt,
-  verifyJwt,
   verifyPassword,
 } = require('./_lib/auth-crypto');
 const { query } = require('./_lib/db');
 const handlePasswordChange = require('./_lib/password');
+const { createApiError, requireClinicSession, sendDbError } = require('./_lib/validation');
 
 const DEFAULT_CLINIC_SLUG = 'temara';
 
@@ -51,7 +50,9 @@ const STAFF_LOOKUP_SQL = `
     su.role::text AS role,
     su.display_name,
     c.slug,
-    c.name AS clinic_name
+    c.name AS clinic_name,
+    c.theme_preset,
+    c.theme_tokens
   FROM staff_users su
   INNER JOIN clinics c ON c.id = su.clinic_id
   WHERE lower(su.username) = ANY($1::text[])
@@ -96,36 +97,76 @@ function resolveAuthRoute(req) {
   return 'login';
 }
 
-function sessionUserFromPayload(payload) {
+const SESSION_ME_SQL = `
+  SELECT
+    s.id,
+    s.username,
+    s.role::text AS role,
+    c.id AS clinic_id,
+    c.slug,
+    c.name AS clinic_name,
+    c.theme_preset,
+    c.theme_tokens
+  FROM staff_users s
+  JOIN clinics c ON s.clinic_id = c.id
+  WHERE s.id = $1 AND c.id = $2
+  LIMIT 1
+`;
+
+function parseThemeTokens(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function clinicFromRow(row) {
   return {
-    sub: payload.sub,
-    role: payload.role,
-    clinic_id: payload.clinic_id,
-    slug: payload.slug,
+    id: row.clinic_id,
+    slug: row.slug,
+    name: row.clinic_name,
+    theme_preset: row.theme_preset || 'oak-lounge',
+    theme_tokens: parseThemeTokens(row.theme_tokens),
   };
 }
 
 async function handleMe(req, res) {
   applyCors(res, 'GET, POST, OPTIONS');
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    return res.status(503).json({ ok: false, code: 'UNAUTHORIZED' });
-  }
+  const session = requireClinicSession(req, res, { allowedRoles: ['doctor', 'assistant'] });
+  if (!session) return;
 
-  const token = getTokenFromRequest(req);
-  const payload = verifyJwt(token, secret);
-  if (!payload?.sub || !payload?.role || !payload?.clinic_id) {
-    return res.status(401).json({ ok: false, code: 'UNAUTHORIZED' });
-  }
+  try {
+    const result = await query(SESSION_ME_SQL, [session.sub, session.clinic_id]);
+    const row = result.rows && result.rows[0];
+    if (!row) {
+      return res.status(401).json(createApiError('UNAUTHORIZED'));
+    }
 
-  return res.status(200).json({
-    ok: true,
-    authenticated: true,
-    user: sessionUserFromPayload(payload),
-    role: payload.role,
-    sub: payload.sub,
-  });
+    const user = {
+      id: row.id,
+      username: row.username,
+      role: row.role,
+    };
+    const clinic = clinicFromRow(row);
+
+    return res.status(200).json({
+      ok: true,
+      user,
+      clinic,
+      role: user.role,
+      authenticated: true,
+    });
+  } catch (err) {
+    return sendDbError(res, err);
+  }
 }
 
 function handleLogout(req, res) {
@@ -214,12 +255,21 @@ async function handleLogin(req, res) {
   return res.status(200).json({
     ok: true,
     user: {
+      id: staffRow.id,
       username: staffRow.username,
       role: staffRow.role,
       displayName: staffRow.display_name,
       clinicSlug: staffRow.slug,
       clinicName: staffRow.clinic_name,
     },
+    clinic: clinicFromRow({
+      clinic_id: staffRow.clinic_id,
+      slug: staffRow.slug,
+      clinic_name: staffRow.clinic_name,
+      theme_preset: staffRow.theme_preset,
+      theme_tokens: staffRow.theme_tokens,
+    }),
+    role: staffRow.role,
   });
 }
 
