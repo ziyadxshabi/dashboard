@@ -59,14 +59,32 @@ function parseThemeTokens(raw) {
   return {};
 }
 
+function resolveCalEmbedUrl(row) {
+  const smsUrl = String(row.sms_booking_url || '').trim();
+  if (/^https:\/\//i.test(smsUrl)) return smsUrl;
+
+  const eventType = String(row.cal_event_type_id || '').trim().replace(/^\/+/, '');
+  if (!eventType) return '';
+  if (/^https:\/\//i.test(eventType)) return eventType;
+  return `https://cal.com/${eventType}`;
+}
+
 function toPublicClinic(row) {
+  const themeTokens = parseThemeTokens(row.theme_tokens);
+  const calEventTypeId = String(row.cal_event_type_id || '');
+  const calEmbedUrl = resolveCalEmbedUrl(row);
   return {
     name: String(row.name || ''),
     slug: String(row.slug || ''),
     phone: String(row.phone || ''),
     themePreset: String(row.theme_preset || 'oak-lounge'),
-    themeTokens: parseThemeTokens(row.theme_tokens),
-    calEventTypeId: String(row.cal_event_type_id || ''),
+    theme_preset: String(row.theme_preset || 'oak-lounge'),
+    themeTokens,
+    theme_tokens: themeTokens,
+    calEventTypeId,
+    cal_event_type_id: calEventTypeId,
+    calEmbedUrl,
+    cal_embed_url: calEmbedUrl,
   };
 }
 

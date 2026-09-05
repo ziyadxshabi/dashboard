@@ -10,11 +10,16 @@
   const TOKEN_NAME_RE = /^--[a-zA-Z0-9-]+$/;
   const TOKEN_UNSAFE_RE = /url\s*\(|expression\s*\(|javascript:|@import/i;
   const CAL_LINK_RE = /^[a-zA-Z0-9][a-zA-Z0-9/_-]*$/;
+  const CAL_HOSTS = { 'cal.com': true, 'www.cal.com': true, 'app.cal.com': true };
 
   function extractSlug() {
-    const parts = window.location.pathname.split('/');
-    const fromPath = String(parts[2] || '').trim().toLowerCase();
-    if (fromPath && fromPath !== 'book.html') return fromPath;
+    const pathname = String(window.location.pathname || '').replace(/\/+$/, '');
+    const parts = pathname.split('/').filter(Boolean);
+    const bookIdx = parts.indexOf('book');
+    if (bookIdx >= 0) {
+      const fromPath = String(parts[bookIdx + 1] || '').trim().toLowerCase();
+      if (fromPath && fromPath !== 'book.html') return fromPath;
+    }
     const fromQuery = new URLSearchParams(window.location.search).get('slug');
     return String(fromQuery || DEFAULT_SLUG).trim().toLowerCase() || DEFAULT_SLUG;
   }
@@ -30,13 +35,13 @@
 
   function applyThemeTokens(tokens) {
     if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) return;
-    const root = document.documentElement;
+    const root = document.documentElement.style;
     Object.keys(tokens).forEach((key) => {
       const name = key.indexOf('--') === 0 ? key : `--${key}`;
       if (!TOKEN_NAME_RE.test(name)) return;
       const value = String(tokens[key] ?? '').trim();
       if (!value || TOKEN_UNSAFE_RE.test(value)) return;
-      root.style.setProperty(name, value);
+      root.setProperty(name, value);
     });
   }
 
@@ -51,6 +56,31 @@
     return DEFAULT_CAL_LINK;
   }
 
+  function resolveCalEmbed(clinic) {
+    const embedUrl = String(clinic.calEmbedUrl || clinic.cal_embed_url || '').trim();
+    const eventType = String(clinic.calEventTypeId || clinic.cal_event_type_id || '').trim();
+
+    if (embedUrl) {
+      try {
+        const parsed = new URL(embedUrl);
+        if (/^https?:$/i.test(parsed.protocol) && CAL_HOSTS[parsed.hostname]) {
+          const calLink = sanitizeCalLink(parsed.pathname.replace(/^\/+/, ''));
+          return { calLink, iframeSrc: `https://cal.com/${calLink}` };
+        }
+        if (parsed.protocol === 'https:') {
+          return { calLink: sanitizeCalLink(eventType), iframeSrc: embedUrl };
+        }
+      } catch {
+        const asPath = embedUrl.replace(/^https?:\/\/(?:www\.|app\.)?cal\.com\/+/i, '');
+        const calLink = sanitizeCalLink(asPath);
+        return { calLink, iframeSrc: `https://cal.com/${calLink}` };
+      }
+    }
+
+    const calLink = sanitizeCalLink(eventType);
+    return { calLink, iframeSrc: `https://cal.com/${calLink}` };
+  }
+
   function showError(message) {
     const page = $('book-page');
     const error = $('book-error');
@@ -61,24 +91,25 @@
     document.title = 'Prise de rendez-vous';
   }
 
-  function mountIframe(container, calLink) {
+  function mountIframe(container, iframeSrc) {
     if (!container) return;
     container.replaceChildren();
     const frame = document.createElement('iframe');
     frame.title = 'Calendrier de prise de rendez-vous';
-    frame.src = `https://cal.com/${calLink}`;
+    frame.src = iframeSrc;
     frame.loading = 'lazy';
     frame.referrerPolicy = 'no-referrer-when-downgrade';
     frame.setAttribute('allow', 'camera; microphone; fullscreen; payment');
     container.appendChild(frame);
   }
 
-  function loadCalEmbed(container, calLink) {
+  function loadCalEmbed(container, calLink, iframeSrc) {
     if (!container) return;
+    const fallbackSrc = iframeSrc || `https://cal.com/${calLink}`;
 
     function startInline() {
       if (typeof window.Cal !== 'function') {
-        mountIframe(container, calLink);
+        mountIframe(container, fallbackSrc);
         return;
       }
       try {
@@ -89,7 +120,7 @@
           layout: 'month_view',
         });
       } catch {
-        mountIframe(container, calLink);
+        mountIframe(container, fallbackSrc);
       }
     }
 
@@ -101,7 +132,7 @@
     const existing = document.querySelector('script[data-cal-embed]');
     if (existing) {
       existing.addEventListener('load', startInline, { once: true });
-      existing.addEventListener('error', () => mountIframe(container, calLink), { once: true });
+      existing.addEventListener('error', () => mountIframe(container, fallbackSrc), { once: true });
       return;
     }
 
@@ -110,14 +141,14 @@
     script.async = true;
     script.dataset.calEmbed = 'true';
     script.addEventListener('load', startInline, { once: true });
-    script.addEventListener('error', () => mountIframe(container, calLink), { once: true });
+    script.addEventListener('error', () => mountIframe(container, fallbackSrc), { once: true });
     document.head.appendChild(script);
   }
 
   function applyClinic(clinic) {
     const name = clinic.name || 'Clinique';
     const phone = clinic.phone || '';
-    const preset = clinic.themePreset || 'oak-lounge';
+    const preset = clinic.themePreset || clinic.theme_preset || 'oak-lounge';
 
     document.documentElement.setAttribute('data-theme', preset);
     document.title = `${name} — Prise de rendez-vous en ligne`;
@@ -143,11 +174,11 @@
       }
     });
 
-    applyThemeTokens(clinic.themeTokens);
+    applyThemeTokens(clinic.themeTokens || clinic.theme_tokens);
 
     const embed = $('cal-embed');
-    const calLink = sanitizeCalLink(clinic.calEventTypeId);
-    loadCalEmbed(embed, calLink);
+    const { calLink, iframeSrc } = resolveCalEmbed(clinic);
+    loadCalEmbed(embed, calLink, iframeSrc);
 
     const page = $('book-page');
     const error = $('book-error');

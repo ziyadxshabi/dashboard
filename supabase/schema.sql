@@ -94,7 +94,9 @@ CREATE TABLE IF NOT EXISTS team_notes (
   patient_name TEXT,
   author_name  TEXT NOT NULL,
   content      TEXT NOT NULL,
-  created_at   TIMESTAMPTZ DEFAULT now()
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  pinned       BOOLEAN NOT NULL DEFAULT false,
+  category     TEXT NOT NULL DEFAULT 'general'
 );
 
 CREATE INDEX IF NOT EXISTS idx_bookings_clinic_starts
@@ -105,6 +107,9 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_clinic_status
 
 CREATE INDEX IF NOT EXISTS idx_team_notes_clinic_created
   ON team_notes (clinic_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_team_notes_clinic_pinned_posted
+  ON team_notes (clinic_id, pinned DESC, created_at DESC);
 
 -- Seed: Clinique Dentaire Témara Mall
 INSERT INTO clinics (slug, name)

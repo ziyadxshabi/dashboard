@@ -159,10 +159,10 @@ GET /api/public/clinic/:slug
     │
     ▼
 clinics WHERE slug = $1
-    │  returns name, slug, phone, themePreset, themeTokens, calEventTypeId
+    │  returns name, slug, phone, themePreset, themeTokens, calEventTypeId, calEmbedUrl
     │  never returns clinic UUID, DATABASE_URL, Twilio numbers, or hashes
     ▼
-book.js applies CSS tokens and embeds https://app.cal.com / https://cal.com
+book.js hydrates title/header from clinic.name, applies theme_tokens, embeds cal_embed_url
 ```
 
 ### 3.4 Staff operational reads/writes

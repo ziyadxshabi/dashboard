@@ -2,7 +2,7 @@
 /**
  * Direct handler tests against local PostgreSQL.
  * Loads Temara_Dashboard/.env.local, invokes serverless handlers with a
- * Vercel-compatible (req, res) shim, and asserts the Wave 1/3 API contracts.
+ * Vercel-compatible (req, res) shim, and asserts the Wave 1–3 API contracts.
  *
  * Seeded credentials: docteur / dentaflow, assistante / dentaflow, clinic slug temara.
  * Auth cookie: dentaflow_session.
@@ -51,6 +51,7 @@ const handleWaitlist = require(path.join(DASHBOARD, 'api/waitlist.js'));
 const handleDashboard = require(path.join(DASHBOARD, 'api/dashboard-data.js'));
 const handlePublicClinic = require(path.join(DASHBOARD, 'api/public/clinic/[slug].js'));
 const handleUpdateStatus = require(path.join(DASHBOARD, 'api/update-status.js'));
+const handleTeamNotes = require(path.join(DASHBOARD, 'api/team-notes.js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 
@@ -230,6 +231,9 @@ async function run() {
   const waitlistAnon = await invoke(handleWaitlist, createReq({ method: 'GET', url: '/api/waitlist', headers: {} }));
   ok('GET /api/waitlist without cookie returns 401', waitlistAnon.statusCode === 401);
 
+  const notesAnon = await invoke(handleTeamNotes, createReq({ method: 'GET', url: '/api/team-notes', headers: {} }));
+  ok('GET /api/team-notes without cookie returns 401', notesAnon.statusCode === 401);
+
   // ── Roster (Postgres) ──────────────────────────────────────────────────
   console.log('\n[roster]');
   const roster = await invoke(
@@ -381,6 +385,82 @@ async function run() {
     await query('DELETE FROM waitlist WHERE id = $1', [waitlistPost.body.id]);
   }
 
+  // ── Team notes (Postgres) ──────────────────────────────────────────────
+  console.log('\n[team-notes]');
+  await query(`ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`);
+  await query(`ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'general'`);
+
+  const notesGet = await invoke(
+    handleTeamNotes,
+    createReq({ method: 'GET', url: '/api/team-notes', headers: assistantCookie })
+  );
+  ok('GET /api/team-notes authenticated returns 200', notesGet.statusCode === 200, `status=${notesGet.statusCode} body=${JSON.stringify(notesGet.body)}`);
+  ok('GET /api/team-notes ok:true', notesGet.body?.ok === true);
+  ok('GET /api/team-notes data is an array', Array.isArray(notesGet.body?.data));
+
+  const notesGetDoctor = await invoke(
+    handleTeamNotes,
+    createReq({ method: 'GET', url: '/api/team-notes', headers: doctorCookie })
+  );
+  ok('GET /api/team-notes as doctor returns 200', notesGetDoctor.statusCode === 200, `status=${notesGetDoctor.statusCode}`);
+
+  const noteMarker = `wave2-note-${Date.now()}`;
+  let insertedNoteId = null;
+  try {
+    const notesPost = await invoke(
+      handleTeamNotes,
+      createReq({
+        method: 'POST',
+        url: '/api/team-notes',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          text: noteMarker,
+          category: 'general',
+          pinned: true,
+          author: 'Assistante Test',
+        },
+      })
+    );
+    ok(
+      'POST /api/team-notes returns 200',
+      notesPost.statusCode === 200,
+      `status=${notesPost.statusCode} body=${JSON.stringify(notesPost.body)}`
+    );
+    ok('POST /api/team-notes ok:true', notesPost.body?.ok === true);
+    ok('POST /api/team-notes returns newNote id', Boolean(notesPost.body?.data?.id));
+    ok(
+      'POST /api/team-notes persists message',
+      notesPost.body?.data?.message === noteMarker,
+      `message=${notesPost.body?.data?.message}`
+    );
+    ok('POST /api/team-notes pinned is true', notesPost.body?.data?.pinned === true);
+    insertedNoteId = notesPost.body?.data?.id || null;
+
+    const notesAfter = await invoke(
+      handleTeamNotes,
+      createReq({ method: 'GET', url: '/api/team-notes', headers: assistantCookie })
+    );
+    const persisted = (notesAfter.body?.data || []).some(
+      (row) => row.id === insertedNoteId || row.message === noteMarker || row.text === noteMarker
+    );
+    ok('GET /api/team-notes includes the inserted note', persisted);
+  } finally {
+    if (insertedNoteId) {
+      await query('DELETE FROM team_notes WHERE id = $1', [insertedNoteId]);
+    }
+  }
+
+  const notesEmpty = await invoke(
+    handleTeamNotes,
+    createReq({
+      method: 'POST',
+      url: '/api/team-notes',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: {},
+    })
+  );
+  ok('POST /api/team-notes empty body returns 400', notesEmpty.statusCode === 400);
+
   const waitlistBadPhone = await invoke(
     handleWaitlist,
     createReq({
@@ -422,6 +502,15 @@ async function run() {
   ok('GET /api/public/clinic/temara returns 200', clinic.statusCode === 200, `status=${clinic.statusCode}`);
   ok('public clinic slug is temara', clinic.body?.clinic?.slug === CLINIC_SLUG);
   ok('public clinic does not leak clinic UUID', clinic.body?.clinic?.id == null);
+  ok(
+    'public clinic exposes calEmbedUrl',
+    typeof clinic.body?.clinic?.calEmbedUrl === 'string' && clinic.body.clinic.calEmbedUrl.startsWith('https://cal.com/'),
+    `calEmbedUrl=${clinic.body?.clinic?.calEmbedUrl}`
+  );
+  ok(
+    'public clinic exposes themeTokens object',
+    clinic.body?.clinic?.themeTokens != null && typeof clinic.body.clinic.themeTokens === 'object'
+  );
 
   // ── Password change (scrypt + staff_users) ─────────────────────────────
   console.log('\n[auth password]');

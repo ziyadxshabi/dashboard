@@ -244,28 +244,31 @@ function validatePhone(value) {
   return { ok: true, value: phone };
 }
 
+function sanitizeString(value, maxLen) {
+  const limit = Number.isFinite(maxLen) && maxLen > 0 ? maxLen : 2000;
+  const text = String(value ?? '').replace(/\u0000/g, '').trim();
+  if (!text) return '';
+  return text.length > limit ? text.slice(0, limit) : text;
+}
+
+function parsePinned(value) {
+  if (value === true || value === 1) return true;
+  const raw = String(value ?? '').trim().toLowerCase();
+  return raw === 'true' || raw === '1' || raw === 'oui' || raw === 'yes';
+}
+
 function validateTeamNoteInput(body = {}) {
-  const note = String(body.note ?? body.text ?? body.content ?? '').trim();
-  const patientName = String(body.patientName ?? body.patient_name ?? '').trim();
+  const note = sanitizeString(body.note ?? body.text ?? body.content ?? body.message, 2000);
+  const patientName = sanitizeString(body.patientName ?? body.patient_name, 200);
   const bookingRaw = String(body.bookingId ?? body.booking_id ?? '').trim();
-  const author = String(body.author ?? body.author_name ?? '').trim();
+  const author = sanitizeString(body.author ?? body.author_name, 120);
+  const category = sanitizeString(body.category, 64) || 'general';
+  const pinned = parsePinned(body.pinned);
 
   if (!note) {
     return {
       ok: false,
       error: createApiError('VALIDATION_ERROR', 'note is required'),
-    };
-  }
-  if (note.length > 2000) {
-    return {
-      ok: false,
-      error: createApiError('VALIDATION_ERROR', 'note must be at most 2000 characters'),
-    };
-  }
-  if (patientName.length > 200) {
-    return {
-      ok: false,
-      error: createApiError('VALIDATION_ERROR', 'patientName is too long'),
     };
   }
 
@@ -276,6 +279,8 @@ function validateTeamNoteInput(body = {}) {
       patientName: patientName || null,
       bookingId: UUID_RE.test(bookingRaw) ? bookingRaw : null,
       author,
+      category,
+      pinned,
     },
   };
 }
@@ -393,6 +398,7 @@ module.exports = {
   validatePasswordChange,
   validateStatusUpdate,
   validatePhone,
+  sanitizeString,
   validateTeamNoteInput,
   validateFillGapInput,
   canonicalizeAppointmentStatus,
