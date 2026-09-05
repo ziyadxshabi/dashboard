@@ -45,11 +45,10 @@ loadEnvFile(path.join(DASHBOARD, '.env.local'));
 loadEnvFile(path.join(DASHBOARD, '.env'));
 
 const handleAuth = require(path.join(DASHBOARD, 'api/auth.js'));
-const handlePassword = require(path.join(DASHBOARD, 'api/auth/password.js'));
 const handleRoster = require(path.join(DASHBOARD, 'api/roster.js'));
 const handleWaitlist = require(path.join(DASHBOARD, 'api/waitlist.js'));
 const handleDashboard = require(path.join(DASHBOARD, 'api/dashboard-data.js'));
-const handlePublicClinic = require(path.join(DASHBOARD, 'api/public/clinic.js'));
+const handlePublicClinic = require(path.join(DASHBOARD, 'api/public/clinic/[slug].js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 
@@ -311,7 +310,7 @@ async function run() {
   // ── Password change (scrypt + staff_users) ─────────────────────────────
   console.log('\n[auth password]');
   const missingSession = await invoke(
-    handlePassword,
+    handleAuth,
     createReq({
       method: 'POST',
       url: '/api/auth/password',
@@ -322,7 +321,7 @@ async function run() {
   ok('POST /api/auth/password without cookie returns 401', missingSession.statusCode === 401);
 
   const shortPwd = await invoke(
-    handlePassword,
+    handleAuth,
     createReq({
       method: 'POST',
       url: '/api/auth/password',
@@ -334,7 +333,7 @@ async function run() {
   ok('short newPassword uses VALIDATION_ERROR', shortPwd.body?.code === 'VALIDATION_ERROR');
 
   const wrongCurrent = await invoke(
-    handlePassword,
+    handleAuth,
     createReq({
       method: 'POST',
       url: '/api/auth/password',
@@ -352,7 +351,7 @@ async function run() {
   const NEW_PASSWORD = 'wave3pass!';
   try {
     const changed = await invoke(
-      handlePassword,
+      handleAuth,
       createReq({
         method: 'POST',
         url: '/api/auth/password',

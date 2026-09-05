@@ -194,14 +194,30 @@ function parseBody(req, rawBuffer) {
   return text;
 }
 
+function isSafeApiFile(candidate) {
+  const resolved = path.resolve(candidate);
+  if (!resolved.startsWith(path.resolve(API_DIR))) return false;
+  const relFromApi = path.relative(API_DIR, resolved);
+  if (relFromApi.split(path.sep).some((part) => part.startsWith('_'))) return false;
+  return fs.existsSync(resolved);
+}
+
 function resolveApiHandlerPath(pathname) {
-  // pathname like /api/auth or /api/team-notes
+  // pathname like /api/auth or /api/public/clinic/temara
   const rel = pathname.replace(/^\/api\//, '').replace(/\/+$/, '');
   if (!rel || rel.includes('..')) return null;
-  const candidate = path.join(API_DIR, `${rel}.js`);
-  const resolved = path.resolve(candidate);
-  if (!resolved.startsWith(path.resolve(API_DIR))) return null;
-  return fs.existsSync(resolved) ? resolved : null;
+
+  const exact = path.join(API_DIR, `${rel}.js`);
+  if (isSafeApiFile(exact)) return path.resolve(exact);
+
+  const parts = rel.split('/');
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const dynamicParts = parts.slice(0, i).concat('[slug]');
+    const dynamicCandidate = path.join(API_DIR, ...dynamicParts) + '.js';
+    if (isSafeApiFile(dynamicCandidate)) return path.resolve(dynamicCandidate);
+  }
+
+  return null;
 }
 
 async function handleApi(req, res, pathname, searchParams) {

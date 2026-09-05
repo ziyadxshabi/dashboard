@@ -4,14 +4,14 @@
  */
 'use strict';
 
-const { applyCors } = require('./_lib/auth-crypto');
-const { query } = require('./_lib/db');
+const { applyCors } = require('../_lib/auth-crypto');
+const { query } = require('../_lib/db');
 const {
   createApiError,
   requireClinicSession,
   sendDbError,
   validateTeamNoteInput,
-} = require('./_lib/validation');
+} = require('../_lib/validation');
 
 const TEAM_NOTES_GET_SQL = `
   SELECT id, booking_id, patient_name, author_name, content, created_at

@@ -2,7 +2,7 @@
  * Dashboard KPI proxy — JWT-gated bridge to n8n via Ngrok.
  * Secrets live in Vercel Environment Variables only (never on the client).
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+const { applyCors, requireBearerSession } = require('../_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 

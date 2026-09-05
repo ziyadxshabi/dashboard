@@ -1,21 +1,18 @@
 /**
  * Authenticated staff password update — writes staff_users.password_hash via scrypt.
- *
- * POST /api/auth/password
- * POST /api/auth?action=password  (via auth.js routing / vercel rewrite)
- *
- * Auth: httpOnly dentaflow_session cookie → JWT { sub, clinic_id }.
+ * Invoked from api/auth.js (POST /api/auth/password and ?action=password).
+ * Lives under _lib so it is not packaged as a separate Vercel function.
  */
 'use strict';
 
-const { applyCors, hashPassword, verifyPassword } = require('../_lib/auth-crypto');
-const { query } = require('../_lib/db');
+const { applyCors, hashPassword, verifyPassword } = require('./auth-crypto');
+const { query } = require('./db');
 const {
   createApiError,
   requireClinicSession,
   sendDbError,
   validatePasswordChange,
-} = require('../_lib/validation');
+} = require('./validation');
 
 const SELECT_PASSWORD_SQL = `
   SELECT password_hash

@@ -1,11 +1,11 @@
 /**
  * DentaFlow OS — staff_users login against PostgreSQL.
  *
- * Routes (single serverless function, plus rewrite fallbacks):
+ * Routes (single serverless function; vercel.json rewrites subpaths here):
  *   POST /api/auth            → login
- *   POST /api/auth/me         → session probe (also Temara_Dashboard/api/auth/me.js)
- *   POST /api/auth/logout     → clear httpOnly cookie
- *   POST /api/auth/password   → update staff_users.password_hash (also api/auth/password.js)
+ *   POST /api/auth/me         → session probe (?action=me)
+ *   POST /api/auth/logout     → clear httpOnly cookie (?action=logout)
+ *   POST /api/auth/password   → update staff_users.password_hash (?action=password)
  *
  * JWT is stored in a single httpOnly cookie: dentaflow_session.
  */
@@ -24,7 +24,7 @@ const {
   verifyPassword,
 } = require('./_lib/auth-crypto');
 const { query } = require('./_lib/db');
-const handlePasswordChange = require('./auth/password');
+const handlePasswordChange = require('./_lib/password');
 
 const DEFAULT_CLINIC_SLUG = 'temara';
 
@@ -106,7 +106,7 @@ function sessionUserFromPayload(payload) {
 }
 
 async function handleMe(req, res) {
-  applyCors(res, 'POST, OPTIONS');
+  applyCors(res, 'GET, POST, OPTIONS');
 
   const secret = process.env.JWT_SECRET;
   if (!secret) {
@@ -224,17 +224,24 @@ async function handleLogin(req, res) {
 }
 
 module.exports = async function handler(req, res) {
+  const route = resolveAuthRoute(req);
+
   if (req.method === 'OPTIONS') {
-    applyCors(res, 'POST, OPTIONS');
+    applyCors(res, 'GET, POST, OPTIONS');
     return res.status(204).end();
+  }
+
+  if (route === 'me') {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    }
+    return handleMe(req, res);
   }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
-  const route = resolveAuthRoute(req);
-  if (route === 'me') return handleMe(req, res);
   if (route === 'logout') return handleLogout(req, res);
   if (route === 'password') return handlePasswordChange(req, res);
   return handleLogin(req, res);

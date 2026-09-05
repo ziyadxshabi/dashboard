@@ -2,7 +2,7 @@
  * Universal n8n webhook proxy for miscellaneous POST targets.
  * Set the N8N_WEBHOOK_* env vars below + N8N_AUTH_KEY in Vercel.
  */
-const { applyCors, requireBearerSession } = require('./_lib/auth-crypto');
+const { applyCors, requireBearerSession } = require('../_lib/auth-crypto');
 
 const UPSTREAM_TIMEOUT_MS = 30_000;
 

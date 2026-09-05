@@ -4,14 +4,14 @@
  */
 'use strict';
 
-const { applyCors } = require('./_lib/auth-crypto');
-const { query } = require('./_lib/db');
+const { applyCors } = require('../_lib/auth-crypto');
+const { query } = require('../_lib/db');
 const {
   createApiError,
   requireClinicSession,
   sendDbError,
   validateStatusUpdate,
-} = require('./_lib/validation');
+} = require('../_lib/validation');
 
 const UPDATE_STATUS_SQL = `
   UPDATE bookings

@@ -3,9 +3,9 @@
  */
 'use strict';
 
-const { applyCors } = require('./_lib/auth-crypto');
-const { query } = require('./_lib/db');
-const { createApiError, sendDbError, validatePhone } = require('./_lib/validation');
+const { applyCors } = require('../_lib/auth-crypto');
+const { query } = require('../_lib/db');
+const { createApiError, sendDbError, validatePhone } = require('../_lib/validation');
 
 const DEFAULT_CLINIC_SLUG = 'temara';
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

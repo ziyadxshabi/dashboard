@@ -4,14 +4,14 @@
  */
 'use strict';
 
-const { applyCors } = require('./_lib/auth-crypto');
-const { query } = require('./_lib/db');
+const { applyCors } = require('../_lib/auth-crypto');
+const { query } = require('../_lib/db');
 const {
   createApiError,
   requireClinicSession,
   sendDbError,
   validateFillGapInput,
-} = require('./_lib/validation');
+} = require('../_lib/validation');
 
 const FILL_GAP_CANDIDATES_SQL = `
   SELECT id, patient_name, patient_phone, priority
