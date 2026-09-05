@@ -40,6 +40,7 @@ function loadEnvFile(file) {
   return true;
 }
 
+loadEnvFile(path.join(ROOT, '.env.local'));
 loadEnvFile(path.join(DASHBOARD, '.env.local'));
 loadEnvFile(path.join(DASHBOARD, '.env'));
 
@@ -56,6 +57,13 @@ const CLINIC_SLUG = 'temara';
 const SEED_PASSWORD = 'dentaflow';
 const DOCTOR_USER = 'docteur';
 const ASSISTANT_USER = 'assistante';
+
+function staffUsernameAliases(username) {
+  const key = String(username || '').trim().toLowerCase();
+  if (key === 'doctor' || key === 'docteur') return ['doctor', 'docteur'];
+  if (key === 'assistant' || key === 'assistante') return ['assistant', 'assistante'];
+  return [key];
+}
 
 const stats = { passed: 0, failed: 0, skipped: 0 };
 
@@ -159,9 +167,9 @@ async function restoreSeedPassword(username) {
      SET password_hash = $1
      FROM clinics c
      WHERE su.clinic_id = c.id
-       AND lower(su.username) = lower($2)
+       AND lower(su.username) = ANY($2::text[])
        AND c.slug = $3`,
-    [hash, username, CLINIC_SLUG]
+    [hash, staffUsernameAliases(username), CLINIC_SLUG]
   );
 }
 
@@ -173,6 +181,9 @@ async function run() {
     Boolean(String(process.env.DATABASE_URL || '').trim())
   );
   ok('JWT_SECRET is configured', Boolean(String(process.env.JWT_SECRET || '').trim()));
+
+  await restoreSeedPassword(DOCTOR_USER);
+  await restoreSeedPassword(ASSISTANT_USER);
 
   // ── Login + session cookie ─────────────────────────────────────────────
   console.log('\n[auth login]');
@@ -360,9 +371,9 @@ async function run() {
       `SELECT su.password_hash
        FROM staff_users su
        INNER JOIN clinics c ON c.id = su.clinic_id
-       WHERE lower(su.username) = lower($1) AND c.slug = $2
+       WHERE lower(su.username) = ANY($1::text[]) AND c.slug = $2
        LIMIT 1`,
-      [ASSISTANT_USER, CLINIC_SLUG]
+      [staffUsernameAliases(ASSISTANT_USER), CLINIC_SLUG]
     );
     const storedHash = hashRow.rows[0]?.password_hash || '';
     ok('updated hash uses scrypt$ prefix', storedHash.startsWith('scrypt$'));

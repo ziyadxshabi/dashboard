@@ -28,6 +28,20 @@ const handlePasswordChange = require('./auth/password');
 
 const DEFAULT_CLINIC_SLUG = 'temara';
 
+const STAFF_NAME_ALIASES = {
+  doctor: ['doctor', 'docteur'],
+  docteur: ['doctor', 'docteur'],
+  assistant: ['assistant', 'assistante'],
+  assistante: ['assistant', 'assistante'],
+};
+
+const STAFF_ROLE_ALIASES = {
+  doctor: 'doctor',
+  docteur: 'doctor',
+  assistant: 'assistant',
+  assistante: 'assistant',
+};
+
 const STAFF_LOOKUP_SQL = `
   SELECT
     su.id,
@@ -40,10 +54,23 @@ const STAFF_LOOKUP_SQL = `
     c.name AS clinic_name
   FROM staff_users su
   INNER JOIN clinics c ON c.id = su.clinic_id
-  WHERE lower(su.username) = lower($1)
+  WHERE lower(su.username) = ANY($1::text[])
     AND c.slug = $2
   LIMIT 1
 `;
+
+function staffLookupNames(username) {
+  const key = String(username || '').trim().toLowerCase();
+  if (!key) return [];
+  const aliases = STAFF_NAME_ALIASES[key];
+  return aliases ? [...aliases] : [key];
+}
+
+function canonicalizeStaffRole(role) {
+  const key = String(role || '').trim().toLowerCase();
+  if (!key) return '';
+  return STAFF_ROLE_ALIASES[key] || key;
+}
 
 function resolveAuthRoute(req) {
   const raw = String(req.url || '');
@@ -132,10 +159,13 @@ async function handleLogin(req, res) {
   }
 
   const body = req.body ?? {};
-  const requestedRole = typeof body.role === 'string' ? body.role.trim().toLowerCase() : '';
+  const requestedRole = canonicalizeStaffRole(
+    typeof body.role === 'string' ? body.role.trim() : ''
+  );
   const normalizedUsername = typeof body.username === 'string' ? body.username.trim() : '';
   const normalizedPassword = typeof body.password === 'string' ? body.password : '';
   const clinicSlug = resolveClinicSlug(body);
+  const lookupNames = staffLookupNames(normalizedUsername);
 
   if (!normalizedUsername || !normalizedPassword) {
     await recordLoginFailure();
@@ -144,7 +174,7 @@ async function handleLogin(req, res) {
 
   let staffRow;
   try {
-    const result = await query(STAFF_LOOKUP_SQL, [normalizedUsername, clinicSlug]);
+    const result = await query(STAFF_LOOKUP_SQL, [lookupNames, clinicSlug]);
     staffRow = result.rows[0];
   } catch (err) {
     console.error('[auth] staff_users lookup failed:', err?.message || err);
