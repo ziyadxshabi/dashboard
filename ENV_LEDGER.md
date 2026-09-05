@@ -1,137 +1,139 @@
 # DentaFlow OS — Environment Variables Ledger
 
 > Last audited: 2026-09-05
-> Status: Wave 4 — Supabase PostgreSQL + cookie auth
-> Secrets belong in Vercel Project Settings (Production / Preview) and local `Temara_Dashboard/.env.local` (gitignored). Never commit real values.
+> Status: Wave 4 — active production variables only
+> Secrets belong in Vercel Project Settings and gitignored `Temara_Dashboard/.env.local`. Never commit real values.
 
-This ledger is the operator-facing list of environment variables for the production dashboard. Runtime architecture is in `SYSTEM_ARCHITECTURE.md`.
+This ledger lists **exactly** the variables the running OS reads. Architecture: `SYSTEM_ARCHITECTURE.md`.
 
 ---
 
-## Active (required in production)
+## Active variables
 
-### PostgreSQL — Supabase
+### `DATABASE_URL` — required
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | **Yes** | Supabase **transaction pooler** connection string (**port 6543**). Used by `Temara_Dashboard/api/_lib/db.js` (`pg` Pool). Local Docker/dev may use `postgres://dentaflow:dentaflow@127.0.0.1:5432/dentaflow` (no TLS). Hosted Supabase uses TLS. |
+Supabase **transaction pooler** connection string on **port 6543**.
 
-Example shape (placeholder only):
+- Consumer: `Temara_Dashboard/api/_lib/db.js` (`pg` Pool).
+- Production: TLS (`ssl: { rejectUnauthorized: false }` for the pooler). Direct `db.<ref>.supabase.co:5432` is IPv6-only and is not used here.
+- Local Docker/dev may use `postgres://dentaflow:dentaflow@127.0.0.1:5432/dentaflow` (no TLS).
 
 ```text
-DATABASE_URL=postgres://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-1-<region>.pooler.supabase.com:6543/postgres
 ```
 
-Do **not** expose this URL from `/api/health` or any client-facing handler.
+Never return this URL from `/api/health` or any client-facing handler.
 
-### Authentication
+### `JWT_SECRET` — required
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `JWT_SECRET` | **Yes** | HS256 signing key for the httpOnly `dentaflow_session` cookie. **≥ 32 random characters.** Claims: `sub`, `role`, `clinic_id`, `slug`. |
+HS256 signing key for the httpOnly `dentaflow_session` cookie.
 
-Staff usernames and scrypt hashes live in PostgreSQL `staff_users`, not in env.
+- Consumer: `api/_lib/auth-crypto.js`, `api/auth.js`, `requireClinicSession`.
+- **≥ 32 random bytes** (hex or base64). Rotate independently of the database password.
+- Claims: `sub`, `role`, `clinic_id`, `slug`.
 
-### Cal.com
+### `CLINIC_ID` — default tenant slug
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `CALCOM_WEBHOOK_SECRET` | Optional | HMAC-SHA256 for `POST /api/webhooks/cal` (`X-Cal-Signature-256`). When unset, the webhook accepts unsigned payloads (dev only). Set in production. |
+Default clinic slug when a JWT has no `clinic_id` (should not happen after login). Example: `temara`.
 
-### Redis / Upstash (optional login rate-limit)
+- Consumer: `requireClinicSession` fallback and public defaults.
+- Authoritative tenant id at runtime is **`clinics.id` (UUID)** on the JWT, not this slug.
+- Public booking still defaults missing `/book/:slug` to `temara`.
 
-Login throttling in `api/_lib/auth-crypto.js` is optional and **fails open** if Redis is unreachable.
+### `CALCOM_WEBHOOK_SECRET` — production required
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `UPSTASH_REDIS_REST_URL` | Optional | Upstash REST base URL (rate-limiting). |
-| `UPSTASH_REDIS_REST_TOKEN` | Optional | Upstash REST bearer token. |
+HMAC-SHA256 secret for `POST /api/webhooks/cal`.
 
-**Runtime aliases (what the code reads today):** `REDIS_CONNECTION_URL` and `REDIS_REST_TOKEN`. Set those to the same values as the Upstash REST URL/token (or duplicate the pair). Missing Redis does **not** block Postgres APIs or health checks.
+- Header: `X-Cal-Signature-256`.
+- When **set**: unsigned or mismatched signatures are rejected.
+- When **unset** (local only): unsigned payloads are accepted so handler tests can run.
 
-### Optional clinic / CORS
+### `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — optional
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `VERCEL_FRONTEND_URL` | Optional | CORS `Access-Control-Allow-Origin` on selected handlers. |
-| `CLINIC_ID` | Optional | Legacy slug fallback; JWT `clinic_id` is authoritative. |
+Upstash Redis REST credentials for **login rate-limiting only** (not sessions, not patient data).
+
+- Consumer: `api/_lib/auth-crypto.js`.
+- If either is missing or Redis errors, rate limiting **fails open**. Postgres APIs keep working.
+- Legacy aliases still accepted: `REDIS_CONNECTION_URL`, `REDIS_REST_TOKEN`.
 
 ---
 
-## Deprecated / non-blocking
+## Local development (`.env.local`)
 
-These keys may still exist in Vercel from the Baserow/n8n prototype. They are **not** required for roster, waitlist, dashboard KPIs, public booking, password change, or `/api/health`. Missing values must not take down the OS.
+`scripts/setup-dev-env.sh` writes `Temara_Dashboard/.env.local` when missing:
 
-### `BASEROW_*` (deprecated)
+```text
+DATABASE_URL=postgres://dentaflow:dentaflow@127.0.0.1:5432/dentaflow
+JWT_SECRET=<generated>
+CLINIC_ID=temara
+```
 
-| Variable | Status |
-| --- | --- |
-| `BASEROW_API_URL` | Deprecated — non-blocking. Waitlist/patients are PostgreSQL. |
-| `BASEROW_API_TOKEN` | Deprecated — non-blocking. |
-| `BASEROW_TABLE_ID` | Deprecated — non-blocking. |
-| `BASEROW_WAITLIST_TABLE_ID` | Deprecated — non-blocking. |
-| `BASEROW_WAITLIST_BROADCAST_TABLE_ID` | Deprecated — non-blocking. |
-| `BASEROW_LEADS_TABLE_ID` | Deprecated — non-blocking. |
+Seeded UI logins (scrypt hashes live in `staff_users`, not in env):
 
-### `N8N_WEBHOOK_*` and n8n auth (deprecated)
+- Médecin: `docteur` / `dentaflow` (alias `doctor`)
+- Assistant(e): `assistante` / `dentaflow` (alias `assistant`)
 
-| Variable | Status |
-| --- | --- |
-| `N8N_WEBHOOK_URL` | Deprecated — non-blocking. |
-| `N8N_WEBHOOK_DASHBOARD` | Deprecated — non-blocking. KPIs come from `/api/dashboard-data` SQL. |
-| `N8N_WEBHOOK_ROSTER` | Deprecated — non-blocking. Roster is `/api/roster` SQL. |
-| `N8N_WEBHOOK_UPDATE_STATUS` | Deprecated — non-blocking. |
-| `N8N_WEBHOOK_DELAY_ALERT` | Deprecated — non-blocking. |
-| `N8N_WEBHOOK_FILL_GAP` | Deprecated — non-blocking (optional fan-out only). |
-| `N8N_WEBHOOK_BULK_SMS` | Deprecated — non-blocking. |
-| `N8N_WEBHOOK_GET_NOTES` | Deprecated — non-blocking. Notes are PostgreSQL. |
-| `N8N_WEBHOOK_POST_NOTE` | Deprecated — non-blocking. |
-| `N8N_WEBHOOK_LEAD_CAPTURE` | Deprecated — non-blocking. |
-| `N8N_WEBHOOK_ASSISTANT_PROXY` | Deprecated — non-blocking. |
-| `N8N_WAITLIST_WEBHOOK` | Deprecated — non-blocking. Waitlist is PostgreSQL. |
-| `N8N_AUTH_KEY` | Deprecated — non-blocking. |
-| `N8N_AGENCY_AUTH_KEY` | Deprecated — non-blocking. |
-| `DASHBOARD_AUTH_KEY` | Deprecated — non-blocking. |
-| `DASHBOARD_AUTH_KEY_SHA256` | Deprecated — non-blocking. |
+---
 
-### Env-based staff hashes (deprecated)
+## Fully deprecated (do not set, do not restore)
+
+These names may still exist in an old Vercel project. They are **not** read by live roster, waitlist, notes, fill-gap, bulk-sms audit, KPIs, public booking, auth, or health. Missing values must not take down the OS. Remove them when convenient.
+
+### Baserow — fully deprecated
 
 | Variable | Status |
 | --- | --- |
-| `DOCTOR_USERNAME` / `DOCTOR_PASSWORD_HASH` | Deprecated — login uses `staff_users`. |
-| `ASSISTANT_USERNAME` / `ASSISTANT_PASSWORD_HASH` | Deprecated — login uses `staff_users`. |
+| `BASEROW_API_URL` | Fully deprecated. Patients/waitlist are PostgreSQL. |
+| `BASEROW_API_TOKEN` | Fully deprecated. |
+| `BASEROW_TABLE_ID` | Fully deprecated. |
+| `BASEROW_WAITLIST_TABLE_ID` | Fully deprecated. |
+| `BASEROW_WAITLIST_BROADCAST_TABLE_ID` | Fully deprecated. |
+| `BASEROW_LEADS_TABLE_ID` | Fully deprecated. |
+
+### ngrok / n8n tunnels — fully deprecated
+
+| Variable | Status |
+| --- | --- |
+| `N8N_WEBHOOK_URL` and all `N8N_WEBHOOK_*` | Fully deprecated. No live handler proxies n8n. |
+| `N8N_WAITLIST_WEBHOOK` | Fully deprecated. |
+| `N8N_AUTH_KEY` / `N8N_AGENCY_AUTH_KEY` | Fully deprecated. |
+| `DASHBOARD_AUTH_KEY` / `DASHBOARD_AUTH_KEY_SHA256` | Fully deprecated. |
+| Any ngrok `*.ngrok-free.app` / `*.ngrok.io` URL | Fully deprecated. |
+
+### Other leftovers
+
+| Variable | Status |
+| --- | --- |
+| `DOCTOR_USERNAME` / `DOCTOR_PASSWORD_HASH` | Deprecated. Login uses `staff_users`. |
+| `ASSISTANT_USERNAME` / `ASSISTANT_PASSWORD_HASH` | Deprecated. |
 | `DOCTOR_PIN` / `ASSISTANT_PIN` | Deprecated prototype. |
-
-### Other leftover names
-
-| Variable | Status |
-| --- | --- |
-| `CAL_WEBHOOK_SECRET` | Alias leftover; prefer `CALCOM_WEBHOOK_SECRET`. |
-| `CALCOM_API_KEY` / `CALCOM_EVENT_TYPE_ID` | n8n-era; event type now lives on `clinics`. |
-| Direct `POSTGRES_*` besides `DATABASE_URL` | Unused. |
+| `CAL_WEBHOOK_SECRET` | Use `CALCOM_WEBHOOK_SECRET`. |
+| `CALCOM_API_KEY` / `CALCOM_EVENT_TYPE_ID` | Event type lives on `clinics`. |
+| `POSTGRES_HOST` / `POSTGRES_PASSWORD` (besides `DATABASE_URL`) | Unused. |
 
 ---
 
 ## Environment matrix
 
-| Concern | Development | Production |
+| Variable | Development | Production |
 | --- | --- | --- |
-| `DATABASE_URL` | Local Postgres `:5432` | Supabase pooler `:6543` |
-| `JWT_SECRET` | Dev secret (≥ 32 chars) | Unique production secret |
+| `DATABASE_URL` | Local `:5432` or pooler `:6543` | Supabase pooler `:6543` |
+| `JWT_SECRET` | Generated local secret | Unique production secret |
+| `CLINIC_ID` | `temara` | Default slug only |
 | `CALCOM_WEBHOOK_SECRET` | Optional | Set, HMAC on |
-| Upstash Redis | Optional | Optional (login limiter) |
-| `BASEROW_*` / `N8N_WEBHOOK_*` | Ignore | Ignore (non-blocking) |
-| Frontend | `scripts/dev-server.js` | Vercel |
+| `UPSTASH_REDIS_REST_URL` / `TOKEN` | Optional | Optional login limiter |
+| Baserow / ngrok / n8n | Ignore | Ignore / delete |
 
 ---
 
 ## Security checklist
 
-- [x] `DATABASE_URL` is server-only (Vercel env / `.env.local`)
-- [x] `JWT_SECRET` signs httpOnly `dentaflow_session` (not sessionStorage as the credential)
-- [x] `/api/health` does not echo URLs or pool stats
-- [x] `BASEROW_*` and `N8N_WEBHOOK_*` marked deprecated / non-blocking
-- [x] Settings passwords are not stored in `localStorage`
+- [ ] `DATABASE_URL` is server-only (Vercel env / `.env.local`)
+- [ ] `JWT_SECRET` is unique per environment and ≥ 32 characters
+- [ ] `/api/health` does not echo URLs or pool stats
+- [ ] `CALCOM_WEBHOOK_SECRET` is set in production
+- [ ] Baserow, ngrok, and `N8N_*` keys are removed from Vercel when possible
+- [ ] `.env.local` is gitignored
 
 ---
 

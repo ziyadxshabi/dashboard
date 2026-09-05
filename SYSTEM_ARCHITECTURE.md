@@ -1,274 +1,257 @@
 # DentaFlow OS — System Architecture
 
 > **Classification:** Internal developer reference
-> **Scope:** Multi-clinic booking, operations, messaging, and staff auth
-> **Last aligned to codebase:** production dashboard (`Temara_Dashboard`), Supabase PostgreSQL, Vercel serverless APIs
+> **Runtime:** Supabase PostgreSQL + Vercel serverless (`Temara_Dashboard`)
+> **Last aligned to codebase:** 2026-09-05
+
+This document describes the **active** production architecture. Baserow, Google Sheets, ngrok, and n8n proxies are not sources of truth and are not part of the runtime path.
 
 ---
 
-## 1. System Overview & Core Philosophy
+## 1. System overview
 
-### 1.1 Single Source of Truth (SSOT)
+DentaFlow OS is a **multi-tenant clinic operating system** for dental practices.
 
-DentaFlow OS is a **multi-tenant clinic operating system**. One PostgreSQL database (Supabase) holds every durable operational fact. Tenant isolation is enforced by `clinic_id` foreign keys on every operational table — never by separate databases per clinic.
+- **One PostgreSQL database** (Supabase) stores every durable operational fact.
+- **One Vercel project** (`Temara_Dashboard`) serves the staff UI, the public booking portal, and Node serverless APIs.
+- **Tenant isolation** is `clinic_id` on every child row — never a database per clinic.
+- **Cal.com** is the patient-facing calendar. Inbound webhooks write `bookings`.
 
-| Domain | Authoritative store | Consumers |
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Staff browser  GET /          Public patient  GET /book/:slug          │
+│  Doctor + assistant shells     book.html + book.js (no JWT)             │
+│  Role-gated from one origin    Cal.com embed after clinic hydration     │
+└──────────────┬───────────────────────────────┬──────────────────────────┘
+               │ cookie JWT                    │ public JSON
+               ▼                               ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Vercel — Temara_Dashboard (static + serverless /api/*)                 │
+│                                                                         │
+│  Auth     POST /api/auth   GET|POST /api/auth/me   POST /api/auth/logout│
+│  Ops      GET /api/roster  PATCH status  GET|POST /api/waitlist         │
+│           POST /api/fill-gap  POST /api/bulk-sms  GET|POST /api/team-notes│
+│           GET /api/dashboard-data                                       │
+│  Public   GET /api/public/clinic/:slug   GET /api/health                │
+│  Ingest   POST /api/webhooks/cal                                        │
+└──────────────┬───────────────────────────────┬──────────────────────────┘
+               │ DATABASE_URL :6543            │ HMAC optional
+               ▼                               ▼
+        Supabase PostgreSQL                 Cal.com
+        clinics, staff_users,               BOOKING_CREATED
+        bookings, waitlist,                 BOOKING_RESCHEDULED
+        team_notes, sms_dispatch_log        BOOKING_CANCELLED
+```
+
+**Rules:**
+
+- Do not treat Baserow, Google Sheets, or n8n as SSOT.
+- Do not query across clinics. Bind `clinic_id` from the JWT (or `clinics.slug` on public routes).
+- Do not store JWTs in `localStorage`. The credential is httpOnly `dentaflow_session`.
+- Do not return `DATABASE_URL`, pool stats, Twilio numbers, password hashes, or clinic UUIDs from public handlers.
+
+---
+
+## 2. Surfaces
+
+### 2.1 Unified role-gated UI — `GET /`
+
+Staff use a **single origin** (`index.html` + `auth.js`). After `POST /api/auth`:
+
+| Role | Shell | Client |
 | --- | --- | --- |
-| Clinic identity, branding, Cal.com event type | **PostgreSQL `clinics`** | Public booking portal, staff JWT (`slug`, `clinic_id`) |
-| Staff credentials | **PostgreSQL `staff_users`** | `POST /api/auth`, password rotation |
-| Appointments / day roster | **PostgreSQL `bookings`** (synced from Cal.com) | `/api/roster`, `/api/dashboard-data`, `/api/update-status` |
-| Waitlist | **PostgreSQL `waitlist`** | `/api/waitlist`, `/api/fill-gap`, `/api/lead-capture` |
-| Team notes | **PostgreSQL `team_notes`** | `/api/team-notes` |
-| Calendar of record (patient-facing slots) | **Cal.com** | Public embed on `/book/:slug`; inbound webhook writes `bookings` |
-| Ephemeral rate limits | **Redis** (Upstash REST, optional) | Login throttling in `auth-crypto.js` |
-| Staff session identity | **httpOnly JWT cookie `dentaflow_session`** | All authenticated `/api/*` handlers |
+| `doctor` | Doctor dashboard in `index.html` | `dashboard_app.js` |
+| `assistant` | `assistant-shell.html` (loaded into the same page) | `app.js` |
 
-**Rules of engagement:**
+`GET /api/auth/me` hydrates `{ user, clinic }` (name, `theme_preset`, `theme_tokens`). HTTP 401 is session death (`DentaFlowAuth.logout`), never an empty “degraded” clinic.
 
-- Do **not** treat Baserow, Google Sheets, or n8n static data as SSOT. Those prototype paths are deprecated.
-- Do **not** query across clinics. Every operational `SELECT`/`INSERT`/`UPDATE` binds `clinic_id` from the JWT (or from `clinics.slug` on public routes).
-- Do **not** store JWTs in `localStorage`. The only session credential is the httpOnly `dentaflow_session` cookie.
-- Do **not** return database URLs, pool stats, or credentials from `/api/health` or any public handler.
+The PIN-era assistant app lives in `_attic/Temara_Assistant_Dashboard/` and is **not deployed**.
 
-### 1.2 Core objectives
+### 2.2 Public patient booking — `GET /book/:slug`
 
-1. **Multi-clinic tenancy** — one Supabase project, many rows in `clinics`, isolation via `clinic_id`.
-2. **Zero-friction public booking** — `/book/:slug` is themed from `/api/public/clinic/:slug` and embeds Cal.com.
-3. **Staff operations on Postgres** — roster, waitlist, KPIs, notes, and status updates read/write PostgreSQL through Vercel serverless functions.
-4. **Cal.com as the patient calendar** — bookings enter the OS through `POST /api/webhooks/cal` into `bookings`.
+`Temara_Dashboard/vercel.json` rewrites `/book` and `/book/:slug` to `book.html`.
+
+1. `book.js` extracts the slug (`/book/temara` → `temara`, default `temara`).
+2. `GET /api/public/clinic/:slug` returns name, phone, theme, `calEmbedUrl` — **no clinic UUID, no Twilio, no hashes**.
+3. The page title, header, and CSS tokens update; Cal.com mounts from `cal_embed_url` or `cal_event_type_id`.
+
+Patients never write `bookings` from this page. Cal.com does; `/api/webhooks/cal` ingests.
 
 ---
 
-## 2. Infrastructure & Component Stack
+## 3. Multi-tenant data model
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Clients                                                                 │
-│  • Doctor shell (index.html)                                             │
-│  • Assistant shell (assistant-shell.html)                                │
-│  • Public booking portal (/book/:slug → book.html)                       │
-└───────────────┬───────────────────────────────┬──────────────────────────┘
-                │ HTTPS + cookie JWT            │ no auth
-                ▼                               ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Vercel — Temara_Dashboard                                               │
-│  Static UI + serverless /api/*                                           │
-│  /api/auth  /api/roster  /api/waitlist  /api/dashboard-data              │
-│  /api/public/clinic/:slug  /api/webhooks/cal  /api/health                │
-└───────────────┬───────────────────────────────┬──────────────────────────┘
-                │ DATABASE_URL (pooler :6543)   │ Cal.com embed + webhook
-                ▼                               ▼
-         Supabase PostgreSQL              Cal.com (calendar)
-         clinics, staff_users,            HMAC optional
-         bookings, waitlist,              CALCOM_WEBHOOK_SECRET
-         team_notes
-```
+Canonical SQL: `supabase/schema.sql`. Access: `Temara_Dashboard/api/_lib/db.js` (`pg` Pool, parameterized queries only).
 
-### 2.1 Frontend — Vercel static clinic OS
+**Tenant key:** `clinics.id` (UUID). Child tables use `clinic_id … ON DELETE CASCADE`.
 
-- **Host:** Vercel (static assets + Node serverless functions under `Temara_Dashboard/api/`).
-- **Staff surfaces:**
-  - **Doctor** — `index.html` + `dashboard_app.js`
-  - **Assistant** — `assistant-shell.html` + `app.js`
-- **Public surface:** `/book/:slug` rewrites to `book.html` + `book.js` (no JWT).
-- **Auth client:** `auth.js` (`window.DentaFlowAuth`) posts to `/api/auth` with `credentials: 'include'`. The JWT is **not** a Bearer token the UI stores; it is set as `dentaflow_session` (httpOnly, Secure, SameSite=Lax).
-- **Password rotation:** settings form in `shared.js` posts to `/api/auth/password`.
-- **Frontend never holds database or Twilio secrets** — privileged work stays in `/api/*`.
-
-### 2.2 API — Vercel serverless on PostgreSQL
-
-Operational handlers in `Temara_Dashboard/api/` use `api/_lib/db.js` (`pg` Pool, `DATABASE_URL`) and `requireClinicSession` from `api/_lib/validation.js`. Clinic scope is always `session.clinic_id`.
-
-| Route | Role |
+| Table | Role |
 | --- | --- |
-| `POST /api/auth` | Login against `staff_users` + `clinics.slug` |
-| `GET`/`POST /api/auth/me` | Session probe + clinic theme hydration |
-| `POST /api/auth/logout` | Clear `dentaflow_session` |
-| `POST /api/auth/password` | scrypt rotate `staff_users.password_hash` |
-| `GET /api/roster` | Today's `bookings` for the clinic |
-| `GET`/`POST /api/waitlist` | Clinic waitlist |
-| `POST /api/fill-gap` | Waitlist candidates + optional `bookings` insert |
-| `POST /api/bulk-sms` | `sms_dispatch_log` audit (no n8n) |
-| `GET /api/dashboard-data` | KPI aggregations on today's `bookings` |
-| `GET /api/public/clinic/:slug` | Public theme + Cal.com event type (no secrets) |
-| `POST /api/webhooks/cal` | Cal.com → `bookings` upsert/cancel |
-| `GET /api/health` | `SELECT 1` liveness, sanitized JSON |
+| `clinics` | Slug, display name, phone, `theme_preset`, `theme_tokens`, Cal.com event type, SMS booking URL |
+| `staff_users` | Per-clinic unique `username`, scrypt `password_hash`, role `doctor` \| `assistant`, `display_name` |
+| `bookings` | Appointments (`cal_booking_uid`, patient, `appointment_status`, `starts_at`) |
+| `waitlist` | Active / filled candidates, `waitlist_priority` |
+| `team_notes` | Clinic-scoped notes (`author_name` / `content`, `pinned`, `category`) |
+| `sms_dispatch_log` | Bulk SMS audit rows (message, recipient count, JSON recipients) |
 
-Remaining `N8N_WEBHOOK_*` proxies (`/api/n8n-proxy`, `/api/n8n-delay-alert`, …) are **legacy bridges**. Fill-gap and bulk-sms are Postgres-backed.
+Enums:
 
-### 2.3 Primary database — Supabase PostgreSQL
+- `appointment_status`: `Confirme`, `En attente`, `En salle d'attente`, `En soin`, `Termine`, `No-show`, `Annule`
+- `waitlist_priority`: `Faible`, `Moyenne`, `Haute`, `Urgent`
+- `staff_role`: `doctor`, `assistant`
 
-- **One database, many clinics.** Production `DATABASE_URL` is the Supabase **transaction pooler (port 6543)**.
-- **Tenant key:** `clinics.id` (UUID). Child tables (`staff_users`, `bookings`, `waitlist`, `team_notes`) reference `clinic_id` with `ON DELETE CASCADE`.
-- **Staff:** `staff_users.username` is unique per clinic. Roles are `doctor` \| `assistant`. Passwords are scrypt hashes (`scrypt$<salt>$<derived>`).
-- **Access:** parameterized SQL only (`query(text, params)`). No string-concatenated identifiers.
-
-### 2.4 Caching / locking — Redis (optional)
-
-Redis is **not** the session store and **not** the patient database. When configured, Upstash REST is used only for login rate limiting (`auth-crypto.js`). If Redis is absent, login rate limiting fails open.
+Seed clinic slug: `temara` (Clinique Dentaire Témara Mall). Seed usernames in SQL: `docteur`, `assistante` (login also accepts `doctor` / `assistant`).
 
 ---
 
-## 3. Data Flows & External Services
+## 4. Vercel serverless APIs
 
-### 3.1 Authentication flow
+Handlers under `Temara_Dashboard/api/` (Hobby cap 12 functions). `_lib/` and `_archive/` are not deployed as routes.
+
+| Route | Auth | Store |
+| --- | --- | --- |
+| `POST /api/auth` | Public | `staff_users` ⋈ `clinics` |
+| `GET` / `POST /api/auth/me` | Cookie | Staff + clinic hydration |
+| `POST /api/auth/logout` | Cookie | Expire `dentaflow_session` |
+| `POST /api/auth/password` | Cookie | Rotate `password_hash` |
+| `GET /api/roster` | Cookie | Today's `bookings` (`Africa/Casablanca`) |
+| `POST /api/update-status` / `PATCH /api/roster` | Cookie | Direct `bookings.status` update |
+| `GET` / `POST /api/waitlist` | Cookie | `waitlist` |
+| `POST /api/fill-gap` | Cookie | Waitlist candidates; optional `bookings` insert |
+| `POST /api/bulk-sms` | Cookie | `sms_dispatch_log` (no n8n) |
+| `GET` / `POST /api/team-notes` | Cookie | `team_notes` |
+| `GET /api/dashboard-data` | Cookie | KPI aggregations on `bookings` |
+| `GET /api/public/clinic/:slug` | None | Public clinic branding |
+| `POST /api/webhooks/cal` | HMAC optional | Cal.com → `bookings` |
+| `GET /api/health` | None | `SELECT 1` — `{ ok, status, database, timestamp }` only |
+
+Clinic scope for staff routes: `requireClinicSession` → `session.clinic_id`.
+
+---
+
+## 5. Authentication
+
+### 5.1 Password verification (scrypt)
+
+Stored as `scrypt$<salt-b64>$<derived-b64>` (`api/_lib/auth-crypto.js`). Login and password change use `verifyPassword` / `hashPassword` (timing-safe compare). Env hashes (`DOCTOR_PASSWORD_HASH`, …) are **not** used.
+
+### 5.2 Session cookie
 
 ```
 Browser  POST /api/auth  { username, password, slug? }
     │
     ▼
-staff_users ⋈ clinics  WHERE lower(username)=lower($1) AND clinics.slug=$2
-    │
-    ├─ verifyPassword(password, password_hash)   // scrypt, timing-safe
-    ├─ signJwt({ sub, role, clinic_id, slug })   // HS256, JWT_SECRET
-    └─ Set-Cookie: dentaflow_session=<jwt>; HttpOnly; Secure; SameSite=Lax
+staff_users ⋈ clinics
+    ├─ bilingual username aliases (see below)
+    ├─ verifyPassword  →  scrypt
+    ├─ signJwt({ sub, role, clinic_id, slug })  →  HS256, JWT_SECRET
+    └─ Set-Cookie: dentaflow_session=<jwt>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age≈8h
 ```
 
-JWT claims:
-
-| Claim | Meaning |
+| JWT claim | Meaning |
 | --- | --- |
-| `sub` | `staff_users.id` (UUID) |
-| `role` | `doctor` or `assistant` |
-| `clinic_id` | `clinics.id` (UUID) — **tenant scope for every subsequent query** |
+| `sub` | `staff_users.id` |
+| `role` | Canonical `doctor` or `assistant` |
+| `clinic_id` | `clinics.id` — tenant scope for every later query |
 | `slug` | `clinics.slug` (e.g. `temara`) |
 
-Protected handlers call `requireClinicSession(req, res)` which reads the cookie (not a required `Authorization` header), verifies the JWT, and returns `{ sub, role, clinic_id, slug }`.
+`GET /api/auth/me` re-reads staff + clinic and returns `{ ok, user, clinic }`. Logout expires `dentaflow_session` (and legacy `dentaflow_session_ast` if present).
 
-Password change (`POST /api/auth/password`) re-reads `password_hash` for `id = sub AND clinic_id = $clinic_id`, verifies the current password, hashes the new one with `hashPassword`, and updates that row only.
+### 5.3 Bilingual aliases
 
-### 3.2 Cal.com webhook → bookings
+Canonical DB roles remain `doctor` and `assistant`. Login accepts French and English usernames **and** role labels:
+
+| Input | Resolved username lookup | Canonical role |
+| --- | --- | --- |
+| `doctor` / `docteur` | `doctor`, `docteur` | `doctor` |
+| `assistant` / `assistante` | `assistant`, `assistante` | `assistant` |
+
+Seeded local password: `dentaflow` (see `scripts/setup-dev-env.sh` / handler tests).
+
+### 5.4 Optional Redis rate limit
+
+Login throttling uses Upstash REST (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`). If Redis is unset or down, limiting **fails open**. Redis is not the session store.
+
+---
+
+## 6. Direct PostgreSQL status updates
+
+`POST /api/update-status` and `PATCH /api/roster` (`api/_lib/update-booking-status.js`):
+
+- Require `dentaflow_session` (`doctor` or `assistant`).
+- Validate status codes (`confirme`, `en_attente`, `en_salle`, `en_soin`, `termine`, `no_show`, `annule`) and map to `appointment_status`.
+- `UPDATE bookings SET status = $1, updated_at = NOW() WHERE clinic_id = $2 AND (id = $3 OR cal_booking_uid = $3)`.
+- Cross-clinic IDs → 404. Invalid status → 400. `annule` also sets `triggerCalCancel: true` for the client.
+
+No n8n, Baserow, or Sheets write path.
+
+---
+
+## 7. Cal.com webhook synchronization
+
+`POST /api/webhooks/cal` (`Temara_Dashboard/api/webhooks/cal.js`):
 
 ```
-Cal.com (BOOKING_CREATED | BOOKING_RESCHEDULED | BOOKING_CANCELLED)
-    │  POST /api/webhooks/cal
+Cal.com  BOOKING_CREATED | BOOKING_RESCHEDULED | BOOKING_CANCELLED
     │  optional HMAC  X-Cal-Signature-256  + CALCOM_WEBHOOK_SECRET
     ▼
 Resolve clinic_id (event type / slug, fallback clinics.slug = 'temara')
     │
     ├─ CREATED     → INSERT bookings … ON CONFLICT (cal_booking_uid) DO UPDATE
-    ├─ RESCHEDULED → UPDATE bookings SET starts_at, duration_min
-    └─ CANCELLED   → UPDATE bookings SET status = 'Annule'
+    │                status Confirme
+    ├─ RESCHEDULED → UPDATE starts_at, status Confirme, updated_at
+    └─ CANCELLED   → UPDATE status Annule, updated_at
 ```
 
-The public portal does **not** write `bookings` directly. Patients book on Cal.com; the webhook is the ingest path.
-
-### 3.3 Public booking portal
-
-```
-GET /book/:slug          → book.html  (Vercel rewrite)
-GET /api/public/clinic/:slug
-    │
-    ▼
-clinics WHERE slug = $1
-    │  returns name, slug, phone, themePreset, themeTokens, calEventTypeId, calEmbedUrl
-    │  never returns clinic UUID, DATABASE_URL, Twilio numbers, or hashes
-    ▼
-book.js hydrates title/header from clinic.name, applies theme_tokens, embeds cal_embed_url
-```
-
-### 3.4 Staff operational reads/writes
-
-All of the following filter or insert with `clinic_id` from the JWT:
-
-- Roster — today's `bookings` in `Africa/Casablanca`
-- Dashboard KPIs — counts by `appointment_status`
-- Waitlist — `waitlist` rows with `waitlist_priority` (`Faible` \| `Moyenne` \| `Haute` \| `Urgent`)
-- Fill-gap / lead-capture — waitlist candidates / intake
-- Team notes — `team_notes` scoped to the clinic
-- Status updates — `bookings.status` for the clinic
+When `CALCOM_WEBHOOK_SECRET` is set, unsigned payloads are rejected. When unset (local), unsigned payloads are accepted for development.
 
 ---
 
-## 4. Security & Authentication Architecture
+## 8. Security headers
 
-### 4.1 Cookie session (not Bearer-in-sessionStorage)
+`Temara_Dashboard/vercel.json`:
 
-- **Cookie name:** `dentaflow_session` (single cookie for both roles).
-- **Flags:** HttpOnly, Secure, SameSite=Lax, Path=/, Max-Age ≈ 8h.
-- **Logout:** `POST /api/auth/logout` expires `dentaflow_session` (and the legacy `dentaflow_session_ast` name if present).
-- Frontend `sessionStorage` may still remember **role for UI routing**; it is not the credential.
+- Global: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`
+- Public booking must allow Cal.com iframes (`app.cal.com`, `cal.com`)
 
-**Anti-cascade rule:** HTTP 401 from a protected API is session death (`DentaFlowAuth.logout`), never “Mode dégradé” empty clinic data.
-
-### 4.2 HTTP security headers (`Temara_Dashboard/vercel.json`)
-
-Global (`/(.*)`):
-
-- `X-Content-Type-Options: nosniff`
-- `X-XSS-Protection: 1; mode=block`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-- `X-Frame-Options: DENY` on staff surfaces (`/`, `/index.html`, `/assistant-shell.html`)
-- CSP allows Cal.com scripts/frames and Supabase `connect-src`; staff pages set `frame-ancestors 'none'`
-
-Public booking (`/book.html`, `/book/:slug`):
-
-- `X-Frame-Options: SAMEORIGIN` (overrides DENY so the Cal.com embed can run in-page)
-- CSP `frame-src 'self' https://app.cal.com https://cal.com`
-
-### 4.3 Health endpoint
-
-`GET /api/health` runs `query('SELECT 1')` and returns only `{ ok, status, database, timestamp }`. Non-GET → 405. Failures → 503 `degraded` / `disconnected`. No URLs, pool sizes, or error strings.
-
-### 4.4 Trust boundaries
-
-```
-Untrusted: Browser, public /book/:slug, Cal.com webhooks, /api/health
-Semi-trusted: Vercel serverless (holds DATABASE_URL + JWT_SECRET; validates cookie)
-SSOT: Supabase PostgreSQL (clinic-scoped rows)
-Calendar ingest: Cal.com → /api/webhooks/cal
-Optional: Upstash Redis (login rate limit only)
-```
+Trust boundaries: public `/book/:slug` and webhooks are untrusted; serverless holds `DATABASE_URL` and `JWT_SECRET`; PostgreSQL is SSOT.
 
 ---
 
-## 5. Deprecated prototype components
+## 9. Deprecated prototype components
 
-Moved to `_attic/` — **do not deploy**, do not point DNS here:
+Do **not** deploy, restore as SSOT, or document as the live stack:
 
-| Path | Why retired |
+| Item | Status |
 | --- | --- |
-| `_attic/Temara_Assistant_Dashboard/` | PIN-era assistant console; separate app that talked to n8n/ngrok |
-| `_attic/README.md` | Notes that this tree is not a Vercel project |
+| `_attic/Temara_Assistant_Dashboard/` | PIN-era n8n/ngrok assistant console |
+| `Temara_Dashboard/api/_archive/` | Old n8n proxies (`n8n-proxy`, `bulk-sms` webhook, …) |
+| Baserow REST + Google Sheets “Calculs” | Prototype waitlist / KPI path |
+| `N8N_WEBHOOK_*`, `N8N_AUTH_KEY`, ngrok URLs | Deprecated |
+| Env `DOCTOR_PASSWORD_HASH` / PIN logins | Replaced by `staff_users` |
+| JWT in `sessionStorage` as the access token | Replaced by httpOnly cookie |
 
-**Deprecated references (non-blocking, do not restore as SSOT):**
-
-- `BASEROW_*` — old waitlist/patient REST API
-- `N8N_WEBHOOK_*` / `N8N_AUTH_KEY` — dashboard used to proxy every mutation through n8n
-- Google Sheets “Calculs” KPI path
-- `DOCTOR_PASSWORD_HASH` / `ASSISTANT_PASSWORD_HASH` env logins — replaced by `staff_users.password_hash`
-- JWT in `sessionStorage` as the access token — replaced by httpOnly `dentaflow_session`
-- Settings passwords in `localStorage` (`df_pwd_doc` / `df_pwd_asst`)
-
-Live environment variable policy is in `ENV_LEDGER.md`.
+Environment policy: `ENV_LEDGER.md`.
 
 ---
 
-## Appendix A — Key repository paths
+## Appendix — Key paths
 
 | Path | Role |
 | --- | --- |
-| `Temara_Dashboard/` | Production clinic UI + Vercel APIs |
-| `Temara_Dashboard/api/_lib/db.js` | `pg` pool, `DATABASE_URL` |
-| `Temara_Dashboard/api/_lib/auth-crypto.js` | scrypt, JWT, cookie, optional Redis limiter |
-| `Temara_Dashboard/api/_lib/validation.js` | `requireClinicSession`, API errors |
-| `Temara_Dashboard/api/auth.js` | Login / me / logout / password routing |
-| `Temara_Dashboard/api/webhooks/cal.js` | Cal.com → `bookings` |
-| `Temara_Dashboard/api/public/clinic.js` | Public tenant branding |
-| `Temara_Dashboard/api/health.js` | Sanitized DB probe |
-| `Temara_Dashboard/vercel.json` | Rewrites + security headers / CSP |
-| `Temara_Dashboard/book.html` / `book.js` | Public Cal.com portal |
-| `_attic/` | Deprecated prototypes |
+| `Temara_Dashboard/` | Production UI + Vercel APIs (set as Vercel Root Directory) |
+| `Temara_Dashboard/api/_lib/db.js` | `pg` pool |
+| `Temara_Dashboard/api/_lib/auth-crypto.js` | scrypt, JWT, cookie, optional Redis |
+| `Temara_Dashboard/api/_lib/validation.js` | `requireClinicSession`, validators |
+| `Temara_Dashboard/api/auth.js` | Login / me / logout / password |
+| `Temara_Dashboard/api/webhooks/cal.js` | Cal.com ingest |
+| `Temara_Dashboard/api/public/clinic/[slug].js` | Public branding |
+| `supabase/schema.sql` | Canonical schema + Temara seed |
+| `scripts/dev-server.js` | Local Vercel-like server |
+| `scripts/test-handlers-direct.js` | `npm test` |
+| `_attic/` | Retired prototypes |
 
-## Appendix B — Operational invariants
-
-1. **Tenant isolation = `clinic_id` on every operational row.**
-2. **Staff auth = `staff_users` + scrypt + `dentaflow_session`.**
-3. **Calendar ingest = Cal.com webhook → `bookings`.**
-4. **Public portal = `/book/:slug` + `/api/public/clinic/:slug` (no JWT, no secrets).**
-5. **401 = logout**, never a degraded empty dashboard.
-6. **Secrets never in static JS** and never in `/api/health`.
+**Invariants:** tenant isolation = `clinic_id`; staff auth = scrypt + `dentaflow_session`; calendar ingest = Cal.com webhook; public portal never sees secrets; 401 = logout.
 
 ---
 

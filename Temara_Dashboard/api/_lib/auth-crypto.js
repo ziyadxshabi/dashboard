@@ -99,18 +99,22 @@ function getClientFingerprint(req) {
 }
 
 function redisBaseUrl() {
-  return String(process.env.REDIS_CONNECTION_URL || '').replace(/\/+$/, '');
+  return String(
+    process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_CONNECTION_URL || ''
+  ).replace(/\/+$/, '');
 }
 
 function redisHeaders() {
-  const token = String(process.env.REDIS_REST_TOKEN || '').trim();
+  const token = String(
+    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.REDIS_REST_TOKEN || ''
+  ).trim();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function redisPost(path) {
   const base = redisBaseUrl();
   if (!base) {
-    throw new Error('REDIS_CONNECTION_URL missing');
+    throw new Error('UPSTASH_REDIS_REST_URL missing');
   }
 
   const controller = new AbortController();

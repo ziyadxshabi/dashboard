@@ -4,5 +4,9 @@
   "private": true,
   "dependencies": {
     "pg": "^8.13.1"
+  },
+  "scripts": {
+    "test": "node ../scripts/test-handlers-direct.js",
+    "smoke": "node ../scripts/smoke-test.js"
   }
 }
