@@ -1,5 +1,7 @@
 /**
- * Public patient booking portal — loads clinic theme + Cal.com embed.
+ * Public patient booking portal — isolated from staff dashboard runtime.
+ * Consumes ONLY /api/public/clinic/:slug and the Cal.com embed. Never loads
+ * app.js, shared.js, auth cookies, or dashboard chrome.
  */
 (function () {
   'use strict';
@@ -160,7 +162,7 @@
     try {
       const response = await fetch(`/api/public/clinic/${encodeURIComponent(slug)}`, {
         headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
+        credentials: 'omit',
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload || payload.ok === false || !payload.clinic) {
