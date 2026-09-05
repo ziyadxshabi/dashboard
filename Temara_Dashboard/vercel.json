@@ -4,6 +4,7 @@
     { "source": "/api/auth/me", "destination": "/api/auth?action=me" },
     { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" },
     { "source": "/api/auth/password", "destination": "/api/auth?action=password" },
+    { "source": "/api/update-status", "destination": "/api/roster?action=status" },
     { "source": "/book/:slug", "destination": "/book.html" },
     { "source": "/book", "destination": "/book.html" }
   ],

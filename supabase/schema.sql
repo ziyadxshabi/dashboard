@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   starts_at       TIMESTAMPTZ NOT NULL,
   duration_min    INT DEFAULT 30,
   notes           TEXT,
-  created_at      TIMESTAMPTZ DEFAULT now()
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS waitlist (

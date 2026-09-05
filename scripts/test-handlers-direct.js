@@ -49,8 +49,9 @@ const handleRoster = require(path.join(DASHBOARD, 'api/roster.js'));
 const handleWaitlist = require(path.join(DASHBOARD, 'api/waitlist.js'));
 const handleDashboard = require(path.join(DASHBOARD, 'api/dashboard-data.js'));
 const handlePublicClinic = require(path.join(DASHBOARD, 'api/public/clinic/[slug].js'));
+const handleUpdateStatus = require(path.join(DASHBOARD, 'api/update-status.js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
-const { hashPassword, verifyPassword } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
+const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 
 const CLINIC_SLUG = 'temara';
 const SEED_PASSWORD = 'dentaflow';
@@ -226,6 +227,109 @@ async function run() {
   ok('GET /api/roster authenticated returns 200', roster.statusCode === 200, `status=${roster.statusCode}`);
   ok('GET /api/roster ok:true', roster.body?.ok === true);
   ok('GET /api/roster data is an array', Array.isArray(roster.body?.data));
+
+  // ── Status updates (Postgres bookings) ─────────────────────────────────
+  console.log('\n[update-status]');
+  await query(
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`
+  );
+
+  const clinicRow = await query('SELECT id FROM clinics WHERE slug = $1 LIMIT 1', [CLINIC_SLUG]);
+  const clinicId = clinicRow.rows[0]?.id;
+  ok('temara clinic id is available for status tests', Boolean(clinicId));
+
+  let statusBookingId = null;
+  try {
+    const inserted = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status, starts_at, duration_min
+       ) VALUES ($1, $2, $3, $4, 'Confirme'::appointment_status, NOW(), 30)
+       RETURNING id`,
+      [clinicId, 'Patient Test R13 Status', '0612345678', 'Controle']
+    );
+    statusBookingId = inserted.rows[0]?.id;
+    ok('inserted clinic-scoped test booking', Boolean(statusBookingId));
+
+    async function postStatus(status, headers = assistantCookie) {
+      return invoke(
+        handleUpdateStatus,
+        createReq({
+          method: 'POST',
+          url: '/api/update-status',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: { bookingId: statusBookingId, newStatus: status },
+        })
+      );
+    }
+
+    const toSalle = await postStatus('en_salle');
+    ok(
+      'POST /api/update-status en_salle returns 200',
+      toSalle.statusCode === 200,
+      `status=${toSalle.statusCode} body=${JSON.stringify(toSalle.body)}`
+    );
+    ok(
+      'en_salle writes En salle d\'attente',
+      toSalle.body?.data?.status === "En salle d'attente" && toSalle.body?.data?.statusCode === 'en_salle'
+    );
+
+    const toSoin = await postStatus('En soin');
+    ok('POST /api/update-status French "En soin" returns 200', toSoin.statusCode === 200);
+    ok(
+      'en_soin writes En soin',
+      toSoin.body?.data?.status === 'En soin' && toSoin.body?.data?.statusCode === 'en_soin'
+    );
+
+    const toTermine = await postStatus('termine');
+    ok('POST /api/update-status termine returns 200', toTermine.statusCode === 200);
+    ok('termine writes Termine', toTermine.body?.data?.status === 'Termine');
+
+    const toNoShow = await postStatus('no_show');
+    ok('POST /api/update-status no_show returns 200', toNoShow.statusCode === 200);
+    ok('no_show writes No-show', toNoShow.body?.data?.status === 'No-show');
+    ok('status update stamps updated_at', Boolean(toNoShow.body?.data?.updated_at));
+
+    const patchViaRoster = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { bookingId: statusBookingId, newStatus: 'confirme' },
+      })
+    );
+    ok('PATCH /api/roster confirme returns 200', patchViaRoster.statusCode === 200);
+    ok('PATCH /api/roster writes Confirme', patchViaRoster.body?.data?.status === 'Confirme');
+
+    const invalid = await postStatus('not-a-status');
+    ok('POST /api/update-status rejects invalid status with 400', invalid.statusCode === 400);
+    ok('invalid status uses VALIDATION_ERROR', invalid.body?.code === 'VALIDATION_ERROR');
+
+    const foreignToken = signJwt(
+      {
+        sub: '00000000-0000-4000-8000-000000000099',
+        role: 'assistant',
+        clinic_id: '00000000-0000-4000-8000-000000000001',
+        slug: 'other-clinic',
+      },
+      process.env.JWT_SECRET
+    );
+    const crossClinic = await postStatus('en_salle', { cookie: cookieHeader(foreignToken) });
+    ok(
+      'cross-clinic status mutation returns 403 or 404',
+      crossClinic.statusCode === 403 || crossClinic.statusCode === 404,
+      `status=${crossClinic.statusCode}`
+    );
+
+    const cancelled = await postStatus('Annulé');
+    ok('POST /api/update-status Annulé returns 200', cancelled.statusCode === 200);
+    ok('annule writes Annule', cancelled.body?.data?.status === 'Annule');
+    ok('annule sets triggerCalCancel', cancelled.body?.triggerCalCancel === true);
+  } finally {
+    if (statusBookingId) {
+      await query('DELETE FROM bookings WHERE id = $1', [statusBookingId]);
+    }
+  }
 
   // ── Waitlist GET + POST ────────────────────────────────────────────────
   console.log('\n[waitlist]');

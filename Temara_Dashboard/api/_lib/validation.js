@@ -8,6 +8,36 @@ const { getTokenFromRequest, verifyJwt } = require('./auth-crypto');
 const PHONE_RE = /^(\+212\s?|0)[5-7]\d{8}$/;
 const NAME_RE = /^[a-zA-ZÀ-ÿ\s\-']+$/;
 
+const BOOKING_STATUS_CODES = Object.freeze([
+  'confirme',
+  'en_attente',
+  'en_salle',
+  'en_soin',
+  'termine',
+  'no_show',
+  'annule',
+]);
+
+const STATUS_CODE_TO_DB = Object.freeze({
+  confirme: 'Confirme',
+  en_attente: 'En attente',
+  en_salle: "En salle d'attente",
+  en_soin: 'En soin',
+  termine: 'Termine',
+  no_show: 'No-show',
+  annule: 'Annule',
+});
+
+const STATUS_CODE_TO_UI = Object.freeze({
+  confirme: 'Confirmé',
+  en_attente: 'En attente',
+  en_salle: "En salle d'attente",
+  en_soin: 'En soin',
+  termine: 'Terminé',
+  no_show: 'No-show',
+  annule: 'Annulé',
+});
+
 const APPOINTMENT_STATUSES = Object.freeze([
   'Confirmé',
   'Confirme',
@@ -19,6 +49,7 @@ const APPOINTMENT_STATUSES = Object.freeze([
   'No-show',
   'Annulé',
   'Annule',
+  ...BOOKING_STATUS_CODES,
 ]);
 
 const WAITLIST_PRIORITIES = Object.freeze(['Faible', 'Moyenne', 'Haute', 'Urgent']);
@@ -59,29 +90,43 @@ function normalizeStatusKey(value) {
     .replace(/\u2019/g, "'");
 }
 
-function canonicalizeAppointmentStatus(raw) {
-  const key = normalizeStatusKey(raw);
+function resolveBookingStatus(raw) {
+  const key = normalizeStatusKey(raw)
+    .replace(/['’]/g, '')
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_');
   if (!key) return null;
 
   const aliases = {
-    confirme: 'Confirmé',
-    'en attente': 'En attente',
-    "en salle d'attente": "En salle d'attente",
-    'en salle dattente': "En salle d'attente",
-    'en soin': 'En soin',
-    termine: 'Terminé',
-    'no-show': 'No-show',
-    noshow: 'No-show',
-    annule: 'Annulé',
+    confirme: 'confirme',
+    en_attente: 'en_attente',
+    en_salle: 'en_salle',
+    en_salle_dattente: 'en_salle',
+    en_salle_d_attente: 'en_salle',
+    en_soin: 'en_soin',
+    termine: 'termine',
+    no_show: 'no_show',
+    noshow: 'no_show',
+    annule: 'annule',
   };
 
-  return aliases[key] || null;
+  const code = aliases[key];
+  if (!code || !STATUS_CODE_TO_DB[code]) return null;
+
+  return {
+    code,
+    dbStatus: STATUS_CODE_TO_DB[code],
+    uiStatus: STATUS_CODE_TO_UI[code],
+  };
+}
+
+function canonicalizeAppointmentStatus(raw) {
+  const resolved = resolveBookingStatus(raw);
+  return resolved ? resolved.uiStatus : null;
 }
 
 function isAllowedAppointmentStatus(raw) {
-  const value = String(raw || '').trim();
-  if (APPOINTMENT_STATUSES.includes(value)) return true;
-  return canonicalizeAppointmentStatus(value) != null;
+  return resolveBookingStatus(raw) != null;
 }
 
 function requireClinicSession(req, res, options = {}) {
@@ -312,12 +357,13 @@ function validateStatusUpdate(body = {}) {
     };
   }
 
-  if (!isAllowedAppointmentStatus(newStatus)) {
+  const resolved = resolveBookingStatus(newStatus);
+  if (!resolved) {
     return {
       ok: false,
       error: createApiError(
         'VALIDATION_ERROR',
-        `newStatus must be one of: ${APPOINTMENT_STATUSES.join(', ')}`
+        `newStatus must be one of: ${BOOKING_STATUS_CODES.join(', ')}`
       ),
     };
   }
@@ -326,13 +372,19 @@ function validateStatusUpdate(body = {}) {
     ok: true,
     value: {
       bookingId,
-      newStatus,
+      newStatus: resolved.uiStatus,
+      statusCode: resolved.code,
+      dbStatus: resolved.dbStatus,
+      uiStatus: resolved.uiStatus,
     },
   };
 }
 
 module.exports = {
   APPOINTMENT_STATUSES,
+  BOOKING_STATUS_CODES,
+  STATUS_CODE_TO_DB,
+  STATUS_CODE_TO_UI,
   WAITLIST_PRIORITIES,
   createApiError,
   requireClinicSession,
@@ -344,5 +396,6 @@ module.exports = {
   validateTeamNoteInput,
   validateFillGapInput,
   canonicalizeAppointmentStatus,
+  resolveBookingStatus,
   compactPhone,
 };

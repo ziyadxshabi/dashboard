@@ -7,6 +7,7 @@
 const { applyCors } = require('./_lib/auth-crypto');
 const { query } = require('./_lib/db');
 const { createApiError, requireClinicSession, sendDbError } = require('./_lib/validation');
+const handleStatusUpdate = require('./_lib/update-booking-status');
 
 const ROSTER_SQL = `
   SELECT id, cal_booking_uid, patient_name, patient_phone, treatment_name, status, starts_at, duration_min, notes
@@ -62,8 +63,19 @@ function mapRosterRow(row) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    applyCors(res, 'GET, OPTIONS');
+    applyCors(res, 'GET, POST, PATCH, OPTIONS');
     return res.status(204).end();
+  }
+
+  let action = '';
+  try {
+    action = new URL(String(req.url || ''), 'http://localhost').searchParams.get('action') || '';
+  } catch {
+    action = '';
+  }
+
+  if (req.method === 'PATCH' || (req.method === 'POST' && action === 'status')) {
+    return handleStatusUpdate(req, res);
   }
 
   applyCors(res, 'GET, OPTIONS');

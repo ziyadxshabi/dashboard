@@ -1,1 +1,3 @@
-This folder contains deprecated prototype applications (PIN-based assistant console, legacy Sheets integrations). Do not deploy to Vercel or point DNS records here.
+Archived legacy PIN-based assistant dashboard. Unified role-gated UI is located in Temara_Dashboard/.
+
+Do not deploy this folder to Vercel or point DNS records here.
