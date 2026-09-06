@@ -383,13 +383,230 @@ function buildApptCardHTML(appt) {
 
 /* ── FULLCALENDAR — DASHBOARD MANAGEMENT CALENDAR ───────────────────────── */
 let dashboardCalendar = null;
+let calendarChromeBound = false;
+let lastOverviewRoster = [];
+let affluencePeriod = 'today';
+
+const CAL_CHIP_TONES = ['sky', 'sage', 'lilac', 'peach', 'rose', 'mist'];
+
+function casablancaIsoDate(value) {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+}
+
+function casablancaDateTimeLocal(value) {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Casablanca',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(parsed).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  if (!parts.year || parts.hour == null) return '';
+  const pad = (value) => String(value || '').padStart(2, '0');
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`;
+}
+
+function hashTone(label) {
+  const raw = String(label || '').toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = (hash + raw.charCodeAt(i) * (i + 1)) % 997;
+  }
+  return CAL_CHIP_TONES[hash % CAL_CHIP_TONES.length];
+}
+
+function familyNameFromPatient(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Patient';
+  return parts[parts.length - 1];
+}
+
+function isCancelledStatus(status) {
+  return /annul/i.test(String(status || ''));
+}
+
+function calendarClinicName() {
+  const clinic = window.DentaFlowAuth?.getSessionClinic?.();
+  const fromSession = String(clinic?.name || '').trim();
+  if (fromSession) return fromSession;
+  const branded = doctorEl('calendar-os-clinic')?.textContent?.trim();
+  return branded || '';
+}
+
+function syncCalendarClinicLabel() {
+  const el = doctorEl('calendar-os-clinic');
+  if (!el) return;
+  const name = calendarClinicName();
+  if (name) el.textContent = name;
+}
+
+function updateCalendarTitle() {
+  const titleEl = doctorEl('calendar-os-title');
+  if (!titleEl || !dashboardCalendar) return;
+  const api = dashboardCalendar.view;
+  const raw = String(api?.title || '').trim();
+  titleEl.textContent = raw || 'Agenda';
+}
+
+function setCalendarViewButtons(viewType) {
+  doctorQueryAll('[data-cal-view]').forEach((btn) => {
+    const active = btn.getAttribute('data-cal-view') === viewType;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function closeCalendarInspector() {
+  const panel = doctorEl('calendar-inspector');
+  if (!panel) return;
+  panel.hidden = true;
+  doctorQueryAll('.fc-event.is-selected').forEach((el) => el.classList.remove('is-selected'));
+}
+
+function openCalendarInspector(event, eventEl) {
+  const panel = doctorEl('calendar-inspector');
+  if (!panel || !event) return;
+  const props = event.extendedProps || {};
+  const name = props.patientName || event.title || 'Patient';
+  const treatment = props.treatment || 'Consultation';
+  const phone = props.phone || '—';
+  const status = props.status || '';
+  const duration = Number(props.durationMin) || 0;
+  const start = event.start;
+  const timeLabel = start
+    ? start.toLocaleString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Africa/Casablanca',
+      })
+    : '';
+
+  const setTextSafe = (id, text) => {
+    const el = doctorEl(id);
+    if (el) el.textContent = text;
+  };
+
+  setTextSafe('cal-insp-time', timeLabel);
+  setTextSafe('cal-insp-name', name);
+  setTextSafe('cal-insp-status', status || '—');
+  setTextSafe('cal-insp-treatment', treatment);
+  setTextSafe('cal-insp-phone', phone || '—');
+  setTextSafe('cal-insp-duration', duration > 0 ? `${duration} min` : '—');
+
+  panel.hidden = false;
+  doctorQueryAll('.fc-event.is-selected').forEach((el) => el.classList.remove('is-selected'));
+  eventEl?.classList.add('is-selected');
+}
+
+function mapRosterRowToCalendarEvent(row) {
+  const startRaw = row.starts_at || row.startTime;
+  const start = startRaw ? new Date(startRaw) : null;
+  if (!start || Number.isNaN(start.getTime())) return null;
+  const duration = Number(row.duration_min) > 0 ? Number(row.duration_min) : 30;
+  const end = new Date(start.getTime() + duration * 60_000);
+  const patientName = row.patient_name || row.name || 'Patient';
+  const treatment = row.treatment_name || row.treatment || 'Consultation';
+  const cancelled = isCancelledStatus(row.status);
+  const tone = hashTone(treatment);
+  const startLocal = casablancaDateTimeLocal(start);
+  const endLocal = casablancaDateTimeLocal(end);
+  if (!startLocal || !endLocal) return null;
+  return {
+    id: String(row.id || ''),
+    title: familyNameFromPatient(patientName),
+    start: startLocal,
+    end: endLocal,
+    classNames: ['cal-chip', `cal-chip--${tone}`, cancelled ? 'is-cancelled' : ''].filter(Boolean),
+    extendedProps: {
+      patientName,
+      treatment,
+      phone: row.patient_phone || row.phone || '',
+      status: row.status || '',
+      durationMin: duration,
+      notes: row.notes || '',
+    },
+  };
+}
+
+async function fetchRosterRange(fromIso, toIso) {
+  const params = new URLSearchParams({ from: fromIso, to: toIso });
+  const response = await fetch(`${CONFIG.ROSTER_ENDPOINT}?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: getApiAuthHeaders({ Accept: 'application/json' }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  });
+  assertAuthorizedResponse(response);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  const unwrapped = unwrapRosterPayload(payload);
+  return parseRosterResponse(unwrapped);
+}
+
+function setCalendarEmptyState(isEmpty) {
+  const empty = doctorEl('calendar-os-empty');
+  if (!empty) return;
+  empty.hidden = !isEmpty;
+}
+
+function bindCalendarChrome() {
+  if (calendarChromeBound) return;
+  const stage = doctorQuery('.calendar-os-stage') || doctorEl('view-calendar');
+  if (!stage) return;
+  calendarChromeBound = true;
+
+  doctorQueryAll('[data-cal-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!dashboardCalendar) return;
+      const action = btn.getAttribute('data-cal-nav');
+      if (action === 'prev') dashboardCalendar.prev();
+      else if (action === 'next') dashboardCalendar.next();
+      else if (action === 'today') dashboardCalendar.today();
+    });
+  });
+
+  doctorQueryAll('[data-cal-view]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!dashboardCalendar) return;
+      const view = btn.getAttribute('data-cal-view');
+      if (!view) return;
+      dashboardCalendar.changeView(view);
+      setCalendarViewButtons(view);
+    });
+  });
+
+  doctorEl('calendar-inspector-close')?.addEventListener('click', closeCalendarInspector);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeCalendarInspector();
+  });
+}
 
 function initDashboardCalendar() {
   const el = doctorEl('dashboard-cal-inline');
   if (!el) return;
 
+  bindCalendarChrome();
+  syncCalendarClinicLabel();
+
   if (dashboardCalendar) {
-    requestAnimationFrame(() => dashboardCalendar.updateSize());
+    requestAnimationFrame(() => {
+      dashboardCalendar.updateSize();
+      updateCalendarTitle();
+    });
     return;
   }
 
@@ -402,28 +619,85 @@ function initDashboardCalendar() {
 
   dashboardCalendar = new FullCalendar.Calendar(el, {
     initialView: 'timeGridWeek',
-    headerToolbar: {
-      left:   'prev,next today',
-      center: 'title',
-      right:  'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
-    },
+    headerToolbar: false,
     locale: 'fr',
     firstDay: 1,
     height: 'auto',
     expandRows: true,
     slotMinTime: '08:00:00',
     slotMaxTime: '19:00:00',
+    scrollTime: '08:00:00',
     nowIndicator: true,
     allDaySlot: false,
-    events: [],
+    slotDuration: '00:30:00',
+    slotLabelInterval: '01:00:00',
+    slotEventOverlap: false,
+    displayEventTime: true,
+    displayEventEnd: false,
     eventTimeFormat: {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
     },
+    eventContent(arg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'cal-chip__inner';
+      if (arg.timeText) {
+        const time = document.createElement('span');
+        time.className = 'cal-chip__time';
+        time.textContent = arg.timeText;
+        wrap.appendChild(time);
+      }
+      const title = document.createElement('span');
+      title.className = 'cal-chip__title';
+      title.textContent = arg.event.title || '';
+      wrap.appendChild(title);
+      return { domNodes: [wrap] };
+    },
+    datesSet(info) {
+      updateCalendarTitle();
+      setCalendarViewButtons(info.view.type);
+      closeCalendarInspector();
+    },
+    events(info, successCallback, failureCallback) {
+      const fromIso = casablancaIsoDate(info.start);
+      const exclusiveEnd = new Date(info.end.getTime() - 1);
+      const toIso = casablancaIsoDate(exclusiveEnd);
+      if (!fromIso || !toIso) {
+        successCallback([]);
+        setCalendarEmptyState(true);
+        return;
+      }
+      fetchRosterRange(fromIso, toIso)
+        .then((rows) => {
+          const events = rows.map(mapRosterRowToCalendarEvent).filter(Boolean);
+          setCalendarEmptyState(events.length === 0);
+          successCallback(events);
+        })
+        .catch((err) => {
+          if (isUnauthorizedError(err)) return;
+          console.error('[Calendar] roster load failed:', err?.message || err);
+          setCalendarEmptyState(true);
+          failureCallback(err);
+        });
+    },
+    eventClick(info) {
+      info.jsEvent?.preventDefault();
+      openCalendarInspector(info.event, info.el);
+    },
+    eventDidMount(info) {
+      const name = info.event.extendedProps?.patientName || info.event.title;
+      const treatment = info.event.extendedProps?.treatment || '';
+      info.el.setAttribute('title', [name, treatment].filter(Boolean).join(' · '));
+    },
   });
 
   dashboardCalendar.render();
+  updateCalendarTitle();
+  setCalendarViewButtons('timeGridWeek');
+  if (typeof window.refreshLucideIcons === 'function') {
+    window.refreshLucideIcons(doctorEl('view-calendar') || document);
+  }
 }
 
 /* ── HERO GREETING & DATE ────────────────────────────────────────────────── */
@@ -594,6 +868,23 @@ function navigateToView(viewKey) {
 }
 
 /* ── CHART PERIOD TOGGLE ─────────────────────────────────────────────────── */
+function setAffluenceCopy(period) {
+  const title = doctorEl('affluence-chart-title');
+  const sub = doctorEl('affluence-chart-sub');
+  if (period === 'week') {
+    if (title) title.textContent = 'Affluence 7 jours';
+    if (sub) sub.textContent = 'Patients par jour — semaine glissante';
+    return;
+  }
+  if (period === 'month') {
+    if (title) title.textContent = 'Affluence mensuelle';
+    if (sub) sub.textContent = 'Patients par semaine — 4 dernières semaines';
+    return;
+  }
+  if (title) title.textContent = 'Affluence horaire';
+  if (sub) sub.textContent = "Patients par heure aujourd'hui";
+}
+
 function initChartToggles() {
   const toggle  = doctorEl('chart-toggle');
   const slider  = doctorEl('chart-toggle-slider');
@@ -604,6 +895,9 @@ function initChartToggles() {
     buttons.forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     slider.style.transform = `translateX(${index * 100}%)`;
+    affluencePeriod = btn.getAttribute('data-period') || 'today';
+    setAffluenceCopy(affluencePeriod);
+    if (lastChartData) renderHoursChart(lastChartData);
   }
 
   buttons.forEach((btn, index) => {
@@ -612,10 +906,49 @@ function initChartToggles() {
 }
 
 /* ── TODAY'S SCHEDULE FEED ───────────────────────────────────────────────── */
-function renderAppointmentsList() {
+function renderAppointmentsList(records) {
   const container = doctorEl('appointments-list');
   if (!container) return;
+
+  const rows = Array.isArray(records) ? records : lastOverviewRoster;
+  const upcoming = rows
+    .filter((row) => row && !isCancelledStatus(row.status))
+    .slice()
+    .sort(sortDoctorAppointmentsByTime);
+
   container.replaceChildren();
+
+  if (!upcoming.length) {
+    const empty = document.createElement('p');
+    empty.className = 'schedule-empty';
+    empty.textContent = "Aucun rendez-vous aujourd'hui.";
+    container.appendChild(empty);
+    hideSkeleton('roster');
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  upcoming.forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+  container.appendChild(fragment);
+  hideSkeleton('roster');
+}
+
+async function loadOverviewRoster() {
+  const response = await fetch(CONFIG.ROSTER_ENDPOINT, {
+    method: 'GET',
+    credentials: 'include',
+    headers: getApiAuthHeaders({ Accept: 'application/json' }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  });
+  assertAuthorizedResponse(response);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  const unwrapped = unwrapRosterPayload(payload);
+  lastOverviewRoster = parseRosterResponse(unwrapped)
+    .map(normalizeDoctorAppointment)
+    .filter(Boolean);
+  renderAppointmentsList(lastOverviewRoster);
 }
 
 function renderWaitlistPanel() {
@@ -1480,13 +1813,23 @@ async function loadDashboard(isSilentSync = false) {
       applySkeletonState();
     }
 
-    const response = await fetch(CONFIG.DATA_URL, {
-      method:  'GET',
-      credentials: 'include',
-      headers: getApiAuthHeaders(),
-      cache:   'no-store',
-      signal:  AbortSignal.timeout(10_000),
-    });
+    const [response, rosterResult] = await Promise.all([
+      fetch(CONFIG.DATA_URL, {
+        method:  'GET',
+        credentials: 'include',
+        headers: getApiAuthHeaders(),
+        cache:   'no-store',
+        signal:  AbortSignal.timeout(10_000),
+      }),
+      loadOverviewRoster().catch((err) => {
+        if (isUnauthorizedError(err)) throw err;
+        console.warn('[Dashboard] Roster list failed:', err?.message || err);
+        lastOverviewRoster = [];
+        renderAppointmentsList([]);
+        return null;
+      }),
+    ]);
+    void rosterResult;
 
     assertAuthorizedResponse(response);
 
@@ -1527,6 +1870,7 @@ async function loadDashboard(isSilentSync = false) {
 
     renderKPICards(data);
     renderCharts(data);
+    if (dashboardCalendar) dashboardCalendar.refetchEvents();
 
     const now = new Date().toLocaleTimeString('fr-MA', {
       hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca',
@@ -1679,6 +2023,33 @@ function updateSparkline(pathElement, value, maxValue) {
   setSparklineGeometry(pathElement, dynamicD, `0,${midY} ${qX.toFixed(1)},${peakY.toFixed(1)} ${midX.toFixed(1)},${midY} ${width},${flatY}`);
 }
 
+function updateSparklineSeries(pathElement, values) {
+  if (!pathElement) return;
+  const svg = pathElement.ownerSVGElement;
+  const viewBox = svg?.viewBox?.baseVal;
+  const width = viewBox?.width || 52;
+  const height = viewBox?.height || 22;
+  const nums = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+
+  if (nums.length < 2) {
+    updateSparkline(pathElement, nums[0] || 0, Math.max(nums[0] || 0, 1));
+    return;
+  }
+
+  const max = Math.max(...nums, 1);
+  const min = Math.min(...nums, 0);
+  const span = Math.max(max - min, 1);
+  const step = width / (nums.length - 1);
+  const pts = nums.map((value, index) => {
+    const x = index * step;
+    const y = height - 2 - ((value - min) / span) * (height - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  setSparklineGeometry(pathElement, `M ${pts.join(' L ')}`, pts.join(' '));
+}
+
 function buildSparklineSvg(_values, { width = 52, height = 22, tone = 'gold' } = {}) {
   return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M 0 10 L ${(width / 2).toFixed(1)} 10 L ${width} 10"/></svg>`;
 }
@@ -1752,16 +2123,24 @@ function animatePulseCharts(scope) {
 function bindKpiMicroCharts(data = {}) {
   const patientsToday = asMetric(data.patients_today);
   const noShows = asMetric(data.no_shows);
-  const newPatients = asMetric(data.pending_plans);
+  const week = Array.isArray(data.week_patients) ? data.week_patients : null;
 
   const trendPatientsSvg = doctorQuery('#trend-patients svg');
-  updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
+  if (week && week.length) {
+    updateSparklineSeries(trendPatientsSvg?.querySelector('path, polyline'), week);
+  } else {
+    updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
+  }
 
   const trendNoshowsSvg = doctorQuery('#trend-noshows svg');
   updateBarChart(trendNoshowsSvg, noShows);
 
   const trendNewSvg = doctorQuery('#trend-new svg');
-  updateSparkline(trendNewSvg?.querySelector('path, polyline'), newPatients, 10);
+  if (week && week.length) {
+    updateSparklineSeries(trendNewSvg?.querySelector('path, polyline'), week);
+  } else {
+    updateSparkline(trendNewSvg?.querySelector('path, polyline'), asMetric(data.pending_plans), 10);
+  }
 
   const kpiScope = doctorQuery('.kpi-row');
   if (kpiScope) animatePulseCharts(kpiScope);
@@ -2244,33 +2623,73 @@ function renderCharts(data) {
   renderAcceptanceChart(data);
 }
 
-/* Bar chart: patient volume by hour */
+/* Bar chart: patient volume by hour / week / month */
+function affluenceBarColors(values) {
+  const maxVal = Math.max(...values, 1);
+  const pearl = isPearlTheme();
+  return values.map((value) => {
+    const intensity = value / maxVal;
+    if (pearl) {
+      if (intensity >= 0.75) return 'rgba(23, 23, 23, 0.92)';
+      if (intensity >= 0.4) return 'rgba(23, 23, 23, 0.42)';
+      return 'rgba(23, 23, 23, 0.14)';
+    }
+    if (intensity >= 0.75) return 'rgba(245, 245, 245, 0.92)';
+    if (intensity >= 0.4) return 'rgba(245, 245, 245, 0.4)';
+    return 'rgba(245, 245, 245, 0.14)';
+  });
+}
+
+function getLast4WeekLabels() {
+  const labels = [];
+  const now = new Date();
+  for (let offset = 3; offset >= 0; offset -= 1) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - offset * 7);
+    labels.push(
+      day.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'Africa/Casablanca',
+      })
+    );
+  }
+  return labels;
+}
+
+function resolveAffluenceSeries(data, period) {
+  if (period === 'week') {
+    const week = Array.isArray(data?.week_patients) ? data.week_patients.map((n) => asMetric(n)) : [];
+    if (week.length < 7) return null;
+    return { labels: getLast7DayLabels(), values: week.slice(-7) };
+  }
+  if (period === 'month') {
+    const month = Array.isArray(data?.month_weeks) ? data.month_weeks.map((n) => asMetric(n)) : [];
+    if (month.length < 4) return null;
+    return { labels: getLast4WeekLabels(), values: month.slice(-4) };
+  }
+  const hours = ['08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h'];
+  const keys = ['hour_08','hour_09','hour_10','hour_11','hour_12',
+                'hour_13','hour_14','hour_15','hour_16','hour_17','hour_18'];
+  const hasHours = keys.some((key) => data?.[key] != null);
+  if (!hasHours) return null;
+  return { labels: hours, values: keys.map((key) => asMetric(data?.[key])) };
+}
+
 function renderHoursChart(data) {
-  const hours  = ['08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h'];
-  const keys   = ['hour_08','hour_09','hour_10','hour_11','hour_12',
-                  'hour_13','hour_14','hour_15','hour_16','hour_17','hour_18'];
   const ctx = doctorEl('chart-hours');
   if (!ctx) return;
 
-  const hasHours = keys.some((key) => data?.[key] != null);
-  if (!hasHours) {
+  setAffluenceCopy(affluencePeriod);
+  const series = resolveAffluenceSeries(data, affluencePeriod);
+  if (!series) {
     if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
     setCanvasChartEmpty(ctx, 'Données insuffisantes');
     return;
   }
   clearCanvasChartEmpty(ctx);
-  const values = keys.map(k => asMetric(data?.[k]));
-  const maxVal = Math.max(...values, 1);
-
-  // Colour bars: accent for busy hours, dimmer for quiet
-  const colors = values.map(v => {
-    const intensity = v / maxVal;
-    return intensity >= 0.75
-      ? 'rgba(232, 201, 122, 0.90)'  // peak
-      : intensity >= 0.4
-      ? 'rgba(184, 150, 90, 0.65)'   // moderate
-      : 'rgba(184, 150, 90, 0.25)';  // quiet
-  });
+  const colors = affluenceBarColors(series.values);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
 
@@ -2279,14 +2698,13 @@ function renderHoursChart(data) {
   hoursChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: hours,
+      labels: series.labels,
       datasets: [{
         label: 'Patients',
-        data:  values,
+        data:  series.values,
         backgroundColor: colors,
-        borderColor:     colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
         borderWidth: 0,
-        borderRadius: 10,
+        borderRadius: 8,
         borderSkipped: false,
       }]
     },
@@ -2294,7 +2712,7 @@ function renderHoursChart(data) {
       responsive: true,
       maintainAspectRatio: false,
       animation: {
-        duration: 700,
+        duration: reduceMotion ? 0 : 220,
         easing: 'easeOutQuart',
       },
       plugins: {
@@ -2306,13 +2724,13 @@ function renderHoursChart(data) {
           titleColor:      chartTheme.tooltipTitle,
           bodyColor:       chartTheme.tooltipBody,
           callbacks: {
-            label: ctx => ` ${ctx.parsed.y} patient${ctx.parsed.y !== 1 ? 's' : ''}`,
+            label: (item) => ` ${item.parsed.y} patient${item.parsed.y !== 1 ? 's' : ''}`,
           }
         },
       },
       scales: {
         x: {
-          grid:  { color: chartTheme.grid, drawBorder: false },
+          grid:  { display: false, drawBorder: false },
           ticks: { color: chartTheme.ticks, font: { family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', size: 11 } },
         },
         y: {
@@ -2906,6 +3324,8 @@ function normalizeDoctorAppointment(raw) {
   const amount = Number(amountRaw);
   const safeAmount = Number.isFinite(amount) ? amount : 0;
 
+  const durationMin = Number(firstPresent(item.duration_min, item.durationMin, item.duration) ?? 0);
+
   return {
     id: bookingId ?? item.id,
     rowId: bookingId,
@@ -2919,6 +3339,9 @@ function normalizeDoctorAppointment(raw) {
     observations,
     insurance,
     amount: safeAmount,
+    duration_min: Number.isFinite(durationMin) && durationMin > 0 ? durationMin : 30,
+    starts_at: rawDate,
+    startTime: rawDate,
   };
 }
 

@@ -344,7 +344,7 @@
     const name = String(clinic.name || '').trim();
     if (name) {
       document.querySelectorAll(
-        '.login-viewport-brand-sub, .sidebar-brand-sub, .assistant-mobile-bar__brand'
+        '.login-viewport-brand-sub, .sidebar-brand-sub, .assistant-mobile-bar__brand, #calendar-os-clinic'
       ).forEach((el) => {
         el.textContent = name;
       });
@@ -602,6 +602,7 @@
     SESSION_TOKEN_KEY,
     getRole: getStoredRole,
     getSessionUser,
+    getSessionClinic: () => sessionClinic,
     getToken: getBearerToken,
     getAuthHeaders: buildAuthHeaders,
     isAuthenticated,
