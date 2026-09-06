@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="oak-lounge">
+<html lang="fr" data-theme="pearl-clinic">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,6 +35,7 @@
   <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="dashboard_style.css" />
+  <link rel="stylesheet" href="product-ui.css" />
   <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.23/dist/lenis.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -44,7 +45,7 @@
 <body class="os-boot-pending auth-gate-active">
   <a href="#main-content" class="skip-link">Aller au contenu principal</a>
 
-  <!-- Secure credential gateway — Oak Lounge -->
+  <!-- Credential gateway -->
   <div id="login-overlay" class="login-overlay is-visible">
     <header class="login-viewport-brand login-coalesce-item" data-coalesce="brand" aria-label="DentaFlow OS">
       <div class="login-viewport-brand-mark" aria-hidden="true">
@@ -312,7 +313,6 @@
               <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name"></span></h1>
               <p class="hero-date" id="hero-date">—</p>
             </div>
-            <span class="dentaflow-os-watermark" aria-hidden="true">DENTAFLOW OS</span>
           </div>
           <div class="hero-sync">
             <span class="sync-dot" id="sync-dot"></span>
@@ -325,12 +325,12 @@
           <div class="reclaimed-banner__content">
             <div class="hero-split-layout">
               <div class="hero-split-block hero-split-block--primary">
-                <p class="hero-split-subtitle kinetic-label">PATIENTS RÉCUPÉRÉS PAR DENTAFLOW</p>
+                <p class="hero-split-subtitle kinetic-label">Patients récupérés</p>
                 <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
                 <p class="hero-split-helper">Aucune série de créneaux récupérés n'est enregistrée.</p>
               </div>
               <div class="hero-split-block hero-split-block--secondary">
-                <p class="hero-split-subtitle kinetic-label">REVENU ESTIMÉ GÉNÉRÉ</p>
+                <p class="hero-split-subtitle kinetic-label">Revenu estimé</p>
                 <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">—</div>
                 <p class="hero-split-helper">Non calculé — pas de table de créneaux récupérés</p>
               </div>
@@ -491,7 +491,7 @@
           ></div>
         </article>
 
-        <section class="doctor-bento-row" aria-label="Superpouvoir — message sur-mesure">
+        <section class="doctor-bento-row" aria-label="Action — message sur-mesure">
           <article class="superpower-bento-card superpower-bento-card--doctor-custom" aria-labelledby="doctor-custom-sms-title">
             <div class="superpower-bento-card__glow" aria-hidden="true"></div>
             <header class="superpower-bento-card__head">
@@ -499,7 +499,7 @@
                 <i data-lucide="message-square-share" aria-hidden="true"></i>
               </div>
               <div class="superpower-bento-card__copy">
-                <p class="superpower-bento-card__eyebrow">Superpouvoir · Diffusion</p>
+                <p class="superpower-bento-card__eyebrow">Action · Diffusion</p>
                 <h2 class="superpower-bento-card__title" id="doctor-custom-sms-title">Message Sur-Mesure</h2>
                 <p class="superpower-bento-card__desc">
                   Rédigez un SMS personnalisé et diffusez-le à votre base patients active. Idéal pour annonces, rappels ciblés ou communications premium du cabinet.
@@ -918,17 +918,17 @@
               <button
                 type="button"
                 class="theme-switch-btn is-active"
-                id="theme-btn-oak"
-                data-theme-value="oak-lounge"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
                 aria-pressed="true"
-              >Oak Lounge</button>
+              >Clair</button>
               <button
                 type="button"
                 class="theme-switch-btn"
-                id="theme-btn-pearl"
-                data-theme-value="pearl-clinic"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
                 aria-pressed="false"
-              >Pearl Clinic</button>
+              >Sombre</button>
             </div>
           </article>
 

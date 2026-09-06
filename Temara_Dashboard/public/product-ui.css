@@ -1,0 +1,811 @@
+/**
+ * DentaFlow OS — product chrome (HoneyBook split + quiet SaaS cards).
+ * Loaded last. Tokens here win over oak-gold prototype styles.
+ */
+
+html[data-theme="pearl-clinic"] {
+  --bg-main: #f4f5f6;
+  --bg-sidebar: #171717;
+  --bg-card: #ffffff;
+  --border-color: rgba(15, 15, 15, 0.08);
+  --accent-primary: #171717;
+  --accent-gold: #737373;
+  --accent-charcoal: #171717;
+  --executive-black: #171717;
+  --card-border-executive: rgba(15, 15, 15, 0.08);
+  --text-main: #171717;
+  --text-muted: #6b6b6b;
+  --text-hierarchy-primary: #171717;
+  --text-hierarchy-secondary: #525252;
+  --text-hierarchy-tertiary: #737373;
+  --divider-subtle: rgba(15, 15, 15, 0.08);
+  --surface-row-hover: rgba(15, 15, 15, 0.03);
+  --card-padding: 1.25rem;
+  --tabbar-float-bg: rgba(255, 255, 255, 0.94);
+  --tabbar-float-border: rgba(15, 15, 15, 0.08);
+  --tabbar-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.05), 0 1px 3px rgba(15, 15, 15, 0.04);
+  --shadow-hover: 0 2px 8px rgba(15, 15, 15, 0.06);
+  --border-hairline: 1px solid rgba(15, 15, 15, 0.08);
+  --glass-blur: none;
+  --input-bg: #ffffff;
+  --void: var(--bg-main);
+  --surface: var(--bg-card);
+  --surface-2: #fafafa;
+  --border: var(--border-color);
+  --border-2: rgba(15, 15, 15, 0.12);
+  --accent: var(--accent-primary);
+  --accent-2: #525252;
+  --accent-dim: rgba(23, 23, 23, 0.06);
+  --accent-glow: transparent;
+  --danger-glow: transparent;
+  --text: var(--text-main);
+  --text-dim: var(--text-muted);
+  --rail-text: #f5f5f5;
+  --rail-muted: rgba(255, 255, 255, 0.55);
+  --rail-hover: rgba(255, 255, 255, 0.08);
+  --rail-active: rgba(255, 255, 255, 0.12);
+  --rail-active-text: #ffffff;
+  --success: #3f6b4a;
+  --danger: #b42318;
+}
+
+html[data-theme="oak-lounge"] {
+  --bg-main: #111111;
+  --bg-sidebar: #0c0c0c;
+  --bg-card: #1a1a1a;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --accent-primary: #f5f5f5;
+  --accent-gold: #a3a3a3;
+  --text-main: #f5f5f5;
+  --text-muted: #a3a3a3;
+  --text-hierarchy-primary: #fafafa;
+  --text-hierarchy-secondary: #a3a3a3;
+  --text-hierarchy-tertiary: #737373;
+  --divider-subtle: rgba(255, 255, 255, 0.08);
+  --surface-row-hover: rgba(255, 255, 255, 0.04);
+  --card-padding: 1.25rem;
+  --tabbar-float-bg: rgba(26, 26, 26, 0.94);
+  --tabbar-float-border: rgba(255, 255, 255, 0.1);
+  --tabbar-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --border-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-blur: none;
+  --input-bg: #141414;
+  --void: var(--bg-main);
+  --surface: var(--bg-card);
+  --surface-2: #222222;
+  --border: var(--border-color);
+  --border-2: rgba(255, 255, 255, 0.14);
+  --accent: var(--accent-primary);
+  --accent-2: #d4d4d4;
+  --accent-dim: rgba(255, 255, 255, 0.08);
+  --accent-glow: transparent;
+  --danger-glow: transparent;
+  --text: var(--text-main);
+  --text-dim: var(--text-muted);
+  --rail-text: #f5f5f5;
+  --rail-muted: rgba(255, 255, 255, 0.5);
+  --rail-hover: rgba(255, 255, 255, 0.08);
+  --rail-active: rgba(255, 255, 255, 0.12);
+  --rail-active-text: #ffffff;
+}
+
+html,
+body {
+  background: var(--bg-main) !important;
+  color: var(--text-main);
+}
+
+h1, h2, h3,
+.hero-title,
+.view-page-title,
+.login-title,
+.settings-card-title,
+.assistant-header__title {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.dentaflow-os-watermark,
+.reclaimed-banner__glow,
+.superpower-bento-card__glow {
+  display: none !important;
+}
+
+/* ── Login: light product gate ── */
+.login-overlay {
+  --login-overlay-bg: #f4f5f6;
+  --login-modal-bg: #ffffff;
+  --login-modal-border: rgba(15, 15, 15, 0.08);
+  --login-off-white: #171717;
+  --login-taupe: #6b6b6b;
+  --login-champagne: #525252;
+  --login-terracotta: #171717;
+  --login-footer-muted: #737373;
+  background: #f4f5f6 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="oak-lounge"] .login-overlay {
+  --login-overlay-bg: #111111;
+  --login-modal-bg: #1a1a1a;
+  --login-modal-border: rgba(255, 255, 255, 0.1);
+  --login-off-white: #f5f5f5;
+  --login-taupe: #a3a3a3;
+  --login-champagne: #d4d4d4;
+  --login-terracotta: #f5f5f5;
+  background: #111111 !important;
+}
+
+.login-viewport-brand-name,
+.login-viewport-brand-sub {
+  color: var(--login-off-white);
+}
+
+.login-viewport-brand-sub {
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.login-panel-front {
+  background: var(--login-modal-bg) !important;
+  border: 1px solid var(--login-modal-border) !important;
+  box-shadow: var(--shadow-card) !important;
+  border-radius: 16px !important;
+}
+
+.login-role-toggle {
+  background: #f4f5f6 !important;
+  border: 1px solid rgba(15, 15, 15, 0.08) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="oak-lounge"] .login-role-toggle {
+  background: #111111 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.login-role-toggle__thumb {
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.08) !important;
+}
+
+html[data-theme="oak-lounge"] .login-role-toggle__thumb {
+  background: #2a2a2a !important;
+}
+
+.login-role-btn {
+  color: #6b6b6b;
+  font-weight: 500;
+}
+
+.login-role-btn.is-active {
+  color: #171717;
+}
+
+.login-field-label {
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #525252 !important;
+}
+
+.login-input {
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 15, 15, 0.12) !important;
+  color: #171717 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="oak-lounge"] .login-input {
+  background: #141414 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f5f5f5 !important;
+}
+
+.login-input:focus {
+  border-color: #171717 !important;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.12) !important;
+}
+
+.login-submit {
+  background: #171717 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+}
+
+.login-submit:hover:not(:disabled) {
+  background: #2a2a2a !important;
+  transform: none !important;
+}
+
+html[data-theme="oak-lounge"] .login-submit {
+  background: #f5f5f5 !important;
+  color: #111111 !important;
+}
+
+.login-error {
+  color: #b42318;
+}
+
+/* ── Dark rail (both themes) ── */
+.sidebar,
+.assistant-sidebar {
+  background: var(--bg-sidebar) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 20px 12px 16px !important;
+}
+
+.sidebar-brand {
+  padding: 8px 12px 20px !important;
+}
+
+.sidebar-brand-name {
+  color: var(--rail-text) !important;
+  font-weight: 600 !important;
+}
+
+.sidebar-brand-sub {
+  color: var(--rail-muted) !important;
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+.nav-link {
+  color: var(--rail-muted) !important;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  transform: none !important;
+}
+
+.nav-link:hover {
+  color: var(--rail-text) !important;
+  background: var(--rail-hover) !important;
+  transform: none !important;
+}
+
+.nav-link.is-active {
+  color: var(--rail-active-text) !important;
+  background: var(--rail-active) !important;
+  box-shadow: none !important;
+}
+
+.sidebar [data-lucide],
+.assistant-sidebar [data-lucide],
+html[data-theme="pearl-clinic"] .sidebar .nav-link [data-lucide],
+html[data-theme="pearl-clinic"] .assistant-sidebar .nav-link [data-lucide],
+html[data-theme="pearl-clinic"] .nav-link .nav-icon {
+  stroke: var(--rail-muted) !important;
+  color: var(--rail-muted) !important;
+  opacity: 1 !important;
+}
+
+.sidebar .nav-link.is-active [data-lucide],
+.assistant-sidebar .nav-link.is-active [data-lucide],
+html[data-theme="pearl-clinic"] .sidebar .nav-link.is-active [data-lucide],
+html[data-theme="pearl-clinic"] .assistant-sidebar .nav-link.is-active [data-lucide],
+html[data-theme="pearl-clinic"] .nav-link.is-active .nav-icon {
+  stroke: var(--rail-active-text) !important;
+  color: var(--rail-active-text) !important;
+}
+
+.account-card,
+#doctor-shell .doctor-account-dock .account-card,
+body.mode-assistant .account-card {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.account-card__name {
+  color: var(--rail-text) !important;
+}
+
+.account-card__role {
+  color: var(--rail-muted) !important;
+}
+
+.account-card__avatar {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: var(--rail-text) !important;
+  border-radius: 8px !important;
+}
+
+.btn-account-menu {
+  color: var(--rail-muted) !important;
+}
+
+.nav-accordion-header__label,
+.sidebar-superpouvoirs .nav-accordion-header__label {
+  color: var(--rail-muted) !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.btn-super,
+.sidebar-superpouvoirs .btn-super--compact {
+  background: var(--rail-hover) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  color: var(--rail-text) !important;
+}
+
+.btn-super__label,
+.sidebar-superpouvoirs .btn-super--compact .btn-super__label {
+  color: var(--rail-text) !important;
+}
+
+.btn-super__hint,
+.sidebar-superpouvoirs .btn-super--compact .btn-super__hint {
+  color: var(--rail-muted) !important;
+}
+
+.btn-super__icon [data-lucide],
+.sidebar-superpouvoirs .btn-super--compact .btn-super__icon [data-lucide] {
+  stroke: var(--rail-muted) !important;
+}
+
+/* ── Work surface ── */
+.main,
+.wrapper,
+body.mode-assistant .assistant-main {
+  background: var(--bg-main);
+}
+
+.hero-header {
+  border-bottom: 0 !important;
+  margin-bottom: 8px;
+  align-items: flex-end;
+}
+
+.hero-title,
+.assistant-header__title {
+  font-size: clamp(1.5rem, 2.2vw, 1.85rem) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  text-transform: none !important;
+  color: var(--text-main) !important;
+}
+
+.hero-title #greeting-time {
+  color: var(--text-main) !important;
+}
+
+.hero-date,
+.assistant-header__sub {
+  text-transform: none !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  color: var(--text-muted) !important;
+}
+
+.hero-sync {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.sync-label {
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+.assistant-panel__title,
+.view-page-title,
+.chart-title,
+.hero-greeting,
+#roster-title,
+.section-header-inline__title,
+.kinetic-label,
+.kpi-label,
+.hero-split-subtitle {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+  line-height: 1.35 !important;
+  color: var(--text-muted) !important;
+}
+
+.view-page-title {
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+}
+
+.kpi-card,
+.chart-card,
+.schedule-widget,
+.team-messages-card,
+.reclaimed-banner,
+.settings-card,
+.superpower-bento-card,
+.sms-campaign-panel,
+.view-placeholder-card,
+.doctor-metric-card,
+.assistant-pulse-card,
+.pulse-card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-card) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.kpi-card::before,
+.kpi-card:hover::before {
+  display: none !important;
+}
+
+.kpi-card:hover,
+.chart-card:hover,
+.schedule-widget:hover {
+  border-color: var(--border-2) !important;
+  box-shadow: var(--shadow-hover) !important;
+}
+
+.kpi-number,
+.hero-value,
+.doctor-metric-value,
+.pulse-card__value {
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+  font-size: clamp(1.5rem, 3vw, 2rem) !important;
+}
+
+.hero-value--revenue {
+  color: var(--text-main) !important;
+}
+
+.reclaimed-banner {
+  padding: 20px 24px !important;
+  overflow: visible;
+}
+
+.reclaimed-banner:hover {
+  border-color: var(--border-2) !important;
+}
+
+.hero-split-helper {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.chart-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 32px 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.team-messages-empty {
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.matte-chip,
+.status-pill,
+.crm-tag {
+  border-radius: 999px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  font-size: 12px !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--surface-2) !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+}
+
+.matte-chip--confirmé,
+.crm-tag--confirmé,
+.status-pill.confirmé {
+  background: rgba(63, 107, 74, 0.1) !important;
+  border-color: rgba(63, 107, 74, 0.2) !important;
+  color: var(--success) !important;
+}
+
+.waitlist-input,
+.settings-input,
+.handoff-input,
+textarea.waitlist-input {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  color: var(--text-main) !important;
+}
+
+.waitlist-input:focus,
+.settings-input:focus {
+  outline: none;
+  border-color: var(--text-main) !important;
+  box-shadow: 0 0 0 3px var(--accent-dim) !important;
+}
+
+.btn-matte-primary,
+#btn-bulk-confirm {
+  background: var(--accent-primary) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+html[data-theme="oak-lounge"] .btn-matte-primary,
+html[data-theme="oak-lounge"] #btn-bulk-confirm {
+  color: #111111 !important;
+}
+
+#bulk-action-bar {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-hover) !important;
+  border-radius: 12px !important;
+  color: var(--text-main) !important;
+}
+
+.theme-switch-btn {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+.theme-switch-btn.is-active {
+  background: var(--accent-primary) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="oak-lounge"] .theme-switch-btn.is-active {
+  color: #111111 !important;
+}
+
+.superpower-bento-card__eyebrow {
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.live-indicator-dot {
+  box-shadow: none !important;
+}
+
+.mobile-tabbar .tab-link.is-active [data-lucide] {
+  stroke: var(--text-main) !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--text-main);
+  outline-offset: 2px;
+}
+
+.login-mark-icon {
+  filter: none !important;
+  opacity: 1 !important;
+  color: var(--login-off-white);
+}
+
+.login-viewport-brand-mark {
+  background: transparent !important;
+  border: 1px solid var(--login-modal-border, rgba(15, 15, 15, 0.12));
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kinetic-title:hover,
+.kinetic-label:hover,
+.kinetic-value:hover {
+  letter-spacing: inherit !important;
+}
+
+.assistant-panel,
+.roster-card,
+.waitlist-card,
+.crm-card,
+.timeline-item,
+.appt-card,
+.brutalist-triage-panel,
+.planning-card,
+.handoff-card,
+.sms-campaign-panel,
+.doctor-custom-sms-compose {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-card) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.assistant-panel__title,
+#roster-title,
+.superpower-bento-card__title {
+  font-size: 1.15rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  text-transform: none !important;
+  color: var(--text-main) !important;
+}
+
+.empty-state,
+.empty-state-host:not([hidden]) {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+}
+
+.empty-state__icon {
+  color: var(--text-muted) !important;
+  opacity: 0.45 !important;
+}
+
+.empty-state__text {
+  color: var(--text-muted) !important;
+}
+
+.roster-table,
+.waitlist-table,
+.crm-table,
+.schedule-table,
+.data-table,
+.brutalist-triage-table {
+  background: var(--bg-card);
+}
+
+.roster-table th,
+.waitlist-table th,
+.crm-table thead th,
+.schedule-table th,
+.data-table th,
+.brutalist-triage-table th {
+  color: var(--text-muted) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  background: var(--surface-2) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.roster-table td,
+.waitlist-table td,
+.crm-table tbody td,
+.schedule-table td,
+.data-table td,
+.brutalist-triage-table td {
+  color: var(--text-main) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.mobile-tabbar {
+  background: var(--tabbar-float-bg) !important;
+  border: 1px solid var(--tabbar-float-border) !important;
+  box-shadow: var(--tabbar-float-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.mobile-tabbar .tab-link {
+  color: var(--text-muted) !important;
+}
+
+.mobile-tabbar .tab-link.is-active {
+  color: var(--text-main) !important;
+  background: var(--accent-dim) !important;
+}
+
+.mobile-tabbar .tab-link [data-lucide],
+html[data-theme="pearl-clinic"] .mobile-tabbar .tab-link .tab-icon {
+  stroke: var(--text-muted) !important;
+  color: var(--text-muted) !important;
+}
+
+.mobile-tabbar .tab-link.is-active [data-lucide],
+html[data-theme="pearl-clinic"] .mobile-tabbar .tab-link.is-active .tab-icon {
+  stroke: var(--text-main) !important;
+  color: var(--text-main) !important;
+}
+
+.btn-gold,
+.waitlist-submit-btn,
+.btn-primary,
+.doctor-custom-sms-submit {
+  background: var(--accent-primary) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="oak-lounge"] .btn-gold,
+html[data-theme="oak-lounge"] .waitlist-submit-btn,
+html[data-theme="oak-lounge"] .btn-primary,
+html[data-theme="oak-lounge"] .doctor-custom-sms-submit {
+  color: #111111 !important;
+}
+
+.doctor-custom-sms-textarea {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 10px !important;
+  color: var(--text-main) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="pearl-clinic"] .nav-link:hover {
+  color: var(--rail-text) !important;
+  background: var(--rail-hover) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="pearl-clinic"] .nav-link.is-active {
+  color: var(--rail-active-text) !important;
+  background: var(--rail-active) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="pearl-clinic"] .sidebar-brand-sub {
+  color: var(--rail-muted) !important;
+}
+
+.sidebar-brand-icon,
+.sidebar-brand-icon .nav-icon,
+.sidebar-brand-icon [data-lucide] {
+  color: var(--rail-text) !important;
+  stroke: var(--rail-text) !important;
+}
+
+.live-indicator-dot {
+  background: var(--success) !important;
+  box-shadow: none !important;
+}
+
+.assistant-mobile-bar {
+  background: var(--bg-main) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-main) !important;
+}
+
+.assistant-mobile-bar__brand {
+  color: var(--text-main) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.account-card__name.kinetic-label {
+  color: var(--rail-text) !important;
+  font-size: 13px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-overlay,
+  .nav-link,
+  .kpi-card,
+  .login-submit {
+    transition: none !important;
+  }
+}

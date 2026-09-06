@@ -1,5 +1,5 @@
 /**
- * Assistant Command Center — Postgres roster, waitlist, and team notes.
+ * Assistant shell — Postgres roster, waitlist, and team notes.
  * Clinique Dentaire Témara Mall · DentaFlow OS
  */
 
@@ -1136,7 +1136,7 @@ let handoffNotes = [];
     dot.classList.add(state);
     if (state === 'loading') label.textContent = 'Synchronisation en cours…';
     else if (state === 'error') label.textContent = 'Hors-ligne · Mode dégradé';
-    else label.textContent = 'Synchronisé · Typebot actif';
+    else label.textContent = 'Synchronisé';
   }
 
   /**
@@ -3984,7 +3984,7 @@ let handoffNotes = [];
   const SETTINGS_STORAGE_KEY = 'dentaflow_assistant_prefs';
 
   const DEFAULT_SETTINGS = {
-    theme: 'oak-lounge',
+    theme: 'pearl-clinic',
     profileName: '',
     profileSpecialty: 'Assistante dentaire',
     smsReminders: true,

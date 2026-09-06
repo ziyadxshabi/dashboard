@@ -124,7 +124,7 @@ function doctorQueryAll(selector) {
  * DAILY_GOAL_MAD: Daily revenue target in Moroccan Dirham.
  * REFRESH_INTERVAL_MS: Auto-refresh interval (300000 = 5 minutes).
  */
-const DEFAULT_THEME = 'oak-lounge';
+const DEFAULT_THEME = 'pearl-clinic';
 const STORAGE_KEYS = {
   THEME: 'doctor_theme',
   DAILY_GOAL: 'doctor_daily_goal',
@@ -151,8 +151,8 @@ function persistDailyGoal(value) {
 function resolveInitialTheme() {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.THEME);
-    if (stored === 'dark') return 'oak-lounge';
-    if (stored === 'light') return 'pearl-clinic';
+    if (stored === 'dark' || stored === 'oak-lounge') return 'oak-lounge';
+    if (stored === 'light' || stored === 'pearl-clinic') return 'pearl-clinic';
   } catch { /* private browsing / disabled storage */ }
   return DEFAULT_THEME;
 }
@@ -758,7 +758,7 @@ function prependWaitlistEntry({ nom, telephone, priorite }) {
 /* ── SETTINGS PANEL ──────────────────────────────────────────────────────── */
 /** Volatile preferences — live DOM only, reset on full page reload */
 const volatileSettings = {
-  theme:           'oak-lounge',
+  theme:           'pearl-clinic',
   profileName:     null,
   profileSpecialty:null,
   dailyGoal:       null,
@@ -791,34 +791,34 @@ function isPearlTheme() {
 function getChartThemeColors() {
   if (isPearlTheme()) {
     return {
-      grid:           '#000000',
-      ticks:          '#000000',
-      axisBorder:     '#000000',
-      centreText:     '#0A0A0A',
-      centreSub:      '#0A0A0A',
-      tooltipBg:      '#FDFCFA',
-      tooltipBorder:  '#000000',
-      tooltipTitle:   '#0A0A0A',
-      tooltipBody:    '#262322',
-      doughnutBorder: '#000000',
-      emptySegment:   '#EAE6DF',
-      pendingSegment: '#D5CFC4',
+      grid:           '#e5e5e5',
+      ticks:          '#737373',
+      axisBorder:     '#e5e5e5',
+      centreText:     '#171717',
+      centreSub:      '#6b6b6b',
+      tooltipBg:      '#ffffff',
+      tooltipBorder:  '#e5e5e5',
+      tooltipTitle:   '#171717',
+      tooltipBody:    '#525252',
+      doughnutBorder: '#ffffff',
+      emptySegment:   '#f4f5f6',
+      pendingSegment: '#d4d4d4',
     };
   }
 
   return {
-    grid:           '#1E2530',
-    ticks:          '#7A8899',
-    axisBorder:     '#1E2530',
-    centreText:     '#E8ECF0',
-    centreSub:      '#7A8899',
-    tooltipBg:      '#1A2030',
-    tooltipBorder:  '#252E3E',
-    tooltipTitle:   '#E8ECF0',
-    tooltipBody:    '#7A8899',
-    doughnutBorder: '#141820',
-    emptySegment:   '#1E2530',
-    pendingSegment: '#252E3E',
+    grid:           '#2a2a2a',
+    ticks:          '#a3a3a3',
+    axisBorder:     '#2a2a2a',
+    centreText:     '#f5f5f5',
+    centreSub:      '#a3a3a3',
+    tooltipBg:      '#1a1a1a',
+    tooltipBorder:  '#2a2a2a',
+    tooltipTitle:   '#f5f5f5',
+    tooltipBody:    '#a3a3a3',
+    doughnutBorder: '#1a1a1a',
+    emptySegment:   '#222222',
+    pendingSegment: '#3a3a3a',
   };
 }
 
