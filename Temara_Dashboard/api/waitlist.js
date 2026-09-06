@@ -14,7 +14,7 @@ const {
 } = require('./_lib/validation');
 
 const WAITLIST_GET_SQL = `
-  SELECT id, patient_name, patient_phone, priority, notes, status, created_at
+  SELECT id, patient_name, patient_phone, priority, notes, status, created_at, sms_consent, last_notified_at
   FROM waitlist
   WHERE clinic_id = $1 AND status = 'active'
   ORDER BY
@@ -29,8 +29,8 @@ const WAITLIST_GET_SQL = `
 `;
 
 const WAITLIST_INSERT_SQL = `
-  INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status)
-  VALUES ($1, $2, $3, $4, $5, 'active')
+  INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status, sms_consent, consent_at)
+  VALUES ($1, $2, $3, $4, $5, 'active', $6, CASE WHEN $6 THEN NOW() ELSE NULL END)
   RETURNING id
 `;
 
@@ -55,6 +55,8 @@ function mapWaitlistRow(row) {
     notes,
     created_at: row.created_at,
     status: row.status,
+    sms_consent: row.sms_consent !== false,
+    last_notified_at: row.last_notified_at || null,
   };
 }
 
@@ -70,13 +72,14 @@ async function handlePost(req, res, session) {
     return res.status(400).json(parsed.error);
   }
 
-  const { patientName, phone, priority, notes } = parsed.value;
+  const { patientName, phone, priority, notes, smsConsent } = parsed.value;
   const result = await query(WAITLIST_INSERT_SQL, [
     session.clinic_id,
     patientName,
     phone,
     priority,
     notes,
+    smsConsent !== false,
   ]);
   const insertedRow = result.rows[0];
 

@@ -1805,7 +1805,7 @@ function initDoctorCustomSms() {
         method: 'POST',
         credentials: 'include',
         headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ customMessage }),
+        body: JSON.stringify({ customMessage, action: 'today' }),
         signal: AbortSignal.timeout(12_000),
       });
 
@@ -1816,7 +1816,14 @@ function initDoctorCustomSms() {
         throw new Error(payload?.error || payload?.details || `HTTP ${response.status}`);
       }
 
-      showDashboardToast('Message personnalisé envoyé avec succès.', 'success');
+      const sent = Number(payload?.dispatchedCount || 0);
+      if (sent > 0) {
+        showDashboardToast('Message personnalisé envoyé avec succès.', 'success');
+      } else if (payload?.twilioConfigured === false) {
+        showDashboardToast("SMS non envoyé — Twilio n'est pas configuré.", 'error');
+      } else {
+        showDashboardToast('Aucun destinataire SMS pour aujourd’hui.', 'error');
+      }
       textarea.value = '';
       updateCounter();
     } catch (err) {

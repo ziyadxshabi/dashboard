@@ -18,6 +18,13 @@ const {
   validatePhone,
   STATUS_CODE_TO_DB,
 } = require('../_lib/validation');
+const { tryAcquireLock } = require('../_lib/notification-locks');
+const {
+  notifyBookingCreated,
+  notifyBookingRescheduled,
+  notifyBookingCancelled,
+} = require('../_lib/notify');
+const { blastWaitlistSlot } = require('../_lib/waitlist-blast');
 
 const DEFAULT_SLUG = 'temara';
 const DEFAULT_DURATION_MIN = 30;
@@ -27,27 +34,29 @@ const STATUS_ANNULE = STATUS_CODE_TO_DB.annule;
 
 const INSERT_CREATED_SQL = `
   INSERT INTO bookings (
-    clinic_id, cal_booking_uid, patient_name, patient_phone,
+    clinic_id, cal_booking_uid, patient_name, patient_phone, patient_email,
     treatment_name, status, starts_at, duration_min, buffer_min, booking_kind, notes, updated_at
   )
   VALUES (
-    $1, $2, $3, $4, $5, $6::appointment_status, $7, $8,
+    $1, $2, $3, $4, $5, $6, $7::appointment_status, $8, $9,
     COALESCE((SELECT buffer_min FROM clinics WHERE id = $1), 10),
     'visit',
-    $9,
+    $10,
     NOW()
   )
   ON CONFLICT (cal_booking_uid) DO UPDATE SET
     clinic_id = EXCLUDED.clinic_id,
     patient_name = EXCLUDED.patient_name,
     patient_phone = EXCLUDED.patient_phone,
+    patient_email = EXCLUDED.patient_email,
     treatment_name = EXCLUDED.treatment_name,
     status = EXCLUDED.status,
     starts_at = EXCLUDED.starts_at,
     duration_min = EXCLUDED.duration_min,
     notes = EXCLUDED.notes,
     updated_at = NOW()
-  RETURNING id, cal_booking_uid, status::text AS status, starts_at
+  RETURNING id, clinic_id, cal_booking_uid, patient_name, patient_phone, patient_email,
+            status::text AS status, starts_at
 `;
 
 const UPDATE_RESCHEDULED_SQL = `
@@ -56,7 +65,9 @@ const UPDATE_RESCHEDULED_SQL = `
       status = $2::appointment_status,
       updated_at = NOW()
   WHERE cal_booking_uid = $3
-  RETURNING id, cal_booking_uid, status::text AS status, starts_at
+     OR ($4::text IS NOT NULL AND cal_booking_uid = $4)
+  RETURNING id, clinic_id, cal_booking_uid, patient_name, patient_phone, patient_email,
+            status::text AS status, starts_at
 `;
 
 const UPDATE_CANCELLED_SQL = `
@@ -64,7 +75,9 @@ const UPDATE_CANCELLED_SQL = `
   SET status = $1::appointment_status,
       updated_at = NOW()
   WHERE cal_booking_uid = $2
-  RETURNING id, cal_booking_uid, status::text AS status, starts_at
+     OR ($3::text IS NOT NULL AND cal_booking_uid = $3)
+  RETURNING id, clinic_id, cal_booking_uid, patient_name, patient_phone, patient_email,
+            status::text AS status, starts_at
 `;
 
 function unwrapValue(raw) {
@@ -136,6 +149,10 @@ function extractEventName(body, booking) {
 
 function extractUid(booking) {
   return firstString(booking.uid, booking.bookingId, booking.booking_uid, booking.bookingUid);
+}
+
+function extractRescheduleUid(booking) {
+  return firstString(booking.rescheduleUid, booking.reschedule_uid, booking.uidPrevious);
 }
 
 function extractAttendee(booking) {
@@ -221,12 +238,25 @@ async function resolveClinicId(booking, body) {
   return fallback.rows[0]?.id || null;
 }
 
-function jsonOk(res, action, bookingId) {
+function jsonOk(res, action, bookingId, extra = {}) {
   return res.status(200).json({
     ok: true,
     action,
     bookingId: bookingId || null,
+    ...extra,
   });
+}
+
+async function maybeNotify(lockKey, fn) {
+  const lock = await tryAcquireLock(lockKey, 86400);
+  if (!lock.acquired) return { notified: false, duplicate: Boolean(lock.duplicate) };
+  try {
+    await fn();
+    return { notified: true, duplicate: false };
+  } catch (err) {
+    console.error('[cal-notify]', err?.message || err);
+    return { notified: false, duplicate: false };
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -262,6 +292,8 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    const previousUid = extractRescheduleUid(booking) || null;
+
     if (eventType === 'BOOKING_CREATED') {
       const clinicId = await resolveClinicId(booking, body);
       if (!clinicId) {
@@ -276,13 +308,18 @@ module.exports = async function handler(req, res) {
         uid,
         extractPatientName(booking),
         extractPhone(booking),
+        extractEmail(booking) || null,
         extractMotif(booking),
         STATUS_CONFIRME,
         startsAt,
         durationMin(booking),
         buildNotes(booking),
       ]);
-      return jsonOk(res, eventType, result.rows[0]?.id);
+      const row = result.rows[0];
+      const notify = await maybeNotify(`lock:booking:${uid}:${eventType}`, async () => {
+        await notifyBookingCreated(row, req);
+      });
+      return jsonOk(res, eventType, row?.id, notify);
     }
 
     if (eventType === 'BOOKING_RESCHEDULED') {
@@ -290,13 +327,29 @@ module.exports = async function handler(req, res) {
       if (!startsAt) {
         return res.status(400).json(createApiError('VALIDATION_ERROR', 'Missing startTime'));
       }
-      const result = await query(UPDATE_RESCHEDULED_SQL, [startsAt, STATUS_CONFIRME, uid]);
-      return jsonOk(res, eventType, result.rows[0]?.id);
+      const result = await query(UPDATE_RESCHEDULED_SQL, [
+        startsAt,
+        STATUS_CONFIRME,
+        uid,
+        previousUid,
+      ]);
+      const row = result.rows[0];
+      const notify = await maybeNotify(`lock:booking:${uid}:${eventType}`, async () => {
+        if (row) await notifyBookingRescheduled(row, req);
+      });
+      return jsonOk(res, eventType, row?.id, notify);
     }
 
     if (eventType === 'BOOKING_CANCELLED') {
-      const result = await query(UPDATE_CANCELLED_SQL, [STATUS_ANNULE, uid]);
-      return jsonOk(res, eventType, result.rows[0]?.id);
+      const result = await query(UPDATE_CANCELLED_SQL, [STATUS_ANNULE, uid, previousUid]);
+      const row = result.rows[0];
+      const notify = await maybeNotify(`lock:booking:${uid}:${eventType}`, async () => {
+        if (row) {
+          await notifyBookingCancelled(row, req);
+          await blastWaitlistSlot(row.clinic_id, req, { topN: 3, batchId: `cancel-${row.id}` });
+        }
+      });
+      return jsonOk(res, eventType, row?.id, notify);
     }
 
     return jsonOk(res, eventType || 'PING', null);

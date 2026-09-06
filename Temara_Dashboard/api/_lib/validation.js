@@ -219,6 +219,15 @@ function validateWaitlistInput(body = {}) {
     };
   }
 
+  const consentRaw = body.consent_sms ?? body.sms_consent ?? body.consentSms;
+  const smsConsent =
+    consentRaw === undefined || consentRaw === null || consentRaw === ''
+      ? true
+      : consentRaw === true ||
+        consentRaw === 1 ||
+        String(consentRaw).toLowerCase() === 'true' ||
+        String(consentRaw).toLowerCase() === 'oui';
+
   return {
     ok: true,
     value: {
@@ -226,6 +235,7 @@ function validateWaitlistInput(body = {}) {
       phone,
       priority,
       notes,
+      smsConsent,
     },
   };
 }
@@ -325,6 +335,12 @@ function validateFillGapInput(body = {}) {
     };
   }
 
+  const notifyRaw = body.notifyWaitlist ?? body.notify_waitlist ?? body.notify;
+  const notifyWaitlist =
+    notifyRaw === true ||
+    notifyRaw === 1 ||
+    String(notifyRaw || '').toLowerCase() === 'true';
+
   return {
     ok: true,
     value: {
@@ -332,16 +348,32 @@ function validateFillGapInput(body = {}) {
       slotTime,
       reason,
       candidateId: UUID_RE.test(candidateRaw) ? candidateRaw : null,
+      notifyWaitlist,
     },
   };
 }
 
 function validateBulkSmsInput(body = {}) {
+  const action = String(body.action || '').trim().toLowerCase();
   const message = sanitizeString(body.customMessage ?? body.message ?? body.text, 500);
-  if (message.length < 3) {
+
+  if (action === 'force-tomorrow') {
     return {
-      ok: false,
-      error: createApiError('VALIDATION_ERROR', 'customMessage must be at least 3 characters'),
+      ok: true,
+      value: { message, recipients: [], action, useDefaultTemplate: false },
+    };
+  }
+
+  if (action === 'today') {
+    if (message.length < 3) {
+      return {
+        ok: false,
+        error: createApiError('VALIDATION_ERROR', 'customMessage must be at least 3 characters'),
+      };
+    }
+    return {
+      ok: true,
+      value: { message, recipients: [], action, useDefaultTemplate: false },
     };
   }
 
@@ -372,11 +404,32 @@ function validateBulkSmsInput(body = {}) {
     };
   }
 
+  if (!message) {
+    return {
+      ok: true,
+      value: {
+        message: '',
+        recipients: recipients.slice(0, 100),
+        action: '',
+        useDefaultTemplate: true,
+      },
+    };
+  }
+
+  if (message.length < 3) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'customMessage must be at least 3 characters'),
+    };
+  }
+
   return {
     ok: true,
     value: {
       message,
-      recipients: recipients.slice(0, 200),
+      recipients: recipients.slice(0, 100),
+      action: '',
+      useDefaultTemplate: false,
     },
   };
 }

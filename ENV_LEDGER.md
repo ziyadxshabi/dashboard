@@ -1,6 +1,6 @@
 # DentaFlow OS — Environment Variables Ledger
 
-> Last audited: 2026-09-05
+> Last audited: 2026-09-06
 > Status: Wave 4 — active production variables only
 > Secrets belong in Vercel Project Settings and gitignored `Temara_Dashboard/.env.local`. Never commit real values.
 
@@ -58,6 +58,34 @@ Upstash Redis REST credentials for **login rate-limiting only** (not sessions, n
 - If either is missing or Redis errors, rate limiting **fails open**. Postgres APIs keep working.
 - Legacy aliases still accepted: `REDIS_CONNECTION_URL`, `REDIS_REST_TOKEN`.
 
+### `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` — optional (SMS off without them)
+
+Twilio Programmable SMS. Handlers never report `dispatchedCount > 0` without a SID.
+
+- Consumers: `api/_lib/twilio.js`, `api/bulk-sms.js`, Concierge notify, crons, `api/webhooks/twilio.js`.
+- `TWILIO_FROM` may be overridden per clinic by `clinics.twilio_from`.
+- Alias accepted: `TWILIO_FROM_NUMBER`, `N8N_TWILIO_AUTH_TOKEN` (do not set n8n names on new projects).
+
+### `TWILIO_WEBHOOK_URL` — production required for inbound SMS/voice
+
+Canonical public URL of `POST /api/webhooks/twilio` (Twilio signature validation). Example: `https://<host>/api/webhooks/twilio`.
+
+### `RESEND_API_KEY` / `RESEND_FROM` — optional (email fail-open)
+
+Concierge confirmation / cancel / reschedule and reminder emails. Missing keys skip email.
+
+### `SLACK_WEBHOOK_URL` — optional (fail-open)
+
+Incoming webhook for RDV + SMS-failure alerts (replaces n8n Slack credential).
+
+### `CRON_SECRET` — production required for Vercel cron
+
+Bearer or `x-cron-secret` for `GET|POST /api/roster?action=cron-reminders` and `cron-leak`. Staff JWT is also accepted (ops override).
+
+### `CALCOM_API_KEY` / `CLINIC_URGENCY_EMAIL` — optional Cal busy sync
+
+When a doctor creates a Postgres block, DentaFlow may `POST https://api.cal.com/v1/bookings` so `/book/temara` stops offering that slot. Event type is `clinics.cal_event_type_id`. Missing keys skip Cal; Postgres block still succeeds.
+
 ---
 
 ## Local development (`.env.local`)
@@ -110,7 +138,7 @@ These names may still exist in an old Vercel project. They are **not** read by l
 | `ASSISTANT_USERNAME` / `ASSISTANT_PASSWORD_HASH` | Deprecated. |
 | `DOCTOR_PIN` / `ASSISTANT_PIN` | Deprecated prototype. |
 | `CAL_WEBHOOK_SECRET` | Use `CALCOM_WEBHOOK_SECRET`. |
-| `CALCOM_API_KEY` / `CALCOM_EVENT_TYPE_ID` | Event type lives on `clinics`. |
+| `CALCOM_EVENT_TYPE_ID` | Event type lives on `clinics.cal_event_type_id`. `CALCOM_API_KEY` is optional again for busy sync. |
 | `POSTGRES_HOST` / `POSTGRES_PASSWORD` (besides `DATABASE_URL`) | Unused. |
 
 ---
@@ -123,6 +151,11 @@ These names may still exist in an old Vercel project. They are **not** read by l
 | `JWT_SECRET` | Generated local secret | Unique production secret |
 | `CLINIC_ID` | `temara` | Default slug only |
 | `CALCOM_WEBHOOK_SECRET` | Optional | Set, HMAC on |
+| `TWILIO_ACCOUNT_SID` / `AUTH_TOKEN` / `FROM` | Optional | Set to send SMS |
+| `TWILIO_WEBHOOK_URL` | Optional | Public Twilio callback |
+| `RESEND_API_KEY` / `SLACK_WEBHOOK_URL` | Optional | Fail-open notify |
+| `CRON_SECRET` | Optional | Set for Vercel cron |
+| `CALCOM_API_KEY` | Optional | Doctor block → Cal busy |
 | `UPSTASH_REDIS_REST_URL` / `TOKEN` | Optional | Optional login limiter |
 | Baserow / ngrok / n8n | Ignore | Ignore / delete |
 

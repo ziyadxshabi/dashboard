@@ -14,6 +14,7 @@ const {
   STATUS_CODE_TO_DB,
 } = require('./_lib/validation');
 const { resolveTreatment, clinicBufferMin } = require('./_lib/roster-ops');
+const { blastWaitlistSlot, notifySlotFilledCleanup } = require('./_lib/waitlist-blast');
 
 const FILL_GAP_CANDIDATES_SQL = `
   SELECT
@@ -134,7 +135,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json(parsed.error);
   }
 
-  const { slotDate, slotTime, reason, candidateId } = parsed.value;
+  const { slotDate, slotTime, reason, candidateId, notifyWaitlist } = parsed.value;
 
   try {
     let booking = null;
@@ -165,12 +166,30 @@ module.exports = async function handler(req, res) {
       ]);
       booking = mapBooking(inserted.rows[0]);
       await query(FILL_GAP_MARK_FILLED_SQL, [candidate.id, session.clinic_id]);
+      try {
+        await notifySlotFilledCleanup(session.clinic_id, req, candidate.id);
+      } catch (err) {
+        console.error('[fill-gap-cleanup]', err?.message || err);
+      }
+    }
+
+    let waitlistNotify = null;
+    if (notifyWaitlist && !candidateId) {
+      try {
+        waitlistNotify = await blastWaitlistSlot(session.clinic_id, req, {
+          topN: 3,
+          batchId: `fill-${slotDate}-${slotTime}`,
+        });
+      } catch (err) {
+        console.error('[fill-gap-blast]', err?.message || err);
+        waitlistNotify = { ok: false, error: 'notify_failed' };
+      }
     }
 
     const candidates = await loadCandidates(session.clinic_id);
     return res.status(200).json({
       ok: true,
-      data: { candidates, booking },
+      data: { candidates, booking, waitlistNotify },
     });
   } catch (err) {
     return sendDbError(res, err);

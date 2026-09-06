@@ -22,6 +22,8 @@ const {
 } = require('./_lib/validation');
 const handleStatusUpdate = require('./_lib/update-booking-status');
 const rosterOps = require('./_lib/roster-ops');
+const { requireCronOrStaff } = require('./_lib/cron-auth');
+const { runReminders, runRemindersAllClinics, runLeakDrip, runLeakDripAllClinics } = require('./_lib/cron-notify');
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROSTER_DAYS = 42;
@@ -238,6 +240,28 @@ module.exports = async function handler(req, res) {
   }
 
   const action = searchParam(req, 'action');
+
+  if (action === 'cron-reminders' || action === 'cron-leak') {
+    applyCors(res, 'GET, POST, OPTIONS');
+    const auth = requireCronOrStaff(req, res, requireClinicSession);
+    if (!auth) return;
+    try {
+      if (action === 'cron-reminders') {
+        const payload =
+          auth.role === 'cron'
+            ? await runRemindersAllClinics(req)
+            : await runReminders(auth.clinic_id, req);
+        return res.status(200).json(payload);
+      }
+      const payload =
+        auth.role === 'cron'
+          ? await runLeakDripAllClinics(req)
+          : await runLeakDrip(auth.clinic_id, req);
+      return res.status(200).json(payload);
+    } catch (err) {
+      return sendDbError(res, err);
+    }
+  }
 
   if (req.method === 'PATCH' || (req.method === 'POST' && action === 'status')) {
     return handleStatusUpdate(req, res);
