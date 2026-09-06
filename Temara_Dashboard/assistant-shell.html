@@ -183,6 +183,35 @@
           </div>
         </section>
 
+        <section class="status-board-wrap assistant-status-board" aria-label="Tableau de statut du jour">
+          <div class="status-board-toolbar">
+            <h3 class="section-header-inline__title">Flux du fauteuil</h3>
+            <label class="filter-toggle status-board-filter">
+              <input type="checkbox" id="assistant-urgence-filter" />
+              <span>Urgences uniquement</span>
+            </label>
+          </div>
+          <div class="status-board" id="assistant-status-board">
+            <article class="status-board__lane" data-lane="confirme">
+              <header class="status-board__head"><h3>Confirmé</h3><span class="status-board__count" data-count="confirme">0</span></header>
+              <ul class="status-board__list" id="asst-lane-confirme"></ul>
+            </article>
+            <article class="status-board__lane" data-lane="en_salle">
+              <header class="status-board__head"><h3>En salle</h3><span class="status-board__count" data-count="en_salle">0</span></header>
+              <ul class="status-board__list" id="asst-lane-en_salle"></ul>
+            </article>
+            <article class="status-board__lane" data-lane="en_soin">
+              <header class="status-board__head"><h3>En soin</h3><span class="status-board__count" data-count="en_soin">0</span></header>
+              <ul class="status-board__list" id="asst-lane-en_soin"></ul>
+            </article>
+            <article class="status-board__lane" data-lane="termine">
+              <header class="status-board__head"><h3>Terminé</h3><span class="status-board__count" data-count="termine">0</span></header>
+              <ul class="status-board__list" id="asst-lane-termine"></ul>
+            </article>
+          </div>
+          <div class="status-board__strip" id="assistant-status-strip"></div>
+        </section>
+
         <section class="assistant-bento-row" aria-label="Superpouvoir — combler un créneau">
           <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
             <div class="superpower-bento-card__glow" aria-hidden="true"></div>
@@ -233,7 +262,7 @@
                   <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
                 </button>
                 <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
-                  <button type="button" class="actions-popover__item v-disabled" id="btn-daily-report" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
+                  <button type="button" class="actions-popover__item" id="btn-daily-report" role="menuitem">
                     Générer Rapport Journalier
                   </button>
                   <button type="button" class="actions-popover__item" id="btn-alerte-retard" data-action="doctor-delayed" role="menuitem">
@@ -483,6 +512,13 @@
               </div>
             </div>
             </div>
+            <div class="gap-panel" id="assistant-gap-panel" aria-label="Créneaux libres du jour">
+              <div class="gap-panel__head">
+                <div class="chart-title">Créneaux libres</div>
+                <div class="chart-sub">Trou ≥ 30 min — placer un patient de la liste d'attente</div>
+              </div>
+              <ul class="gap-list" id="assistant-gap-list"></ul>
+            </div>
             <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container" role="region" aria-label="Patients en liste d'attente" tabindex="0">
               <div class="skeleton-wrapper" id="waitlist-skeleton">
                 <div class="skeleton skeleton-text"></div>
@@ -515,7 +551,7 @@
         <header class="view-page-header view-page-header--row">
           <div>
             <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">Coordonnées patients et statut des rendez-vous</p>
+            <p class="view-page-sub">Identité de réservation — historique par téléphone</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -523,23 +559,13 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Rechercher par nom, téléphone ou email…"
+              placeholder="Rechercher par nom ou téléphone…"
               autocomplete="off"
             />
           </div>
         </header>
 
         <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
-          <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
-            <button
-              type="button"
-              class="filter-chip"
-              id="crm-filter-unpaid"
-              aria-pressed="false"
-            >
-              Non payé
-            </button>
-          </div>
           <div class="skeleton-wrapper" id="crm-skeleton">
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text short"></div>
@@ -554,10 +580,10 @@
                 <tr>
                   <th scope="col">Nom</th>
                   <th scope="col">Téléphone</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Motif</th>
-                  <th scope="col">Facturation</th>
-                  <th scope="col">Statut</th>
+                  <th scope="col">Dernier motif</th>
+                  <th scope="col">Visites</th>
+                  <th scope="col">Dernier RDV</th>
+                  <th scope="col">Prochain RDV</th>
                 </tr>
               </thead>
               <tbody id="crm-table-body">
@@ -634,12 +660,12 @@
               <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
+            <p class="settings-card-desc">Préférence locale uniquement — l'envoi automatique des rappels n'est pas actif pour le moment.</p>
 
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels SMS</span>
-                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
+                <span class="settings-toggle-hint">Rappel 24h avant — envoi automatique plus tard</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-sms-toggle" checked />
@@ -650,7 +676,7 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
+                <span class="settings-toggle-hint">Préférence enregistrée localement — pas d'envoi pour l'instant</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-email-toggle" checked />
@@ -796,8 +822,8 @@
       </header>
 
       <div class="crm-side-panel-body">
-        <section class="crm-side-panel-section" aria-label="Coordonnées">
-          <h3 class="crm-side-panel-section-title">Coordonnées</h3>
+        <section class="crm-side-panel-section" aria-label="Identité de réservation">
+          <h3 class="crm-side-panel-section-title">Réservation</h3>
           <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field">
               <dt>Téléphone</dt>
@@ -807,35 +833,32 @@
               <dt>Email</dt>
               <dd id="crm-panel-email">—</dd>
             </div>
-          </dl>
-        </section>
-
-        <section class="crm-side-panel-section" aria-label="Couverture médicale">
-          <h3 class="crm-side-panel-section-title">Couverture</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field crm-side-panel-field--coverage">
-              <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="crm-side-panel-section" aria-label="Rendez-vous">
-          <h3 class="crm-side-panel-section-title">Rendez-vous</h3>
-          <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field">
-              <dt>Date du rendez-vous</dt>
+              <dt>Visites</dt>
+              <dd id="crm-panel-visits">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>No-shows / Annulations</dt>
+              <dd id="crm-panel-risk">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Dernier RDV</dt>
               <dd id="crm-panel-last-visit">—</dd>
             </div>
             <div class="crm-side-panel-field">
-              <dt>Motif de Consultation</dt>
+              <dt>Dernier motif</dt>
               <dd id="crm-panel-motif">—</dd>
             </div>
-            <div class="crm-side-panel-field crm-side-panel-field--block">
-              <dt>Notes</dt>
-              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
-            </div>
           </dl>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Historique des rendez-vous">
+          <h3 class="crm-side-panel-section-title">Historique</h3>
+          <ol class="crm-timeline" id="crm-panel-timeline"></ol>
+        </section>
+        <section class="crm-side-panel-section" aria-label="Notes d'équipe">
+          <h3 class="crm-side-panel-section-title">Transmission</h3>
+          <div id="crm-panel-notes" class="crm-side-panel-notes">Aucune note liée à ce patient.</div>
         </section>
       </div>
     </aside>

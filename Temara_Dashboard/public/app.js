@@ -186,6 +186,9 @@ let handoffNotes = [];
   let toastTimer = null;
   let rosterData = [];
   let allRosterRecords = [];
+  let lastDirectory = [];
+  let lastGaps = [];
+  let lastWaitlist = [];
   let crmPatientsById = {};
   let crmUnpaidOnly = false;
   let waitlistUrgentOnly = false;
@@ -1013,12 +1016,10 @@ let handoffNotes = [];
   }
 
   function guardDeployingFeatureButtons() {
-    wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
     wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
     wireDeployingFeatureButton($('btn-force-sms'), DEPLOYING_FEATURE_NOTICES.forceReminders);
     wireDeployingFeatureButton($('btn-block-slot'), DEPLOYING_FEATURE_NOTICES.blockSlot);
     wireDeployingFeatureButton($('btn-alerte-retard'), DEPLOYING_FEATURE_NOTICES.delayAlert);
-    wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
   }
 
   function escapeCsvCell(value) {
@@ -1076,37 +1077,12 @@ let handoffNotes = [];
   }
 
   function generateDailyReport() {
-    const calendar = getAssistantCalendarInstance();
-    let rows = [];
-
-    if (calendar && typeof calendar.getEvents === 'function') {
-      rows = calendar.getEvents()
-        .filter(isCalendarEventToday)
-        .sort((a, b) => (a.start?.getTime?.() ?? 0) - (b.start?.getTime?.() ?? 0))
-        .map(mapCalendarEventToReportRow);
+    const Ops = window.DentaFlowBookingOps;
+    const rows = sortRosterByTime(filterTodayRosterRecords(allRosterRecords));
+    if (Ops?.downloadDailyCsv) {
+      Ops.downloadDailyCsv(rows, `Rapport_Dentaflow_${getTodayDateKey()}.csv`);
+      Ops.printDailyRoster(rows, { title: 'Liste du jour — Cabinet Témara' });
     }
-
-    if (!rows.length && allRosterRecords.length) {
-      rows = sortRosterByTime(filterTodayRosterRecords(allRosterRecords))
-        .map(mapRosterRecordToReportRow);
-    }
-
-    const header = ['Heure', 'Patient', 'Type', 'Statut'];
-    const csvLines = [header, ...rows].map((line) => line.map(escapeCsvCell).join(';'));
-    const csvContent = `\uFEFF${csvLines.join('\r\n')}`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const dateKey = getTodayDateKey();
-    const filename = `Rapport_Dentaflow_${dateKey}.csv`;
-
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-
     const countLabel = rows.length === 1 ? '1 rendez-vous' : `${rows.length} rendez-vous`;
     showToast(
       rows.length
@@ -1122,6 +1098,22 @@ let handoffNotes = [];
     if (exportBtn && exportBtn.dataset.superWired !== 'true') {
       exportBtn.dataset.superWired = 'true';
       exportBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        generateDailyReport();
+      });
+    }
+    const dailyBtn = $('btn-daily-report');
+    if (dailyBtn && dailyBtn.dataset.superWired !== 'true') {
+      dailyBtn.dataset.superWired = 'true';
+      dailyBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        generateDailyReport();
+      });
+    }
+    const waitlistExport = $('waitlist-popover-export');
+    if (waitlistExport && waitlistExport.dataset.superWired !== 'true') {
+      waitlistExport.dataset.superWired = 'true';
+      waitlistExport.addEventListener('click', (event) => {
         event.preventDefault();
         generateDailyReport();
       });
@@ -2094,6 +2086,12 @@ let handoffNotes = [];
       practitioner,
       time: formatAppointmentTime(rawDate),
       rawDate,
+      starts_at: rawDate,
+      duration_min: Number(item.duration_min) || 30,
+      patient_name: String(patientName).trim() || 'Non spécifié',
+      patient_phone: phone,
+      treatment_name: String(treatment).trim() || 'Consultation',
+      notes: observations,
       noShow: Boolean(
         item.noShow ??
         item['Historique No-Show'] ??
@@ -3418,11 +3416,7 @@ let handoffNotes = [];
       restartViewStaggerAnimations($('view-overview'));
     }
 
-    renderCRMTable(rows);
-    if (rows.length) {
-      updateCRMSidePanel(toCrmPatient(rows[0]));
-    }
-
+    renderAssistantStatusBoard(rows, Boolean($('assistant-urgence-filter')?.checked));
     renderOperationalPulse(computeOperationalPulse(rows));
     refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     renderOverviewTimeline(rows);
@@ -4147,6 +4141,7 @@ let handoffNotes = [];
 
     el.innerHTML = '';
 
+    const Ops = window.DentaFlowBookingOps;
     dashboardCalendar = new FullCalendar.Calendar(el, {
       initialView: 'timeGridWeek',
       headerToolbar: {
@@ -4162,11 +4157,14 @@ let handoffNotes = [];
       slotMaxTime: '19:00:00',
       nowIndicator: true,
       allDaySlot: false,
-      events: [],
       eventTimeFormat: {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
+      },
+      datesSet: (info) => {
+        const range = Ops?.ymdFromView(info);
+        if (range) void loadAssistantCalendarRange(range.from, range.to);
       },
     });
 
@@ -4174,18 +4172,241 @@ let handoffNotes = [];
     window.calendar = dashboardCalendar;
   }
 
+  async function fetchAssistantJson(url) {
+    window.DentaFlowAuth?.requireSession?.();
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: apiHeaders(),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.details || payload?.error || `HTTP ${response.status}`);
+    }
+    return payload;
+  }
+
+  async function loadAssistantCalendarRange(from, to) {
+    if (!dashboardCalendar) return;
+    try {
+      const payload = await fetchAssistantJson(
+        `${CONFIG.ROSTER_PROXY}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      );
+      const unwrapped = unwrapRosterProxyPayload(payload);
+      const records = parseRosterResponse(unwrapped).map(normalizeRosterRecord).filter(Boolean);
+      dashboardCalendar.removeAllEvents();
+      records.forEach((record) => {
+        const event = window.DentaFlowBookingOps?.toCalendarEvent(record);
+        if (event) dashboardCalendar.addEvent(event);
+      });
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      console.error('[Assistant calendar]', err?.message || err);
+    }
+  }
+
+  function gapClockLabel(value) {
+    const text = String(value || '');
+    if (/^\d{2}:\d{2}$/.test(text)) return text;
+    const sliced = text.slice(11, 16);
+    return /^\d{2}:\d{2}$/.test(sliced) ? sliced : (text.slice(0, 5) || '—');
+  }
+
+  function gapSlotParts(gap) {
+    const date = String(gap.date || '').slice(0, 10);
+    const start = String(gap.start || '');
+    if (/^\d{2}:\d{2}$/.test(start)) return { slotDate: date, slotTime: start };
+    return { slotDate: date || start.slice(0, 10), slotTime: gapClockLabel(start) };
+  }
+
+  function renderAssistantStatusBoard(records, urgencesOnly = false) {
+    const lanes = window.DentaFlowBookingOps?.partitionStatusBoard(records, urgencesOnly) || {};
+    const mapping = [
+      ['asst-lane-confirme', 'confirme', lanes.confirme || []],
+      ['asst-lane-en_salle', 'en_salle', lanes.en_salle || []],
+      ['asst-lane-en_soin', 'en_soin', lanes.en_soin || []],
+      ['asst-lane-termine', 'termine', lanes.termine || []],
+    ];
+    mapping.forEach(([id, key, items]) => {
+      const el = $(id);
+      if (!el) return;
+      el.replaceChildren();
+      const countEl = assistantQuery(`.status-board__count[data-count="${key}"]`);
+      if (countEl) countEl.textContent = String(items.length);
+      if (!items.length) {
+        const empty = document.createElement('p');
+        empty.className = 'status-board__empty';
+        empty.textContent = 'Aucun rendez-vous';
+        el.appendChild(empty);
+        return;
+      }
+      items.forEach((record) => {
+        const card = document.createElement('li');
+        card.className = 'status-board__card';
+        card.innerHTML = `<p class="status-board__time">${escapeHtml(record.time || '—')}</p>
+          <p class="status-board__name">${escapeHtml(record.name || 'Patient')}</p>
+          <p class="status-board__motif">${escapeHtml(record.treatment || '—')}</p>`;
+        el.appendChild(card);
+      });
+    });
+    const strip = $('assistant-status-strip');
+    if (strip) {
+      strip.replaceChildren();
+      const stripRows = [...(lanes.en_attente || []), ...(lanes.no_show || []), ...(lanes.annule || [])];
+      if (!stripRows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'status-board__empty';
+        empty.textContent = 'Aucune absence ni annulation aujourd’hui.';
+        strip.appendChild(empty);
+      } else {
+        stripRows.forEach((record) => {
+          const chip = document.createElement('span');
+          chip.className = 'status-board__chip';
+          chip.textContent = `${record.time || '—'} · ${record.name || 'Patient'} · ${record.status || ''}`;
+          strip.appendChild(chip);
+        });
+      }
+    }
+  }
+
+  function renderAssistantGapList(gaps) {
+    const host = $('assistant-gap-list');
+    if (!host) return;
+    host.replaceChildren();
+    if (!gaps.length) {
+      const empty = document.createElement('p');
+      empty.className = 'gap-list__empty';
+      empty.textContent = 'Aucun créneau libre ≥ 30 min aujourd’hui.';
+      host.appendChild(empty);
+      return;
+    }
+    gaps.forEach((gap) => {
+      const row = document.createElement('li');
+      row.className = 'gap-list__row';
+      row.innerHTML = `<span>${escapeHtml(gapClockLabel(gap.start))} – ${escapeHtml(gapClockLabel(gap.end))}</span>
+        <span>${Number(gap.duration_min) || 0} min</span>`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-action-sm';
+      btn.textContent = 'Remplir';
+      btn.addEventListener('click', () => fillAssistantGap(gap));
+      row.appendChild(btn);
+      host.appendChild(row);
+    });
+  }
+
+  async function loadPatientDirectory() {
+    try {
+      const payload = await fetchAssistantJson(`${CONFIG.ROSTER_PROXY}?view=directory`);
+      lastDirectory = Array.isArray(payload?.data) ? payload.data : [];
+      renderCRMTable(lastDirectory);
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      lastDirectory = [];
+      renderCRMTable([]);
+    }
+  }
+
+  async function loadAssistantGaps() {
+    try {
+      const payload = await fetchAssistantJson(`${CONFIG.ROSTER_PROXY}?view=gaps`);
+      const pack = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+      lastGaps = Array.isArray(pack?.gaps) ? pack.gaps : [];
+      renderAssistantGapList(lastGaps);
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      lastGaps = [];
+      renderAssistantGapList([]);
+    }
+  }
+
+  async function loadAssistantWaitlist() {
+    try {
+      const payload = await fetchAssistantJson(CONFIG.ENDPOINTS.WAITLIST_ADD);
+      lastWaitlist = Array.isArray(payload?.data) ? payload.data : [];
+      renderWaitlistPanel();
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      lastWaitlist = [];
+      renderWaitlistPanel();
+    }
+  }
+
+  async function fillAssistantGap(gap) {
+    const { slotDate, slotTime } = gapSlotParts(gap);
+    const candidate = lastWaitlist.find((row) => String(row.status || '').toLowerCase() === 'active')
+      || lastWaitlist[0];
+    if (!candidate?.id) {
+      showToast('Ajoutez d’abord un patient à la liste d’attente.', 'warning');
+      return;
+    }
+    const confirmed = await askConfirm('Placer un patient de la liste d’attente sur ce créneau ?');
+    if (!confirmed) return;
+    try {
+      const response = await fetch(CONFIG.FILL_GAP_PROXY, {
+        method: 'POST',
+        credentials: 'include',
+        headers: apiHeaders(),
+        body: JSON.stringify({ slotDate, slotTime, candidateId: candidate.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      showToast('Créneau comblé depuis la liste d’attente.', 'success');
+      await Promise.all([loadPlanning(), loadAssistantGaps(), loadAssistantWaitlist(), loadPatientDirectory()]);
+    } catch {
+      showToast('Impossible de remplir ce créneau — réessayez.', 'error');
+    }
+  }
+
+  function initAssistantStatusBoard() {
+    $('assistant-urgence-filter')?.addEventListener('change', (event) => {
+      renderAssistantStatusBoard(
+        filterTodayRosterRecords(allRosterRecords),
+        event.target.checked
+      );
+    });
+    $('waitlist-popover-fill-gap')?.addEventListener('click', async (event) => {
+      event.preventDefault();
+      if (!lastGaps[0]) {
+        showToast('Aucun créneau libre ≥ 30 min aujourd’hui.', 'info');
+        return;
+      }
+      await fillAssistantGap(lastGaps[0]);
+    });
+  }
+
   function createApptCardElement(appt) {
     return createWaitlistTableRow(appt);
+  }
+
+  function mapWaitlistRow(appt) {
+    if (!appt || typeof appt !== 'object') return null;
+    const name = appt.name || appt.patient_name || appt.nom || '';
+    const phone = appt.phone || appt.patient_phone || appt.telephone || '';
+    const priorite = appt.priorite || appt.priority || '';
+    return {
+      ...appt,
+      name,
+      phone,
+      telephone: phone,
+      priorite,
+      treatment: appt.treatment || priorite,
+      tagClass: appt.tagClass || (isWaitlistUrgent({ ...appt, priorite, treatment: priorite }) ? 'urgence' : ''),
+    };
   }
 
   function renderWaitlistPanel() {
     return safeRender('renderWaitlistPanel', () => {
     const container = $('waitlist-panel-list');
     if (!container) return;
-    const allWaitlist = [];
+    const mapped = lastWaitlist.map(mapWaitlistRow).filter(Boolean);
     const waitlist = waitlistUrgentOnly
-      ? allWaitlist.filter(isWaitlistUrgent)
-      : allWaitlist;
+      ? mapped.filter(isWaitlistUrgent)
+      : mapped;
     container.replaceChildren();
 
     const table = container.closest('.waitlist-table');
@@ -4296,6 +4517,7 @@ let handoffNotes = [];
           telephone: patientPhone,
           priorite: patientPriority,
         });
+        await loadAssistantWaitlist();
         showToast('Patient ajouté à la liste d\'attente avec succès', 'success');
       } catch (error) {
         if (isFetchAborted(error)) {
@@ -4435,20 +4657,21 @@ let handoffNotes = [];
 
   function toCrmPatient(record) {
     if (!record) return null;
-    const coverage = record.coverage ?? record.insurance ?? '';
-    const billingStatus = String(record.billingStatus || '').trim();
+    const Ops = window.DentaFlowBookingOps;
     return {
-      id: record.id,
+      id: record.id ?? record.phone_e164 ?? record.phone,
       name: record.name || 'Non spécifié',
-      phone: record.phone || '',
+      phone: record.phone || record.phone_e164 || '',
       email: record.email || '',
-      motif: record.treatment || 'Consultation',
-      status: record.status || 'Confirmé',
-      observations: record.observations || '',
-      coverage,
-      insurance: coverage,
-      billingStatus,
-      lastVisit: formatCrmLastVisit(record.rawDate),
+      motif: record.last_treatment || record.treatment || 'Consultation',
+      visit_count: Number(record.visit_count) || 0,
+      no_show_count: Number(record.no_show_count) || 0,
+      cancel_count: Number(record.cancel_count) || 0,
+      last_visit: record.last_visit || null,
+      next_visit: record.next_visit || null,
+      recent_visits: Array.isArray(record.recent_visits) ? record.recent_visits : [],
+      last_visit_label: Ops?.formatDayLabel(record.last_visit) || '—',
+      next_visit_label: Ops?.formatDayLabel(record.next_visit) || '—',
     };
   }
 
@@ -4468,17 +4691,15 @@ let handoffNotes = [];
 
   function updateCRMSidePanel(patientData) {
     if (!patientData) return;
+    const Ops = window.DentaFlowBookingOps;
 
     setText('crm-panel-name', patientData.name || 'Non spécifié');
     setCopyableField('crm-panel-phone', patientData.phone, 'Non renseigné');
-    setCopyableField('crm-panel-insurance', patientData.insurance, 'Non renseigné');
-    setText('crm-panel-last-visit', patientData.lastVisit || 'Non renseigné');
-    setText('crm-panel-email', patientData.email || 'Non renseigné');
+    setText('crm-panel-email', patientData.email || '—');
+    setText('crm-panel-visits', String(patientData.visit_count || 0));
+    setText('crm-panel-risk', `${patientData.no_show_count || 0} / ${patientData.cancel_count || 0}`);
+    setText('crm-panel-last-visit', patientData.last_visit_label || '—');
     setText('crm-panel-motif', patientData.motif || 'Consultation');
-    setText(
-      'crm-panel-observations',
-      patientData.observations || 'Aucune observation clinique enregistrée.'
-    );
 
     const subtitleEl = $('crm-panel-subtitle');
     if (subtitleEl) {
@@ -4490,10 +4711,44 @@ let handoffNotes = [];
 
     const statusEl = $('crm-panel-status');
     if (statusEl) {
-      const statusLabel = patientData.status || 'Confirmé';
-      const mod = getCrmStatutTagClass(statusLabel);
-      statusEl.className = `crm-side-panel-statut status-pill ${mod}`.trim();
-      fillStatusPillElement(statusEl, statusLabel, mod);
+      const statusLabel = patientData.next_visit ? 'Prochain RDV' : (patientData.last_visit ? 'Vu' : '—');
+      statusEl.className = 'crm-side-panel-statut crm-tag';
+      statusEl.textContent = statusLabel;
+    }
+
+    const timeline = $('crm-panel-timeline');
+    if (timeline) {
+      timeline.replaceChildren();
+      const visits = patientData.recent_visits || [];
+      if (!visits.length) {
+        const empty = document.createElement('li');
+        empty.textContent = 'Aucun historique de rendez-vous.';
+        timeline.appendChild(empty);
+      } else {
+        visits.forEach((visit) => {
+          const li = document.createElement('li');
+          li.className = 'crm-timeline__item';
+          const when = Ops?.formatDayLabel(visit.starts_at) || '';
+          const time = Ops?.casablancaHm(visit.starts_at) || '';
+          li.innerHTML = `<strong>${escapeHtml(visit.treatment_name || 'Consultation')}</strong>
+            <span>${escapeHtml(when)} ${escapeHtml(time)} · ${escapeHtml(visit.status || '')}</span>
+            ${visit.notes ? `<p>${escapeHtml(visit.notes)}</p>` : ''}`;
+          timeline.appendChild(li);
+        });
+      }
+    }
+
+    const notesEl = $('crm-panel-notes');
+    if (notesEl) {
+      const related = (handoffNotes || []).filter((note) => {
+        const name = String(note.patient_name || '').toLowerCase();
+        const visitIds = new Set((patientData.recent_visits || []).map((visit) => String(visit.id)));
+        const bookingMatch = note.booking_id && visitIds.has(String(note.booking_id));
+        return bookingMatch || (name && name === String(patientData.name || '').toLowerCase());
+      });
+      notesEl.textContent = related.length
+        ? related.map((note) => `${note.author || 'Équipe'}: ${note.message || note.text}`).join('\n')
+        : 'Aucune note liée à ce patient.';
     }
   }
 
@@ -4511,9 +4766,10 @@ let handoffNotes = [];
       emptyRow.className = 'crm-table-empty';
       const cell = document.createElement('td');
       cell.colSpan = 6;
-      cell.textContent = 'Aucun patient pour aujourd\'hui.';
+      cell.textContent = 'Aucun patient trouvé';
       emptyRow.appendChild(cell);
       tbody.appendChild(emptyRow);
+      hideSkeleton('crm');
       return;
     }
 
@@ -4529,62 +4785,16 @@ let handoffNotes = [];
       tr.setAttribute('role', 'button');
       tr.dataset.patientId = String(patient.id);
 
-      const nameCell = document.createElement('td');
-      const hasNotes = Boolean(String(patient.observations || '').trim());
-      if (hasNotes) {
-        nameCell.className = 'has-notes';
-        nameCell.textContent = patient.name || '';
-        const indicator = document.createElement('span');
-        indicator.className = 'notes-indicator';
-        indicator.setAttribute('aria-hidden', 'true');
-        indicator.dataset.tooltip = 'Notes internes disponibles';
-        nameCell.appendChild(indicator);
-      } else {
-        nameCell.textContent = patient.name || '';
-      }
-      if (patient.name) nameCell.dataset.tooltip = patient.name;
-
-      const phoneCell = document.createElement('td');
-      if (patient.phone) {
-        phoneCell.appendChild(createCopyableSpan(patient.phone));
-      } else {
-        phoneCell.textContent = 'Non renseigné';
-      }
-
-      const emailCell = document.createElement('td');
-      emailCell.textContent = patient.email || '—';
-
-      const motifCell = document.createElement('td');
-      motifCell.appendChild(createStatusPillElement(
-        patient.motif || 'Consultation',
-        'status-pill--neutral'
-      ));
-
-      const billingCell = document.createElement('td');
-      const billingLabel = patient.billingStatus || '—';
-      if (billingLabel && billingLabel !== '—') {
-        billingCell.appendChild(createStatusPillElement(
-          billingLabel,
-          getBillingStatusPillClass(billingLabel)
-        ));
-      } else {
-        billingCell.textContent = '—';
-      }
-
-      const statusCell = document.createElement('td');
-      statusCell.appendChild(createStatusPillElement(
-        patient.status || 'Confirmé',
-        getCrmStatutTagClass(patient.status)
-      ));
-
-      tr.dataset.billingStatus = patient.billingStatus || '';
-
-      tr.append(nameCell, phoneCell, emailCell, motifCell, billingCell, statusCell);
+      [patient.name, patient.phone || '—', patient.motif, String(patient.visit_count), patient.last_visit_label, patient.next_visit_label]
+        .forEach((text) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
       tbody.appendChild(tr);
     });
 
-    const firstRow = tbody.querySelector('.crm-table-row');
-    if (firstRow) firstRow.classList.add('active-row');
+    hideSkeleton('crm');
     refreshInvisibleUIDecorations(tbody);
     applyCrmRowVisibility();
     });
@@ -4620,9 +4830,7 @@ let handoffNotes = [];
     tbody.querySelectorAll('tr.crm-table-row').forEach((row) => {
       const text = row.textContent.toLowerCase();
       const matchesSearch = !query || text.includes(query);
-      const billingStatus = row.dataset.billingStatus || '';
-      const matchesBilling = !crmUnpaidOnly || isUnpaidBillingStatus(billingStatus);
-      row.classList.toggle('is-hidden', !(matchesSearch && matchesBilling));
+      row.classList.toggle('is-hidden', !matchesSearch);
     });
   }
 
@@ -4771,30 +4979,11 @@ let handoffNotes = [];
     button.dataset.fillGapWired = 'true';
 
     button.addEventListener('click', async () => {
-      const confirmed = await askConfirm('Remplacer le créneau avec un patient de la liste d\'attente ?');
-      if (!confirmed) return;
-
-      button.classList.add('is-loading');
-      button.disabled = true;
-      try {
-        const response = await fetch(
-          CONFIG.FILL_GAP_PROXY,
-          { method: 'POST', credentials: 'include', headers: apiHeaders(), body: JSON.stringify({}) }
-        );
-        const payload = await response.json();
-        if (!response.ok || payload?.ok === false) {
-          throw new Error(payload?.error || `HTTP ${response.status}`);
-        }
-
-        button.classList.add('is-success');
-        toastFillGapResult(payload);
-      } catch {
-        showToast('Impossible de consulter la liste d\'attente — réessayez.', 'error');
-      } finally {
-        button.classList.remove('is-loading');
-        button.disabled = false;
-        setTimeout(() => button.classList.remove('is-success'), 2500);
+      if (!lastGaps.length) {
+        showToast('Aucun créneau libre ≥ 30 min aujourd’hui.', 'info');
+        return;
       }
+      await fillAssistantGap(lastGaps[0]);
     });
   }
 
@@ -4950,7 +5139,11 @@ let handoffNotes = [];
       initCrmSearch();
       initCrmSidePanel();
     });
+    runInitStep('statusBoard', () => initAssistantStatusBoard());
     runInitStep('planning', () => loadPlanning());
+    runInitStep('directory', () => loadPatientDirectory());
+    runInitStep('gaps', () => loadAssistantGaps());
+    runInitStep('waitlistOps', () => loadAssistantWaitlist());
 
     runInitStep('activeView', () => {
       const activeViewEl = $(VIEW_MAP[activeView]);

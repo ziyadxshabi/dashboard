@@ -77,12 +77,15 @@
     return {
       id,
       text,
+      message: text,
       type: author ? 'manual' : 'system',
       category,
       pinned,
       author: author || undefined,
       time,
       readBy: Array.isArray(item.readBy) ? item.readBy : [],
+      patient_name: asText(item.patient_name),
+      booking_id: item.booking_id ?? null,
     };
   }
 

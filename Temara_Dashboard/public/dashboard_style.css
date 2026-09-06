@@ -7646,3 +7646,192 @@ html[data-theme="oak-lounge"] .status-pill--urgence,
 html[data-theme="oak-lounge"] .appt-tag--urgence {
   color: #E8A090 !important;
 }
+
+/* ── Booking OS: status board, gaps, CRM timeline ── */
+.honest-banner__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.status-board-wrap {
+  margin-top: 24px;
+}
+
+.status-board-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.status-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.status-board__lane {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  min-height: 160px;
+  padding: 10px;
+}
+
+.status-board__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.status-board__head h3 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #A0A0AB;
+}
+
+.status-board__count {
+  font-variant-numeric: tabular-nums;
+  color: #C89E66;
+  font-size: 13px;
+}
+
+.status-board__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-board__card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.status-board__time {
+  margin: 0;
+  font-size: 11px;
+  color: #C89E66;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-board__name,
+.status-board__motif {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.status-board__motif {
+  color: #8C8C9A;
+  font-size: 12px;
+}
+
+.status-board__empty {
+  margin: 8px 0 0;
+  color: #6B6B78;
+  font-size: 12px;
+}
+
+.status-board__strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.status-board__chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(224, 122, 95, 0.35);
+  color: #E07A5F;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.gap-panel {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gap-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gap-list__row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.gap-list__empty {
+  margin: 8px 0 0;
+  color: #8C8C9A;
+  font-size: 13px;
+}
+
+.crm-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.crm-timeline__item {
+  border-left: 2px solid rgba(200, 158, 102, 0.45);
+  padding: 0 0 0 12px;
+}
+
+.crm-timeline__item strong {
+  display: block;
+  font-size: 13px;
+}
+
+.crm-timeline__item span,
+.crm-timeline__item p {
+  display: block;
+  color: #8C8C9A;
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+
+@media (max-width: 900px) {
+  .honest-banner__grid,
+  .status-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+html[data-theme="pearl-clinic"] .status-board__lane,
+html[data-theme="pearl-clinic"] .gap-panel {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="pearl-clinic"] .status-board__card {
+  background: #f7f5f1;
+  border-color: rgba(0, 0, 0, 0.06);
+}
