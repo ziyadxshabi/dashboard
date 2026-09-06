@@ -1829,6 +1829,11 @@ function getEmptyDashboardData() {
     no_shows:        0,
     accepted_plans:  0,
     pending_plans:   0,
+    reserved_min:    0,
+    open_min:        CONFIG.OPEN_MINUTES || 660,
+    treatment_mix:   [],
+    returning_phones: 0,
+    new_phones:      0,
   };
 }
 
@@ -1983,7 +1988,11 @@ function normaliseData(raw) {
     if (typeof v === 'number' && Number.isFinite(v)) {
       out[k] = v;
     } else if (Array.isArray(v)) {
-      out[k] = v.map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : asMetric(item)));
+      out[k] = v.map((item) => {
+        if (typeof item === 'number' && Number.isFinite(item)) return item;
+        if (item && typeof item === 'object' && !Array.isArray(item)) return item;
+        return asMetric(item);
+      });
     } else if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
       out[k] = Number(v);
     } else if (typeof v === 'boolean') {
@@ -3764,9 +3773,15 @@ function renderDoctorLiveGlance(records) {
 
   const todayRows = filterTodayAppointments(records).sort(sortDoctorAppointmentsByTime);
   const chair = todayRows.filter((record) => normalizeDigestStatus(record.status) === 'en soin');
+  const nowMs = Date.now();
   const upcoming = todayRows.filter((record) => {
     const key = normalizeDigestStatus(record.status);
-    return key === 'confirme' || key === 'en attente' || (key.includes('salle') && key.includes('attente'));
+    if (key === 'annule' || key === 'termine' || key === 'no-show' || key === 'en soin') return false;
+    const waiting = key.includes('salle') && key.includes('attente');
+    if (waiting) return true;
+    if (key !== 'confirme' && key !== 'en attente') return false;
+    const start = new Date(record.rawDate || record.starts_at || 0).getTime();
+    return Number.isFinite(start) && start >= nowMs;
   }).slice(0, 3);
 
   renderGlanceRows('hub-in-chair', chair, 'Personne au fauteuil');
