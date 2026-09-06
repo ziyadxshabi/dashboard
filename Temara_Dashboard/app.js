@@ -82,6 +82,8 @@ const PIN_BADGE_SVG = lucideIcon('pin', 'icon-sm');
 
 const PLANNING_UPSTREAM_ERROR_MESSAGE =
   'Erreur de connexion au serveur (503). Veuillez rafraîchir la page ou contacter le support.';
+const PLANNING_SERVER_ERROR_MESSAGE =
+  'Erreur interne du serveur (HTTP 500). Veuillez rafraîchir la page ou contacter le support.';
 
   const RowUI = window.DentaFlowRowUI || {};
 
@@ -2456,14 +2458,17 @@ let handoffNotes = [];
     if (/service unavailable|upstream http error|upstream timeout|upstream error/i.test(msg)) {
       return PLANNING_UPSTREAM_ERROR_MESSAGE;
     }
-    if (/503/.test(msg)) {
+    const httpStatusMatch = msg.match(/\bHTTP (5\d{2})\b/);
+    if (httpStatusMatch) {
+      return httpStatusMatch[1] === '503'
+        ? PLANNING_UPSTREAM_ERROR_MESSAGE
+        : PLANNING_SERVER_ERROR_MESSAGE;
+    }
+    if (/\b503\b/.test(msg)) {
       return PLANNING_UPSTREAM_ERROR_MESSAGE;
     }
     if (/^HTTP 404\b/.test(msg) || msg.includes('HTTP 404')) {
       return 'Erreur de synchronisation avec la base de données';
-    }
-    if (/^HTTP 5\d{2}\b/.test(msg)) {
-      return PLANNING_UPSTREAM_ERROR_MESSAGE;
     }
     if (/failed to fetch|networkerror|load failed/i.test(msg)) {
       return 'Impossible de charger le planning — Mode hors-ligne';
@@ -2472,7 +2477,7 @@ let handoffNotes = [];
       return 'Aucun rendez-vous trouvé ou données indisponibles.';
     }
     if (msg.startsWith('{') && msg.includes('"error"')) {
-      return PLANNING_UPSTREAM_ERROR_MESSAGE;
+      return PLANNING_SERVER_ERROR_MESSAGE;
     }
     if (msg && msg.length <= 160) {
       return msg;
