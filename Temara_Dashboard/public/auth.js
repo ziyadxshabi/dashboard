@@ -7,7 +7,6 @@
 
   const AUTH_ENDPOINT = '/api/auth';
   const SESSION_ROLE_KEY = 'dentaflow_role';
-  const SESSION_TOKEN_KEY = 'dentaflow_session';
 
   let selectedRole = 'doctor';
   let authInitialized = false;
@@ -15,6 +14,10 @@
   let isLoggingOut = false;
   let sessionValidated = false;
   let sessionUser = null;
+  let sessionRole = '';
+  /** idle | pending | ok | none — cookie probe, not sessionStorage. */
+  let restoreState = 'idle';
+  let restoreInflight = null;
   const logoutTeardowns = [];
 
   function initLoginReveal() {
@@ -385,8 +388,10 @@
 
   function markSessionValidated(payload) {
     sessionValidated = true;
+    restoreState = 'ok';
     sessionUser = payload?.user && typeof payload.user === 'object' ? payload.user : null;
     const role = payload?.role || payload?.user?.role || selectedRole || '';
+    sessionRole = role;
     if (role) {
       try {
         sessionStorage.setItem(SESSION_ROLE_KEY, role);
@@ -394,28 +399,68 @@
     }
   }
 
-  async function tryRestoreSession() {
+  function rememberFailedRestore() {
+    sessionValidated = false;
+    sessionUser = null;
+    sessionRole = '';
+    restoreState = 'none';
+    try {
+      sessionStorage.removeItem(SESSION_ROLE_KEY);
+    } catch { /* private browsing / disabled storage */ }
+  }
+
+  async function probeCookieSession() {
+    restoreState = 'pending';
     const session = await validateSession();
     if (!session?.ok) {
-      clearSession();
-      showLoginGate();
-      return;
+      rememberFailedRestore();
+      return null;
     }
     markSessionValidated(session);
     applySessionClinic(session.clinic);
-    await handleAuthSuccess(session.role || session.user?.role);
+    return session;
+  }
+
+  function restoreCookieSession() {
+    if (isAuthenticated()) return Promise.resolve(true);
+    if (restoreInflight) return restoreInflight;
+    if (restoreState === 'none') return Promise.resolve(false);
+
+    restoreInflight = probeCookieSession()
+      .then((session) => Boolean(session))
+      .finally(() => {
+        restoreInflight = null;
+      });
+    return restoreInflight;
+  }
+
+  async function ensureSessionRestored() {
+    if (isAuthenticated()) return true;
+    return restoreCookieSession();
+  }
+
+  function isRestorePending() {
+    return restoreState === 'pending' || Boolean(restoreInflight);
+  }
+
+  async function tryRestoreSession() {
+    const restored = await restoreCookieSession();
+    if (!restored) {
+      showLoginGate();
+      return false;
+    }
+    await handleAuthSuccess(getStoredRole() || selectedRole);
+    return true;
   }
 
   async function initAuthGate() {
     if (authInitialized) return;
     authInitialized = true;
 
-    if (document.body.classList.contains('mode-client')) return;
-
-    // No auth gate marker + no session → hard redirect to login entry.
+    // No auth gate marker: wait for the cookie probe before redirecting.
     if (!document.body.classList.contains('auth-gate-active')) {
-      if (!isAuthenticated()) {
-        clearSession();
+      const ok = await ensureSessionRestored();
+      if (!ok) {
         window.location.replace(getLoginHref());
       }
       return;
@@ -435,6 +480,7 @@
   }
 
   function getStoredRole() {
+    if (sessionRole) return sessionRole;
     try {
       return sessionStorage.getItem(SESSION_ROLE_KEY) || '';
     } catch {
@@ -443,7 +489,7 @@
   }
 
   function isAuthenticated() {
-    return sessionValidated && Boolean(getStoredRole());
+    return sessionValidated && Boolean(sessionRole || getStoredRole());
   }
 
   function getSessionUser() {
@@ -470,9 +516,10 @@
   function clearSession() {
     sessionValidated = false;
     sessionUser = null;
+    sessionRole = '';
+    if (restoreState !== 'pending') restoreState = 'none';
     try {
       sessionStorage.removeItem(SESSION_ROLE_KEY);
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
     } catch { /* private browsing / disabled storage */ }
   }
 
@@ -491,12 +538,12 @@
    * Returns false when navigation/redirect was triggered.
    */
   function enforceRouteGuard() {
-    if (document.body.classList.contains('mode-client')) return true;
-
     // Auth gate page may render login UI while unauthenticated.
     if (document.body.classList.contains('auth-gate-active')) {
       return isAuthenticated();
     }
+
+    if (isRestorePending()) return false;
 
     if (!isAuthenticated()) {
       clearSession();
@@ -508,10 +555,12 @@
   }
 
   /**
-   * Call before any protected data fetch. Throws after starting logout/redirect.
+   * Call before any protected data fetch. Awaits cookie restore, then throws
+   * after starting logout/redirect if the session is still missing.
    */
-  function requireSession() {
-    if (isAuthenticated()) return true;
+  async function requireSession() {
+    const ok = await ensureSessionRestored();
+    if (ok) return true;
     void logout();
     throw createUnauthorizedError();
   }
@@ -599,13 +648,14 @@
 
   window.DentaFlowAuth = {
     SESSION_ROLE_KEY,
-    SESSION_TOKEN_KEY,
     getRole: getStoredRole,
     getSessionUser,
     getSessionClinic: () => sessionClinic,
     getToken: getBearerToken,
     getAuthHeaders: buildAuthHeaders,
     isAuthenticated,
+    isRestorePending,
+    ensureSessionRestored,
     checkSession,
     enforceRouteGuard,
     requireSession,
