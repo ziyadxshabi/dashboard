@@ -491,6 +491,7 @@ async function run() {
       'en_soin writes En soin',
       toSoin.body?.data?.status === 'En soin' && toSoin.body?.data?.statusCode === 'en_soin'
     );
+    ok('en_soin stamps care_started_at', Boolean(toSoin.body?.data?.care_started_at));
 
     const toTermine = await postStatus('termine');
     ok('POST /api/update-status termine returns 200', toTermine.statusCode === 200);
@@ -533,7 +534,21 @@ async function run() {
       `status=${crossClinic.statusCode}`
     );
 
-    const cancelled = await postStatus('Annulé');
+    const doctorStatus = await postStatus('en_salle', doctorCookie);
+    ok('POST /api/update-status as doctor returns 403', doctorStatus.statusCode === 403);
+
+    const missingReason = await postStatus('Annulé');
+    ok('POST /api/update-status Annulé without cancel_reason returns 400', missingReason.statusCode === 400);
+
+    const cancelled = await invoke(
+      handleUpdateStatus,
+      createReq({
+        method: 'POST',
+        url: '/api/update-status',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { bookingId: statusBookingId, newStatus: 'Annulé', cancelReason: 'oublie' },
+      })
+    );
     ok('POST /api/update-status Annulé returns 200', cancelled.statusCode === 200);
     ok('annule writes Annule', cancelled.body?.data?.status === 'Annule');
     ok('annule sets triggerCalCancel', cancelled.body?.triggerCalCancel === true);
@@ -797,11 +812,11 @@ async function run() {
       createReq({
         method: 'POST',
         url: '/api/fill-gap',
-        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
         body: {
           slotDate: '2026-09-12',
           slotTime: '10:30',
-          reason: 'Trou dans le planning',
+          reason: 'Consultation',
           candidateId: fillGapWaitlistId,
         },
       })
@@ -838,6 +853,17 @@ async function run() {
     })
   );
   ok('POST /api/fill-gap rejects invalid slotDate with 400', fillGapBadDate.statusCode === 400);
+
+  const fillGapDoctor = await invoke(
+    handleFillGap,
+    createReq({
+      method: 'POST',
+      url: '/api/fill-gap',
+      headers: { ...doctorCookie, 'content-type': 'application/json' },
+      body: { slotDate: '2026-09-12', slotTime: '10:30' },
+    })
+  );
+  ok('POST /api/fill-gap as doctor returns 403', fillGapDoctor.statusCode === 403);
 
   // ── Bulk SMS audit (Postgres) ──────────────────────────────────────────
   console.log('\n[bulk-sms]');
@@ -1272,6 +1298,253 @@ async function run() {
     ok('BOOKING_CANCELLED status is Annule', cancelledRow.rows[0]?.status === 'Annule');
   } finally {
     await query('DELETE FROM bookings WHERE cal_booking_uid = $1', [calUid]);
+  }
+
+  // ── Assistant floor ops ────────────────────────────────────────────────
+  console.log('\n[floor-ops]');
+  const floorIds = [];
+  try {
+    const catalog = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?catalog=1', headers: assistantCookie })
+    );
+    ok('GET /api/roster?catalog=1 returns 200', catalog.statusCode === 200, `status=${catalog.statusCode}`);
+    ok('catalog lists treatments', Array.isArray(catalog.body?.data?.treatments) && catalog.body.data.treatments.length > 0);
+    ok('catalog includes buffer_min', Number(catalog.body?.data?.buffer_min) >= 0);
+
+    const visitStart = '2026-11-03T09:00:00.000+01:00';
+    const overlapStart = '2026-11-03T09:05:00.000+01:00';
+    const dupPhone = '0655510001';
+
+    const visit = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'visit',
+          patientName: 'Nadia Floor',
+          phone: dupPhone,
+          treatment: 'Consultation',
+          startsAt: visitStart,
+        },
+      })
+    );
+    ok('POST /api/roster visit returns 201', visit.statusCode === 201, `status=${visit.statusCode} body=${JSON.stringify(visit.body)}`);
+    if (visit.body?.data?.id) floorIds.push(visit.body.data.id);
+
+    const overlap = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'visit',
+          patientName: 'Omar Floor',
+          phone: '0655510002',
+          treatment: 'Consultation',
+          startsAt: overlapStart,
+        },
+      })
+    );
+    ok('POST /api/roster overlap returns 409', overlap.statusCode === 409, `status=${overlap.statusCode} body=${JSON.stringify(overlap.body)}`);
+    ok('overlap uses OVERLAP code', overlap.body?.code === 'OVERLAP');
+
+    const dupHint = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'visit',
+          patientName: 'Nadia Floor',
+          phone: dupPhone,
+          treatment: 'Détartrage',
+          startsAt: '2026-11-03T11:00:00.000+01:00',
+        },
+      })
+    );
+    ok('POST /api/roster duplicate hint returns 409', dupHint.statusCode === 409);
+    ok('duplicate uses DUPLICATE_HINT', dupHint.body?.code === 'DUPLICATE_HINT');
+
+    const dupConfirm = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'visit',
+          patientName: 'Nadia Floor',
+          phone: dupPhone,
+          treatment: 'Détartrage',
+          startsAt: '2026-11-03T11:00:00.000+01:00',
+          confirmDuplicate: true,
+        },
+      })
+    );
+    ok('confirmDuplicate visit returns 201', dupConfirm.statusCode === 201, `status=${dupConfirm.statusCode}`);
+    if (dupConfirm.body?.data?.id) floorIds.push(dupConfirm.body.data.id);
+
+    const walkIn = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'visit',
+          walkIn: true,
+          patientName: 'Walkin Floor',
+          phone: '0655510003',
+          treatment: 'Urgence',
+        },
+      })
+    );
+    ok('POST /api/roster walk-in returns 201', walkIn.statusCode === 201, `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`);
+    ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
+    if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+
+    const doctorVisit = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'visit',
+          patientName: 'Docteur Visit',
+          phone: '0655510004',
+          treatment: 'Consultation',
+          startsAt: '2026-11-04T09:00:00.000+01:00',
+        },
+      })
+    );
+    ok('POST visit as doctor returns 403', doctorVisit.statusCode === 403);
+
+    const block = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'block',
+          blockLabel: 'Déjeuner',
+          startsAt: '2026-11-04T12:00:00.000+01:00',
+          durationMin: 60,
+        },
+      })
+    );
+    ok('POST /api/roster block as doctor returns 201', block.statusCode === 201, `status=${block.statusCode} body=${JSON.stringify(block.body)}`);
+    ok('block kind is block', block.body?.data?.booking_kind === 'block');
+    if (block.body?.data?.id) floorIds.push(block.body.data.id);
+
+    const assistantBlock = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'block',
+          blockLabel: 'Labo',
+          startsAt: '2026-11-04T14:00:00.000+01:00',
+        },
+      })
+    );
+    ok('POST block as assistant returns 403', assistantBlock.statusCode === 403);
+
+    const hold = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: {
+          kind: 'emergency_hold',
+          startsAt: '2026-11-04T16:00:00.000+01:00',
+          durationMin: 30,
+        },
+      })
+    );
+    ok('POST emergency_hold returns 201', hold.statusCode === 201, `status=${hold.statusCode}`);
+    ok('hold kind is emergency_hold', hold.body?.data?.booking_kind === 'emergency_hold');
+    const holdId = hold.body?.data?.id;
+    if (holdId) floorIds.push(holdId);
+
+    const released = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=release',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: holdId,
+          patientName: 'Urgence Relachee',
+          phone: '0655510005',
+          treatment: 'Urgence',
+        },
+      })
+    );
+    ok('POST /api/roster?action=release returns 200', released.statusCode === 200, `status=${released.statusCode} body=${JSON.stringify(released.body)}`);
+    ok('released hold becomes visit', released.body?.data?.booking_kind === 'visit');
+
+    const recall = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=recall',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          bookingId: visit.body?.data?.id,
+          dueOn: '2020-01-01',
+        },
+      })
+    );
+    ok('POST /api/roster?action=recall returns 200', recall.statusCode === 200, `status=${recall.statusCode}`);
+    const recallId = recall.body?.data?.id;
+
+    const due = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?recalls=open', headers: assistantCookie })
+    );
+    ok('GET /api/roster?recalls=open returns 200', due.statusCode === 200);
+    ok(
+      'open recalls include the due row',
+      (due.body?.data || []).some((row) => row.id === recallId),
+      JSON.stringify(due.body?.data)
+    );
+
+    const fillBlocked = await invoke(
+      handleFillGap,
+      createReq({
+        method: 'POST',
+        url: '/api/fill-gap',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          slotDate: '2026-11-04',
+          slotTime: '12:00',
+          reason: 'Consultation',
+          candidateId: null,
+        },
+      })
+    );
+    ok('fill-gap without candidate still lists waitlist', fillBlocked.statusCode === 200);
+
+    if (recallId) await query('DELETE FROM recalls WHERE id = $1', [recallId]);
+  } finally {
+    if (floorIds.length) {
+      await query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [floorIds]);
+    }
+    await query(
+      `DELETE FROM bookings
+       WHERE patient_phone IN ('0655510001','0655510002','0655510003','0655510004','0655510005')
+          OR patient_name IN ('Nadia Floor','Omar Floor','Walkin Floor','Urgence Relachee')`
+    );
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────

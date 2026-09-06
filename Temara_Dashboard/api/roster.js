@@ -5,21 +5,58 @@
  * GET /api/roster                 → today's roster (Africa/Casablanca)
  * GET /api/roster?from&to         → inclusive date range, max 42 days
  * GET /api/roster?q=              → name/phone search, last 90 days
+ * GET /api/roster?catalog=1       → treatment catalog + next free slot
+ * GET /api/roster?recalls=open    → due 6-month recalls
+ * POST /api/roster                → visit / walk-in / block / emergency_hold
+ * POST /api/roster?action=recall|release|delete|status
  */
 'use strict';
 
 const { applyCors } = require('./_lib/auth-crypto');
 const { query } = require('./_lib/db');
-const { createApiError, requireClinicSession, sendDbError } = require('./_lib/validation');
+const {
+  createApiError,
+  requireClinicSession,
+  sendDbError,
+  validateRosterCreate,
+} = require('./_lib/validation');
 const handleStatusUpdate = require('./_lib/update-booking-status');
+const rosterOps = require('./_lib/roster-ops');
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROSTER_DAYS = 42;
 const SEARCH_LOOKBACK_DAYS = 90;
 const MAX_QUERY_LEN = 80;
 
+const ROSTER_COLUMNS = `
+  id,
+  cal_booking_uid,
+  patient_name,
+  patient_phone,
+  treatment_name,
+  status,
+  starts_at,
+  duration_min,
+  notes,
+  booking_kind,
+  care_started_at,
+  cancel_reason,
+  buffer_min,
+  (
+    SELECT COUNT(*)::int
+    FROM bookings n
+    WHERE n.clinic_id = bookings.clinic_id
+      AND COALESCE(n.booking_kind, 'visit') = 'visit'
+      AND n.status = 'No-show'
+      AND n.patient_phone <> ''
+      AND n.patient_phone = bookings.patient_phone
+      AND (n.starts_at AT TIME ZONE 'Africa/Casablanca')::date
+        >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 90
+  ) AS noshow_90d
+`;
+
 const ROSTER_TODAY_SQL = `
-  SELECT id, cal_booking_uid, patient_name, patient_phone, treatment_name, status, starts_at, duration_min, notes
+  SELECT ${ROSTER_COLUMNS}
   FROM bookings
   WHERE clinic_id = $1
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
@@ -27,7 +64,7 @@ const ROSTER_TODAY_SQL = `
 `;
 
 const ROSTER_RANGE_SQL = `
-  SELECT id, cal_booking_uid, patient_name, patient_phone, treatment_name, status, starts_at, duration_min, notes
+  SELECT ${ROSTER_COLUMNS}
   FROM bookings
   WHERE clinic_id = $1
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date >= $2::date
@@ -36,7 +73,7 @@ const ROSTER_RANGE_SQL = `
 `;
 
 const ROSTER_SEARCH_SQL = `
-  SELECT id, cal_booking_uid, patient_name, patient_phone, treatment_name, status, starts_at, duration_min, notes
+  SELECT ${ROSTER_COLUMNS}
   FROM bookings
   WHERE clinic_id = $1
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
@@ -51,7 +88,7 @@ const ROSTER_SEARCH_SQL = `
 `;
 
 const ROSTER_RANGE_SEARCH_SQL = `
-  SELECT id, cal_booking_uid, patient_name, patient_phone, treatment_name, status, starts_at, duration_min, notes
+  SELECT ${ROSTER_COLUMNS}
   FROM bookings
   WHERE clinic_id = $1
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date >= $2::date
@@ -92,6 +129,11 @@ function mapRosterRow(row) {
     status: row.status,
     time,
     duration_min: row.duration_min,
+    buffer_min: row.buffer_min,
+    booking_kind: row.booking_kind || 'visit',
+    care_started_at: row.care_started_at || null,
+    cancel_reason: row.cancel_reason || null,
+    noshow_90d: Number(row.noshow_90d) || 0,
     cal_booking_uid: row.cal_booking_uid,
     calBookingId: row.cal_booking_uid,
     notes: row.notes || '',
@@ -181,64 +223,108 @@ function parseRosterQuery(req) {
   return { ok: true, q };
 }
 
+function searchParam(req, name) {
+  try {
+    return new URL(String(req.url || ''), 'http://localhost').searchParams.get(name) || '';
+  } catch {
+    return '';
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'GET, POST, PATCH, OPTIONS');
     return res.status(204).end();
   }
 
-  let action = '';
-  try {
-    action = new URL(String(req.url || ''), 'http://localhost').searchParams.get('action') || '';
-  } catch {
-    action = '';
-  }
+  const action = searchParam(req, 'action');
 
   if (req.method === 'PATCH' || (req.method === 'POST' && action === 'status')) {
     return handleStatusUpdate(req, res);
   }
 
-  applyCors(res, 'GET, OPTIONS');
+  applyCors(res, 'GET, POST, PATCH, OPTIONS');
 
-  if (req.method !== 'GET') {
+  if (req.method === 'GET') {
+    const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+    if (!session) return;
+
+    if (searchParam(req, 'catalog') === '1') {
+      try {
+        return await rosterOps.handleCatalog(res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (searchParam(req, 'recalls')) {
+      try {
+        return await rosterOps.handleRecallsGet(res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    const parsedRange = parseRosterRange(req);
+    if (!parsedRange.ok) {
+      return res.status(400).json(parsedRange.error);
+    }
+    const parsedQuery = parseRosterQuery(req);
+    if (!parsedQuery.ok) {
+      return res.status(400).json(parsedQuery.error);
+    }
+
+    try {
+      const like = parsedQuery.q ? `%${parsedQuery.q}%` : '';
+      let result;
+      if (parsedRange.range && like) {
+        result = await query(ROSTER_RANGE_SEARCH_SQL, [
+          session.clinic_id,
+          parsedRange.range.from,
+          parsedRange.range.to,
+          like,
+        ]);
+      } else if (like) {
+        result = await query(ROSTER_SEARCH_SQL, [session.clinic_id, like]);
+      } else if (parsedRange.range) {
+        result = await query(ROSTER_RANGE_SQL, [
+          session.clinic_id,
+          parsedRange.range.from,
+          parsedRange.range.to,
+        ]);
+      } else {
+        result = await query(ROSTER_TODAY_SQL, [session.clinic_id]);
+      }
+      const appointments = (result.rows || []).map(mapRosterRow);
+      return res.status(200).json({ ok: true, data: appointments });
+    } catch (err) {
+      return sendDbError(res, err);
+    }
+  }
+
+  if (req.method !== 'POST') {
     return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
   const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
   if (!session) return;
 
-  const parsedRange = parseRosterRange(req);
-  if (!parsedRange.ok) {
-    return res.status(400).json(parsedRange.error);
-  }
-  const parsedQuery = parseRosterQuery(req);
-  if (!parsedQuery.ok) {
-    return res.status(400).json(parsedQuery.error);
-  }
-
   try {
-    const like = parsedQuery.q ? `%${parsedQuery.q}%` : '';
-    let result;
-    if (parsedRange.range && like) {
-      result = await query(ROSTER_RANGE_SEARCH_SQL, [
-        session.clinic_id,
-        parsedRange.range.from,
-        parsedRange.range.to,
-        like,
-      ]);
-    } else if (like) {
-      result = await query(ROSTER_SEARCH_SQL, [session.clinic_id, like]);
-    } else if (parsedRange.range) {
-      result = await query(ROSTER_RANGE_SQL, [
-        session.clinic_id,
-        parsedRange.range.from,
-        parsedRange.range.to,
-      ]);
-    } else {
-      result = await query(ROSTER_TODAY_SQL, [session.clinic_id]);
+    if (action === 'recall') {
+      return await rosterOps.handleRecallCreate(req, res, session);
     }
-    const appointments = (result.rows || []).map(mapRosterRow);
-    return res.status(200).json({ ok: true, data: appointments });
+    if (action === 'release') {
+      return await rosterOps.handleReleaseHold(req, res, session);
+    }
+    if (action === 'delete') {
+      return await rosterOps.handleDeleteBlock(req, res, session);
+    }
+
+    const parsed = validateRosterCreate(req.body ?? {});
+    if (!parsed.ok) {
+      return res.status(400).json(parsed.error);
+    }
+    return await rosterOps.handleCreate(req, res, session, parsed);
   } catch (err) {
     return sendDbError(res, err);
   }

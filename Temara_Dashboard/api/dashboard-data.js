@@ -39,6 +39,7 @@ const DASHBOARD_KPI_SQL = `
     COUNT(*) FILTER (WHERE status::text IN ('No-show', 'No-Show'))::int AS no_shows
   FROM bookings
   WHERE clinic_id = $1
+    AND COALESCE(booking_kind, 'visit') = 'visit'
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
 `;
 
@@ -57,6 +58,7 @@ const WEEK_PATIENTS_SQL = `
       COUNT(*) FILTER (WHERE status::text NOT IN ('Annule', 'Annulé'))::int AS patients
     FROM bookings
     WHERE clinic_id = $1
+      AND COALESCE(booking_kind, 'visit') = 'visit'
       AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
         >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
     GROUP BY 1
@@ -70,6 +72,7 @@ const HOURLY_TODAY_SQL = `
     COUNT(*) FILTER (WHERE status::text NOT IN ('Annule', 'Annulé'))::int AS patients
   FROM bookings
   WHERE clinic_id = $1
+    AND COALESCE(booking_kind, 'visit') = 'visit'
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
   GROUP BY 1
 `;
@@ -80,6 +83,7 @@ const RESERVED_TODAY_SQL = `
   SELECT COALESCE(SUM(duration_min), 0)::int AS reserved_min
   FROM bookings
   WHERE clinic_id = $1
+    AND COALESCE(booking_kind, 'visit') = 'visit'
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
       = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
     AND status::text NOT IN ('Annule', 'Annulé')
@@ -91,6 +95,7 @@ const TREATMENT_MIX_SQL = `
     COUNT(*)::int AS count
   FROM bookings
   WHERE clinic_id = $1
+    AND COALESCE(booking_kind, 'visit') = 'visit'
     AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
       >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
     AND status::text NOT IN ('Annule', 'Annulé')
@@ -104,6 +109,7 @@ const PHONE_FIDELITY_SQL = `
     SELECT DISTINCT TRIM(patient_phone) AS phone
     FROM bookings
     WHERE clinic_id = $1
+      AND COALESCE(booking_kind, 'visit') = 'visit'
       AND patient_phone IS NOT NULL
       AND TRIM(patient_phone) <> ''
       AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
@@ -114,6 +120,7 @@ const PHONE_FIDELITY_SQL = `
     SELECT DISTINCT TRIM(patient_phone) AS phone
     FROM bookings
     WHERE clinic_id = $1
+      AND COALESCE(booking_kind, 'visit') = 'visit'
       AND patient_phone IS NOT NULL
       AND TRIM(patient_phone) <> ''
       AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
@@ -160,6 +167,7 @@ const MONTH_WEEKS_SQL = `
       COUNT(*) FILTER (WHERE status::text NOT IN ('Annule', 'Annulé'))::int AS patients
     FROM bookings
     WHERE clinic_id = $1
+      AND COALESCE(booking_kind, 'visit') = 'visit'
       AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
         >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 27
       AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date

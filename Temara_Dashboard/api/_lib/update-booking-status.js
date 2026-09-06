@@ -19,9 +19,15 @@ const {
 const UPDATE_STATUS_SQL = `
   UPDATE bookings
   SET status = $1::appointment_status,
+      cancel_reason = CASE WHEN $1::text = 'Annule' THEN $4 ELSE NULL END,
+      care_started_at = CASE
+        WHEN $1::text = 'En soin' THEN COALESCE(care_started_at, NOW())
+        ELSE care_started_at
+      END,
       updated_at = NOW()
   WHERE clinic_id = $2
     AND (id::text = $3 OR cal_booking_uid = $3)
+    AND COALESCE(booking_kind, 'visit') = 'visit'
   RETURNING
     id,
     clinic_id,
@@ -32,6 +38,9 @@ const UPDATE_STATUS_SQL = `
     status::text AS status,
     starts_at,
     duration_min,
+    booking_kind,
+    care_started_at,
+    cancel_reason,
     notes,
     created_at,
     updated_at
@@ -49,7 +58,7 @@ module.exports = async function handleStatusUpdate(req, res) {
     return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant'] });
   if (!session) return;
 
   const parsed = validateStatusUpdate(req.body ?? {});
@@ -62,6 +71,7 @@ module.exports = async function handleStatusUpdate(req, res) {
       parsed.value.dbStatus,
       session.clinic_id,
       parsed.value.bookingId,
+      parsed.value.cancelReason,
     ]);
     const updatedBooking = result.rows[0];
     if (!updatedBooking) {
