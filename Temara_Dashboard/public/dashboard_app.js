@@ -425,6 +425,7 @@ function initDashboardCalendar() {
       right:  'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
     },
     locale: 'fr',
+    timeZone: 'Africa/Casablanca',
     firstDay: 1,
     height: 'auto',
     expandRows: true,
@@ -2668,12 +2669,12 @@ function updateHonestBanner(data = {}) {
       ? `${asMetric(data.occupancy.booked_min)} min réservées / ${asMetric(data.occupancy.capacity_min)} min ouvertes`
       : 'Minutes réservées / plage 08h–19h'
   );
-  const recovered = asMetric(data.recovered_slots);
+  const recovered = asMetric(data.waitlist_filled);
   setText('banner-recovered', String(recovered));
   setText(
     'banner-recovered-helper',
     recovered
-      ? `${recovered} rendez-vous issus de la liste d'attente`
+      ? `${recovered} patient${recovered > 1 ? 's' : ''} de la liste d'attente placé${recovered > 1 ? 's' : ''} sur un trou`
       : 'Liste d\'attente placée sur un trou du planning'
   );
   setText('banner-noshow-rate', Ops?.rateLabel(data.no_show_rate) || '—');

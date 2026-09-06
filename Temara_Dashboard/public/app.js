@@ -4150,6 +4150,7 @@ let handoffNotes = [];
         right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
       },
       locale: 'fr',
+      timeZone: 'Africa/Casablanca',
       firstDay: 1,
       height: 'auto',
       expandRows: true,
