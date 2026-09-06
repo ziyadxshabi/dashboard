@@ -15,8 +15,7 @@
   const NOSHOW_SVG = lucideIcon('alert-triangle', 'icon-sm');
   const EMPTY_STATE_SVG_CALENDAR = lucideIcon('calendar-clock', 'icon-lg');
   const EMPTY_STATE_SVG_INBOX = lucideIcon('inbox', 'icon-lg');
-  const EMPTY_STATE_DEFAULT_MESSAGE = 'Aucun rendez-vous. En attente de nouvelles réservations.';
-  const emptyStatePulseTweens = new WeakMap();
+  const EMPTY_STATE_DEFAULT_MESSAGE = 'Aucun rendez-vous pour le moment.';
 
   function extractInitials(fullName) {
     const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
@@ -237,33 +236,13 @@
   function clearEmptyState(hostId) {
     const host = document.getElementById(hostId);
     if (!host) return;
-    const icon = host.querySelector('.empty-state__icon');
-    if (icon && typeof gsap !== 'undefined') {
-      gsap.killTweensOf(icon);
-    }
     host.replaceChildren();
     host.hidden = true;
   }
 
   function initEmptyStatePulse(emptyStateEl) {
-    if (!emptyStateEl || typeof gsap === 'undefined') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const icon = emptyStateEl.querySelector('.empty-state__icon');
-    if (!icon) return;
-
-    const existing = emptyStatePulseTweens.get(icon);
-    if (existing) existing.kill();
-
-    gsap.set(icon, { opacity: 0.1 });
-    const tween = gsap.to(icon, {
-      opacity: 0.3,
-      duration: 1.5,
-      ease: 'sine.inOut',
-      yoyo: true,
-      repeat: -1,
-    });
-    emptyStatePulseTweens.set(icon, tween);
+    const icon = emptyStateEl?.querySelector('.empty-state__icon');
+    if (icon) icon.style.opacity = '0.4';
   }
 
   Object.assign(RowUI, {

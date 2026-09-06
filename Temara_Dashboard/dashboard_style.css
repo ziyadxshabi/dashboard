@@ -5148,8 +5148,13 @@ html[data-theme="oak-lounge"] .settings-input:focus {
    BRUTALIST PREMIUM MINIMALISM — structural override layer
    ============================================================ */
 
-*, *::before, *::after {
-  box-shadow: none !important;
+/* Calendar OS chrome keeps its own elevation — do not wipe .calendar-os-* or FullCalendar. */
+.kpi-card--matte,
+.doctor-metric-card--matte,
+.digest-metric,
+.brutalist-triage-panel,
+.brutalist-digest-container {
+  box-shadow: var(--shadow-card, none);
 }
 
 body {
@@ -5755,17 +5760,17 @@ body.mode-assistant #superpouvoirs-panel:has(.superpouvoirs-accordion.is-open) .
 .brutalist-digest-container {
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-color, rgba(15, 15, 15, 0.08));
   box-shadow: none;
 }
 
 .digest-title {
-  font-size: 11px;
-  color: #888;
-  letter-spacing: 0.05em;
-  margin: 0 0 16px;
-  text-transform: uppercase;
-  font-weight: 500;
+  font-size: 15px;
+  color: var(--text-main, #171717);
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  text-transform: none;
+  font-weight: 600;
 }
 
 .digest-grid {
@@ -5775,8 +5780,8 @@ body.mode-assistant #superpouvoirs-panel:has(.superpouvoirs-accordion.is-open) .
 }
 
 .digest-metric {
-  background: #0A0A0A;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(15, 15, 15, 0.08));
   padding: 16px;
   border-radius: 6px;
   display: flex;
@@ -5854,8 +5859,8 @@ body.mode-assistant #superpouvoirs-panel:has(.superpouvoirs-accordion.is-open) .
 }
 
 .brutalist-triage-panel {
-  background: #0A0A0A;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(15, 15, 15, 0.08));
   border-radius: 6px;
   overflow: hidden;
   box-shadow: none;
@@ -6304,16 +6309,16 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 }
 
 #doctor-shell .chart-title {
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-hierarchy-primary, #F3F4F6);
+  color: var(--text-main);
 }
 
 #doctor-shell .chart-sub,
 #doctor-shell .view-page-sub {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 400;
-  color: var(--text-hierarchy-tertiary, rgba(255, 255, 255, 0.5));
+  color: var(--text-muted);
 }
 
 #doctor-shell .view-page-title {
@@ -6329,9 +6334,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 }
 
 .kpi-card--matte {
-  background: #121110;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(15, 15, 15, 0.08));
+  box-shadow: var(--shadow-card);
   padding: var(--card-padding, 1.5rem);
 }
 
@@ -6379,9 +6384,9 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 }
 
 .doctor-metric-card--matte {
-  background: #121110;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(15, 15, 15, 0.08));
+  box-shadow: var(--shadow-card);
   padding: var(--card-padding, 1.5rem);
 }
 

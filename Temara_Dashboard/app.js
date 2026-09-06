@@ -148,7 +148,7 @@ const PLANNING_SERVER_ERROR_MESSAGE =
   }
 
   const EMPTY_STATE_DEFAULT_MESSAGE = RowUI.EMPTY_STATE_DEFAULT_MESSAGE
-    || 'Aucun rendez-vous. En attente de nouvelles réservations.';
+    || 'Aucun rendez-vous pour le moment.';
   const EMPTY_STATE_SVG_CALENDAR = RowUI.EMPTY_STATE_SVG_CALENDAR || lucideIcon('calendar-clock', 'icon-lg');
   const EMPTY_STATE_SVG_INBOX = RowUI.EMPTY_STATE_SVG_INBOX || lucideIcon('inbox', 'icon-lg');
 
@@ -857,7 +857,7 @@ let handoffNotes = [];
       select.replaceChildren();
       const blank = document.createElement('option');
       blank.value = '';
-      blank.textContent = 'Soin';
+      blank.textContent = 'Choisir un soin';
       select.appendChild(blank);
       treatments.forEach((item) => {
         const option = document.createElement('option');
@@ -1071,7 +1071,7 @@ let handoffNotes = [];
       if (!rows.length) {
         const empty = document.createElement('p');
         empty.className = 'status-board__empty';
-        empty.textContent = '—';
+        empty.textContent = key === 'care' ? 'Fauteuil libre' : 'Aucun';
         host.appendChild(empty);
         return;
       }
@@ -1709,8 +1709,8 @@ let handoffNotes = [];
       }
       const detail = String(payload.details || payload.error || '').trim();
       const friendlyMessage = /réponse vide|respond to webhook/i.test(detail)
-        ? 'Aucun rendez-vous trouvé ou données indisponibles.'
-        : (detail || 'Aucun rendez-vous trouvé ou données indisponibles.');
+        ? 'Aucun rendez-vous trouvé.'
+        : (detail || 'Aucun rendez-vous trouvé.');
       throw new Error(friendlyMessage);
     }
     if (payload && typeof payload === 'object' && payload.ok === true && 'data' in payload) {
@@ -2457,7 +2457,7 @@ let handoffNotes = [];
       return 'Impossible de charger le planning — Mode hors-ligne';
     }
     if (/réponse vide|respond to webhook|webhook not registered/i.test(msg)) {
-      return 'Aucun rendez-vous trouvé ou données indisponibles.';
+      return 'Aucun rendez-vous trouvé.';
     }
     if (msg.startsWith('{') && msg.includes('"error"')) {
       return PLANNING_SERVER_ERROR_MESSAGE;
