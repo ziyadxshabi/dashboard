@@ -320,7 +320,7 @@
           </div>
         </header>
 
-        <section class="reclaimed-banner" aria-label="Impact DentaFlow — patients récupérés et revenu estimé">
+        <section class="reclaimed-banner reclaimed-banner--quiet" aria-label="Patients récupérés et revenu estimé">
           <div class="reclaimed-banner__glow" aria-hidden="true"></div>
           <div class="reclaimed-banner__content">
             <div class="hero-split-layout">
@@ -397,8 +397,8 @@
             <div class="chart-header">
               <div class="chart-header-top">
                 <div>
-                  <div class="chart-title">Affluence Horaire</div>
-                  <div class="chart-sub">Patients par heure — identifiez les créneaux chargés</div>
+                  <div class="chart-title" id="affluence-chart-title">Affluence horaire</div>
+                  <div class="chart-sub" id="affluence-chart-sub">Patients par heure aujourd'hui</div>
                 </div>
                 <div class="chart-toggle" id="chart-toggle" role="group" aria-label="Période d'affichage">
                   <div class="chart-toggle-slider" id="chart-toggle-slider" aria-hidden="true"></div>
@@ -612,18 +612,57 @@
       </section>
 
       <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
-        <header class="view-page-header">
-          <h2 class="view-page-title">Calendrier Clinique</h2>
-          <p class="view-page-sub">Agenda de gestion — consultations et créneaux de la semaine</p>
+        <header class="calendar-os-header">
+          <div class="calendar-os-heading">
+            <h2 class="calendar-os-title" id="calendar-os-title">Agenda</h2>
+            <p class="calendar-os-clinic" id="calendar-os-clinic"></p>
+          </div>
+          <div class="calendar-os-toolbar">
+            <div class="calendar-os-nav" role="group" aria-label="Naviguer dans l'agenda">
+              <button type="button" class="calendar-os-icon-btn" data-cal-nav="prev" aria-label="Période précédente">
+                <i data-lucide="chevron-left" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="calendar-os-today-btn" data-cal-nav="today">Aujourd'hui</button>
+              <button type="button" class="calendar-os-icon-btn" data-cal-nav="next" aria-label="Période suivante">
+                <i data-lucide="chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="calendar-os-views" role="group" aria-label="Type de vue">
+              <button type="button" class="calendar-os-view-btn" data-cal-view="timeGridDay">Jour</button>
+              <button type="button" class="calendar-os-view-btn is-active" data-cal-view="timeGridWeek" aria-pressed="true">Semaine</button>
+              <button type="button" class="calendar-os-view-btn" data-cal-view="dayGridMonth">Mois</button>
+            </div>
+          </div>
         </header>
 
-        <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
-          <div class="calendar-embed-header">
-            <div class="chart-title">Planning Hebdomadaire</div>
-            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
-          </div>
-          <div id="dashboard-cal-inline"></div>
-        </article>
+        <div class="calendar-os-stage">
+          <article class="calendar-embed-panel" aria-label="Agenda des rendez-vous">
+            <div id="dashboard-cal-inline"></div>
+            <p class="calendar-os-empty" id="calendar-os-empty" hidden>Aucun rendez-vous sur cette période.</p>
+          </article>
+          <aside class="calendar-inspector" id="calendar-inspector" hidden>
+            <button type="button" class="calendar-inspector__close" id="calendar-inspector-close" aria-label="Fermer le détail">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+            <p class="calendar-inspector__time" id="cal-insp-time"></p>
+            <h3 class="calendar-inspector__name" id="cal-insp-name"></h3>
+            <p class="calendar-inspector__status" id="cal-insp-status"></p>
+            <dl class="calendar-inspector__meta">
+              <div>
+                <dt>Soin</dt>
+                <dd id="cal-insp-treatment"></dd>
+              </div>
+              <div>
+                <dt>Téléphone</dt>
+                <dd id="cal-insp-phone"></dd>
+              </div>
+              <div>
+                <dt>Durée</dt>
+                <dd id="cal-insp-duration"></dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
       </section>
 
       <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">

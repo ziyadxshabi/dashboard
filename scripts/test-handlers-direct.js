@@ -310,6 +310,106 @@ async function run() {
     (roster.body?.data || []).every((row) => !Object.prototype.hasOwnProperty.call(row, 'Patient (Nom Complet)'))
   );
 
+  const rosterClinic = await query('SELECT id FROM clinics WHERE slug = $1 LIMIT 1', [CLINIC_SLUG]);
+  const rosterClinicId = rosterClinic.rows[0]?.id;
+  ok('temara clinic id is available for roster range tests', Boolean(rosterClinicId));
+
+  const rosterRangeIds = [];
+  try {
+    const bounds = await query(`
+      SELECT
+        (NOW() AT TIME ZONE 'Africa/Casablanca')::date::text AS today,
+        ((NOW() AT TIME ZONE 'Africa/Casablanca')::date - 1)::text AS yesterday,
+        ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + 1)::text AS tomorrow
+    `);
+    const todayIso = bounds.rows[0]?.today;
+    const yesterdayIso = bounds.rows[0]?.yesterday;
+    const tomorrowIso = bounds.rows[0]?.tomorrow;
+
+    const inserted = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status, starts_at, duration_min
+       ) VALUES
+         ($1, 'Roster Today Apple', '0600000091', 'Detartrage', 'Confirme'::appointment_status,
+          ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '11:00') AT TIME ZONE 'Africa/Casablanca', 30),
+         ($1, 'Roster Tomorrow Apple', '0600000092', 'Controle', 'Confirme'::appointment_status,
+          ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + 1 + TIME '10:00') AT TIME ZONE 'Africa/Casablanca', 30)
+       RETURNING id`,
+      [rosterClinicId]
+    );
+    inserted.rows.forEach((row) => rosterRangeIds.push(row.id));
+
+    const rosterToday = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster', headers: doctorCookie })
+    );
+    const todayNames = (rosterToday.body?.data || []).map((row) => row.patient_name);
+    ok(
+      'default GET /api/roster includes today booking',
+      todayNames.includes('Roster Today Apple'),
+      JSON.stringify(todayNames)
+    );
+    ok(
+      'default GET /api/roster stays today-only',
+      !todayNames.includes('Roster Tomorrow Apple'),
+      JSON.stringify(todayNames)
+    );
+
+    const rosterRange = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?from=${yesterdayIso}&to=${tomorrowIso}`,
+        headers: doctorCookie,
+      })
+    );
+    const rangeNames = (rosterRange.body?.data || []).map((row) => row.patient_name);
+    ok('ranged GET /api/roster returns 200', rosterRange.statusCode === 200, `status=${rosterRange.statusCode}`);
+    ok(
+      'ranged GET /api/roster includes in-window rows',
+      rangeNames.includes('Roster Today Apple') && rangeNames.includes('Roster Tomorrow Apple'),
+      JSON.stringify(rangeNames)
+    );
+
+    const missingTo = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: `/api/roster?from=${todayIso}`, headers: doctorCookie })
+    );
+    ok('GET /api/roster from without to returns 400', missingTo.statusCode === 400);
+
+    const inverted = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?from=${tomorrowIso}&to=${yesterdayIso}`,
+        headers: doctorCookie,
+      })
+    );
+    ok('GET /api/roster inverted range returns 400', inverted.statusCode === 400);
+
+    const invalidDate = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?from=2026-02-31&to=2026-03-01',
+        headers: doctorCookie,
+      })
+    );
+    ok('GET /api/roster invalid calendar date returns 400', invalidDate.statusCode === 400);
+
+    const tooWide = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?from=2026-01-01&to=2026-03-01',
+        headers: doctorCookie,
+      })
+    );
+    ok('GET /api/roster range over 42 days returns 400', tooWide.statusCode === 400);
+  } finally {
+    await query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [rosterRangeIds]);
+  }
+
   // ── Status updates (Postgres bookings) ─────────────────────────────────
   console.log('\n[update-status]');
   await query(
@@ -708,6 +808,33 @@ async function run() {
   ok(
     'GET /api/dashboard-data week_patients are numbers',
     (dash.body?.data?.week_patients || []).every((n) => typeof n === 'number' && Number.isFinite(n))
+  );
+  ok(
+    'GET /api/dashboard-data month_weeks has 4 counts',
+    Array.isArray(dash.body?.data?.month_weeks) && dash.body.data.month_weeks.length === 4,
+    JSON.stringify(dash.body?.data?.month_weeks)
+  );
+  ok(
+    'GET /api/dashboard-data month_weeks are numbers',
+    (dash.body?.data?.month_weeks || []).every((n) => typeof n === 'number' && Number.isFinite(n))
+  );
+  const hourKeys = [
+    'hour_08',
+    'hour_09',
+    'hour_10',
+    'hour_11',
+    'hour_12',
+    'hour_13',
+    'hour_14',
+    'hour_15',
+    'hour_16',
+    'hour_17',
+    'hour_18',
+  ];
+  ok(
+    'GET /api/dashboard-data exposes hour_08 through hour_18',
+    hourKeys.every((key) => typeof dash.body?.data?.[key] === 'number' && Number.isFinite(dash.body.data[key])),
+    JSON.stringify(hourKeys.map((key) => [key, dash.body?.data?.[key]]))
   );
 
   // ── Public clinic ──────────────────────────────────────────────────────
