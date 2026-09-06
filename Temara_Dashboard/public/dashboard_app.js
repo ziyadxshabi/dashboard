@@ -2665,9 +2665,9 @@ function renderKPICards(data) {
   const no_shows          = asMetric(data?.no_shows);
   const pending_plans     = asMetric(data?.pending_plans ?? data?.pending_quotes);
 
-  setKpiTrend('trend-patients', buildSparklineSvg(null, { tone: 'gold' }));
-  setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
-  setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
+  setKpiTrend('trend-patients', '');
+  setKpiTrend('trend-noshows', '');
+  setKpiTrend('trend-new', '');
 
   renderDoctorHubCharts(data);
   renderLoadMixFidelity(data);

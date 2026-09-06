@@ -1784,6 +1784,10 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
   letter-spacing: -0.03em !important;
 }
 
+.kpi-trend:empty {
+  display: none;
+}
+
 #doctor-shell .kpi-card--matte .kpi-sub,
 #doctor-shell .doctor-metric-card--matte .doctor-metric-delta,
 .kpi-card--matte .kpi-sub,
