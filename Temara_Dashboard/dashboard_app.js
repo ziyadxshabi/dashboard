@@ -1,8 +1,4 @@
 /* --- SECURITY — auth gate handled by auth.js --- */
-const AUTH_CONFIG = {
-  SESSION_KEY: 'dentaflow_session',
-};
-
 function getApiAuthHeaders(extra = {}) {
   const authHeaders = typeof window.DentaFlowAuth?.getAuthHeaders === 'function'
     ? window.DentaFlowAuth.getAuthHeaders()
@@ -45,12 +41,16 @@ function askConfirm(message) {
   return Promise.resolve(true);
 }
 
-function unlockDashboard({ skipDashboardFetch = false } = {}) {
-  if (
-    typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
-    !window.DentaFlowAuth.isAuthenticated()
-  ) {
-    void window.DentaFlowAuth.logout?.();
+async function unlockDashboard({ skipDashboardFetch = false } = {}) {
+  const auth = window.DentaFlowAuth;
+  if (typeof auth?.ensureSessionRestored === 'function') {
+    const ok = await auth.ensureSessionRestored();
+    if (!ok) {
+      void auth.logout?.();
+      return;
+    }
+  } else if (typeof auth?.isAuthenticated === 'function' && !auth.isAuthenticated()) {
+    void auth.logout?.();
     return;
   }
 
@@ -61,26 +61,17 @@ function unlockDashboard({ skipDashboardFetch = false } = {}) {
   }
 
   if (!skipDashboardFetch && typeof loadDashboard === 'function') {
-    loadDashboard();
+    void loadDashboard();
   }
   if (typeof loadDoctorHubData === 'function') {
-    loadDoctorHubData();
+    void loadDoctorHubData();
   }
   if (typeof loadTeamNotes === 'function') {
-    loadTeamNotes();
+    void loadTeamNotes();
   }
 }
 
 window.unlockDashboard = unlockDashboard;
-
-document.addEventListener('DOMContentLoaded', () => {
-  initAppMode();
-
-  if (document.body.classList.contains('mode-client')) {
-    initMotionStack();
-    initClientBooking();
-  }
-});
 /* --- END SECURITY --- */
 
 /**
@@ -126,7 +117,6 @@ function doctorQueryAll(selector) {
  */
 const DEFAULT_THEME = 'pearl-clinic';
 const STORAGE_KEYS = {
-  THEME: 'doctor_theme',
   DAILY_GOAL: 'doctor_daily_goal',
 };
 
@@ -149,18 +139,24 @@ function persistDailyGoal(value) {
 }
 
 function resolveInitialTheme() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.THEME);
-    if (stored === 'dark' || stored === 'oak-lounge') return 'oak-lounge';
-    if (stored === 'light' || stored === 'pearl-clinic') return 'pearl-clinic';
-  } catch { /* private browsing / disabled storage */ }
+  if (typeof window.DentaFlowTheme?.readStoredTheme === 'function') {
+    return window.DentaFlowTheme.readStoredTheme();
+  }
   return DEFAULT_THEME;
 }
 
 function persistThemePreference(theme) {
-  const storageValue = theme === 'pearl-clinic' ? 'light' : 'dark';
+  if (typeof window.DentaFlowTheme?.writeStoredTheme === 'function') {
+    window.DentaFlowTheme.writeStoredTheme(theme);
+    return;
+  }
+  const resolved = theme === 'pearl-clinic' || theme === 'light' ? 'pearl-clinic' : 'oak-lounge';
   try {
-    localStorage.setItem(STORAGE_KEYS.THEME, storageValue);
+    const raw = localStorage.getItem('dentaflow_assistant_prefs');
+    const prefs = raw ? JSON.parse(raw) : {};
+    prefs.theme = resolved;
+    localStorage.setItem('dentaflow_assistant_prefs', JSON.stringify(prefs));
+    localStorage.removeItem('doctor_theme');
   } catch { /* private browsing / disabled storage */ }
 }
 
@@ -222,7 +218,6 @@ let doctorDashboardInitialized = false;
 
 function initializeDoctorDashboard() {
   if (doctorDashboardInitialized) return;
-  if (document.body.classList.contains('mode-client')) return;
   if (document.body.classList.contains('mode-assistant')) return;
   if (
     typeof window.DentaFlowAuth?.enforceRouteGuard === 'function' &&
@@ -234,6 +229,7 @@ function initializeDoctorDashboard() {
     typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
     !window.DentaFlowAuth.isAuthenticated()
   ) {
+    if (window.DentaFlowAuth.isRestorePending?.()) return;
     void window.DentaFlowAuth.logout?.();
     return;
   }
@@ -250,7 +246,7 @@ function initializeDoctorDashboard() {
   initSecurityManagement();
   initThemeSwitcher();
   initAccountCardMenu();
-  window.initSettingsDemoState?.();
+  window.initSettingsPrefsState?.();
   initCrmSearch();
   initCrmSidePanel();
   initSmsCampaign();
@@ -932,6 +928,13 @@ function syncTabFromHash() {
 
 function initNavigation() {
   syncTabFromHash();
+  if (initNavigation.hashBound) return;
+  initNavigation.hashBound = true;
+  window.addEventListener('hashchange', () => {
+    if (document.body.classList.contains('mode-doctor')) {
+      syncTabFromHash();
+    }
+  });
 }
 
 function initMobileNav() {
@@ -1327,16 +1330,20 @@ function applyUserProfile(name, specialty) {
 }
 
 function initUserProfile() {
-  const saved = loadSettings();
   const nameEl      = doctorEl('settings-profile-name');
   const specialtyEl = doctorEl('settings-profile-specialty');
-
   const defaults = getProfileDefaults();
-  const profileName      = saved.profileName      ?? defaults.profileName;
-  const profileSpecialty = saved.profileSpecialty ?? defaults.profileSpecialty;
+  const profileName = defaults.profileName;
+  const profileSpecialty = defaults.profileSpecialty;
 
-  if (nameEl)      nameEl.value      = profileName;
-  if (specialtyEl) specialtyEl.value = profileSpecialty;
+  if (nameEl) {
+    nameEl.value = profileName;
+    nameEl.readOnly = true;
+  }
+  if (specialtyEl) {
+    specialtyEl.value = profileSpecialty;
+    specialtyEl.readOnly = true;
+  }
 
   applyUserProfile(profileName, profileSpecialty);
 }
@@ -1378,10 +1385,10 @@ function initSettings() {
 
   const smsToggle = doctorEl('settings-sms-toggle');
   const emailToggle = doctorEl('settings-email-toggle');
-  if (smsToggle && smsToggle.dataset.demoBound !== 'true') {
+  if (smsToggle && smsToggle.dataset.prefsBound !== 'true') {
     smsToggle.checked = saved.smsReminders !== false;
   }
-  if (emailToggle && emailToggle.dataset.demoBound !== 'true') {
+  if (emailToggle && emailToggle.dataset.prefsBound !== 'true') {
     emailToggle.checked = saved.emailReminders !== false;
   }
 }
@@ -2026,7 +2033,7 @@ async function loadDashboard(isSilentSync = false) {
   const errorBanner = doctorEl('error-banner');
 
   try {
-    window.DentaFlowAuth?.requireSession?.();
+    await window.DentaFlowAuth?.requireSession?.();
 
     if (!isSilentSync) {
       applySkeletonState();
@@ -3233,185 +3240,6 @@ function initMotionStack() {
   gsap.ticker.lagSmoothing(0);
 }
 
-/* ── App mode: Client Portal (#reserver) vs Doctor Dashboard ─────────────── */
-
-const CLIENT_HASH = '#reserver';
-
-function isClientPortalRoute() {
-  return window.location.hash === CLIENT_HASH
-    || window.location.hash === '#booking'
-    || new URLSearchParams(window.location.search).get('view') === 'reserver';
-}
-
-function setAppMode(mode) {
-  const isClient = mode === 'client';
-  document.body.classList.toggle('mode-client', isClient);
-  document.body.classList.toggle('mode-doctor', !isClient);
-}
-
-function enterClientPortal(replaceHash = true) {
-  document.body.classList.remove('auth-gate-active');
-  setAppMode('client');
-  if (replaceHash && window.location.hash !== CLIENT_HASH) {
-    history.replaceState(null, '', CLIENT_HASH);
-  }
-  initMotionStack();
-  initClientBooking();
-}
-
-function enterDoctorApp() {
-  setAppMode('doctor');
-  const base = window.location.pathname + window.location.search;
-  const hash = viewKeyFromHash(window.location.hash) ? window.location.hash : DEFAULT_VIEW_HASH;
-  history.replaceState(null, '', `${base}${hash}`);
-
-  if (!document.body.classList.contains('auth-gate-active')) {
-    initializeDoctorDashboard();
-    unlockDashboard();
-    syncTabFromHash();
-  }
-}
-
-function initAppMode() {
-  if (isClientPortalRoute()) {
-    enterClientPortal(false);
-    return;
-  }
-
-  setAppMode('doctor');
-
-  doctorEl('link-doctor-app')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    enterDoctorApp();
-  });
-
-  window.addEventListener('hashchange', () => {
-    if (isClientPortalRoute()) {
-      enterClientPortal(false);
-    } else if (document.body.classList.contains('mode-client')) {
-      enterDoctorApp();
-    } else if (document.body.classList.contains('mode-doctor')) {
-      syncTabFromHash();
-    }
-  });
-}
-
-/* ── Client Booking Portal — multi-step wizard (Cal.com hook) ────────────── */
-
-const BOOKING_STATE = {
-  step: 1,
-  serviceId: '',
-  serviceLabel: '',
-  slotLabel: 'À confirmer via Cal.com',
-};
-
-/** GSAP step transition: slide out left, fade new step in from right */
-function animateBookingStep(fromEl, toEl, direction = 1) {
-  if (typeof gsap === 'undefined') {
-    fromEl.hidden = true;
-    fromEl.classList.remove('is-active');
-    toEl.hidden = false;
-    toEl.classList.add('is-active');
-    return;
-  }
-
-  const outX = direction > 0 ? -20 : 20;
-  const inFromX = direction > 0 ? 20 : -20;
-
-  gsap.to(fromEl, {
-    x: outX,
-    opacity: 0,
-    duration: 0.4,
-    ease: 'power2.out',
-    onComplete: () => {
-      fromEl.hidden = true;
-      fromEl.classList.remove('is-active');
-      gsap.set(fromEl, { clearProps: 'transform,opacity' });
-
-      toEl.hidden = false;
-      toEl.classList.add('is-active');
-      gsap.fromTo(
-        toEl,
-        { x: inFromX, opacity: 0 },
-        { x: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }
-      );
-    },
-  });
-}
-
-function updateBookingProgress(step) {
-  document.querySelectorAll('[data-step-indicator]').forEach((el) => {
-    const n = Number(el.dataset.stepIndicator);
-    el.classList.toggle('is-active', n === step);
-    el.classList.toggle('is-done', n < step);
-  });
-}
-
-function goToBookingStep(nextStep) {
-  const fromEl = document.querySelector('.booking-step.is-active');
-  const toEl = doctorEl(`booking-step-${nextStep}`);
-  if (!fromEl || !toEl || nextStep === BOOKING_STATE.step) return;
-
-  const direction = nextStep > BOOKING_STATE.step ? 1 : -1;
-  BOOKING_STATE.step = nextStep;
-  updateBookingProgress(nextStep);
-  animateBookingStep(fromEl, toEl, direction);
-}
-
-function initClientBooking() {
-  const wizard = doctorEl('booking-wizard');
-  if (!wizard || wizard.dataset.initialized === 'true') return;
-  wizard.dataset.initialized = 'true';
-
-  const btnStep1Next = doctorEl('btn-step1-next');
-  const btnStep2Back = doctorEl('btn-step2-back');
-  const btnStep2Next = doctorEl('btn-step2-next');
-  const btnStep3Back = doctorEl('btn-step3-back');
-  const btnConfirm   = doctorEl('btn-booking-confirm');
-  const summaryService = doctorEl('summary-service');
-  const summarySlot    = doctorEl('summary-slot');
-  const successEl      = doctorEl('booking-success');
-
-  document.querySelectorAll('.service-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.service-card').forEach((c) => c.classList.remove('is-selected'));
-      card.classList.add('is-selected');
-      BOOKING_STATE.serviceId = card.dataset.service || '';
-      BOOKING_STATE.serviceLabel = card.dataset.serviceLabel || card.textContent.trim();
-      if (btnStep1Next) btnStep1Next.disabled = false;
-    });
-  });
-
-  btnStep1Next?.addEventListener('click', () => goToBookingStep(2));
-
-  btnStep2Back?.addEventListener('click', () => goToBookingStep(1));
-  btnStep2Next?.addEventListener('click', () => {
-    /* TODO: read selected slot from Cal.com embed callback */
-    if (summaryService) summaryService.textContent = BOOKING_STATE.serviceLabel || '—';
-    if (summarySlot) summarySlot.textContent = BOOKING_STATE.slotLabel;
-    goToBookingStep(3);
-  });
-
-  btnStep3Back?.addEventListener('click', () => goToBookingStep(2));
-
-  btnConfirm?.addEventListener('click', async () => {
-    if (typeof gsap !== 'undefined') {
-      gsap.to(btnConfirm, {
-        scale: 0.95,
-        duration: 0.1,
-        yoyo: true,
-        repeat: 1,
-        ease: 'power2.inOut',
-      });
-    }
-
-    if (successEl) {
-      successEl.hidden = false;
-      btnConfirm.disabled = true;
-    }
-  });
-}
-
 /* ── Doctor Hub — metric stagger + patient accordion ─────────────────────── */
 
 const DOCTOR_HUB_ANIM = {
@@ -3990,7 +3818,7 @@ async function loadDoctorHubData(isSilentSync = false) {
   }
 
   try {
-    window.DentaFlowAuth?.requireSession?.();
+    await window.DentaFlowAuth?.requireSession?.();
 
     const response = await fetch(CONFIG.ROSTER_PROXY, {
       method: 'GET',
@@ -4339,7 +4167,7 @@ async function loadTeamNotes() {
   }
 
   try {
-    window.DentaFlowAuth?.requireSession?.();
+    await window.DentaFlowAuth?.requireSession?.();
 
     const response = await fetch(CONFIG.TEAM_NOTES_PROXY, {
       method: 'GET',
@@ -4395,7 +4223,6 @@ let smartSyncInFlight = false;
 
 function initSmartSync() {
   if (smartSyncInitialized) return;
-  if (document.body.classList.contains('mode-client')) return;
   if (document.body.classList.contains('mode-assistant')) return;
 
   smartSyncInitialized = true;

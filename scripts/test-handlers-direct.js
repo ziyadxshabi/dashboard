@@ -12,6 +12,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..');
 const DASHBOARD = path.join(ROOT, 'Temara_Dashboard');
@@ -225,6 +226,52 @@ function casablancaHourNow() {
 
 async function run() {
   console.log('\n== Direct handler tests (PostgreSQL) ==\n');
+
+  console.log('[frontend contracts]');
+  const authSrc = fs.readFileSync(path.join(DASHBOARD, 'auth.js'), 'utf8');
+  const dashSrc = fs.readFileSync(path.join(DASHBOARD, 'dashboard_app.js'), 'utf8');
+  const appSrc = fs.readFileSync(path.join(DASHBOARD, 'app.js'), 'utf8');
+  const themeBootSrc = fs.readFileSync(path.join(DASHBOARD, 'theme-boot.js'), 'utf8');
+  ok('auth.js does not define SESSION_TOKEN_KEY', !/\bSESSION_TOKEN_KEY\b/.test(authSrc));
+  ok('auth.js serializes cookie restore', /\brestoreInflight\b/.test(authSrc) && /\bensureSessionRestored\b/.test(authSrc));
+  ok('auth.js requireSession awaits restore', /async function requireSession/.test(authSrc));
+  ok(
+    'dashboard_app.js has no Cal booking wizard stub',
+    !/\binitClientBooking\b/.test(dashSrc) && !/\bBOOKING_STATE\b/.test(dashSrc)
+  );
+  ok(
+    'dashboard_app.js has no #reserver client portal',
+    !/#reserver/.test(dashSrc) && !/\benterClientPortal\b/.test(dashSrc)
+  );
+  ok('app.js does not use demoStorage names', !/\bdemoStorage(Get|Set)\b/.test(appSrc));
+  ok('theme-boot.js reads dentaflow_assistant_prefs', /dentaflow_assistant_prefs/.test(themeBootSrc));
+  ok('theme-boot.js migrates doctor_theme', /doctor_theme/.test(themeBootSrc));
+
+  const themeStore = { doctor_theme: 'dark' };
+  const themeDoc = { attr: 'pearl-clinic' };
+  vm.runInNewContext(themeBootSrc, {
+    localStorage: {
+      getItem(key) {
+        return Object.prototype.hasOwnProperty.call(themeStore, key) ? themeStore[key] : null;
+      },
+      setItem(key, value) {
+        themeStore[key] = String(value);
+      },
+      removeItem(key) {
+        delete themeStore[key];
+      },
+    },
+    document: {
+      documentElement: {
+        setAttribute(name, value) {
+          if (name === 'data-theme') themeDoc.attr = value;
+        },
+      },
+    },
+  });
+  ok('theme-boot migrates doctor_theme=dark to oak-lounge', themeDoc.attr === 'oak-lounge');
+  ok('theme-boot writes dentaflow_assistant_prefs.theme', /oak-lounge/.test(themeStore.dentaflow_assistant_prefs || ''));
+  ok('theme-boot removes legacy doctor_theme', !Object.prototype.hasOwnProperty.call(themeStore, 'doctor_theme'));
 
   ok(
     'DATABASE_URL is configured',

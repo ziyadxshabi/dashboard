@@ -874,7 +874,7 @@
               <i data-lucide="user" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Profil Utilisateur</h3>
-            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du tableau de bord.</p>
+            <p class="settings-card-desc">Identité du compte connecté. Le nom affiché vient de la session.</p>
             <div class="settings-field">
               <label class="settings-label" for="settings-profile-name">Nom Complet</label>
               <input
@@ -884,6 +884,7 @@
                 name="profile_name"
                 value=""
                 autocomplete="name"
+                readonly
               />
             </div>
             <div class="settings-field">
@@ -894,6 +895,7 @@
                 id="settings-profile-specialty"
                 name="profile_specialty"
                 value="Chirurgien-dentiste"
+                readonly
               />
             </div>
           </article>

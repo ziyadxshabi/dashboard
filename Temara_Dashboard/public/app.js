@@ -1164,7 +1164,12 @@ let handoffNotes = [];
         hour12: false,
       });
 
-      const profileName = (volatileSettings.profileName || DEFAULT_SETTINGS.profileName).trim();
+      const profileName = (
+        window.DentaFlowTheme?.getSessionDisplayName?.() ||
+        volatileSettings.profileName ||
+        DEFAULT_SETTINGS.profileName ||
+        'Assistante'
+      ).trim();
       const author = profileName.split(/\s+/)[0] || profileName;
       const authorInitials = extractInitials(profileName);
       const bookingSelect = $('handoff-booking');
@@ -1269,7 +1274,7 @@ let handoffNotes = [];
     }, 500);
   }
 
-  function demoStorageGet(key, fallback = '') {
+  function prefsStorageGet(key, fallback = '') {
     try {
       const value = localStorage.getItem(key);
       return value !== null ? value : fallback;
@@ -1278,7 +1283,7 @@ let handoffNotes = [];
     }
   }
 
-  function demoStorageSet(key, value) {
+  function prefsStorageSet(key, value) {
     try {
       localStorage.setItem(key, String(value));
     } catch (error) {
@@ -1286,18 +1291,18 @@ let handoffNotes = [];
     }
   }
 
-  function parseDemoBool(value, fallback = true) {
+  function parsePrefsBool(value, fallback = true) {
     if (value === '' || value == null) return fallback;
     return value === 'true' || value === '1';
   }
 
-  function bindDemoField(el, storageKey, { onPersist } = {}) {
-    if (!el || el.dataset.demoBound === 'true') return;
-    el.dataset.demoBound = 'true';
+  function bindPrefsField(el, storageKey, { onPersist } = {}) {
+    if (!el || el.dataset.prefsBound === 'true') return;
+    el.dataset.prefsBound = 'true';
 
     const persist = () => {
       const value = el.type === 'checkbox' ? el.checked : el.value;
-      demoStorageSet(storageKey, el.type === 'checkbox' ? String(value) : value);
+      prefsStorageSet(storageKey, el.type === 'checkbox' ? String(value) : value);
       onPersist?.(value, el);
       schedulePreferencesSavedToast();
     };
@@ -1318,7 +1323,7 @@ let handoffNotes = [];
     defaultValue,
     onPersist,
   }) {
-    const stored = demoStorageGet(storageKey, defaultValue);
+    const stored = prefsStorageGet(storageKey, defaultValue);
     window.DentaFlowSelect?.init?.({
       rootId,
       hiddenId,
@@ -1329,7 +1334,7 @@ let handoffNotes = [];
       initialValue: stored,
       once: true,
       onSelect: (value) => {
-        demoStorageSet(storageKey, value);
+        prefsStorageSet(storageKey, value);
         onPersist?.(value);
         schedulePreferencesSavedToast();
       },
@@ -1346,53 +1351,31 @@ let handoffNotes = [];
     }
   }
 
-  function initSettingsDemoState() {
+  function initSettingsPrefsState() {
     const isAssistant = document.body.classList.contains('mode-assistant');
-    const nameKey = isAssistant ? 'df_asst_name' : 'df_doc_name';
-    const roleKey = isAssistant ? 'df_asst_role' : 'df_doc_role';
-
-    const nameEl = $('settings-profile-name');
-    const roleEl = $('settings-profile-specialty');
-    const defaults = isAssistant ? DEFAULT_SETTINGS : {
+    const defaults = isAssistant ? {
+      profileName: window.DentaFlowTheme?.getSessionDisplayName?.() || DEFAULT_SETTINGS.profileName || 'Assistante',
+      profileSpecialty: window.DentaFlowTheme?.getSessionRoleLabel?.('assistant') || DEFAULT_SETTINGS.profileSpecialty,
+    } : {
       profileName: window.DentaFlowTheme?.getSessionDisplayName?.() || 'Praticien',
       profileSpecialty: window.DentaFlowTheme?.getSessionRoleLabel?.('doctor') || 'Chirurgien-dentiste',
     };
 
+    const nameEl = $('settings-profile-name');
+    const roleEl = $('settings-profile-specialty');
+
     if (nameEl) {
-      const storedName = demoStorageGet(nameKey, '');
-      if (storedName) nameEl.value = storedName;
-      else if (!nameEl.value) nameEl.value = defaults.profileName;
+      nameEl.value = defaults.profileName;
+      nameEl.readOnly = true;
     }
     if (roleEl) {
-      const storedRole = demoStorageGet(roleKey, '');
-      if (storedRole) roleEl.value = storedRole;
-      else if (!roleEl.value) roleEl.value = defaults.profileSpecialty;
+      roleEl.value = defaults.profileSpecialty;
+      roleEl.readOnly = true;
     }
 
     if (nameEl || roleEl) {
-      applyProfileForCurrentShell(
-        nameEl?.value || defaults.profileName,
-        roleEl?.value || defaults.profileSpecialty
-      );
+      applyProfileForCurrentShell(defaults.profileName, defaults.profileSpecialty);
     }
-
-    bindDemoField(nameEl, nameKey, {
-      onPersist: () => {
-        const name = nameEl?.value.trim() || defaults.profileName;
-        const role = roleEl?.value.trim() || defaults.profileSpecialty;
-        saveSettings({ profileName: name, profileSpecialty: role });
-        applyProfileForCurrentShell(name, role);
-      },
-    });
-
-    bindDemoField(roleEl, roleKey, {
-      onPersist: () => {
-        const name = nameEl?.value.trim() || defaults.profileName;
-        const role = roleEl?.value.trim() || defaults.profileSpecialty;
-        saveSettings({ profileName: name, profileSpecialty: role });
-        applyProfileForCurrentShell(name, role);
-      },
-    });
 
     const smsToggle = $('settings-sms-toggle');
     const emailToggle = $('settings-email-toggle');
@@ -1400,23 +1383,23 @@ let handoffNotes = [];
     const emailKey = isAssistant ? 'df_asst_email_reminders' : 'df_doc_email_reminders';
 
     if (smsToggle) {
-      smsToggle.checked = parseDemoBool(demoStorageGet(smsKey, ''), smsToggle.checked);
-      bindDemoField(smsToggle, smsKey, {
+      smsToggle.checked = parsePrefsBool(prefsStorageGet(smsKey, ''), smsToggle.checked);
+      bindPrefsField(smsToggle, smsKey, {
         onPersist: (value) => saveSettings({ smsReminders: value }),
       });
     }
     if (emailToggle) {
-      emailToggle.checked = parseDemoBool(demoStorageGet(emailKey, ''), emailToggle.checked);
-      bindDemoField(emailToggle, emailKey, {
+      emailToggle.checked = parsePrefsBool(prefsStorageGet(emailKey, ''), emailToggle.checked);
+      bindPrefsField(emailToggle, emailKey, {
         onPersist: (value) => saveSettings({ emailReminders: value }),
       });
     }
 
     const goalEl = $('settings-daily-goal');
     if (goalEl) {
-      const storedGoal = demoStorageGet('df_doc_daily_goal', goalEl.value || '');
+      const storedGoal = prefsStorageGet('df_doc_daily_goal', goalEl.value || '');
       if (storedGoal) goalEl.value = storedGoal;
-      bindDemoField(goalEl, 'df_doc_daily_goal', {
+      bindPrefsField(goalEl, 'df_doc_daily_goal', {
         onPersist: (value) => {
           const val = parseInt(String(value), 10);
           if (Number.isFinite(val) && val >= 1000 && typeof globalThis.applyDoctorDailyGoal === 'function') {
@@ -1433,14 +1416,14 @@ let handoffNotes = [];
     const dayStartEl = $('settings-day-start');
     const dayEndEl = $('settings-day-end');
     if (dayStartEl) {
-      const stored = demoStorageGet('df_doc_day_start', dayStartEl.value || '09:00');
+      const stored = prefsStorageGet('df_doc_day_start', dayStartEl.value || '09:00');
       dayStartEl.value = stored;
-      bindDemoField(dayStartEl, 'df_doc_day_start');
+      bindPrefsField(dayStartEl, 'df_doc_day_start');
     }
     if (dayEndEl) {
-      const stored = demoStorageGet('df_doc_day_end', dayEndEl.value || '18:00');
+      const stored = prefsStorageGet('df_doc_day_end', dayEndEl.value || '18:00');
       dayEndEl.value = stored;
-      bindDemoField(dayEndEl, 'df_doc_day_end');
+      bindPrefsField(dayEndEl, 'df_doc_day_end');
     }
 
     const emergencyToggle = $('settings-emergency-buffer-toggle');
@@ -1452,17 +1435,17 @@ let handoffNotes = [];
     };
 
     if (emergencyToggle) {
-      emergencyToggle.checked = parseDemoBool(demoStorageGet('df_doc_emergency_buffer', 'true'), true);
+      emergencyToggle.checked = parsePrefsBool(prefsStorageGet('df_doc_emergency_buffer', 'true'), true);
       syncEmergencySlotsState(emergencyToggle.checked);
-      bindDemoField(emergencyToggle, 'df_doc_emergency_buffer', {
+      bindPrefsField(emergencyToggle, 'df_doc_emergency_buffer', {
         onPersist: (value) => syncEmergencySlotsState(value),
       });
     }
     if (emergencySlotsEl) {
-      const storedSlots = demoStorageGet('df_doc_emergency_slots', emergencySlotsEl.value || '2');
+      const storedSlots = prefsStorageGet('df_doc_emergency_slots', emergencySlotsEl.value || '2');
       emergencySlotsEl.value = storedSlots;
       syncEmergencySlotsState(emergencyToggle ? emergencyToggle.checked : true);
-      bindDemoField(emergencySlotsEl, 'df_doc_emergency_slots');
+      bindPrefsField(emergencySlotsEl, 'df_doc_emergency_slots');
     }
 
     initGhostSelectPersist({
@@ -1478,16 +1461,16 @@ let handoffNotes = [];
     const soundTeamToggle = $('settings-sound-team-toggle');
     const soundArrivalToggle = $('settings-sound-arrival-toggle');
     if (soundTeamToggle) {
-      soundTeamToggle.checked = parseDemoBool(demoStorageGet('df_asst_sound_team', 'true'), true);
-      bindDemoField(soundTeamToggle, 'df_asst_sound_team');
+      soundTeamToggle.checked = parsePrefsBool(prefsStorageGet('df_asst_sound_team', 'true'), true);
+      bindPrefsField(soundTeamToggle, 'df_asst_sound_team');
     }
     if (soundArrivalToggle) {
-      soundArrivalToggle.checked = parseDemoBool(demoStorageGet('df_asst_sound_arrival', 'true'), true);
-      bindDemoField(soundArrivalToggle, 'df_asst_sound_arrival');
+      soundArrivalToggle.checked = parsePrefsBool(prefsStorageGet('df_asst_sound_arrival', 'true'), true);
+      bindPrefsField(soundArrivalToggle, 'df_asst_sound_arrival');
     }
   }
 
-  window.initSettingsDemoState = initSettingsDemoState;
+  window.initSettingsPrefsState = initSettingsPrefsState;
 
   const DEPLOYING_FEATURE_NOTICES = {
     dailyReport: {
@@ -2081,7 +2064,7 @@ let handoffNotes = [];
   }
 
   async function postBulkAction(endpoint, payload) {
-    window.DentaFlowAuth?.requireSession?.();
+    await window.DentaFlowAuth?.requireSession?.();
 
     const body = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
       ? { ...payload }
@@ -4003,7 +3986,7 @@ let handoffNotes = [];
   }
 
   async function fetchRosterPayload(url) {
-    window.DentaFlowAuth?.requireSession?.();
+    await window.DentaFlowAuth?.requireSession?.();
 
     const response = await fetch(url, {
       method: 'GET',
@@ -4040,11 +4023,9 @@ let handoffNotes = [];
   }
 
   async function loadPlanning() {
-    if (
-      typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
-      !window.DentaFlowAuth.isAuthenticated()
-    ) {
-      void window.DentaFlowAuth.logout?.();
+    try {
+      await window.DentaFlowAuth?.requireSession?.();
+    } catch {
       return;
     }
 
@@ -4534,11 +4515,21 @@ let handoffNotes = [];
         volatileSettings = {
           ...DEFAULT_SETTINGS,
           ...parsed,
-          theme: normalizeTheme(parsed.theme),
+          theme: normalizeTheme(
+            parsed.theme
+            || window.DentaFlowTheme?.readStoredTheme?.()
+            || DEFAULT_SETTINGS.theme
+          ),
           profileName: parsed.profileName ?? DEFAULT_SETTINGS.profileName,
           profileSpecialty: parsed.profileSpecialty ?? DEFAULT_SETTINGS.profileSpecialty,
           smsReminders: parsed.smsReminders !== false,
           emailReminders: parsed.emailReminders !== false,
+        };
+      } else {
+        const storedTheme = window.DentaFlowTheme?.readStoredTheme?.();
+        volatileSettings = {
+          ...DEFAULT_SETTINGS,
+          theme: storedTheme ? normalizeTheme(storedTheme) : DEFAULT_SETTINGS.theme,
         };
       }
     } catch (error) {
@@ -4552,6 +4543,7 @@ let handoffNotes = [];
     volatileSettings = { ...volatileSettings, ...partial };
     if (partial.theme != null) {
       volatileSettings.theme = normalizeTheme(partial.theme);
+      window.DentaFlowTheme?.writeStoredTheme?.(volatileSettings.theme);
     }
     try {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(volatileSettings));
@@ -5278,15 +5270,22 @@ let handoffNotes = [];
   }
 
   function initUserProfile() {
-    const saved = loadSettings();
     const nameEl = $('settings-profile-name');
     const specialtyEl = $('settings-profile-specialty');
+    const profileName = window.DentaFlowTheme?.getSessionDisplayName?.()
+      || DEFAULT_SETTINGS.profileName
+      || 'Assistante';
+    const profileSpecialty = window.DentaFlowTheme?.getSessionRoleLabel?.()
+      || DEFAULT_SETTINGS.profileSpecialty;
 
-    const profileName = saved.profileName ?? DEFAULT_SETTINGS.profileName;
-    const profileSpecialty = saved.profileSpecialty ?? DEFAULT_SETTINGS.profileSpecialty;
-
-    if (nameEl) nameEl.value = profileName;
-    if (specialtyEl) specialtyEl.value = profileSpecialty;
+    if (nameEl) {
+      nameEl.value = profileName;
+      nameEl.readOnly = true;
+    }
+    if (specialtyEl) {
+      specialtyEl.value = profileSpecialty;
+      specialtyEl.readOnly = true;
+    }
 
     applyUserProfile(profileName, profileSpecialty);
   }
@@ -5296,10 +5295,10 @@ let handoffNotes = [];
     const smsToggle = $('settings-sms-toggle');
     const emailToggle = $('settings-email-toggle');
 
-    if (smsToggle && smsToggle.dataset.demoBound !== 'true') {
+    if (smsToggle && smsToggle.dataset.prefsBound !== 'true') {
       smsToggle.checked = saved.smsReminders !== false;
     }
-    if (emailToggle && emailToggle.dataset.demoBound !== 'true') {
+    if (emailToggle && emailToggle.dataset.prefsBound !== 'true') {
       emailToggle.checked = saved.emailReminders !== false;
     }
   }
@@ -5861,7 +5860,7 @@ let handoffNotes = [];
     });
     runInitStep('settingsUI', () => {
       initSettings();
-      initSettingsDemoState();
+      initSettingsPrefsState();
       window.DentaFlowAuth?.bindPasswordForm?.(assistantRoot());
     });
     runInitStep('theme', () => initThemeSwitcher());
@@ -5902,6 +5901,7 @@ let handoffNotes = [];
       typeof window.DentaFlowAuth?.isAuthenticated === 'function' &&
       !window.DentaFlowAuth.isAuthenticated()
     ) {
+      if (window.DentaFlowAuth.isRestorePending?.()) return;
       void window.DentaFlowAuth.logout?.();
       return;
     }
