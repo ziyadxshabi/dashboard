@@ -1042,7 +1042,7 @@ let handoffNotes = [];
     });
     select.dataset.previousStatus = current;
 
-    card.append(time, name, care, select);
+    card.appendChild(select);
     return card;
   }
 
