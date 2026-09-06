@@ -164,11 +164,6 @@ function ok(name, condition, detail) {
   console.error(`  FAIL ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-function skip(name, reason) {
-  stats.skipped += 1;
-  console.log(`  skip ${name}${reason ? ` — ${reason}` : ''}`);
-}
-
 async function login(username, password) {
   const res = await invoke(
     handleAuth,
@@ -243,6 +238,13 @@ async function run() {
   );
   await query(migrationSql);
   ok('notification SMS migration applied', true);
+
+  await query(
+    `UPDATE clinics
+     SET cal_event_type_id = COALESCE(NULLIF(btrim(cal_event_type_id), ''), 'dentaflow/temara')
+     WHERE slug = $1`,
+    [CLINIC_SLUG]
+  );
 
   await restoreSeedPassword(DOCTOR_USER);
   await restoreSeedPassword(ASSISTANT_USER);
@@ -1089,11 +1091,11 @@ async function run() {
   ok('public clinic slug is temara', clinic.body?.clinic?.slug === CLINIC_SLUG);
   ok('public clinic does not leak clinic UUID', clinic.body?.clinic?.id == null);
   const calEmbedUrl = clinic.body?.clinic?.calEmbedUrl;
-  if (typeof calEmbedUrl === 'string' && calEmbedUrl.startsWith('https://cal.com/')) {
-    ok('public clinic exposes calEmbedUrl', true);
-  } else {
-    skip('public clinic exposes calEmbedUrl', 'known empty-clinic leftover');
-  }
+  ok(
+    'public clinic exposes calEmbedUrl',
+    typeof calEmbedUrl === 'string' && calEmbedUrl.startsWith('https://cal.com/'),
+    `calEmbedUrl=${calEmbedUrl}`
+  );
   ok(
     'public clinic exposes themeTokens object',
     clinic.body?.clinic?.themeTokens != null && typeof clinic.body.clinic.themeTokens === 'object'

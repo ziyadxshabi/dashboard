@@ -240,9 +240,15 @@ CREATE INDEX IF NOT EXISTS idx_sms_messages_sid
   ON sms_messages (twilio_sid);
 
 -- Seed: Clinique Dentaire Témara Mall
-INSERT INTO clinics (slug, name)
-VALUES ('temara', 'Clinique Dentaire Témara Mall')
+-- cal_event_type_id matches Temara_Dashboard/book.js DEFAULT_CAL_LINK so the
+-- public clinic API can emit https://cal.com/dentaflow/temara.
+INSERT INTO clinics (slug, name, cal_event_type_id)
+VALUES ('temara', 'Clinique Dentaire Témara Mall', 'dentaflow/temara')
 ON CONFLICT (slug) DO NOTHING;
+
+UPDATE clinics
+SET cal_event_type_id = COALESCE(NULLIF(btrim(cal_event_type_id), ''), 'dentaflow/temara')
+WHERE slug = 'temara';
 
 -- Seed staff for slug 'temara'.
 -- password_hash values are scrypt placeholders produced by api/_lib/auth-crypto.hashPassword
