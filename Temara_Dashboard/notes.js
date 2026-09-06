@@ -83,6 +83,10 @@
       author: author || undefined,
       time,
       readBy: Array.isArray(item.readBy) ? item.readBy : [],
+      booking_id: asText(item.booking_id ?? item.bookingId) || null,
+      bookingId: asText(item.booking_id ?? item.bookingId) || null,
+      patient_name: asText(item.patient_name ?? item.patientName) || null,
+      patientName: asText(item.patient_name ?? item.patientName) || null,
     };
   }
 

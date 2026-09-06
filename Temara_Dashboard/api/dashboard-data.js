@@ -74,6 +74,65 @@ const HOURLY_TODAY_SQL = `
   GROUP BY 1
 `;
 
+const OPEN_MINUTES = 11 * 60; // 08:00–19:00 Casablanca clinic grid
+
+const RESERVED_TODAY_SQL = `
+  SELECT COALESCE(SUM(duration_min), 0)::int AS reserved_min
+  FROM bookings
+  WHERE clinic_id = $1
+    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+      = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+    AND status::text NOT IN ('Annule', 'Annulé')
+`;
+
+const TREATMENT_MIX_SQL = `
+  SELECT
+    COALESCE(NULLIF(TRIM(treatment_name), ''), 'Non précisé') AS name,
+    COUNT(*)::int AS count
+  FROM bookings
+  WHERE clinic_id = $1
+    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+      >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
+    AND status::text NOT IN ('Annule', 'Annulé')
+  GROUP BY 1
+  ORDER BY count DESC, name ASC
+  LIMIT 12
+`;
+
+const PHONE_FIDELITY_SQL = `
+  WITH this_week AS (
+    SELECT DISTINCT TRIM(patient_phone) AS phone
+    FROM bookings
+    WHERE clinic_id = $1
+      AND patient_phone IS NOT NULL
+      AND TRIM(patient_phone) <> ''
+      AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+        >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
+      AND status::text NOT IN ('Annule', 'Annulé')
+  ),
+  prior AS (
+    SELECT DISTINCT TRIM(patient_phone) AS phone
+    FROM bookings
+    WHERE clinic_id = $1
+      AND patient_phone IS NOT NULL
+      AND TRIM(patient_phone) <> ''
+      AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+        >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 90
+      AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+        < (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
+      AND status::text NOT IN ('Annule', 'Annulé')
+  )
+  SELECT
+    (
+      SELECT COUNT(*)::int FROM this_week tw
+      WHERE EXISTS (SELECT 1 FROM prior p WHERE p.phone = tw.phone)
+    ) AS returning_phones,
+    (
+      SELECT COUNT(*)::int FROM this_week tw
+      WHERE NOT EXISTS (SELECT 1 FROM prior p WHERE p.phone = tw.phone)
+    ) AS new_phones
+`;
+
 const MONTH_WEEKS_SQL = `
   WITH weeks AS (
     SELECT
@@ -143,17 +202,27 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   try {
-    const [kpiResult, weekResult, hourlyResult, monthResult] = await Promise.all([
-      query(DASHBOARD_KPI_SQL, [session.clinic_id]),
-      query(WEEK_PATIENTS_SQL, [session.clinic_id]),
-      query(HOURLY_TODAY_SQL, [session.clinic_id]),
-      query(MONTH_WEEKS_SQL, [session.clinic_id]),
-    ]);
+    const [kpiResult, weekResult, hourlyResult, monthResult, reservedResult, mixResult, fidelityResult] =
+      await Promise.all([
+        query(DASHBOARD_KPI_SQL, [session.clinic_id]),
+        query(WEEK_PATIENTS_SQL, [session.clinic_id]),
+        query(HOURLY_TODAY_SQL, [session.clinic_id]),
+        query(MONTH_WEEKS_SQL, [session.clinic_id]),
+        query(RESERVED_TODAY_SQL, [session.clinic_id]),
+        query(TREATMENT_MIX_SQL, [session.clinic_id]),
+        query(PHONE_FIDELITY_SQL, [session.clinic_id]),
+      ]);
     const row = kpiResult.rows[0] || {};
     const weekPatients = (weekResult.rows || []).map((entry) => Number(entry.patients) || 0);
     while (weekPatients.length < 7) weekPatients.unshift(0);
     const monthWeeks = (monthResult.rows || []).map((entry) => Number(entry.patients) || 0);
     while (monthWeeks.length < 4) monthWeeks.unshift(0);
+    const reservedMin = Number(reservedResult.rows[0]?.reserved_min) || 0;
+    const fidelity = fidelityResult.rows[0] || {};
+    const treatmentMix = (mixResult.rows || []).map((entry) => ({
+      name: String(entry.name || 'Non précisé'),
+      count: Number(entry.count) || 0,
+    }));
 
     return res.status(200).json({
       ok: true,
@@ -162,6 +231,11 @@ module.exports = async function handler(req, res) {
         accepted_plans: Number(row.accepted_plans) || 0,
         pending_plans: Number(row.pending_plans) || 0,
         no_shows: Number(row.no_shows) || 0,
+        reserved_min: reservedMin,
+        open_min: OPEN_MINUTES,
+        treatment_mix: treatmentMix,
+        returning_phones: Number(fidelity.returning_phones) || 0,
+        new_phones: Number(fidelity.new_phones) || 0,
         week_patients: weekPatients.slice(-7),
         month_weeks: monthWeeks.slice(-4),
         ...mapHourlyRows(hourlyResult.rows),

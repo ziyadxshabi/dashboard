@@ -176,10 +176,9 @@ const CONFIG = {
   SMART_SYNC_DEBOUNCE_MS: 15_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
   ROSTER_ENDPOINT:      '/api/roster',
-  DIGEST_DAILY_GOAL_MAD: 6000,
-  DIGEST_REVENUE_PER_PATIENT_MAD: 400,
   CURRENCY_LOCALE:      'fr-MA',
   CURRENCY:             'MAD',
+  OPEN_MINUTES:         660,
 };
 
 const bootDailyGoal = loadPersistedDailyGoal();
@@ -1334,18 +1333,88 @@ function initSecurityManagement() {
 }
 
 /* ── CRM PATIENT SEARCH ──────────────────────────────────────────────────── */
+let crmSearchTimer = null;
+let crmSearchQuery = '';
+
 function initCrmSearch() {
   const searchEl = doctorEl('crm-search');
-  const tbody    = doctorEl('crm-table-body');
-  if (!searchEl || !tbody) return;
+  if (!searchEl || searchEl.dataset.carnetBound === 'true') return;
+  searchEl.dataset.carnetBound = 'true';
 
-  searchEl?.addEventListener('input', () => {
-    const query = searchEl.value.trim().toLowerCase();
-    tbody.querySelectorAll('tr').forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.classList.toggle('is-hidden', query.length > 0 && !text.includes(query));
-    });
+  searchEl.addEventListener('input', () => {
+    clearTimeout(crmSearchTimer);
+    crmSearchTimer = setTimeout(() => {
+      crmSearchQuery = searchEl.value.trim();
+      void loadCarnetDirectory(crmSearchQuery);
+    }, 280);
   });
+}
+
+function formatCarnetWhen(row) {
+  const raw = row?.starts_at || row?.rawDate || row?.startTime;
+  const parsed = raw ? new Date(raw) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return row?.time || '—';
+  return parsed.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Casablanca',
+  });
+}
+
+function groupBookingsForCarnet(rows) {
+  const map = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const phone = String(row.phone || row.patient_phone || '').trim();
+    const name = String(row.name || row.patient_name || '').trim();
+    const key = phone || name.toLowerCase();
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, { id: key, name: name || 'Non spécifié', phone, visits: [] });
+    }
+    const group = map.get(key);
+    if (name && group.name === 'Non spécifié') group.name = name;
+    if (phone && !group.phone) group.phone = phone;
+    group.visits.push(row);
+  });
+  return [...map.values()].map((group) => {
+    group.visits.sort((a, b) => String(b.starts_at || b.rawDate || '').localeCompare(String(a.starts_at || a.rawDate || '')));
+    group.lastVisit = group.visits[0] || null;
+    group.motif = group.lastVisit?.treatment || group.lastVisit?.treatment_name || 'Consultation';
+    group.statut = group.lastVisit?.status || '—';
+    group.lastWhen = formatCarnetWhen(group.lastVisit || {});
+    return group;
+  });
+}
+
+async function loadCarnetDirectory(query) {
+  const tbody = doctorEl('crm-table-body');
+  if (!tbody) return;
+  try {
+    const url = query
+      ? `${CONFIG.ROSTER_PROXY}?q=${encodeURIComponent(query)}`
+      : CONFIG.ROSTER_PROXY;
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ Accept: 'application/json' }),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    const records = parseRosterResponse(unwrapRosterPayload(payload))
+      .map(normalizeDoctorAppointment)
+      .filter(Boolean);
+    renderCRMTable(records);
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    console.error('[Carnet] search failed:', err?.message || err);
+  }
 }
 
 /* ── CRM DOSSIER PATIENT — SLIDE-OVER PANEL ─────────────────────────────── */
@@ -1360,16 +1429,15 @@ function getCrmMotifTagClass(motif) {
 
 function toCrmPatient(record) {
   if (!record) return null;
+  if (record.visits) return record;
   return {
     id: record.id ?? record.rowId,
     name: record.name || 'Non spécifié',
     phone: record.phone || '',
-    email: record.email || '',
     motif: record.treatment || 'Consultation',
     statut: record.status || 'Confirmé',
-    observations: record.observations || 'Aucune observation enregistrée.',
-    insurance: record.insurance || '—',
-    amount: Number(record.amount) || 0,
+    visits: [record],
+    lastWhen: formatCarnetWhen(record),
   };
 }
 
@@ -1377,26 +1445,25 @@ function renderCRMTable(records) {
   const tbody = doctorEl('crm-table-body');
   if (!tbody) return;
 
-  const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+  const groups = groupBookingsForCarnet(records);
   crmPatientsById = {};
   tbody.replaceChildren();
 
-  if (!rows.length) {
+  if (!groups.length) {
     const emptyRow = document.createElement('tr');
     emptyRow.className = 'crm-table-empty';
     const cell = document.createElement('td');
     cell.colSpan = 4;
-    cell.textContent = 'Aucun patient trouvé';
+    cell.textContent = crmSearchQuery
+      ? 'Aucun historique pour cette recherche'
+      : 'Aucun patient aujourd\'hui — recherchez par nom ou téléphone';
     emptyRow.appendChild(cell);
     tbody.appendChild(emptyRow);
     hideSkeleton('crm');
     return;
   }
 
-  rows.forEach((record) => {
-    const patient = toCrmPatient(record);
-    if (!patient?.id) return;
-
+  groups.forEach((patient) => {
     crmPatientsById[String(patient.id)] = patient;
 
     const tr = document.createElement('tr');
@@ -1404,14 +1471,6 @@ function renderCRMTable(records) {
     tr.tabIndex = 0;
     tr.setAttribute('role', 'button');
     tr.dataset.patientId = String(patient.id);
-    tr.dataset.name = patient.name;
-    tr.dataset.phone = patient.phone;
-    tr.dataset.email = patient.email;
-    tr.dataset.motif = patient.motif;
-    tr.dataset.statut = patient.statut;
-    tr.dataset.amount = String(patient.amount);
-    tr.dataset.insurance = patient.insurance;
-    tr.dataset.observations = patient.observations;
 
     const nameCell = document.createElement('td');
     nameCell.textContent = patient.name;
@@ -1419,8 +1478,8 @@ function renderCRMTable(records) {
     const phoneCell = document.createElement('td');
     phoneCell.textContent = patient.phone || '—';
 
-    const emailCell = document.createElement('td');
-    emailCell.textContent = patient.email || '—';
+    const lastCell = document.createElement('td');
+    lastCell.textContent = patient.lastWhen || '—';
 
     const motifCell = document.createElement('td');
     const motifTag = document.createElement('span');
@@ -1429,7 +1488,7 @@ function renderCRMTable(records) {
     motifTag.textContent = patient.motif;
     motifCell.appendChild(motifTag);
 
-    tr.append(nameCell, phoneCell, emailCell, motifCell);
+    tr.append(nameCell, phoneCell, lastCell, motifCell);
     tbody.appendChild(tr);
   });
   hideSkeleton('crm');
@@ -1467,8 +1526,7 @@ function populateCrmSidePanel(patient) {
 
   const subtitleEl = doctorEl('crm-panel-subtitle');
   if (subtitleEl) {
-    const parts = [patient.phone, patient.email].filter(Boolean);
-    subtitleEl.textContent = parts.join(' · ');
+    subtitleEl.textContent = patient.phone || '';
   }
 
   const statutEl = doctorEl('crm-panel-statut');
@@ -1483,10 +1541,31 @@ function populateCrmSidePanel(patient) {
     }
   }
 
-  setText('crm-panel-amount', `${formatMAD(patient.amount)} MAD`);
-  setText('crm-panel-insurance', patient.insurance);
-  setText('crm-panel-motif', patient.motif);
-  setText('crm-panel-observations', patient.observations);
+  const visitsHost = doctorEl('crm-panel-visits');
+  if (visitsHost) {
+    visitsHost.replaceChildren();
+    const visits = Array.isArray(patient.visits) ? patient.visits : [];
+    if (!visits.length) {
+      const empty = document.createElement('p');
+      empty.className = 'chair-glance__empty';
+      empty.textContent = 'Aucune visite enregistrée.';
+      visitsHost.appendChild(empty);
+    } else {
+      visits.slice(0, 12).forEach((visit) => {
+        const item = document.createElement('div');
+        item.className = 'carnet-visit';
+        const when = document.createElement('span');
+        when.className = 'carnet-visit__when';
+        when.textContent = formatCarnetWhen(visit);
+        const care = document.createElement('span');
+        care.textContent = visit.treatment || visit.treatment_name || 'Consultation';
+        const status = document.createElement('span');
+        status.textContent = visit.status || '';
+        item.append(when, care, status);
+        visitsHost.appendChild(item);
+      });
+    }
+  }
 }
 
 function openCrmSidePanel(patient, selectedRow) {
@@ -2376,7 +2455,56 @@ function renderDynamicChart(data, containerId, options = {}) {
 }
 
 function renderDoctorHubCharts(data = {}) {
+  if (!doctorEl('doctor-weekly-trend-chart')) return;
   renderDynamicChart(data, 'doctor-weekly-trend-chart', { unit: 'patients' });
+}
+
+function renderLoadMixFidelity(data = {}) {
+  const reserved = asMetric(data?.reserved_min);
+  const open = asMetric(data?.open_min) || CONFIG.OPEN_MINUTES;
+  const loadEl = doctorEl('load-reserved');
+  if (loadEl) loadEl.textContent = `${reserved} / ${open} min`;
+  const fill = doctorEl('load-meter-fill');
+  if (fill) {
+    fill.style.width = `${Math.min(100, open > 0 ? (reserved / open) * 100 : 0)}%`;
+  }
+
+  const mixHost = doctorEl('treatment-mix-list');
+  if (mixHost) {
+    const mix = Array.isArray(data?.treatment_mix) ? data.treatment_mix : [];
+    mixHost.replaceChildren();
+    if (!mix.length) {
+      const empty = document.createElement('p');
+      empty.className = 'chair-glance__empty';
+      empty.textContent = 'Aucun soin cette semaine.';
+      mixHost.appendChild(empty);
+    } else {
+      const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
+      mix.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'mix-row';
+        const name = document.createElement('span');
+        name.textContent = item.name || 'Non précisé';
+        const count = document.createElement('span');
+        count.textContent = String(item.count || 0);
+        const track = document.createElement('div');
+        track.className = 'mix-row__track';
+        const bar = document.createElement('div');
+        bar.className = 'mix-row__fill';
+        bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
+        track.appendChild(bar);
+        row.append(name, count, track);
+        mixHost.appendChild(row);
+      });
+    }
+  }
+
+  setText('fidelity-returning', String(asMetric(data?.returning_phones)));
+  setText('fidelity-new', String(asMetric(data?.new_phones)));
+
+  const chargeEl = doctorEl('hub-val-charge');
+  if (chargeEl) chargeEl.textContent = `${reserved}/${open}`;
+  setText('hub-delta-charge', 'Temps réservé / ouverture');
 }
 
 function renderKPICards(data) {
@@ -2389,16 +2517,13 @@ function renderKPICards(data) {
   setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
   setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
 
-  const revenueToday = asMetric(data?.revenue_today);
-
   renderDoctorHubCharts(data);
+  renderLoadMixFidelity(data);
   bindKpiMicroCharts(data);
 
   setKPINumber('hub-val-patients', patients_today, true);
   setKPINumber('hub-val-pending', pending_plans, true);
   setKPINumber('hub-val-noshows', no_shows, true);
-  const hubProductionEl = doctorEl('hub-val-production');
-  if (hubProductionEl) hubProductionEl.textContent = formatHubProductionMad(revenueToday);
 
   setText('hub-delta-patients', patients_today > 0 ? 'Aujourd\'hui' : 'Aucun RDV');
   setText('hub-delta-pending', pending_plans > 0
@@ -2407,7 +2532,6 @@ function renderKPICards(data) {
   setText('hub-delta-noshows', no_shows > 0
     ? `${no_shows} créneau${no_shows > 1 ? 'x' : ''} libre${no_shows > 1 ? 's' : ''}`
     : 'Aucune absence');
-  setText('hub-delta-production', 'MAD facturés');
 
   updateRecoveryMetrics(null);
   refreshOperationalCharts(data);
@@ -3423,7 +3547,7 @@ function animateKineticCounter(elementId, targetValue, suffix = '') {
   });
 }
 
-function setDigestFinalValues({ totalVus, totalAnnules, totalRevenue, progressPercent }) {
+function setDigestFinalValues({ totalVus, totalAnnules, reservedMin, openMin, progressPercent }) {
   const vusEl = doctorEl('digest-patients-vus');
   const annulEl = doctorEl('digest-annulations');
   const revEl = doctorEl('digest-revenue');
@@ -3431,7 +3555,7 @@ function setDigestFinalValues({ totalVus, totalAnnules, totalRevenue, progressPe
 
   if (vusEl) vusEl.textContent = String(totalVus);
   if (annulEl) annulEl.textContent = String(totalAnnules);
-  if (revEl) revEl.textContent = `${totalRevenue} MAD`;
+  if (revEl) revEl.textContent = `${reservedMin} / ${openMin} min`;
   if (progEl) progEl.style.width = `${progressPercent}%`;
 }
 
@@ -3439,7 +3563,7 @@ function startDigestKineticCounters({ instant = false } = {}) {
   if (digestKineticsStarted || !pendingDigestKinetics) return;
   digestKineticsStarted = true;
 
-  const { totalVus, totalAnnules, totalRevenue, progressPercent } = pendingDigestKinetics;
+  const { totalVus, totalAnnules, reservedMin, openMin, progressPercent } = pendingDigestKinetics;
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (instant || prefersReducedMotion) {
@@ -3449,7 +3573,8 @@ function startDigestKineticCounters({ instant = false } = {}) {
 
   animateKineticCounter('digest-patients-vus', totalVus);
   animateKineticCounter('digest-annulations', totalAnnules);
-  animateKineticCounter('digest-revenue', totalRevenue, ' MAD');
+  const revEl = doctorEl('digest-revenue');
+  if (revEl) revEl.textContent = `${reservedMin} / ${openMin} min`;
 
   const progEl = doctorEl('digest-progress');
   if (progEl) {
@@ -3467,9 +3592,12 @@ function computeEndOfDayDigest(records) {
 
   const totalVus = todayRows.filter((record) => isDigestSeenStatus(record.status)).length;
   const totalAnnules = todayRows.filter((record) => isDigestCancelledStatus(record.status)).length;
-  const totalRevenue = totalVus * CONFIG.DIGEST_REVENUE_PER_PATIENT_MAD;
+  const reservedMin = todayRows
+    .filter((record) => !isDigestCancelledStatus(record.status))
+    .reduce((sum, record) => sum + (Number(record.duration_min) || 0), 0);
+  const openMin = CONFIG.OPEN_MINUTES;
 
-  return { totalVus, totalAnnules, totalRevenue };
+  return { totalVus, totalAnnules, reservedMin, openMin };
 }
 
 function formatDoctorAppointmentTime(rawDate) {
@@ -3485,9 +3613,7 @@ function formatDoctorAppointmentTime(rawDate) {
 }
 
 function isDoctorEmergencyRecord(record) {
-  const motif = String(record?.treatment || '').toLowerCase();
-  const status = normalizeDigestStatus(record?.status);
-  return motif.includes('urgence') || status.includes('urgence');
+  return false;
 }
 
 function isDoctorActiveTriageRecord(record) {
@@ -3583,56 +3709,95 @@ function createDoctorTriageRow(record) {
   return tr;
 }
 
-function renderDoctorTriageRoster(records) {
-  const waitingBody = doctorEl('doctor-waiting-room-body');
-  const emergencyBody = doctorEl('doctor-emergencies-body');
-  if (!waitingBody || !emergencyBody) return;
-
-  const todayRows = filterTodayAppointments(records)
-    .filter(isDoctorActiveTriageRecord)
-    .sort(sortDoctorAppointmentsByTime);
-
-  const emergencies = todayRows.filter(isDoctorEmergencyRecord);
-  const waiting = todayRows.filter((record) => !isDoctorEmergencyRecord(record));
-
-  waitingBody.replaceChildren();
-  if (!waiting.length) {
-    const emptyRow = document.createElement('tr');
-    emptyRow.className = 'triage-empty';
-    const cell = document.createElement('td');
-    cell.colSpan = 4;
-    cell.textContent = 'Aucun patient en attente';
-    emptyRow.appendChild(cell);
-    waitingBody.appendChild(emptyRow);
-  } else {
-    const fragment = document.createDocumentFragment();
-    waiting.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
-    waitingBody.appendChild(fragment);
+function renderGlanceRows(hostId, rows, emptyText) {
+  const host = doctorEl(hostId);
+  if (!host) return;
+  host.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'chair-glance__empty';
+    empty.textContent = emptyText;
+    host.appendChild(empty);
+    return;
   }
+  rows.forEach((record) => {
+    const row = document.createElement('div');
+    row.className = 'chair-glance__row';
+    const time = document.createElement('strong');
+    time.textContent = record.time || formatDoctorAppointmentTime(record.rawDate || record.starts_at);
+    const name = document.createElement('span');
+    name.textContent = record.name || record.patient_name || 'Patient';
+    const care = document.createElement('span');
+    care.textContent = record.treatment || record.treatment_name || '';
+    row.append(time, name, care);
+    host.appendChild(row);
+  });
+}
 
-  emergencyBody.replaceChildren();
-  if (!emergencies.length) {
-    const emptyRow = document.createElement('tr');
-    emptyRow.className = 'triage-empty';
-    const cell = document.createElement('td');
-    cell.colSpan = 4;
-    cell.textContent = 'Aucune urgence signalée';
-    emptyRow.appendChild(cell);
-    emergencyBody.appendChild(emptyRow);
-  } else {
-    const fragment = document.createDocumentFragment();
-    emergencies.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
-    emergencyBody.appendChild(fragment);
+function renderPinnedHandoffGlance() {
+  const host = doctorEl('hub-pinned-handoff');
+  if (!host) return;
+  const pinned = (teamNotesCache || []).filter((note) => note.pinned);
+  host.replaceChildren();
+  if (!pinned.length) {
+    const empty = document.createElement('p');
+    empty.className = 'chair-glance__empty';
+    empty.textContent = 'Aucune note épinglée.';
+    host.appendChild(empty);
+    return;
   }
+  pinned.slice(0, 4).forEach((note) => {
+    const row = document.createElement('div');
+    row.className = 'chair-glance__row';
+    const who = document.createElement('strong');
+    who.textContent = note.patientName || note.patient_name || note.author || 'Équipe';
+    const text = document.createElement('span');
+    text.textContent = note.text || '';
+    row.append(who, text);
+    host.appendChild(row);
+  });
+}
+
+function renderDoctorLiveGlance(records) {
+  const content = doctorEl('triage-content');
+  if (content) content.hidden = false;
+
+  const todayRows = filterTodayAppointments(records).sort(sortDoctorAppointmentsByTime);
+  const chair = todayRows.filter((record) => normalizeDigestStatus(record.status) === 'en soin');
+  const upcoming = todayRows.filter((record) => {
+    const key = normalizeDigestStatus(record.status);
+    return key === 'confirme' || key === 'en attente' || (key.includes('salle') && key.includes('attente'));
+  }).slice(0, 3);
+
+  renderGlanceRows('hub-in-chair', chair, 'Personne au fauteuil');
+  renderGlanceRows('hub-next-three', upcoming, 'Aucun prochain rendez-vous');
+  renderPinnedHandoffGlance();
   hideSkeleton('triage');
 }
 
-function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
-  const dailyGoal = CONFIG.DIGEST_DAILY_GOAL_MAD;
-  const progressPercent = Math.min(100, (totalRevenue / dailyGoal) * 100);
+function renderDoctorTriageRoster(records) {
+  renderDoctorLiveGlance(records);
+}
+
+function digestProgress(digest) {
+  const openMin = digest.openMin || CONFIG.OPEN_MINUTES;
+  const reservedMin = Number(digest.reservedMin) || 0;
+  return Math.min(100, openMin > 0 ? (reservedMin / openMin) * 100 : 0);
+}
+
+function renderEndOfDayDigest(digest) {
+  const reservedMin = Number(digest.reservedMin) || 0;
+  const openMin = digest.openMin || CONFIG.OPEN_MINUTES;
+  const progressPercent = digestProgress(digest);
 
   digestKineticsStarted = false;
-  pendingDigestKinetics = { totalVus, totalAnnules, totalRevenue, progressPercent };
+  pendingDigestKinetics = {
+    totalVus: digest.totalVus || 0,
+    totalAnnules: digest.totalAnnules || 0,
+    reservedMin,
+    openMin,
+    progressPercent,
+  };
 
   const vusEl = doctorEl('digest-patients-vus');
   const annulEl = doctorEl('digest-annulations');
@@ -3641,7 +3806,7 @@ function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
 
   if (vusEl) vusEl.textContent = '0';
   if (annulEl) annulEl.textContent = '0';
-  if (revEl) revEl.textContent = '0 MAD';
+  if (revEl) revEl.textContent = `0 / ${openMin} min`;
   if (progEl) progEl.style.width = '0%';
 }
 
@@ -3687,8 +3852,7 @@ async function loadDoctorHubData(isSilentSync = false) {
 
     const digest = computeEndOfDayDigest(records);
     if (isSilentSync) {
-      const progressPercent = Math.min(100, (digest.totalRevenue / CONFIG.DIGEST_DAILY_GOAL_MAD) * 100);
-      setDigestFinalValues({ ...digest, progressPercent });
+      setDigestFinalValues({ ...digest, progressPercent: digestProgress(digest) });
     } else {
       renderEndOfDayDigest(digest);
     }
@@ -3714,7 +3878,7 @@ async function loadDoctorHubData(isSilentSync = false) {
     if (isUnauthorizedError(err)) return;
     console.error('[Doctor Hub] Digest load failed:', err?.message || err);
     if (isSilentSync) return;
-    renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, totalRevenue: 0 });
+    renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, reservedMin: 0, openMin: CONFIG.OPEN_MINUTES });
     renderDoctorTriageRoster([]);
     renderCRMTable([]);
     queueOsBootSequence();
@@ -3934,6 +4098,13 @@ function createTeamNoteElement(note) {
   categorySpan.append(categoryDot, document.createTextNode(note.category || 'Info'));
   meta.appendChild(categorySpan);
 
+  if (note.patientName || note.patient_name) {
+    const patientSpan = document.createElement('span');
+    patientSpan.className = 'team-message__patient';
+    patientSpan.textContent = note.patientName || note.patient_name;
+    meta.appendChild(patientSpan);
+  }
+
   if (note.pinned) {
     const pinSpan = document.createElement('span');
     pinSpan.className = 'team-message__pin';
@@ -4026,6 +4197,7 @@ async function loadTeamNotes() {
     const rawRows = parseTeamNotesResponse(payload);
     teamNotesCache = rawRows.map(normalizeTeamNote).filter(Boolean);
     renderTeamNotesList(teamNotesCache);
+    renderPinnedHandoffGlance();
   } catch (error) {
     if (isUnauthorizedError(error)) return;
     console.error('[Team Notes] Load failed:', error?.message || error);

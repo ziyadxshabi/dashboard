@@ -173,6 +173,41 @@
           </div>
         </section>
 
+        <section class="late-strip" aria-labelledby="late-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="late-title">En retard sur l'heure prévue</h3>
+            <span class="late-strip__hint">Heure planifiée — pas l'arrivée</span>
+          </div>
+          <div id="late-list" class="late-list" role="list">
+            <p class="late-list__empty">Aucun retard sur l'heure prévue.</p>
+          </div>
+        </section>
+
+        <section class="status-board-section" aria-labelledby="status-board-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="status-board-title">Board du jour</h3>
+            <span class="section-header-inline__meta">Statuts — salle et fauteuil</span>
+          </div>
+          <div class="status-board" id="status-board">
+            <div class="status-board__col" data-board-col="incoming">
+              <h4 class="status-board__head">À venir</h4>
+              <div class="status-board__cards" id="board-incoming" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="waiting">
+              <h4 class="status-board__head">En salle</h4>
+              <div class="status-board__cards" id="board-waiting" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="care">
+              <h4 class="status-board__head">Au fauteuil</h4>
+              <div class="status-board__cards" id="board-care" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="done">
+              <h4 class="status-board__head">Terminé</h4>
+              <div class="status-board__cards" id="board-done" role="list"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="overview-timeline-section" aria-label="Planning d'aujourd'hui">
           <div class="section-header-inline">
             <h3 class="section-header-inline__title">Planning d'Aujourd'hui</h3>
@@ -288,6 +323,10 @@
           </div>
 
           <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
+            <label class="visually-hidden" for="handoff-booking">Patient du jour</label>
+            <select class="handoff-compose__booking" id="handoff-booking" name="handoff-booking">
+              <option value="">Note générale</option>
+            </select>
             <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
             <input
               type="text"
@@ -337,18 +376,39 @@
       </section>
 
       <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
-        <header class="view-page-header">
-          <h2 class="view-page-title">Calendrier</h2>
-          <p class="view-page-sub">Agenda du cabinet — vue hebdomadaire et créneaux disponibles</p>
+        <header class="calendar-os-header">
+          <div class="calendar-os-heading">
+            <h2 class="calendar-os-title" id="asst-calendar-title">Planning</h2>
+            <p class="calendar-os-clinic">Ops — statut et créneaux</p>
+          </div>
+          <div class="calendar-os-toolbar">
+            <div class="calendar-os-nav" role="group" aria-label="Naviguer dans l'agenda">
+              <button type="button" class="calendar-os-icon-btn" data-asst-cal-nav="prev" aria-label="Période précédente">
+                <i data-lucide="chevron-left" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="calendar-os-today-btn" data-asst-cal-nav="today">Aujourd'hui</button>
+              <button type="button" class="calendar-os-icon-btn" data-asst-cal-nav="next" aria-label="Période suivante">
+                <i data-lucide="chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="calendar-os-views" role="group" aria-label="Type de vue">
+              <button type="button" class="calendar-os-view-btn" data-asst-cal-view="timeGridDay">Jour</button>
+              <button type="button" class="calendar-os-view-btn is-active" data-asst-cal-view="timeGridWeek" aria-pressed="true">Semaine</button>
+              <button type="button" class="calendar-os-view-btn" data-asst-cal-view="dayGridMonth">Mois</button>
+            </div>
+          </div>
         </header>
 
         <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
-          <div class="calendar-embed-header">
-            <div class="chart-title">Planning Hebdomadaire</div>
-            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
-          </div>
           <div id="dashboard-cal-inline"></div>
+          <p class="calendar-os-empty" id="asst-calendar-empty" hidden>Aucun rendez-vous sur cette période.</p>
         </article>
+
+        <div id="ops-chip-sheet" class="ops-chip-sheet" hidden>
+          <p class="ops-chip-sheet__who" id="ops-chip-who"></p>
+          <p class="ops-chip-sheet__meta" id="ops-chip-meta"></p>
+          <div class="ops-chip-sheet__actions" id="ops-chip-actions"></div>
+        </div>
       </section>
 
       <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">

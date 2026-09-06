@@ -24,7 +24,9 @@ const TEAM_NOTES_GET_SQL = `
     content AS message,
     created_at AS posted_at,
     COALESCE(pinned, false) AS pinned,
-    COALESCE(NULLIF(category, ''), 'general') AS category
+    COALESCE(NULLIF(category, ''), 'general') AS category,
+    booking_id,
+    patient_name
   FROM team_notes
   WHERE clinic_id = $1
   ORDER BY pinned DESC, posted_at DESC
@@ -40,7 +42,9 @@ const TEAM_NOTES_INSERT_SQL = `
     content AS message,
     created_at AS posted_at,
     pinned,
-    category
+    category,
+    booking_id,
+    patient_name
 `;
 
 const STAFF_DISPLAY_NAME_SQL = `
@@ -62,6 +66,10 @@ function mapTeamNoteRow(row) {
     category: row.category || 'general',
     text: message,
     time: postedAt,
+    booking_id: row.booking_id == null ? null : String(row.booking_id),
+    bookingId: row.booking_id == null ? null : String(row.booking_id),
+    patient_name: row.patient_name == null || row.patient_name === '' ? null : String(row.patient_name),
+    patientName: row.patient_name == null || row.patient_name === '' ? null : String(row.patient_name),
   };
 }
 

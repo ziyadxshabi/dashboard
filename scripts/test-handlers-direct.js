@@ -406,6 +406,36 @@ async function run() {
       })
     );
     ok('GET /api/roster range over 42 days returns 400', tooWide.statusCode === 400);
+
+    const rosterSearch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?q=Roster%20Today%20Apple',
+        headers: doctorCookie,
+      })
+    );
+    const searchNames = (rosterSearch.body?.data || []).map((row) => row.patient_name);
+    ok('GET /api/roster?q= returns 200', rosterSearch.statusCode === 200, `status=${rosterSearch.statusCode}`);
+    ok(
+      'GET /api/roster?q= matches patient name in 90-day window',
+      searchNames.includes('Roster Today Apple'),
+      JSON.stringify(searchNames)
+    );
+
+    const rosterPhoneSearch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?q=0600000091',
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET /api/roster?q= matches phone',
+      (rosterPhoneSearch.body?.data || []).some((row) => row.patient_phone === '0600000091'),
+      JSON.stringify(rosterPhoneSearch.body?.data)
+    );
   } finally {
     await query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [rosterRangeIds]);
   }
@@ -547,6 +577,39 @@ async function run() {
   const found = (waitlistAfter.body?.data || []).some((row) => row.nom === patientName || row.patient_name === patientName);
   ok('GET /api/waitlist includes the inserted patient', found);
 
+  const waitlistOrderIds = [];
+  try {
+    const low = await query(
+      `INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status)
+       VALUES ($1, $2, $3, 'Faible'::waitlist_priority, '', 'active')
+       RETURNING id`,
+      [rosterClinicId, `WaitLow ${Date.now()}`, '0611111111']
+    );
+    const urgent = await query(
+      `INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status)
+       VALUES ($1, $2, $3, 'Urgent'::waitlist_priority, '', 'active')
+       RETURNING id`,
+      [rosterClinicId, `WaitUrgent ${Date.now()}`, '0622222222']
+    );
+    waitlistOrderIds.push(low.rows[0]?.id, urgent.rows[0]?.id);
+    const ordered = await invoke(
+      handleWaitlist,
+      createReq({ method: 'GET', url: '/api/waitlist', headers: assistantCookie })
+    );
+    const names = (ordered.body?.data || []).map((row) => row.patient_name || row.nom);
+    const urgentIdx = names.findIndex((name) => String(name).startsWith('WaitUrgent'));
+    const lowIdx = names.findIndex((name) => String(name).startsWith('WaitLow'));
+    ok(
+      'GET /api/waitlist lists Urgent before Faible',
+      urgentIdx >= 0 && lowIdx >= 0 && urgentIdx < lowIdx,
+      JSON.stringify({ urgentIdx, lowIdx, names: names.slice(0, 8) })
+    );
+  } finally {
+    if (waitlistOrderIds.length) {
+      await query('DELETE FROM waitlist WHERE id = ANY($1::uuid[])', [waitlistOrderIds.filter(Boolean)]);
+    }
+  }
+
   if (waitlistPost.body?.id) {
     await query('DELETE FROM waitlist WHERE id = $1', [waitlistPost.body.id]);
   }
@@ -599,6 +662,62 @@ async function run() {
     );
     ok('POST /api/team-notes pinned is true', notesPost.body?.data?.pinned === true);
     insertedNoteId = notesPost.body?.data?.id || null;
+
+    let visitNoteId = null;
+    const bookingForNote = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status, starts_at, duration_min
+       ) VALUES (
+         $1, 'Note Visit Patient', '0633333333', 'Controle', 'Confirme'::appointment_status,
+         ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '09:30') AT TIME ZONE 'Africa/Casablanca', 30
+       ) RETURNING id`,
+      [rosterClinicId]
+    );
+    const visitBookingId = bookingForNote.rows[0]?.id;
+    try {
+      const visitNote = await invoke(
+        handleTeamNotes,
+        createReq({
+          method: 'POST',
+          url: '/api/team-notes',
+          headers: { ...assistantCookie, 'content-type': 'application/json' },
+          body: {
+            text: `visit-note-${Date.now()}`,
+            category: 'Planning',
+            bookingId: visitBookingId,
+            patientName: 'Note Visit Patient',
+          },
+        })
+      );
+      ok(
+        'POST /api/team-notes with bookingId returns 200',
+        visitNote.statusCode === 200,
+        `status=${visitNote.statusCode} body=${JSON.stringify(visitNote.body)}`
+      );
+      visitNoteId = visitNote.body?.data?.id || null;
+      ok(
+        'POST /api/team-notes echoes booking_id',
+        visitNote.body?.data?.booking_id === String(visitBookingId) || visitNote.body?.data?.bookingId === String(visitBookingId),
+        JSON.stringify(visitNote.body?.data)
+      );
+      ok(
+        'POST /api/team-notes echoes patient_name',
+        visitNote.body?.data?.patient_name === 'Note Visit Patient',
+        `patient_name=${visitNote.body?.data?.patient_name}`
+      );
+
+      const notesWithVisit = await invoke(
+        handleTeamNotes,
+        createReq({ method: 'GET', url: '/api/team-notes', headers: doctorCookie })
+      );
+      const foundVisit = (notesWithVisit.body?.data || []).some(
+        (row) => row.id === visitNoteId && (row.booking_id === String(visitBookingId) || row.patient_name === 'Note Visit Patient')
+      );
+      ok('GET /api/team-notes includes booking_id for visit notes', foundVisit);
+    } finally {
+      if (visitNoteId) await query('DELETE FROM team_notes WHERE id = $1', [visitNoteId]);
+      if (visitBookingId) await query('DELETE FROM bookings WHERE id = $1', [visitBookingId]);
+    }
 
     const notesAfter = await invoke(
       handleTeamNotes,
@@ -835,6 +954,25 @@ async function run() {
     'GET /api/dashboard-data exposes hour_08 through hour_18',
     hourKeys.every((key) => typeof dash.body?.data?.[key] === 'number' && Number.isFinite(dash.body.data[key])),
     JSON.stringify(hourKeys.map((key) => [key, dash.body?.data?.[key]]))
+  );
+  ok(
+    'GET /api/dashboard-data reserved_min is a number',
+    typeof dash.body?.data?.reserved_min === 'number' && Number.isFinite(dash.body.data.reserved_min),
+    `reserved_min=${dash.body?.data?.reserved_min}`
+  );
+  ok('GET /api/dashboard-data open_min is 660', dash.body?.data?.open_min === 660, `open_min=${dash.body?.data?.open_min}`);
+  ok(
+    'GET /api/dashboard-data treatment_mix is an array',
+    Array.isArray(dash.body?.data?.treatment_mix),
+    JSON.stringify(dash.body?.data?.treatment_mix)
+  );
+  ok(
+    'GET /api/dashboard-data returning_phones is a number',
+    typeof dash.body?.data?.returning_phones === 'number' && Number.isFinite(dash.body.data.returning_phones)
+  );
+  ok(
+    'GET /api/dashboard-data new_phones is a number',
+    typeof dash.body?.data?.new_phones === 'number' && Number.isFinite(dash.body.data.new_phones)
   );
 
   // ── Public clinic ──────────────────────────────────────────────────────
