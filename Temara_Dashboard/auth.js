@@ -304,6 +304,7 @@
 
     showShell(assistantShell);
     showShell(mount);
+    applySessionClinic(sessionClinic);
   }
 
   async function handleAuthSuccess(role) {
@@ -327,8 +328,11 @@
     setupLoginForm();
   }
 
+  let sessionClinic = null;
+
   function applySessionClinic(clinic) {
     if (!clinic || typeof clinic !== 'object') return;
+    sessionClinic = clinic;
 
     const name = String(clinic.name || '').trim();
     if (name) {

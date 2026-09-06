@@ -115,7 +115,8 @@ h1, h2, h3,
 }
 
 /* ── Login: light product gate ── */
-.login-overlay {
+.login-overlay,
+html[data-theme="pearl-clinic"] .login-overlay {
   --login-overlay-bg: #f4f5f6;
   --login-modal-bg: #ffffff;
   --login-modal-border: rgba(15, 15, 15, 0.08);
@@ -799,6 +800,45 @@ html[data-theme="pearl-clinic"] .sidebar-brand-sub {
 .account-card__name.kinetic-label {
   color: var(--rail-text) !important;
   font-size: 13px !important;
+}
+
+.settings-label,
+.login-field-label {
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.mobile-bottom-nav,
+body.mode-assistant .mobile-bottom-nav {
+  background: var(--tabbar-float-bg) !important;
+  border: 1px solid var(--tabbar-float-border) !important;
+  box-shadow: var(--tabbar-float-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.mode-assistant .mobile-bottom-nav .tab-link {
+  color: var(--text-muted) !important;
+}
+
+body.mode-assistant .mobile-bottom-nav .tab-link.is-active {
+  color: var(--text-main) !important;
+  background: var(--accent-dim) !important;
+  box-shadow: none !important;
+}
+
+body.mode-assistant .mobile-bottom-nav .tab-link .tab-icon,
+body.mode-assistant .mobile-bottom-nav .tab-link [data-lucide] {
+  stroke: var(--text-muted) !important;
+  color: var(--text-muted) !important;
+}
+
+body.mode-assistant .mobile-bottom-nav .tab-link.is-active .tab-icon,
+body.mode-assistant .mobile-bottom-nav .tab-link.is-active [data-lucide] {
+  stroke: var(--text-main) !important;
+  color: var(--text-main) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
