@@ -17,7 +17,15 @@ const WAITLIST_GET_SQL = `
   SELECT id, patient_name, patient_phone, priority, notes, status, created_at
   FROM waitlist
   WHERE clinic_id = $1 AND status = 'active'
-  ORDER BY created_at DESC
+  ORDER BY
+    CASE priority::text
+      WHEN 'Urgent' THEN 0
+      WHEN 'Haute' THEN 1
+      WHEN 'Moyenne' THEN 2
+      WHEN 'Normale' THEN 2
+      ELSE 3
+    END,
+    created_at ASC
 `;
 
 const WAITLIST_INSERT_SQL = `
@@ -101,7 +109,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant'] });
   if (!session) return;
 
   try {

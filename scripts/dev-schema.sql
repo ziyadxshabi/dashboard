@@ -1,5 +1,6 @@
 -- Local/dev schema for Wave 1 operational APIs.
 -- Clinic dates are interpreted in Africa/Casablanca by the SQL in the handlers.
+-- Canonical Postgres (UUID, enums, overlap guard) lives in supabase/schema.sql.
 
 CREATE TABLE IF NOT EXISTS bookings (
   id              BIGSERIAL PRIMARY KEY,
@@ -11,6 +12,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   status          TEXT NOT NULL DEFAULT 'En attente',
   starts_at       TIMESTAMPTZ NOT NULL,
   duration_min    INTEGER,
+  buffer_min      INTEGER NOT NULL DEFAULT 10,
+  booking_kind    TEXT NOT NULL DEFAULT 'visit',
+  cancel_reason   TEXT,
+  care_started_at TIMESTAMPTZ,
   notes           TEXT NOT NULL DEFAULT ''
 );
 

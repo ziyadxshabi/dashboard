@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="oak-lounge">
+<html lang="fr" data-theme="pearl-clinic">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,6 +35,7 @@
   <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="dashboard_style.css" />
+  <link rel="stylesheet" href="product-ui.css" />
   <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.23/dist/lenis.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -44,7 +45,7 @@
 <body class="os-boot-pending auth-gate-active">
   <a href="#main-content" class="skip-link">Aller au contenu principal</a>
 
-  <!-- Secure credential gateway — Oak Lounge -->
+  <!-- Credential gateway -->
   <div id="login-overlay" class="login-overlay is-visible">
     <header class="login-viewport-brand login-coalesce-item" data-coalesce="brand" aria-label="DentaFlow OS">
       <div class="login-viewport-brand-mark" aria-hidden="true">
@@ -312,7 +313,6 @@
               <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name"></span></h1>
               <p class="hero-date" id="hero-date">—</p>
             </div>
-            <span class="dentaflow-os-watermark" aria-hidden="true">DENTAFLOW OS</span>
           </div>
           <div class="hero-sync">
             <span class="sync-dot" id="sync-dot"></span>
@@ -320,17 +320,17 @@
           </div>
         </header>
 
-        <section class="reclaimed-banner" aria-label="Impact DentaFlow — patients récupérés et revenu estimé">
+        <section class="reclaimed-banner reclaimed-banner--quiet" aria-label="Patients récupérés et revenu estimé">
           <div class="reclaimed-banner__glow" aria-hidden="true"></div>
           <div class="reclaimed-banner__content">
             <div class="hero-split-layout">
               <div class="hero-split-block hero-split-block--primary">
-                <p class="hero-split-subtitle kinetic-label">PATIENTS RÉCUPÉRÉS PAR DENTAFLOW</p>
+                <p class="hero-split-subtitle kinetic-label">Patients récupérés</p>
                 <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
                 <p class="hero-split-helper">Aucune série de créneaux récupérés n'est enregistrée.</p>
               </div>
               <div class="hero-split-block hero-split-block--secondary">
-                <p class="hero-split-subtitle kinetic-label">REVENU ESTIMÉ GÉNÉRÉ</p>
+                <p class="hero-split-subtitle kinetic-label">Revenu estimé</p>
                 <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">—</div>
                 <p class="hero-split-helper">Non calculé — pas de table de créneaux récupérés</p>
               </div>
@@ -376,6 +376,28 @@
           </div>
         </section>
 
+        <section class="load-mix-row" aria-label="Charge, mix et fidélité">
+          <article class="load-card" aria-labelledby="load-title">
+            <h3 class="chart-title" id="load-title">Charge du jour</h3>
+            <p class="chart-sub">Temps réservé / plage d'ouverture (08:00–19:00)</p>
+            <p class="load-card__value kinetic-value" id="load-reserved">—</p>
+            <div class="load-meter" aria-hidden="true">
+              <div class="load-meter__fill" id="load-meter-fill"></div>
+            </div>
+          </article>
+          <article class="mix-card" aria-labelledby="mix-title">
+            <h3 class="chart-title" id="mix-title">Mix de soins</h3>
+            <p class="chart-sub">Semaine en cours — par traitement</p>
+            <div id="treatment-mix-list" class="mix-list"></div>
+          </article>
+          <article class="fidelity-card" aria-labelledby="fidelity-title">
+            <h3 class="chart-title" id="fidelity-title">Revenus / nouveaux</h3>
+            <p class="chart-sub">Par téléphone · fenêtre 90 jours</p>
+            <p class="fidelity-card__line"><span id="fidelity-returning">—</span> revenus</p>
+            <p class="fidelity-card__line"><span id="fidelity-new">—</span> nouveaux</p>
+          </article>
+        </section>
+
         <section class="team-messages-panel" aria-label="Messages de l'équipe">
           <article class="team-messages-card">
             <header class="team-messages-header">
@@ -397,8 +419,8 @@
             <div class="chart-header">
               <div class="chart-header-top">
                 <div>
-                  <div class="chart-title">Affluence Horaire</div>
-                  <div class="chart-sub">Patients par heure — identifiez les créneaux chargés</div>
+                  <div class="chart-title" id="affluence-chart-title">Affluence horaire</div>
+                  <div class="chart-sub" id="affluence-chart-sub">Patients par heure aujourd'hui</div>
                 </div>
                 <div class="chart-toggle" id="chart-toggle" role="group" aria-label="Période d'affichage">
                   <div class="chart-toggle-slider" id="chart-toggle-slider" aria-hidden="true"></div>
@@ -442,7 +464,7 @@
 
         <header class="view-page-header">
           <h2 class="view-page-title kinetic-title">Cabinet Live</h2>
-          <p class="view-page-sub">Vue opérationnelle — patients du jour et notes cliniques</p>
+          <p class="view-page-sub">Maintenant — fauteuil, suite, transmissions</p>
         </header>
 
         <div class="doctor-metrics" id="doctor-metrics">
@@ -458,7 +480,7 @@
               <span class="doctor-metric-label kinetic-label">En attente</span>
             </div>
             <span class="doctor-metric-value kinetic-value" id="hub-val-pending">—</span>
-            <span class="doctor-metric-delta" id="hub-delta-pending">Devis à valider</span>
+            <span class="doctor-metric-delta" id="hub-delta-pending">Statut En attente</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
             <div class="doctor-metric-card__head">
@@ -467,122 +489,43 @@
             <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">—</span>
             <span class="doctor-metric-delta doctor-metric-delta--warn" id="hub-delta-noshows">Créneaux libres</span>
           </article>
-          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="production">
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="charge">
             <div class="doctor-metric-card__head">
-              <span class="doctor-metric-label kinetic-label">Production</span>
+              <span class="doctor-metric-label kinetic-label">Charge</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-production">—</span>
-            <span class="doctor-metric-delta" id="hub-delta-production">MAD facturés</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-charge">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-charge">Temps réservé / ouverture</span>
           </article>
         </div>
-
-        <article class="chart-card chart-card--doctor-trend" aria-label="Tendance patients sur 7 jours">
-          <header class="chart-header">
-            <div>
-              <h3 class="chart-title">Tendance 7 jours</h3>
-              <p class="chart-sub">Patients par jour — flux hebdomadaire du cabinet</p>
-            </div>
-          </header>
-          <div
-            id="doctor-weekly-trend-chart"
-            class="oak-dynamic-chart"
-            role="img"
-            aria-label="Graphique en barres — patients sur les 7 derniers jours"
-          ></div>
-        </article>
-
-        <section class="doctor-bento-row" aria-label="Superpouvoir — message sur-mesure">
-          <article class="superpower-bento-card superpower-bento-card--doctor-custom" aria-labelledby="doctor-custom-sms-title">
-            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
-            <header class="superpower-bento-card__head">
-              <div class="superpower-bento-card__icon" aria-hidden="true">
-                <i data-lucide="message-square-share" aria-hidden="true"></i>
-              </div>
-              <div class="superpower-bento-card__copy">
-                <p class="superpower-bento-card__eyebrow">Superpouvoir · Diffusion</p>
-                <h2 class="superpower-bento-card__title" id="doctor-custom-sms-title">Message Sur-Mesure</h2>
-                <p class="superpower-bento-card__desc">
-                  Rédigez un SMS personnalisé et diffusez-le à votre base patients active. Idéal pour annonces, rappels ciblés ou communications premium du cabinet.
-                </p>
-              </div>
-            </header>
-            <div class="doctor-custom-sms-compose">
-              <label class="doctor-custom-sms-label" for="doctor-custom-sms-text">Message personnalisé</label>
-              <textarea
-                id="doctor-custom-sms-text"
-                class="doctor-custom-sms-textarea"
-                rows="3"
-                maxlength="320"
-                placeholder="Écrivez votre message personnalisé ici..."
-                aria-describedby="doctor-custom-sms-helper doctor-custom-sms-count"
-              ></textarea>
-              <div class="doctor-custom-sms-meta">
-                <p class="doctor-custom-sms-helper" id="doctor-custom-sms-helper">
-                  Diffusion globale — journal d'audit SMS (aucun envoi automatique).
-                </p>
-                <span class="doctor-custom-sms-counter" id="doctor-custom-sms-count" aria-live="polite">0 / 320</span>
-              </div>
-              <button type="button" id="btn-doctor-custom-sms" class="btn btn-primary doctor-custom-sms-submit">
-                Envoyer le message
-              </button>
-            </div>
-          </article>
-        </section>
 
         <div id="triage-container">
           <div class="skeleton-wrapper" id="triage-skeleton">
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-table-row"></div>
-            <div class="skeleton skeleton-table-row"></div>
-            <div class="skeleton skeleton-table-row"></div>
             <div class="skeleton skeleton-card"></div>
-            <div class="skeleton skeleton-table-row"></div>
-            <div class="skeleton skeleton-table-row"></div>
           </div>
-          <div id="triage-content" class="brutalist-triage-grid" aria-label="Centre de triage" hidden>
-          <article class="brutalist-triage-panel" aria-label="Salle d'attente">
-            <header class="brutalist-triage-panel__header">
-              <h3 class="brutalist-triage-panel__title">Salle d'Attente</h3>
-              <p class="brutalist-triage-panel__sub">Patients confirmés — ordre chronologique</p>
-            </header>
-            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Salle d'attente" tabindex="0">
-              <table class="brutalist-triage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Heure</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Motif</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="doctor-waiting-room-body">
-                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="brutalist-triage-panel" aria-label="Urgences">
-            <header class="brutalist-triage-panel__header">
-              <h3 class="brutalist-triage-panel__title">Urgences</h3>
-              <p class="brutalist-triage-panel__sub">Cas prioritaires — traitement immédiat</p>
-            </header>
-            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Urgences" tabindex="0">
-              <table class="brutalist-triage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Heure</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Motif</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="doctor-emergencies-body">
-                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
+          <div id="triage-content" class="chair-glance" aria-label="Maintenant au cabinet" hidden>
+            <article class="chair-glance__panel" aria-labelledby="hub-chair-title">
+              <header class="chair-glance__head">
+                <h3 class="chair-glance__title" id="hub-chair-title">Au fauteuil</h3>
+                <p class="chair-glance__sub">En soin — écoulé et fin prévue</p>
+              </header>
+              <div id="hub-in-chair" class="chair-glance__body"></div>
+            </article>
+            <article class="chair-glance__panel" aria-labelledby="hub-next-title">
+              <header class="chair-glance__head">
+                <h3 class="chair-glance__title" id="hub-next-title">Prochains</h3>
+                <p class="chair-glance__sub">Les 3 suivants</p>
+              </header>
+              <div id="hub-next-three" class="chair-glance__body"></div>
+            </article>
+            <article class="chair-glance__panel" aria-labelledby="hub-handoff-title">
+              <header class="chair-glance__head">
+                <h3 class="chair-glance__title" id="hub-handoff-title">Transmission</h3>
+                <p class="chair-glance__sub">Notes épinglées</p>
+              </header>
+              <div id="hub-pinned-handoff" class="chair-glance__body"></div>
+            </article>
           </div>
         </div>
 
@@ -599,8 +542,8 @@
             </div>
             <div class="digest-metric digest-revenue">
               <div class="rev-header">
-                <span class="metric-label">Objectif Journalier</span>
-                <span class="metric-value" id="digest-revenue">0 MAD</span>
+                <span class="metric-label">Temps réservé</span>
+                <span class="metric-value" id="digest-revenue">—</span>
               </div>
               <div class="rev-progress-bar">
                 <div class="rev-progress-fill" id="digest-progress"></div>
@@ -612,18 +555,65 @@
       </section>
 
       <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
-        <header class="view-page-header">
-          <h2 class="view-page-title">Calendrier Clinique</h2>
-          <p class="view-page-sub">Agenda de gestion — consultations et créneaux de la semaine</p>
+        <header class="calendar-os-header">
+          <div class="calendar-os-heading">
+            <h2 class="calendar-os-title" id="calendar-os-title">Agenda</h2>
+            <p class="calendar-os-clinic" id="calendar-os-clinic"></p>
+          </div>
+          <div class="calendar-os-toolbar">
+            <div class="calendar-os-nav" role="group" aria-label="Naviguer dans l'agenda">
+              <button type="button" class="calendar-os-icon-btn" data-cal-nav="prev" aria-label="Période précédente">
+                <i data-lucide="chevron-left" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="calendar-os-today-btn" data-cal-nav="today">Aujourd'hui</button>
+              <button type="button" class="calendar-os-icon-btn" data-cal-nav="next" aria-label="Période suivante">
+                <i data-lucide="chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="calendar-os-views" role="group" aria-label="Type de vue">
+              <button type="button" class="calendar-os-view-btn" data-cal-view="timeGridDay">Jour</button>
+              <button type="button" class="calendar-os-view-btn is-active" data-cal-view="timeGridWeek" aria-pressed="true">Semaine</button>
+              <button type="button" class="calendar-os-view-btn" data-cal-view="dayGridMonth">Mois</button>
+            </div>
+          </div>
         </header>
 
-        <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
-          <div class="calendar-embed-header">
-            <div class="chart-title">Planning Hebdomadaire</div>
-            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
-          </div>
-          <div id="dashboard-cal-inline"></div>
-        </article>
+        <div class="calendar-os-stage">
+          <article class="calendar-embed-panel" aria-label="Agenda des rendez-vous">
+            <div id="dashboard-cal-inline"></div>
+            <p class="calendar-os-empty" id="calendar-os-empty" hidden>Aucun rendez-vous sur cette période.</p>
+          </article>
+          <aside class="calendar-inspector" id="calendar-inspector" hidden>
+            <button type="button" class="calendar-inspector__close" id="calendar-inspector-close" aria-label="Fermer le détail">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+            <p class="calendar-inspector__time" id="cal-insp-time"></p>
+            <h3 class="calendar-inspector__name" id="cal-insp-name"></h3>
+            <p class="calendar-inspector__status" id="cal-insp-status"></p>
+            <dl class="calendar-inspector__meta">
+              <div>
+                <dt>Soin</dt>
+                <dd id="cal-insp-treatment"></dd>
+              </div>
+              <div>
+                <dt>Téléphone</dt>
+                <dd id="cal-insp-phone"></dd>
+              </div>
+              <div>
+                <dt>Durée</dt>
+                <dd id="cal-insp-duration"></dd>
+              </div>
+            </dl>
+            <div class="calendar-inspector__actions" id="cal-insp-actions" hidden>
+              <button type="button" class="btn-matte-ghost" id="cal-insp-delete">Retirer le blocage</button>
+            </div>
+          </aside>
+        </div>
+        <div id="block-chip-sheet" class="ops-chip-sheet" hidden>
+          <p class="ops-chip-sheet__who" id="block-chip-when"></p>
+          <p class="ops-chip-sheet__meta">Bloque le fauteuil dans DentaFlow — pas encore sur Cal.com public</p>
+          <div class="ops-chip-sheet__actions" id="block-chip-actions"></div>
+        </div>
       </section>
 
       <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
@@ -637,7 +627,7 @@
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
             <div class="waitlist-form-header">
               <div class="chart-title">Nouveau Patient</div>
-              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+              <div class="chart-sub">À rappeler / à placer — pas d'envoi SMS automatique</div>
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
@@ -762,8 +752,8 @@
       <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
         <header class="view-page-header view-page-header--row">
           <div>
-            <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">CRM clinique — fiches et coordonnées patients</p>
+            <h2 class="view-page-title">Carnet</h2>
+            <p class="view-page-sub">Historique des visites — recherche par nom ou téléphone</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -771,7 +761,7 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Rechercher par nom, téléphone ou email…"
+              placeholder="Nom ou téléphone (90 derniers jours)"
               autocomplete="off"
             />
           </div>
@@ -793,13 +783,14 @@
                 <tr>
                   <th scope="col">Nom</th>
                   <th scope="col">Téléphone</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Motif</th>
+                  <th scope="col">Dernière visite</th>
+                  <th scope="col">Soin</th>
+                  <th scope="col">No-shows (90 j)</th>
                 </tr>
               </thead>
               <tbody id="crm-table-body">
                 <tr class="crm-table-empty">
-                  <td colspan="4">Aucun patient trouvé</td>
+                  <td colspan="5">Aucun patient trouvé</td>
                 </tr>
               </tbody>
             </table>
@@ -918,17 +909,17 @@
               <button
                 type="button"
                 class="theme-switch-btn is-active"
-                id="theme-btn-oak"
-                data-theme-value="oak-lounge"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
                 aria-pressed="true"
-              >Oak Lounge</button>
+              >Clair</button>
               <button
                 type="button"
                 class="theme-switch-btn"
-                id="theme-btn-pearl"
-                data-theme-value="pearl-clinic"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
                 aria-pressed="false"
-              >Pearl Clinic</button>
+              >Sombre</button>
             </div>
           </article>
 
@@ -1016,37 +1007,16 @@
             </div>
           </article>
 
-          <!-- Card: Gestion des Urgences -->
+          <!-- Card: Indisponibilités -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <i data-lucide="triangle-alert" aria-hidden="true"></i>
+              <i data-lucide="calendar-off" aria-hidden="true"></i>
             </div>
-            <h3 class="settings-card-title">Gestion des Urgences</h3>
-            <p class="settings-card-desc">Réservez une capacité tampon pour les cas urgents du jour.</p>
-            <div class="settings-toggle-row">
-              <div class="settings-toggle-info">
-                <span class="settings-toggle-label">Garder des créneaux d'urgence</span>
-                <span class="settings-toggle-hint">Slots protégés non réservables en ligne</span>
-              </div>
-              <label class="settings-toggle">
-                <input type="checkbox" id="settings-emergency-buffer-toggle" checked />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-            <div class="settings-field">
-              <label class="settings-label" for="settings-emergency-slots">Nombre de slots par jour</label>
-              <input
-                class="waitlist-input settings-input"
-                type="number"
-                id="settings-emergency-slots"
-                name="emergency_slots"
-                value="2"
-                min="0"
-                max="10"
-                step="1"
-                inputmode="numeric"
-              />
-            </div>
+            <h3 class="settings-card-title">Indisponibilités</h3>
+            <p class="settings-card-desc">
+              Pause, labo, jour off et urgence réservée se posent sur le calendrier.
+              Le portail public Cal.com peut encore proposer ces heures tant que la synchro n'est pas en place.
+            </p>
           </article>
 
           <!-- Card 3: Sécurité -->
@@ -1170,32 +1140,10 @@
       </header>
 
       <div class="crm-side-panel-body" data-lenis-prevent>
-        <section class="crm-side-panel-section" aria-label="Détails financiers">
-          <h3 class="crm-side-panel-section-title">Détails Financiers</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Montant</dt>
-              <dd id="crm-panel-amount" data-tooltip="Montant facturé pour la dernière visite">—</dd>
-            </div>
-            <div class="crm-side-panel-field">
-              <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="crm-side-panel-section" aria-label="Notes cliniques">
-          <h3 class="crm-side-panel-section-title">Notes Cliniques</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Motif de Consultation</dt>
-              <dd id="crm-panel-motif">—</dd>
-            </div>
-            <div class="crm-side-panel-field crm-side-panel-field--block">
-              <dt>Observations Médicales</dt>
-              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
-            </div>
-          </dl>
+        <section class="crm-side-panel-section" aria-label="Visites">
+          <h3 class="crm-side-panel-section-title">Dernières visites</h3>
+          <p class="chair-glance__empty" id="crm-panel-noshows" hidden></p>
+          <div id="crm-panel-visits" class="carnet-visits"></div>
         </section>
       </div>
     </aside>

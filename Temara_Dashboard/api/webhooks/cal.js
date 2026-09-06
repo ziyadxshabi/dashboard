@@ -28,9 +28,15 @@ const STATUS_ANNULE = STATUS_CODE_TO_DB.annule;
 const INSERT_CREATED_SQL = `
   INSERT INTO bookings (
     clinic_id, cal_booking_uid, patient_name, patient_phone,
-    treatment_name, status, starts_at, duration_min, notes, updated_at
+    treatment_name, status, starts_at, duration_min, buffer_min, booking_kind, notes, updated_at
   )
-  VALUES ($1, $2, $3, $4, $5, $6::appointment_status, $7, $8, $9, NOW())
+  VALUES (
+    $1, $2, $3, $4, $5, $6::appointment_status, $7, $8,
+    COALESCE((SELECT buffer_min FROM clinics WHERE id = $1), 10),
+    'visit',
+    $9,
+    NOW()
+  )
   ON CONFLICT (cal_booking_uid) DO UPDATE SET
     clinic_id = EXCLUDED.clinic_id,
     patient_name = EXCLUDED.patient_name,
@@ -295,6 +301,9 @@ module.exports = async function handler(req, res) {
 
     return jsonOk(res, eventType || 'PING', null);
   } catch (err) {
-    return sendDbError(res, err);
+    return sendDbError(res, err, {
+      overlapMessage:
+        'Créneau déjà pris dans DentaFlow (tampon / blocage). Le rendez-vous Cal.com peut encore exister — synchro Cal.com plus tard.',
+    });
   }
 };

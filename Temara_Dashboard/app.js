@@ -1,5 +1,5 @@
 /**
- * Assistant Command Center — Postgres roster, waitlist, and team notes.
+ * Assistant shell — Postgres roster, waitlist, and team notes.
  * Clinique Dentaire Témara Mall · DentaFlow OS
  */
 
@@ -17,6 +17,7 @@ const CONFIG = {
     GET_NOTES: '/api/team-notes',
     POST_NOTE: '/api/team-notes',
     WAITLIST_ADD: '/api/waitlist',
+    WAITLIST_GET: '/api/waitlist',
     BULK_SMS: '/api/bulk-sms',
   },
 };
@@ -31,6 +32,25 @@ const STATUS_OPTIONS = [
   'No-show',
   'Annulé',
 ];
+
+const CANCEL_REASON_LABELS = {
+  oublie: 'Oubli',
+  cout: 'Coût',
+  reprogramme: 'Reprogrammé',
+  autre: 'Autre',
+};
+
+function bookingKindOf(record) {
+  return String(record?.booking_kind || record?.bookingKind || 'visit') || 'visit';
+}
+
+function isVisitBooking(record) {
+  return bookingKindOf(record) === 'visit';
+}
+
+function isHoldBooking(record) {
+  return bookingKindOf(record) === 'emergency_hold';
+}
 
 const VIEW_MAP = {
   overview: 'view-overview',
@@ -160,25 +180,62 @@ function isPulseCancelledStatus(status) {
 
 function createEmptyOperationalPulse() {
   return {
-    patientsSeen: 0,
-    patientsPlanned: 0,
-    cancellations: 0,
-    punctuality: null,
-    turnoverMinutes: null,
+    planned: 0,
+    seen: 0,
+    inChair: 0,
+    inWaiting: 0,
+    holes: 0,
   };
 }
 
-function computeOperationalPulse(records) {
-  const rows = Array.isArray(records) ? records.filter(Boolean) : [];
-  if (!rows.length) return createEmptyOperationalPulse();
+function isPulseInChairStatus(status) {
+  return normalizePulseStatus(status) === 'en soin';
+}
 
-  return {
-    patientsSeen: rows.filter((record) => isPulseSeenStatus(record.status)).length,
-    patientsPlanned: rows.length,
-    cancellations: rows.filter((record) => isPulseCancelledStatus(record.status)).length,
-    punctuality: null,
-    turnoverMinutes: null,
-  };
+function isPulseWaitingRoomStatus(status) {
+  const key = normalizePulseStatus(status);
+  return key.includes('salle') && key.includes('attente');
+}
+
+function computeOperationalPulse(records) {
+  const pulse = createEmptyOperationalPulse();
+  const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+  for (const record of rows) {
+    if (!isVisitBooking(record)) continue;
+    if (isPulseCancelledStatus(record.status)) {
+      pulse.holes += 1;
+      continue;
+    }
+    pulse.planned += 1;
+    if (isPulseSeenStatus(record.status)) pulse.seen += 1;
+    if (isPulseInChairStatus(record.status)) pulse.inChair += 1;
+    if (isPulseWaitingRoomStatus(record.status)) pulse.inWaiting += 1;
+  }
+  return pulse;
+}
+
+function parseStartsAt(value) {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value == null || value === '') return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isLateOnScheduledTime(record, now = new Date()) {
+  const key = normalizePulseStatus(record?.status);
+  if (key !== 'confirme' && key !== 'en attente') return false;
+  const start = parseStartsAt(record.starts_at || record.startTime || record.rawDate);
+  if (!start) return false;
+  return start.getTime() < now.getTime();
+}
+
+function boardColumnForStatus(status) {
+  const key = normalizePulseStatus(status);
+  if (key === 'termine') return 'done';
+  if (key === 'en soin') return 'care';
+  if (isPulseWaitingRoomStatus(status)) return 'waiting';
+  if (key === 'confirme' || key === 'en attente') return 'incoming';
+  return null;
 }
 
 let handoffNotes = [];
@@ -189,6 +246,7 @@ let handoffNotes = [];
   let crmPatientsById = {};
   let crmUnpaidOnly = false;
   let waitlistUrgentOnly = false;
+  let waitlistEntries = [];
   let selectedPatientIds = [];
   let activeView = 'overview';
   let activeMobileTab = 'overview';
@@ -418,6 +476,13 @@ let handoffNotes = [];
       meta.appendChild(pinBadge);
     }
 
+    if (note.patientName || note.patient_name) {
+      const patientSpan = document.createElement('span');
+      patientSpan.className = 'handoff-note__patient';
+      patientSpan.textContent = note.patientName || note.patient_name;
+      meta.appendChild(patientSpan);
+    }
+
     const textP = document.createElement('p');
     textP.className = 'handoff-note__text';
     textP.textContent = note.text || '';
@@ -530,80 +595,515 @@ let handoffNotes = [];
 
   function renderOperationalPulse(pulseData = createEmptyOperationalPulse()) {
     return safeRender('renderOperationalPulse', () => {
-    const charts = window.DentaFlowPulseCharts || {};
-    const {
-      buildSparklineSvg = () => '',
-      buildBarChartSvg = () => '',
-      buildDoughnutSvg = () => '',
-      updateSparkline = () => {},
-      updateBarChart = () => {},
-      updateDoughnutChart = () => {},
-      animatePulseCharts = () => {},
-    } = charts;
-
     const grid = $('assistant-pulse-grid');
     if (!grid) return;
 
     const data = pulseData ?? createEmptyOperationalPulse();
-    const punctualityLabel = data.punctuality != null ? `${data.punctuality}%` : '--';
-    const turnoverLabel = data.turnoverMinutes != null ? `${data.turnoverMinutes} min` : '--';
-    const punctualityValue = data.punctuality != null
-      ? data.punctuality
-      : (data.patientsPlanned > 0 ? Math.round((data.patientsSeen / data.patientsPlanned) * 100) : 0);
-    const turnoverMaxMinutes = 45;
+    grid.replaceChildren();
 
-    grid.innerHTML = `
-      <article class="pulse-card pulse-card--matte">
-        <div class="pulse-card__head">
-          <p class="pulse-card__label kinetic-label" data-tooltip="Patients déjà reçus sur le total prévu aujourd'hui">Flux patients</p>
-          <div class="pulse-card__chart">${buildSparklineSvg(null, { tone: 'gold' })}</div>
-        </div>
-        <p class="pulse-card__value pulse-card__value--split kinetic-value">
-          ${data.patientsSeen} <span>/ ${data.patientsPlanned}</span>
-        </p>
-        <p class="pulse-card__meta">vus / prévus</p>
-      </article>
+    const cards = [
+      {
+        label: 'Prévus',
+        value: String(data.planned),
+        meta: `${data.seen} vus`,
+        tip: 'Rendez-vous non annulés aujourd\'hui',
+      },
+      {
+        label: 'Au fauteuil',
+        value: String(data.inChair),
+        meta: 'En soin',
+        tip: 'Patients actuellement en soin',
+      },
+      {
+        label: 'En salle',
+        value: String(data.inWaiting),
+        meta: "Salle d'attente",
+        tip: "Patients en salle d'attente",
+      },
+      {
+        label: 'Trous',
+        value: String(data.holes),
+        meta: 'Annulé · no-show',
+        tip: 'Créneaux libérés aujourd\'hui',
+      },
+    ];
 
-      <article class="pulse-card pulse-card--matte">
-        <div class="pulse-card__head">
-          <p class="pulse-card__label kinetic-label" data-tooltip="Annulations et absences non signalées du jour">Absences</p>
-          <div class="pulse-card__chart">${buildBarChartSvg(null, { tone: 'danger' })}</div>
-        </div>
-        <p class="pulse-card__value kinetic-value">${data.cancellations}</p>
-        <p class="pulse-card__meta">annulations · no-shows</p>
-      </article>
-
-      <article class="pulse-card pulse-card--matte">
-        <div class="pulse-card__head">
-          <p class="pulse-card__label kinetic-label" data-tooltip="Pourcentage de patients arrivés à l'heure">Ponctualité</p>
-          <div class="pulse-card__chart">${buildDoughnutSvg(null, { tone: 'success' })}</div>
-        </div>
-        <p class="pulse-card__value kinetic-value">${punctualityLabel}</p>
-        <p class="pulse-card__meta">taux d'arrivée</p>
-      </article>
-
-      <article class="pulse-card pulse-card--matte">
-        <div class="pulse-card__head">
-          <p class="pulse-card__label kinetic-label" data-tooltip="Durée moyenne entre l'arrivée et le début du soin">Rotation</p>
-          <div class="pulse-card__chart">${buildSparklineSvg(null, { tone: 'muted' })}</div>
-        </div>
-        <p class="pulse-card__value kinetic-value">${turnoverLabel}</p>
-        <p class="pulse-card__meta">temps moyen salle</p>
-      </article>`;
-
-    const cards = grid.querySelectorAll('.pulse-card');
-    const fluxStroke = cards[0]?.querySelector('.pulse-sparkline path, .pulse-sparkline polyline');
-    const absencesSvg = cards[1]?.querySelector('.pulse-bars');
-    const punctualitySvg = cards[2]?.querySelector('.pulse-doughnut');
-    const rotationStroke = cards[3]?.querySelector('.pulse-sparkline path, .pulse-sparkline polyline');
-
-    updateSparkline(fluxStroke, data.patientsSeen, data.patientsPlanned);
-    updateBarChart(absencesSvg, data.cancellations);
-    updateDoughnutChart(punctualitySvg, punctualityValue, 100);
-    updateSparkline(rotationStroke, data.turnoverMinutes ?? 0, turnoverMaxMinutes);
-
-    animatePulseCharts(grid);
+    const fragment = document.createDocumentFragment();
+    cards.forEach((card) => {
+      const article = document.createElement('article');
+      article.className = 'pulse-card pulse-card--matte';
+      const head = document.createElement('div');
+      head.className = 'pulse-card__head';
+      const label = document.createElement('p');
+      label.className = 'pulse-card__label kinetic-label';
+      label.dataset.tooltip = card.tip;
+      label.textContent = card.label;
+      head.appendChild(label);
+      const value = document.createElement('p');
+      value.className = 'pulse-card__value kinetic-value';
+      value.textContent = card.value;
+      const meta = document.createElement('p');
+      meta.className = 'pulse-card__meta';
+      meta.textContent = card.meta;
+      article.append(head, value, meta);
+      fragment.appendChild(article);
     });
+    grid.appendChild(fragment);
+    });
+  }
+
+  function formatRosterClock(record) {
+    const start = parseStartsAt(record?.starts_at || record?.startTime || record?.rawDate);
+    if (start) {
+      return start.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Africa/Casablanca',
+      });
+    }
+    return record?.time || '—';
+  }
+
+  function pickCancelReason() {
+    return new Promise((resolve) => {
+      const sheet = $('cancel-reason-sheet');
+      if (!sheet) {
+        resolve('autre');
+        return;
+      }
+      sheet.hidden = false;
+      const onClick = (event) => {
+        const dismiss = event.target.closest('[data-cancel-dismiss]');
+        const btn = event.target.closest('[data-cancel-reason]');
+        if (!dismiss && !btn) return;
+        sheet.hidden = true;
+        sheet.removeEventListener('click', onClick);
+        resolve(btn ? btn.getAttribute('data-cancel-reason') : null);
+      };
+      sheet.addEventListener('click', onClick);
+    });
+  }
+
+  async function postRecallForRecord(record) {
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=recall`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: apiHeaders(),
+        body: JSON.stringify({
+          bookingId: record.id,
+          patientName: record.name || record.patient_name,
+          patientPhone: record.phone || record.patient_phone,
+          treatmentName: record.treatment || record.treatment_name,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      showToast('Rappel 6 mois enregistré — à placer, pas un SMS.', 'success');
+      await loadRecallStrip();
+    } catch {
+      showToast('Impossible d\'enregistrer le rappel.', 'error');
+    }
+  }
+
+  function renderHoldStrip(records) {
+    const section = $('hold-strip');
+    const list = $('hold-list');
+    if (!section || !list) return;
+    const holds = (Array.isArray(records) ? records : []).filter(isHoldBooking);
+    section.hidden = holds.length === 0;
+    list.replaceChildren();
+    holds.forEach((record) => {
+      const chip = document.createElement('div');
+      chip.className = 'hold-chip';
+      chip.setAttribute('role', 'listitem');
+      const when = document.createElement('span');
+      when.textContent = formatRosterClock(record);
+      const label = document.createElement('span');
+      label.textContent = record.name || 'Urgence réservée';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Relâcher';
+      btn.addEventListener('click', () => void releaseEmergencyHold(record.id));
+      chip.append(when, label, btn);
+      list.appendChild(chip);
+    });
+  }
+
+  async function loadRecallStrip() {
+    const section = $('recall-strip');
+    const list = $('recall-list');
+    if (!section || !list) return;
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?recalls=open`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: rosterFetchHeaders(),
+        cache: 'no-store',
+      });
+      assertAuthorizedResponse(response);
+      const payload = await response.json();
+      const rows = Array.isArray(payload?.data) ? payload.data : [];
+      section.hidden = rows.length === 0;
+      list.replaceChildren();
+      rows.forEach((row) => {
+        const chip = document.createElement('div');
+        chip.className = 'recall-chip';
+        chip.setAttribute('role', 'listitem');
+        const due = row.due_on ? String(row.due_on).slice(0, 10) : '';
+        chip.textContent = [due, row.patient_name, row.treatment_name, row.patient_phone]
+          .filter(Boolean)
+          .join(' · ');
+        list.appendChild(chip);
+      });
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      section.hidden = true;
+    }
+  }
+
+  async function releaseEmergencyHold(holdId) {
+    const name = $('floor-book-name')?.value.trim();
+    const phone = $('floor-book-phone')?.value.trim();
+    const treatment = $('floor-book-treatment')?.value.trim();
+    if (!name || !phone || !treatment) {
+      showToast('Remplissez Nouveau RDV (nom, téléphone, soin) puis Relâcher.', 'error');
+      return;
+    }
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=release`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: apiHeaders(),
+        body: JSON.stringify({ id: holdId, patientName: name, phone, treatment }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 409 && payload?.code === 'DUPLICATE_HINT') {
+        const ok = await askConfirm('Même téléphone ou même nom sur 90 jours. Poser quand même ?');
+        if (!ok) return;
+        const retry = await fetch(`${CONFIG.ROSTER_PROXY}?action=release`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: apiHeaders(),
+          body: JSON.stringify({
+            id: holdId,
+            patientName: name,
+            phone,
+            treatment,
+            confirmDuplicate: true,
+          }),
+        });
+        const retryPayload = await retry.json().catch(() => ({}));
+        if (!retry.ok || retryPayload?.ok === false) throw new Error(retryPayload?.error || 'release');
+      } else if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      showToast('Urgence relâchée.', 'success');
+      loadPlanning();
+    } catch {
+      showToast('Impossible de relâcher l\'urgence.', 'error');
+    }
+  }
+
+  async function postRosterBooking(body) {
+    const response = await fetch(CONFIG.ROSTER_PROXY, {
+      method: 'POST',
+      credentials: 'include',
+      headers: apiHeaders(),
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 409 && payload?.code === 'DUPLICATE_HINT') {
+      const ok = await askConfirm('Même téléphone ou même nom sur 90 jours (pas un dossier). Poser quand même ?');
+      if (!ok) return null;
+      return postRosterBooking({ ...body, confirmDuplicate: true });
+    }
+    if (response.status === 409 && payload?.code === 'OVERLAP') {
+      showToast(payload.error || 'Créneau déjà pris.', 'error');
+      return null;
+    }
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return payload;
+  }
+
+  function selectedFloorSlotIso() {
+    const active = $('floor-book-slots')?.querySelector('.floor-composer__slot.is-active');
+    return active?.dataset.startsAt || '';
+  }
+
+  async function loadTreatmentCatalog() {
+    const select = $('floor-book-treatment');
+    const slots = $('floor-book-slots');
+    const durationEl = $('floor-composer-duration');
+    if (!select) return;
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?catalog=1`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: rosterFetchHeaders(),
+        cache: 'no-store',
+      });
+      assertAuthorizedResponse(response);
+      const payload = await response.json();
+      const treatments = payload?.data?.treatments || [];
+      const previous = select.value;
+      select.replaceChildren();
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = 'Soin';
+      select.appendChild(blank);
+      treatments.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.name;
+        option.textContent = `${item.name} · ${item.duration_min} min`;
+        option.dataset.duration = String(item.duration_min);
+        select.appendChild(option);
+      });
+      if (previous && [...select.options].some((opt) => opt.value === previous)) {
+        select.value = previous;
+      }
+      if (slots) {
+        slots.replaceChildren();
+        const next = payload?.data?.nextFreeSlot;
+        if (next?.startsAt) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'floor-composer__slot is-active';
+          chip.dataset.startsAt = typeof next.startsAt === 'string'
+            ? next.startsAt
+            : new Date(next.startsAt).toISOString();
+          chip.textContent = next.time ? `Prochain libre ${next.time}` : 'Prochain libre';
+          chip.addEventListener('click', () => {
+            slots.querySelectorAll('.floor-composer__slot').forEach((el) => el.classList.remove('is-active'));
+            chip.classList.add('is-active');
+          });
+          slots.appendChild(chip);
+        }
+      }
+      const syncDuration = () => {
+        const opt = select.selectedOptions[0];
+        const mins = opt?.dataset?.duration;
+        if (durationEl) durationEl.textContent = mins ? `${mins} min` : 'Durée selon le soin';
+      };
+      select.addEventListener('change', syncDuration);
+      syncDuration();
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+    }
+  }
+
+  function initFloorComposer() {
+    const form = $('floor-book-form');
+    if (!form || form.dataset.floorBound === 'true') return;
+    form.dataset.floorBound = 'true';
+    void loadTreatmentCatalog();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const hint = $('floor-book-hint');
+      if (hint) hint.hidden = true;
+      try {
+        const startsAt = selectedFloorSlotIso();
+        if (!startsAt) {
+          showToast('Choisissez le prochain créneau libre.', 'error');
+          return;
+        }
+        await postRosterBooking({
+          kind: 'visit',
+          patientName: $('floor-book-name')?.value.trim(),
+          phone: $('floor-book-phone')?.value.trim(),
+          treatment: $('floor-book-treatment')?.value.trim(),
+          startsAt,
+        });
+        form.reset();
+        showToast('Rendez-vous posé.', 'success');
+        loadPlanning();
+        void loadTreatmentCatalog();
+      } catch (err) {
+        showToast(err?.message || 'Impossible de poser le rendez-vous.', 'error');
+      }
+    });
+    $('floor-walkin-btn')?.addEventListener('click', async () => {
+      try {
+        await postRosterBooking({
+          kind: 'visit',
+          walkIn: true,
+          patientName: $('floor-book-name')?.value.trim(),
+          phone: $('floor-book-phone')?.value.trim(),
+          treatment: $('floor-book-treatment')?.value.trim(),
+        });
+        $('floor-book-form')?.reset();
+        showToast('Walk-in placé en salle d\'attente.', 'success');
+        loadPlanning();
+        void loadTreatmentCatalog();
+      } catch (err) {
+        showToast(err?.message || 'Aucun créneau walk-in.', 'error');
+      }
+    });
+  }
+
+  function renderLateList(records) {
+    const list = $('late-list');
+    if (!list) return;
+    const late = (Array.isArray(records) ? records : [])
+      .filter((row) => isVisitBooking(row) && isLateOnScheduledTime(row))
+      .sort((a, b) => {
+        const aTime = parseStartsAt(a.starts_at || a.startTime)?.getTime() || 0;
+        const bTime = parseStartsAt(b.starts_at || b.startTime)?.getTime() || 0;
+        return aTime - bTime;
+      });
+    list.replaceChildren();
+    if (!late.length) {
+      const empty = document.createElement('p');
+      empty.className = 'late-list__empty';
+      empty.textContent = 'Aucun retard sur l\'heure prévue.';
+      list.appendChild(empty);
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    late.forEach((record) => {
+      const item = document.createElement('div');
+      item.className = 'late-item';
+      item.setAttribute('role', 'listitem');
+      const time = document.createElement('span');
+      time.className = 'late-item__time';
+      time.textContent = formatRosterClock(record);
+      const name = document.createElement('span');
+      name.className = 'late-item__name';
+      name.textContent = record.name || record.patient_name || 'Patient';
+      const care = document.createElement('span');
+      care.className = 'late-item__care';
+      care.textContent = record.treatment || record.treatment_name || '';
+      item.append(time, name, care);
+      fragment.appendChild(item);
+    });
+    list.appendChild(fragment);
+  }
+
+  function createBoardCard(record) {
+    const card = document.createElement('article');
+    card.className = 'board-card';
+    card.setAttribute('role', 'listitem');
+    card.dataset.patientId = String(record.id || '');
+    card.dataset.bookingId = String(record.id || '');
+
+    const time = document.createElement('span');
+    time.className = 'board-card__time';
+    time.textContent = formatRosterClock(record);
+
+    const name = document.createElement('span');
+    name.className = 'board-card__name';
+    name.textContent = record.name || record.patient_name || 'Patient';
+
+    const care = document.createElement('span');
+    care.className = 'board-card__care';
+    care.textContent = record.treatment || record.treatment_name || '';
+
+    card.append(time, name, care);
+
+    if (boardColumnForStatus(record.status) === 'care') {
+      const elapsed = document.createElement('span');
+      elapsed.className = 'board-card__elapsed';
+      const scheduled = parseStartsAt(record.starts_at || record.rawDate);
+      const started = parseStartsAt(record.care_started_at) || scheduled;
+      const duration = Number(record.duration_min) > 0 ? Number(record.duration_min) : 30;
+      const expected = scheduled ? new Date(scheduled.getTime() + duration * 60000) : null;
+      const mins = started ? Math.max(0, Math.round((Date.now() - started.getTime()) / 60000)) : 0;
+      elapsed.textContent = `Écoulé ${mins} min · fin ${expected ? formatRosterClock({ starts_at: expected }) : '—'}`;
+      card.appendChild(elapsed);
+    }
+
+    if (boardColumnForStatus(record.status) === 'done') {
+      const actions = document.createElement('div');
+      actions.className = 'board-card__actions';
+      const recallBtn = document.createElement('button');
+      recallBtn.type = 'button';
+      recallBtn.textContent = '6 mois';
+      recallBtn.addEventListener('click', () => void postRecallForRecord(record));
+      actions.appendChild(recallBtn);
+      card.appendChild(actions);
+    }
+
+    const select = document.createElement('select');
+    select.className = 'status-select';
+    select.dataset.bookingId = String(record.id || '');
+    const current = record.status || 'Confirmé';
+    const options = STATUS_OPTIONS.includes(current) ? STATUS_OPTIONS : [current, ...STATUS_OPTIONS];
+    options.forEach((opt) => {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === current) option.selected = true;
+      select.appendChild(option);
+    });
+    select.dataset.previousStatus = current;
+
+    card.appendChild(select);
+    return card;
+  }
+
+  function renderStatusBoard(records) {
+    const columns = {
+      incoming: $('board-incoming'),
+      waiting: $('board-waiting'),
+      care: $('board-care'),
+      done: $('board-done'),
+    };
+    if (!columns.incoming) return;
+
+    Object.values(columns).forEach((col) => col.replaceChildren());
+    const buckets = { incoming: [], waiting: [], care: [], done: [] };
+    (Array.isArray(records) ? records : []).forEach((record) => {
+      if (!isVisitBooking(record)) return;
+      const col = boardColumnForStatus(record.status);
+      if (col) buckets[col].push(record);
+    });
+
+    Object.entries(buckets).forEach(([key, rows]) => {
+      const host = columns[key];
+      if (!host) return;
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'status-board__empty';
+        empty.textContent = '—';
+        host.appendChild(empty);
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      rows
+        .slice()
+        .sort((a, b) => String(formatRosterClock(a)).localeCompare(String(formatRosterClock(b))))
+        .forEach((record) => fragment.appendChild(createBoardCard(record)));
+      host.appendChild(fragment);
+    });
+  }
+
+  function refreshHandoffBookingOptions(records) {
+    const select = $('handoff-booking');
+    if (!select) return;
+    const previous = select.value;
+    select.replaceChildren();
+    const general = document.createElement('option');
+    general.value = '';
+    general.textContent = 'Note générale';
+    select.appendChild(general);
+    (Array.isArray(records) ? records : []).forEach((record) => {
+      if (!record?.id || !isVisitBooking(record)) return;
+      if (isPulseCancelledStatus(record.status)) return;
+      const option = document.createElement('option');
+      option.value = String(record.id);
+      option.dataset.patientName = record.name || record.patient_name || '';
+      const clock = formatRosterClock(record);
+      option.textContent = `${clock} · ${record.name || record.patient_name || 'Patient'}`;
+      select.appendChild(option);
+    });
+    if (previous && [...select.options].some((opt) => opt.value === previous)) {
+      select.value = previous;
+    }
   }
 
   let resetHandoffCategorySelect = null;
@@ -665,6 +1165,9 @@ let handoffNotes = [];
       const profileName = (volatileSettings.profileName || DEFAULT_SETTINGS.profileName).trim();
       const author = profileName.split(/\s+/)[0] || profileName;
       const authorInitials = extractInitials(profileName);
+      const bookingSelect = $('handoff-booking');
+      const bookingId = bookingSelect?.value || '';
+      const patientName = bookingSelect?.selectedOptions?.[0]?.dataset?.patientName || '';
 
       const tempId = `temp-${Date.now()}`;
       const newNote = {
@@ -676,6 +1179,10 @@ let handoffNotes = [];
         author,
         time,
         readBy: [authorInitials],
+        bookingId: bookingId || null,
+        booking_id: bookingId || null,
+        patientName: patientName || null,
+        patient_name: patientName || null,
       };
 
       handoffNotes.unshift(newNote);
@@ -696,6 +1203,8 @@ let handoffNotes = [];
               pinned: newNote.pinned,
               author: newNote.author,
               time: newNote.time,
+              bookingId: newNote.bookingId,
+              patientName: newNote.patientName,
             }),
           }
         );
@@ -1136,7 +1645,7 @@ let handoffNotes = [];
     dot.classList.add(state);
     if (state === 'loading') label.textContent = 'Synchronisation en cours…';
     else if (state === 'error') label.textContent = 'Hors-ligne · Mode dégradé';
-    else label.textContent = 'Synchronisé · Typebot actif';
+    else label.textContent = 'Synchronisé';
   }
 
   /**
@@ -2099,6 +2608,12 @@ let handoffNotes = [];
         item['Historique No-Show'] ??
         item['Historique de no-shows']
       ),
+      starts_at: rawDate,
+      duration_min: Number(item.duration_min || item.durationMin) || 30,
+      booking_kind: item.booking_kind || item.bookingKind || 'visit',
+      care_started_at: item.care_started_at || item.careStartedAt || null,
+      cancel_reason: item.cancel_reason || item.cancelReason || null,
+      noshow_90d: Number(item.noshow_90d) || 0,
     };
   }
 
@@ -3354,7 +3869,9 @@ let handoffNotes = [];
 
   function renderPlanning(records) {
     return safeRender('renderPlanning', () => {
-    const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+    const incoming = Array.isArray(records) ? records.filter(Boolean) : [];
+    renderHoldStrip(incoming);
+    const rows = incoming.filter(isVisitBooking);
 
     rosterData = rows.map(record => ({ ...record }));
     selectedPatientIds = [];
@@ -3424,6 +3941,10 @@ let handoffNotes = [];
     }
 
     renderOperationalPulse(computeOperationalPulse(rows));
+    renderLateList(rows);
+    renderStatusBoard(rows);
+    refreshHandoffBookingOptions(rows);
+    void loadRecallStrip();
     refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     renderOverviewTimeline(rows);
     window.refreshLucideIcons?.(document.getElementById('assistant-mount') || document);
@@ -3484,6 +4005,9 @@ let handoffNotes = [];
 
     updateRosterStats([]);
     renderOperationalPulse(createEmptyOperationalPulse());
+    renderLateList([]);
+    renderStatusBoard([]);
+    refreshHandoffBookingOptions([]);
     refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     setSyncIndicator('error');
   }
@@ -3679,7 +4203,7 @@ let handoffNotes = [];
     }
   }
 
-  async function updateRosterStatus(selectEl, previousStatus) {
+  async function updateRosterStatus(selectEl, previousStatus, extra = {}) {
     const bookingId = selectEl.dataset.bookingId || '';
     const newStatus = selectEl.value;
 
@@ -3688,11 +4212,13 @@ let handoffNotes = [];
     selectEl.classList.remove('status-success', 'status-error');
 
     try {
+      const body = { bookingId, newStatus };
+      if (extra.cancelReason) body.cancelReason = extra.cancelReason;
       const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
         method: 'POST',
         credentials: 'include',
         headers: apiHeaders(),
-        body: JSON.stringify({ bookingId, newStatus }),
+        body: JSON.stringify(body),
       });
 
       const responseText = await response.text();
@@ -3729,6 +4255,11 @@ let handoffNotes = [];
           }
         });
         applyMatteSelectSkin(selectEl, newStatus);
+        renderOperationalPulse(computeOperationalPulse(rosterData));
+        renderLateList(rosterData);
+        renderStatusBoard(rosterData);
+        refreshHandoffBookingOptions(rosterData);
+        if (dashboardCalendar) dashboardCalendar.refetchEvents();
         const row = document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${patientId}"]`)
           || document.querySelector(`tr[data-patient-id="${patientId}"]`);
         const card = document.querySelector(`.roster-card[data-patient-id="${patientId}"]`);
@@ -3769,6 +4300,7 @@ let handoffNotes = [];
     const timeline = $('planning-timeline');
     const table = document.querySelector('.roster-table');
     const cards = $('roster-cards');
+    const board = $('status-board');
 
     function rememberPreviousStatus(event) {
       const select = event.target.closest('.status-select');
@@ -3786,13 +4318,19 @@ let handoffNotes = [];
         const patientId = container?.dataset.patientId;
         const patient = rosterData.find((p) => String(p.id) === String(patientId));
         const name = patient?.name || 'ce patient';
-        void askConfirm(`Annuler le rendez-vous de ${name} ? Cette action est irréversible.`).then((ok) => {
+        void askConfirm(`Annuler le rendez-vous de ${name} ?`).then(async (ok) => {
           if (!ok) {
             select.value = previousStatus;
             applyMatteSelectSkin(select, previousStatus);
             return;
           }
-          updateRosterStatus(select, previousStatus);
+          const reason = await pickCancelReason();
+          if (!reason) {
+            select.value = previousStatus;
+            applyMatteSelectSkin(select, previousStatus);
+            return;
+          }
+          updateRosterStatus(select, previousStatus, { cancelReason: reason });
         });
         return;
       }
@@ -3802,9 +4340,11 @@ let handoffNotes = [];
     timeline?.addEventListener('focusin', rememberPreviousStatus);
     table?.addEventListener('focusin', rememberPreviousStatus);
     cards?.addEventListener('focusin', rememberPreviousStatus);
+    board?.addEventListener('focusin', rememberPreviousStatus);
     timeline?.addEventListener('change', handleChange);
     table?.addEventListener('change', handleChange);
     cards?.addEventListener('change', handleChange);
+    board?.addEventListener('change', handleChange);
   }
 
   function clearMobileOverviewSectionClasses() {
@@ -3984,7 +4524,7 @@ let handoffNotes = [];
   const SETTINGS_STORAGE_KEY = 'dentaflow_assistant_prefs';
 
   const DEFAULT_SETTINGS = {
-    theme: 'oak-lounge',
+    theme: 'pearl-clinic',
     profileName: '',
     profileSpecialty: 'Assistante dentaire',
     smsReminders: true,
@@ -4130,13 +4670,284 @@ let handoffNotes = [];
   }
 
   let dashboardCalendar = null;
+  let assistantCalendarChromeBound = false;
+
+  function casablancaIsoDate(value) {
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+  }
+
+  function casablancaDateTimeLocal(value) {
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Casablanca',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      hourCycle: 'h23',
+    });
+    const parts = Object.fromEntries(
+      fmt.formatToParts(parsed).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value])
+    );
+    if (!parts.year || parts.hour == null) return '';
+    const pad = (part) => String(part || '').padStart(2, '0');
+    return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`;
+  }
+
+  function familyNameFromPatient(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'Patient';
+    return parts[parts.length - 1];
+  }
+
+  function mapRosterRowToOpsEvent(row) {
+    const startRaw = row.starts_at || row.startTime;
+    const start = startRaw ? new Date(startRaw) : null;
+    if (!start || Number.isNaN(start.getTime())) return null;
+    const duration = Number(row.duration_min) > 0 ? Number(row.duration_min) : 30;
+    const end = new Date(start.getTime() + duration * 60_000);
+    const patientName = row.patient_name || row.name || 'Patient';
+    const treatment = row.treatment_name || row.treatment || 'Consultation';
+    const startLocal = casablancaDateTimeLocal(start);
+    const endLocal = casablancaDateTimeLocal(end);
+    if (!startLocal || !endLocal) return null;
+    const cancelled = isPulseCancelledStatus(row.status);
+    const kind = bookingKindOf(row);
+    const classNames = ['cal-chip'];
+    if (kind === 'block') classNames.push('cal-chip--block');
+    if (kind === 'emergency_hold') classNames.push('cal-chip--hold');
+    if (cancelled) classNames.push('is-cancelled');
+    return {
+      id: String(row.id || ''),
+      title: kind === 'visit' ? familyNameFromPatient(patientName) : (treatment || patientName),
+      start: startLocal,
+      end: endLocal,
+      classNames,
+      extendedProps: {
+        bookingId: String(row.id || ''),
+        patientName,
+        treatment,
+        phone: row.patient_phone || row.phone || '',
+        status: row.status || '',
+        durationMin: duration,
+        startsAt: startRaw,
+        bookingKind: kind,
+      },
+    };
+  }
+
+  async function fetchAssistantRosterRange(fromIso, toIso) {
+    const params = new URLSearchParams({ from: fromIso, to: toIso });
+    const response = await fetch(`${CONFIG.ROSTER_PROXY}?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: rosterFetchHeaders(),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return Array.isArray(payload?.data) ? payload.data : [];
+  }
+
+  function setAssistantCalendarEmpty(empty) {
+    const el = $('asst-calendar-empty');
+    if (el) el.hidden = !empty;
+  }
+
+  function updateAssistantCalendarTitle() {
+    const titleEl = $('asst-calendar-title');
+    if (!titleEl || !dashboardCalendar) return;
+    titleEl.textContent = String(dashboardCalendar.view?.title || '').trim() || 'Planning';
+  }
+
+  function setAssistantCalendarViewButtons(viewType) {
+    assistantRoot()?.querySelectorAll('[data-asst-cal-view]').forEach((btn) => {
+      const active = btn.getAttribute('data-asst-cal-view') === viewType;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function closeOpsChipSheet() {
+    const sheet = $('ops-chip-sheet');
+    if (sheet) sheet.hidden = true;
+  }
+
+  async function applyOpsStatus(bookingId, newStatus) {
+    const body = { bookingId, newStatus };
+    if (newStatus === 'Annulé' || newStatus === 'Annule') {
+      const reason = await pickCancelReason();
+      if (!reason) return;
+      body.cancelReason = reason;
+    }
+    const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
+      method: 'POST',
+      credentials: 'include',
+      headers: apiHeaders(),
+      body: JSON.stringify(body),
+    });
+    assertAuthorizedResponse(response);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+  }
+
+  function openOpsChipSheet(event, jsEvent) {
+    const sheet = $('ops-chip-sheet');
+    const who = $('ops-chip-who');
+    const meta = $('ops-chip-meta');
+    const actions = $('ops-chip-actions');
+    if (!sheet || !who || !meta || !actions) return;
+
+    const props = event.extendedProps || {};
+    who.textContent = props.patientName || event.title || 'Patient';
+    meta.textContent = [event.start ? formatRosterClock({ starts_at: event.start }) : '', props.status, props.treatment]
+      .filter(Boolean)
+      .join(' · ');
+    actions.replaceChildren();
+
+    if (props.bookingKind === 'emergency_hold') {
+      const release = document.createElement('button');
+      release.type = 'button';
+      release.textContent = 'Relâcher';
+      release.addEventListener('click', async () => {
+        await releaseEmergencyHold(props.bookingId || event.id);
+        closeOpsChipSheet();
+      });
+      actions.appendChild(release);
+      sheet.hidden = false;
+      const hx = Math.min(window.innerWidth - 240, Math.max(12, jsEvent?.clientX || 24));
+      const hy = Math.min(window.innerHeight - 180, Math.max(12, jsEvent?.clientY || 24));
+      sheet.style.left = `${hx}px`;
+      sheet.style.top = `${hy}px`;
+      return;
+    }
+
+    if (props.bookingKind === 'block') {
+      const note = document.createElement('p');
+      note.className = 'ops-chip-sheet__meta';
+      note.textContent = 'Blocage docteur — lecture seule ici.';
+      actions.appendChild(note);
+      sheet.hidden = false;
+      return;
+    }
+
+    STATUS_OPTIONS.forEach((status) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = status;
+      if (status === props.status || normalizePulseStatus(status) === normalizePulseStatus(props.status)) {
+        btn.disabled = true;
+      }
+      btn.addEventListener('click', async () => {
+        try {
+          await applyOpsStatus(props.bookingId || event.id, status);
+          showToast('Statut mis à jour.', 'success');
+          closeOpsChipSheet();
+          dashboardCalendar?.refetchEvents();
+          loadPlanning();
+        } catch {
+          showToast('Impossible de changer le statut.', 'error');
+        }
+      });
+      actions.appendChild(btn);
+    });
+
+    if (isPulseCancelledStatus(props.status)) {
+      const fill = document.createElement('button');
+      fill.type = 'button';
+      fill.textContent = 'Combler le créneau';
+      fill.addEventListener('click', async () => {
+        const confirmed = await askConfirm('Remplacer ce créneau avec un patient de la liste d\'attente ?');
+        if (!confirmed) return;
+        try {
+          const start = event.start ? new Date(event.start) : null;
+          const slotDate = start ? casablancaIsoDate(start) : '';
+          const slotTime = start
+            ? start.toLocaleTimeString('fr-FR', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Africa/Casablanca',
+            })
+            : '';
+          const response = await fetch(CONFIG.FILL_GAP_PROXY, {
+            method: 'POST',
+            credentials: 'include',
+            headers: apiHeaders(),
+            body: JSON.stringify({ slotDate, slotTime }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || payload?.ok === false) {
+            throw new Error(payload?.error || `HTTP ${response.status}`);
+          }
+          toastFillGapResult(payload);
+          closeOpsChipSheet();
+          dashboardCalendar?.refetchEvents();
+          loadPlanning();
+        } catch {
+          showToast('Impossible de combler le créneau.', 'error');
+        }
+      });
+      actions.appendChild(fill);
+    }
+
+    sheet.hidden = false;
+    const x = Math.min(window.innerWidth - 240, Math.max(12, jsEvent?.clientX || 24));
+    const y = Math.min(window.innerHeight - 180, Math.max(12, jsEvent?.clientY || 24));
+    sheet.style.left = `${x}px`;
+    sheet.style.top = `${y}px`;
+  }
+
+  function bindAssistantCalendarChrome() {
+    if (assistantCalendarChromeBound) return;
+    assistantCalendarChromeBound = true;
+    assistantRoot()?.querySelectorAll('[data-asst-cal-nav]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!dashboardCalendar) return;
+        const action = btn.getAttribute('data-asst-cal-nav');
+        if (action === 'prev') dashboardCalendar.prev();
+        if (action === 'next') dashboardCalendar.next();
+        if (action === 'today') dashboardCalendar.today();
+      });
+    });
+    assistantRoot()?.querySelectorAll('[data-asst-cal-view]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!dashboardCalendar) return;
+        const view = btn.getAttribute('data-asst-cal-view');
+        if (!view) return;
+        dashboardCalendar.changeView(view);
+        setAssistantCalendarViewButtons(view);
+      });
+    });
+    document.addEventListener('click', (event) => {
+      const sheet = $('ops-chip-sheet');
+      if (!sheet || sheet.hidden) return;
+      if (sheet.contains(event.target) || event.target.closest('.fc-event')) return;
+      closeOpsChipSheet();
+    });
+  }
 
   function initDashboardCalendar() {
     const el = $('dashboard-cal-inline');
     if (!el) return;
 
+    bindAssistantCalendarChrome();
+
     if (dashboardCalendar) {
-      requestAnimationFrame(() => dashboardCalendar.updateSize());
+      requestAnimationFrame(() => {
+        dashboardCalendar.updateSize();
+        updateAssistantCalendarTitle();
+      });
       return;
     }
 
@@ -4149,29 +4960,121 @@ let handoffNotes = [];
 
     dashboardCalendar = new FullCalendar.Calendar(el, {
       initialView: 'timeGridWeek',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
-      },
+      headerToolbar: false,
       locale: 'fr',
       firstDay: 1,
       height: 'auto',
       expandRows: true,
       slotMinTime: '08:00:00',
       slotMaxTime: '19:00:00',
+      scrollTime: '08:00:00',
       nowIndicator: true,
       allDaySlot: false,
-      events: [],
+      slotDuration: '00:30:00',
+      slotLabelInterval: '01:00:00',
+      slotEventOverlap: false,
+      displayEventTime: true,
+      displayEventEnd: false,
       eventTimeFormat: {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
       },
+      eventContent(arg) {
+        const wrap = document.createElement('div');
+        wrap.className = 'cal-chip__inner';
+        if (arg.timeText) {
+          const time = document.createElement('span');
+          time.className = 'cal-chip__time';
+          time.textContent = arg.timeText;
+          wrap.appendChild(time);
+        }
+        const title = document.createElement('span');
+        title.className = 'cal-chip__title';
+        title.textContent = arg.event.title || '';
+        wrap.appendChild(title);
+        return { domNodes: [wrap] };
+      },
+      datesSet(info) {
+        updateAssistantCalendarTitle();
+        setAssistantCalendarViewButtons(info.view.type);
+        closeOpsChipSheet();
+      },
+      events(info, successCallback, failureCallback) {
+        const fromIso = casablancaIsoDate(info.start);
+        const exclusiveEnd = new Date(info.end.getTime() - 1);
+        const toIso = casablancaIsoDate(exclusiveEnd);
+        if (!fromIso || !toIso) {
+          successCallback([]);
+          setAssistantCalendarEmpty(true);
+          return;
+        }
+        fetchAssistantRosterRange(fromIso, toIso)
+          .then((rows) => {
+            const events = rows.map(mapRosterRowToOpsEvent).filter(Boolean);
+            setAssistantCalendarEmpty(events.length === 0);
+            successCallback(events);
+          })
+          .catch((err) => {
+            if (isUnauthorizedError(err)) return;
+            console.error('[Calendar] roster load failed:', err?.message || err);
+            setAssistantCalendarEmpty(true);
+            failureCallback(err);
+          });
+      },
+      eventClick(info) {
+        info.jsEvent?.preventDefault();
+        info.jsEvent?.stopPropagation();
+        openOpsChipSheet(info.event, info.jsEvent);
+      },
     });
 
     dashboardCalendar.render();
-    window.calendar = dashboardCalendar;
+    updateAssistantCalendarTitle();
+    setAssistantCalendarViewButtons('timeGridWeek');
+    window.refreshLucideIcons?.($('view-calendar') || document);
+  }
+
+  function waitlistPriorityRank(priority) {
+    const key = String(priority || '').trim().toLowerCase();
+    if (key.startsWith('urgent') || key === 'urgence') return 0;
+    if (key.startsWith('haut')) return 1;
+    if (key.startsWith('moy') || key === 'normale') return 2;
+    return 3;
+  }
+
+  function sortWaitlistByPriority(rows) {
+    return [...rows].sort((a, b) => {
+      const rank = waitlistPriorityRank(a.priorite || a.priority) - waitlistPriorityRank(b.priorite || b.priority);
+      if (rank !== 0) return rank;
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+    });
+  }
+
+  async function fetchWaitlistEntries() {
+    const response = await fetch(CONFIG.ENDPOINTS.WAITLIST_GET, {
+      method: 'GET',
+      credentials: 'include',
+      headers: rosterFetchHeaders(),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return Array.isArray(payload?.data) ? payload.data : [];
+  }
+
+  async function loadWaitlistPanel() {
+    try {
+      waitlistEntries = await fetchWaitlistEntries();
+    } catch (error) {
+      if (isUnauthorizedError(error) || isFetchAborted(error)) return;
+      console.error('[Waitlist] GET failed:', error?.message || error);
+      waitlistEntries = [];
+    }
+    renderWaitlistPanel();
   }
 
   function createApptCardElement(appt) {
@@ -4182,10 +5085,10 @@ let handoffNotes = [];
     return safeRender('renderWaitlistPanel', () => {
     const container = $('waitlist-panel-list');
     if (!container) return;
-    const allWaitlist = [];
+    const sorted = sortWaitlistByPriority(waitlistEntries);
     const waitlist = waitlistUrgentOnly
-      ? allWaitlist.filter(isWaitlistUrgent)
-      : allWaitlist;
+      ? sorted.filter(isWaitlistUrgent)
+      : sorted;
     container.replaceChildren();
 
     const table = container.closest('.waitlist-table');
@@ -4203,7 +5106,12 @@ let handoffNotes = [];
     if (table) table.hidden = false;
 
     const fragment = document.createDocumentFragment();
-    waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
+    waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow({
+      ...appt,
+      name: appt.name || appt.nom || appt.patient_name,
+      phone: appt.phone || appt.telephone || appt.patient_phone,
+      priorite: appt.priorite || appt.priority,
+    })));
     container.appendChild(fragment);
     refreshInvisibleUIDecorations(container);
     hideSkeleton('waitlist');
@@ -4291,11 +5199,7 @@ let handoffNotes = [];
         form.reset();
         if (setWaitlistPriorityValue) setWaitlistPriorityValue('Normale');
         else priorityEl.value = 'Normale';
-        prependWaitlistEntry({
-          nom: patientName,
-          telephone: patientPhone,
-          priorite: patientPriority,
-        });
+        await loadWaitlistPanel();
         showToast('Patient ajouté à la liste d\'attente avec succès', 'success');
       } catch (error) {
         if (isFetchAborted(error)) {
@@ -4917,6 +5821,7 @@ let handoffNotes = [];
     });
     runInitStep('keyboardShortcuts', () => initKeyboardShortcuts());
     runInitStep('status', () => initStatusListener());
+    runInitStep('floorOps', () => initFloorComposer());
     runInitStep('quickActions', () => initQuickActions());
     runInitStep('bulkBar', () => initBulkActionBar());
     runInitStep('invisibleUI', () => initInvisibleUI());
@@ -4934,7 +5839,7 @@ let handoffNotes = [];
       initWaitlistPrioritySelect();
       initWaitlistForm();
       initWaitlistUrgentToggle();
-      renderWaitlistPanel();
+      loadWaitlistPanel();
     });
     runInitStep('profile', () => {
       initUserProfile();

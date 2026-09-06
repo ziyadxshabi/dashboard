@@ -207,6 +207,13 @@
         return;
       }
 
+      if (response.status === 503) {
+        showLoginError(
+          'Authentification indisponible sur ce déploiement (JWT_SECRET ou DATABASE_URL manquant).'
+        );
+        return;
+      }
+
       if (!response.ok) {
         showLoginError('Connexion impossible. Réessayez.');
         return;
@@ -304,6 +311,7 @@
 
     showShell(assistantShell);
     showShell(mount);
+    applySessionClinic(sessionClinic);
   }
 
   async function handleAuthSuccess(role) {
@@ -327,19 +335,19 @@
     setupLoginForm();
   }
 
+  let sessionClinic = null;
+
   function applySessionClinic(clinic) {
     if (!clinic || typeof clinic !== 'object') return;
+    sessionClinic = clinic;
 
     const name = String(clinic.name || '').trim();
     if (name) {
-      document.querySelectorAll('.login-viewport-brand-sub, #doctor-shell .sidebar-brand-sub').forEach((el) => {
+      document.querySelectorAll(
+        '.login-viewport-brand-sub, .sidebar-brand-sub, .assistant-mobile-bar__brand, #calendar-os-clinic'
+      ).forEach((el) => {
         el.textContent = name;
       });
-    }
-
-    const preset = String(clinic.theme_preset || clinic.themePreset || '').trim();
-    if (preset) {
-      document.documentElement.setAttribute('data-theme', preset);
     }
 
     const tokens = clinic.theme_tokens || clinic.themeTokens;
@@ -594,6 +602,7 @@
     SESSION_TOKEN_KEY,
     getRole: getStoredRole,
     getSessionUser,
+    getSessionClinic: () => sessionClinic,
     getToken: getBearerToken,
     getAuthHeaders: buildAuthHeaders,
     isAuthenticated,

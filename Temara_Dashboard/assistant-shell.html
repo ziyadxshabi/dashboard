@@ -17,7 +17,7 @@
         </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
-          <span class="sidebar-brand-sub">Command Center</span>
+          <span class="sidebar-brand-sub">Témara Mall</span>
         </div>
       </div>
 
@@ -48,7 +48,7 @@
             aria-expanded="false"
             aria-controls="superpouvoirs-accordion"
           >
-            <span class="nav-accordion-header__label" id="actions-title">Superpouvoirs</span>
+            <span class="nav-accordion-header__label" id="actions-title">Actions</span>
             <i data-lucide="chevron-down" class="nav-accordion-header__chevron icon-xs" aria-hidden="true"></i>
           </div>
           <div class="superpouvoirs-accordion" id="superpouvoirs-accordion">
@@ -126,7 +126,7 @@
     <main class="assistant-main" id="main-content">
 
       <header class="assistant-mobile-bar" aria-label="En-tête mobile">
-        <span class="assistant-mobile-bar__brand">Command Center</span>
+        <span class="assistant-mobile-bar__brand">Témara Mall</span>
         <button
           type="button"
           id="asst-mobile-menu-btn"
@@ -162,14 +162,84 @@
           <div class="assistant-header__meta">
             <div class="hero-sync">
               <span class="sync-dot ok" aria-hidden="true"></span>
-              <span class="sync-label">Synchronisé · Typebot actif</span>
+              <span class="sync-label">Synchronisé</span>
             </div>
           </div>
         </header>
 
-        <section class="assistant-pulse" aria-label="Indicateurs opérationnels du jour">
-          <div class="assistant-pulse-grid" id="assistant-pulse-grid">
-            <!-- rendered by app.js -->
+        <section class="floor-composer" aria-labelledby="floor-composer-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="floor-composer-title">Nouveau RDV</h3>
+            <span class="section-header-inline__meta" id="floor-composer-duration">Durée selon le soin</span>
+          </div>
+          <form id="floor-book-form" class="floor-composer__form">
+            <label class="visually-hidden" for="floor-book-name">Patient</label>
+            <input class="waitlist-input" id="floor-book-name" name="patientName" autocomplete="name" placeholder="Patient" required />
+            <label class="visually-hidden" for="floor-book-phone">Téléphone</label>
+            <input class="waitlist-input" id="floor-book-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="06…" required />
+            <label class="visually-hidden" for="floor-book-treatment">Soin</label>
+            <select class="waitlist-input" id="floor-book-treatment" name="treatment" required>
+              <option value="">Soin</option>
+            </select>
+            <div id="floor-book-slots" class="floor-composer__slots" role="group" aria-label="Prochain créneau"></div>
+            <button type="submit" class="btn-matte-primary" id="floor-book-submit">Poser</button>
+            <button type="button" class="floor-composer__walkin" id="floor-walkin-btn">Walk-in</button>
+          </form>
+          <p class="floor-composer__hint" id="floor-book-hint" hidden></p>
+        </section>
+
+        <div class="assistant-pulse-grid" id="assistant-pulse-grid">
+          <!-- rendered by app.js -->
+        </div>
+
+        <section class="late-strip" aria-labelledby="late-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="late-title">En retard sur l'heure prévue</h3>
+            <span class="late-strip__hint">Heure planifiée — pas l'arrivée</span>
+          </div>
+          <div id="late-list" class="late-list" role="list">
+            <p class="late-list__empty">Aucun retard sur l'heure prévue.</p>
+          </div>
+        </section>
+
+        <section class="recall-strip" id="recall-strip" aria-labelledby="recall-title" hidden>
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="recall-title">À revoir</h3>
+            <span class="section-header-inline__meta">Rappels 6 mois — à placer, pas un SMS</span>
+          </div>
+          <div id="recall-list" class="recall-list" role="list"></div>
+        </section>
+
+        <section class="hold-strip" id="hold-strip" aria-labelledby="hold-title" hidden>
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="hold-title">Urgence réservée</h3>
+            <span class="section-header-inline__meta">Relâcher pour poser un patient</span>
+          </div>
+          <div id="hold-list" class="hold-list" role="list"></div>
+        </section>
+
+        <section class="status-board-section" aria-labelledby="status-board-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="status-board-title">Board du jour</h3>
+            <span class="section-header-inline__meta">Statuts — salle et fauteuil</span>
+          </div>
+          <div class="status-board" id="status-board">
+            <div class="status-board__col" data-board-col="incoming">
+              <h4 class="status-board__head">À venir</h4>
+              <div class="status-board__cards" id="board-incoming" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="waiting">
+              <h4 class="status-board__head">En salle</h4>
+              <div class="status-board__cards" id="board-waiting" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="care">
+              <h4 class="status-board__head">Au fauteuil</h4>
+              <div class="status-board__cards" id="board-care" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="done">
+              <h4 class="status-board__head">Terminé</h4>
+              <div class="status-board__cards" id="board-done" role="list"></div>
+            </div>
           </div>
         </section>
 
@@ -183,7 +253,7 @@
           </div>
         </section>
 
-        <section class="assistant-bento-row" aria-label="Superpouvoir — combler un créneau">
+        <section class="assistant-bento-row" aria-label="Action — combler un créneau">
           <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
             <div class="superpower-bento-card__glow" aria-hidden="true"></div>
             <header class="superpower-bento-card__head">
@@ -191,10 +261,10 @@
                 <i data-lucide="zap" aria-hidden="true"></i>
               </div>
               <div class="superpower-bento-card__copy">
-                <p class="superpower-bento-card__eyebrow">Superpouvoir · Récupération</p>
-                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Campagne de Récupération</h2>
+                <p class="superpower-bento-card__eyebrow">Action · Trous</p>
+                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Combler un trou</h2>
                 <p class="superpower-bento-card__desc">
-                  Envoie un SMS intelligent et personnalisé à tous les patients en liste d'attente pour combler les créneaux vides instantanément. À utiliser en cas d'annulation de dernière minute.
+                  Propose un patient de la liste d'attente pour un créneau libéré aujourd'hui. Pas d'envoi SMS — la liste est celle du cabinet.
                 </p>
               </div>
             </header>
@@ -288,6 +358,10 @@
           </div>
 
           <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
+            <label class="visually-hidden" for="handoff-booking">Patient du jour</label>
+            <select class="handoff-compose__booking" id="handoff-booking" name="handoff-booking">
+              <option value="">Note générale</option>
+            </select>
             <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
             <input
               type="text"
@@ -337,18 +411,39 @@
       </section>
 
       <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
-        <header class="view-page-header">
-          <h2 class="view-page-title">Calendrier</h2>
-          <p class="view-page-sub">Agenda du cabinet — vue hebdomadaire et créneaux disponibles</p>
+        <header class="calendar-os-header">
+          <div class="calendar-os-heading">
+            <h2 class="calendar-os-title" id="asst-calendar-title">Planning</h2>
+            <p class="calendar-os-clinic">Ops — statut et créneaux</p>
+          </div>
+          <div class="calendar-os-toolbar">
+            <div class="calendar-os-nav" role="group" aria-label="Naviguer dans l'agenda">
+              <button type="button" class="calendar-os-icon-btn" data-asst-cal-nav="prev" aria-label="Période précédente">
+                <i data-lucide="chevron-left" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="calendar-os-today-btn" data-asst-cal-nav="today">Aujourd'hui</button>
+              <button type="button" class="calendar-os-icon-btn" data-asst-cal-nav="next" aria-label="Période suivante">
+                <i data-lucide="chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="calendar-os-views" role="group" aria-label="Type de vue">
+              <button type="button" class="calendar-os-view-btn" data-asst-cal-view="timeGridDay">Jour</button>
+              <button type="button" class="calendar-os-view-btn is-active" data-asst-cal-view="timeGridWeek" aria-pressed="true">Semaine</button>
+              <button type="button" class="calendar-os-view-btn" data-asst-cal-view="dayGridMonth">Mois</button>
+            </div>
+          </div>
         </header>
 
         <article class="calendar-embed-panel" aria-label="Calendrier de gestion des rendez-vous">
-          <div class="calendar-embed-header">
-            <div class="chart-title">Planning Hebdomadaire</div>
-            <div class="chart-sub">Clinique Dentaire Témara Mall — vue staff</div>
-          </div>
           <div id="dashboard-cal-inline"></div>
+          <p class="calendar-os-empty" id="asst-calendar-empty" hidden>Aucun rendez-vous sur cette période.</p>
         </article>
+
+        <div id="ops-chip-sheet" class="ops-chip-sheet" hidden>
+          <p class="ops-chip-sheet__who" id="ops-chip-who"></p>
+          <p class="ops-chip-sheet__meta" id="ops-chip-meta"></p>
+          <div class="ops-chip-sheet__actions" id="ops-chip-actions"></div>
+        </div>
       </section>
 
       <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
@@ -361,7 +456,7 @@
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
             <div class="waitlist-form-header">
               <div class="chart-title">Nouveau Patient</div>
-              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+              <div class="chart-sub">À rappeler / à placer — pas d'envoi SMS automatique</div>
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
@@ -581,7 +676,7 @@
               <i data-lucide="user" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Profil Utilisateur</h3>
-            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil du command center.</p>
+            <p class="settings-card-desc">Identité affichée dans la barre latérale et l'accueil.</p>
             <div class="settings-field">
               <label class="settings-label" for="settings-profile-name">Nom Complet</label>
               <input
@@ -610,22 +705,22 @@
               <i data-lucide="sun" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Apparence</h3>
-            <p class="settings-card-desc">Choisissez le thème visuel du command center.</p>
+            <p class="settings-card-desc">Choisissez le thème visuel du tableau de bord.</p>
             <div class="theme-switcher" role="group" aria-label="Thème de l'application">
               <button
                 type="button"
                 class="theme-switch-btn is-active"
-                id="theme-btn-oak"
-                data-theme-value="oak-lounge"
+                id="theme-btn-pearl"
+                data-theme-value="pearl-clinic"
                 aria-pressed="true"
-              >Oak Lounge</button>
+              >Clair</button>
               <button
                 type="button"
                 class="theme-switch-btn"
-                id="theme-btn-pearl"
-                data-theme-value="pearl-clinic"
+                id="theme-btn-oak"
+                data-theme-value="oak-lounge"
                 aria-pressed="false"
-              >Pearl Clinic</button>
+              >Sombre</button>
             </div>
           </article>
 
@@ -664,7 +759,7 @@
               <i data-lucide="calendar-clock" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Ergonomie du Planning</h3>
-            <p class="settings-card-desc">Vue par défaut du planning du jour à l'ouverture du command center.</p>
+            <p class="settings-card-desc">Vue par défaut du planning du jour à l'ouverture.</p>
             <div class="settings-field">
               <span class="settings-label" id="settings-planning-view-label">Vue par défaut</span>
               <div class="ghost-select" id="settings-planning-view-root" data-ghost-select>
@@ -724,7 +819,7 @@
               <i data-lucide="keyboard" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Raccourcis Clavier</h3>
-            <p class="settings-card-desc">Commandes rapides du command center — lecture seule.</p>
+            <p class="settings-card-desc">Commandes rapides — lecture seule.</p>
             <ul class="settings-shortcuts" aria-label="Raccourcis clavier">
               <li><span>Rechercher un patient</span><kbd>Espace</kbd></li>
               <li><span>Aller au planning</span><kbd>G</kbd></li>
@@ -839,6 +934,18 @@
         </section>
       </div>
     </aside>
+  </div>
+
+  <div id="cancel-reason-sheet" class="ops-chip-sheet" hidden>
+    <p class="ops-chip-sheet__who">Motif d'annulation</p>
+    <p class="ops-chip-sheet__meta">Obligatoire — pas un SMS</p>
+    <div class="ops-chip-sheet__actions">
+      <button type="button" data-cancel-reason="oublie">Oubli</button>
+      <button type="button" data-cancel-reason="cout">Coût</button>
+      <button type="button" data-cancel-reason="reprogramme">Reprogrammé</button>
+      <button type="button" data-cancel-reason="autre">Autre</button>
+      <button type="button" data-cancel-dismiss="true">Retour</button>
+    </div>
   </div>
 
   <div id="bulk-action-bar" class="bulk-bar-hidden">

@@ -124,7 +124,7 @@ function doctorQueryAll(selector) {
  * DAILY_GOAL_MAD: Daily revenue target in Moroccan Dirham.
  * REFRESH_INTERVAL_MS: Auto-refresh interval (300000 = 5 minutes).
  */
-const DEFAULT_THEME = 'oak-lounge';
+const DEFAULT_THEME = 'pearl-clinic';
 const STORAGE_KEYS = {
   THEME: 'doctor_theme',
   DAILY_GOAL: 'doctor_daily_goal',
@@ -151,8 +151,8 @@ function persistDailyGoal(value) {
 function resolveInitialTheme() {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.THEME);
-    if (stored === 'dark') return 'oak-lounge';
-    if (stored === 'light') return 'pearl-clinic';
+    if (stored === 'dark' || stored === 'oak-lounge') return 'oak-lounge';
+    if (stored === 'light' || stored === 'pearl-clinic') return 'pearl-clinic';
   } catch { /* private browsing / disabled storage */ }
   return DEFAULT_THEME;
 }
@@ -176,10 +176,9 @@ const CONFIG = {
   SMART_SYNC_DEBOUNCE_MS: 15_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
   ROSTER_ENDPOINT:      '/api/roster',
-  DIGEST_DAILY_GOAL_MAD: 6000,
-  DIGEST_REVENUE_PER_PATIENT_MAD: 400,
   CURRENCY_LOCALE:      'fr-MA',
   CURRENCY:             'MAD',
+  OPEN_MINUTES:         660,
 };
 
 const bootDailyGoal = loadPersistedDailyGoal();
@@ -383,13 +382,338 @@ function buildApptCardHTML(appt) {
 
 /* ── FULLCALENDAR — DASHBOARD MANAGEMENT CALENDAR ───────────────────────── */
 let dashboardCalendar = null;
+let calendarChromeBound = false;
+let inspectorBooking = null;
+let lastOverviewRoster = [];
+let affluencePeriod = 'today';
+
+const CAL_CHIP_TONES = ['sky', 'sage', 'lilac', 'peach', 'rose', 'mist'];
+
+function casablancaIsoDate(value) {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+}
+
+function casablancaDateTimeLocal(value) {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Casablanca',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(parsed).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  if (!parts.year || parts.hour == null) return '';
+  const pad = (value) => String(value || '').padStart(2, '0');
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`;
+}
+
+function hashTone(label) {
+  const raw = String(label || '').toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = (hash + raw.charCodeAt(i) * (i + 1)) % 997;
+  }
+  return CAL_CHIP_TONES[hash % CAL_CHIP_TONES.length];
+}
+
+function familyNameFromPatient(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Patient';
+  return parts[parts.length - 1];
+}
+
+function isCancelledStatus(status) {
+  return /annul/i.test(String(status || ''));
+}
+
+function calendarClinicName() {
+  const clinic = window.DentaFlowAuth?.getSessionClinic?.();
+  const fromSession = String(clinic?.name || '').trim();
+  if (fromSession) return fromSession;
+  const branded = doctorEl('calendar-os-clinic')?.textContent?.trim();
+  return branded || '';
+}
+
+function syncCalendarClinicLabel() {
+  const el = doctorEl('calendar-os-clinic');
+  if (!el) return;
+  const name = calendarClinicName();
+  if (name) el.textContent = name;
+}
+
+function updateCalendarTitle() {
+  const titleEl = doctorEl('calendar-os-title');
+  if (!titleEl || !dashboardCalendar) return;
+  const api = dashboardCalendar.view;
+  const raw = String(api?.title || '').trim();
+  titleEl.textContent = raw || 'Agenda';
+}
+
+function setCalendarViewButtons(viewType) {
+  doctorQueryAll('[data-cal-view]').forEach((btn) => {
+    const active = btn.getAttribute('data-cal-view') === viewType;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function closeCalendarInspector() {
+  const panel = doctorEl('calendar-inspector');
+  if (!panel) return;
+  panel.hidden = true;
+  inspectorBooking = null;
+  doctorQueryAll('.fc-event.is-selected').forEach((el) => el.classList.remove('is-selected'));
+}
+
+function closeBlockChipSheet() {
+  const sheet = doctorEl('block-chip-sheet');
+  if (sheet) sheet.hidden = true;
+}
+
+function openBlockChipSheet(date, jsEvent) {
+  const sheet = doctorEl('block-chip-sheet');
+  const whenEl = doctorEl('block-chip-when');
+  const actions = doctorEl('block-chip-actions');
+  if (!sheet || !actions || !date) return;
+  const startsAt = date instanceof Date ? date : new Date(date);
+  if (whenEl) {
+    whenEl.textContent = startsAt.toLocaleString('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+  actions.replaceChildren();
+  const options = [
+    { kind: 'block', label: 'Déjeuner', blockLabel: 'Déjeuner', durationMin: 60 },
+    { kind: 'block', label: 'Labo', blockLabel: 'Labo', durationMin: 60 },
+    { kind: 'block', label: 'Absent', blockLabel: 'Absent', durationMin: 120 },
+    { kind: 'emergency_hold', label: 'Urgence réservée', durationMin: 30 },
+  ];
+  options.forEach((option) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = option.label;
+    btn.addEventListener('click', async () => {
+      try {
+        const response = await fetch(CONFIG.ROSTER_PROXY, {
+          method: 'POST',
+          credentials: 'include',
+          headers: getApiAuthHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+          body: JSON.stringify({
+            kind: option.kind,
+            blockLabel: option.blockLabel,
+            durationMin: option.durationMin,
+            startsAt: startsAt.toISOString(),
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        showDashboardToast(`${option.label} posé.`, 'success');
+        closeBlockChipSheet();
+        dashboardCalendar?.refetchEvents();
+      } catch (err) {
+        showDashboardToast(err?.message || 'Impossible de bloquer ce créneau.', 'error');
+      }
+    });
+    actions.appendChild(btn);
+  });
+  sheet.hidden = false;
+  const x = Math.min(window.innerWidth - 260, Math.max(12, jsEvent?.clientX || 24));
+  const y = Math.min(window.innerHeight - 200, Math.max(12, jsEvent?.clientY || 24));
+  sheet.style.left = `${x}px`;
+  sheet.style.top = `${y}px`;
+}
+
+async function deleteInspectorBlock() {
+  if (!inspectorBooking?.id) return;
+  try {
+    const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=delete`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+      body: JSON.stringify({ id: inspectorBooking.id }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    showDashboardToast('Blocage retiré.', 'success');
+    closeCalendarInspector();
+    dashboardCalendar?.refetchEvents();
+  } catch (err) {
+    showDashboardToast(err?.message || 'Impossible de retirer le blocage.', 'error');
+  }
+}
+
+function openCalendarInspector(event, eventEl) {
+  const panel = doctorEl('calendar-inspector');
+  if (!panel || !event) return;
+  const props = event.extendedProps || {};
+  const name = props.patientName || event.title || 'Patient';
+  const treatment = props.treatment || 'Consultation';
+  const phone = props.phone || '—';
+  const status = props.status || '';
+  const duration = Number(props.durationMin) || 0;
+  const start = event.start;
+  const timeLabel = start
+    ? start.toLocaleString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+    : '';
+
+  const setTextSafe = (id, text) => {
+    const el = doctorEl(id);
+    if (el) el.textContent = text;
+  };
+
+  setTextSafe('cal-insp-time', timeLabel);
+  setTextSafe('cal-insp-name', name);
+  setTextSafe('cal-insp-status', status || '—');
+  setTextSafe('cal-insp-treatment', treatment);
+  setTextSafe('cal-insp-phone', phone || '—');
+  setTextSafe('cal-insp-duration', duration > 0 ? `${duration} min` : '—');
+
+  inspectorBooking = {
+    id: event.id,
+    kind: props.bookingKind || 'visit',
+  };
+  const actions = doctorEl('cal-insp-actions');
+  if (actions) {
+    const isBlock = inspectorBooking.kind === 'block' || inspectorBooking.kind === 'emergency_hold';
+    actions.hidden = !isBlock;
+  }
+
+  panel.hidden = false;
+  doctorQueryAll('.fc-event.is-selected').forEach((el) => el.classList.remove('is-selected'));
+  eventEl?.classList.add('is-selected');
+}
+
+function mapRosterRowToCalendarEvent(row) {
+  const startRaw = row.starts_at || row.startTime;
+  const start = startRaw ? new Date(startRaw) : null;
+  if (!start || Number.isNaN(start.getTime())) return null;
+  const duration = Number(row.duration_min) > 0 ? Number(row.duration_min) : 30;
+  const end = new Date(start.getTime() + duration * 60_000);
+  const patientName = row.patient_name || row.name || 'Patient';
+  const treatment = row.treatment_name || row.treatment || 'Consultation';
+  const cancelled = isCancelledStatus(row.status);
+  const kind = row.booking_kind || row.bookingKind || 'visit';
+  const tone = kind === 'block' ? 'mist' : kind === 'emergency_hold' ? 'peach' : hashTone(treatment);
+  const startLocal = casablancaDateTimeLocal(start);
+  const endLocal = casablancaDateTimeLocal(end);
+  if (!startLocal || !endLocal) return null;
+  const classNames = ['cal-chip', `cal-chip--${tone}`];
+  if (kind === 'block') classNames.push('cal-chip--block');
+  if (kind === 'emergency_hold') classNames.push('cal-chip--hold');
+  if (cancelled) classNames.push('is-cancelled');
+  return {
+    id: String(row.id || ''),
+    title: kind === 'visit' ? familyNameFromPatient(patientName) : (treatment || patientName),
+    start: startLocal,
+    end: endLocal,
+    classNames,
+    extendedProps: {
+      patientName,
+      treatment,
+      phone: row.patient_phone || row.phone || '',
+      status: row.status || '',
+      durationMin: duration,
+      notes: row.notes || '',
+      bookingKind: kind,
+      careStartedAt: row.care_started_at || null,
+    },
+  };
+}
+
+async function fetchRosterRange(fromIso, toIso) {
+  const params = new URLSearchParams({ from: fromIso, to: toIso });
+  const response = await fetch(`${CONFIG.ROSTER_ENDPOINT}?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: getApiAuthHeaders({ Accept: 'application/json' }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  });
+  assertAuthorizedResponse(response);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  const unwrapped = unwrapRosterPayload(payload);
+  return parseRosterResponse(unwrapped);
+}
+
+function setCalendarEmptyState(isEmpty) {
+  const empty = doctorEl('calendar-os-empty');
+  if (!empty) return;
+  empty.hidden = !isEmpty;
+}
+
+function bindCalendarChrome() {
+  if (calendarChromeBound) return;
+  const stage = doctorQuery('.calendar-os-stage') || doctorEl('view-calendar');
+  if (!stage) return;
+  calendarChromeBound = true;
+
+  doctorQueryAll('[data-cal-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!dashboardCalendar) return;
+      const action = btn.getAttribute('data-cal-nav');
+      if (action === 'prev') dashboardCalendar.prev();
+      else if (action === 'next') dashboardCalendar.next();
+      else if (action === 'today') dashboardCalendar.today();
+    });
+  });
+
+  doctorQueryAll('[data-cal-view]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!dashboardCalendar) return;
+      const view = btn.getAttribute('data-cal-view');
+      if (!view) return;
+      dashboardCalendar.changeView(view);
+      setCalendarViewButtons(view);
+    });
+  });
+
+  doctorEl('calendar-inspector-close')?.addEventListener('click', closeCalendarInspector);
+  doctorEl('cal-insp-delete')?.addEventListener('click', () => void deleteInspectorBlock());
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeCalendarInspector();
+      closeBlockChipSheet();
+    }
+  });
+}
 
 function initDashboardCalendar() {
   const el = doctorEl('dashboard-cal-inline');
   if (!el) return;
 
+  bindCalendarChrome();
+  syncCalendarClinicLabel();
+
   if (dashboardCalendar) {
-    requestAnimationFrame(() => dashboardCalendar.updateSize());
+    requestAnimationFrame(() => {
+      dashboardCalendar.updateSize();
+      updateCalendarTitle();
+    });
     return;
   }
 
@@ -402,28 +726,91 @@ function initDashboardCalendar() {
 
   dashboardCalendar = new FullCalendar.Calendar(el, {
     initialView: 'timeGridWeek',
-    headerToolbar: {
-      left:   'prev,next today',
-      center: 'title',
-      right:  'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
-    },
+    headerToolbar: false,
     locale: 'fr',
     firstDay: 1,
     height: 'auto',
     expandRows: true,
     slotMinTime: '08:00:00',
     slotMaxTime: '19:00:00',
+    scrollTime: '08:00:00',
     nowIndicator: true,
     allDaySlot: false,
-    events: [],
+    slotDuration: '00:30:00',
+    slotLabelInterval: '01:00:00',
+    slotEventOverlap: false,
+    displayEventTime: true,
+    displayEventEnd: false,
     eventTimeFormat: {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
     },
+    eventContent(arg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'cal-chip__inner';
+      if (arg.timeText) {
+        const time = document.createElement('span');
+        time.className = 'cal-chip__time';
+        time.textContent = arg.timeText;
+        wrap.appendChild(time);
+      }
+      const title = document.createElement('span');
+      title.className = 'cal-chip__title';
+      title.textContent = arg.event.title || '';
+      wrap.appendChild(title);
+      return { domNodes: [wrap] };
+    },
+    datesSet(info) {
+      updateCalendarTitle();
+      setCalendarViewButtons(info.view.type);
+      closeCalendarInspector();
+    },
+    events(info, successCallback, failureCallback) {
+      const fromIso = casablancaIsoDate(info.start);
+      const exclusiveEnd = new Date(info.end.getTime() - 1);
+      const toIso = casablancaIsoDate(exclusiveEnd);
+      if (!fromIso || !toIso) {
+        successCallback([]);
+        setCalendarEmptyState(true);
+        return;
+      }
+      fetchRosterRange(fromIso, toIso)
+        .then((rows) => {
+          const events = rows.map(mapRosterRowToCalendarEvent).filter(Boolean);
+          setCalendarEmptyState(events.length === 0);
+          successCallback(events);
+        })
+        .catch((err) => {
+          if (isUnauthorizedError(err)) return;
+          console.error('[Calendar] roster load failed:', err?.message || err);
+          setCalendarEmptyState(true);
+          failureCallback(err);
+        });
+    },
+    eventClick(info) {
+      info.jsEvent?.preventDefault();
+      closeBlockChipSheet();
+      openCalendarInspector(info.event, info.el);
+    },
+    dateClick(info) {
+      info.jsEvent?.preventDefault();
+      closeCalendarInspector();
+      openBlockChipSheet(info.date, info.jsEvent);
+    },
+    eventDidMount(info) {
+      const name = info.event.extendedProps?.patientName || info.event.title;
+      const treatment = info.event.extendedProps?.treatment || '';
+      info.el.setAttribute('title', [name, treatment].filter(Boolean).join(' · '));
+    },
   });
 
   dashboardCalendar.render();
+  updateCalendarTitle();
+  setCalendarViewButtons('timeGridWeek');
+  if (typeof window.refreshLucideIcons === 'function') {
+    window.refreshLucideIcons(doctorEl('view-calendar') || document);
+  }
 }
 
 /* ── HERO GREETING & DATE ────────────────────────────────────────────────── */
@@ -594,6 +981,23 @@ function navigateToView(viewKey) {
 }
 
 /* ── CHART PERIOD TOGGLE ─────────────────────────────────────────────────── */
+function setAffluenceCopy(period) {
+  const title = doctorEl('affluence-chart-title');
+  const sub = doctorEl('affluence-chart-sub');
+  if (period === 'week') {
+    if (title) title.textContent = 'Affluence 7 jours';
+    if (sub) sub.textContent = 'Patients par jour — semaine glissante';
+    return;
+  }
+  if (period === 'month') {
+    if (title) title.textContent = 'Affluence mensuelle';
+    if (sub) sub.textContent = 'Patients par semaine — 4 dernières semaines';
+    return;
+  }
+  if (title) title.textContent = 'Affluence horaire';
+  if (sub) sub.textContent = "Patients par heure aujourd'hui";
+}
+
 function initChartToggles() {
   const toggle  = doctorEl('chart-toggle');
   const slider  = doctorEl('chart-toggle-slider');
@@ -604,6 +1008,9 @@ function initChartToggles() {
     buttons.forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     slider.style.transform = `translateX(${index * 100}%)`;
+    affluencePeriod = btn.getAttribute('data-period') || 'today';
+    setAffluenceCopy(affluencePeriod);
+    if (lastChartData) renderHoursChart(lastChartData);
   }
 
   buttons.forEach((btn, index) => {
@@ -612,10 +1019,49 @@ function initChartToggles() {
 }
 
 /* ── TODAY'S SCHEDULE FEED ───────────────────────────────────────────────── */
-function renderAppointmentsList() {
+function renderAppointmentsList(records) {
   const container = doctorEl('appointments-list');
   if (!container) return;
+
+  const rows = Array.isArray(records) ? records : lastOverviewRoster;
+  const upcoming = rows
+    .filter((row) => row && !isCancelledStatus(row.status))
+    .slice()
+    .sort(sortDoctorAppointmentsByTime);
+
   container.replaceChildren();
+
+  if (!upcoming.length) {
+    const empty = document.createElement('p');
+    empty.className = 'schedule-empty';
+    empty.textContent = "Aucun rendez-vous aujourd'hui.";
+    container.appendChild(empty);
+    hideSkeleton('roster');
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  upcoming.forEach((appt) => fragment.appendChild(createApptCardElement(appt)));
+  container.appendChild(fragment);
+  hideSkeleton('roster');
+}
+
+async function loadOverviewRoster() {
+  const response = await fetch(CONFIG.ROSTER_ENDPOINT, {
+    method: 'GET',
+    credentials: 'include',
+    headers: getApiAuthHeaders({ Accept: 'application/json' }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  });
+  assertAuthorizedResponse(response);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  const unwrapped = unwrapRosterPayload(payload);
+  lastOverviewRoster = parseRosterResponse(unwrapped)
+    .map(normalizeDoctorAppointment)
+    .filter(Boolean);
+  renderAppointmentsList(lastOverviewRoster);
 }
 
 function renderWaitlistPanel() {
@@ -758,7 +1204,7 @@ function prependWaitlistEntry({ nom, telephone, priorite }) {
 /* ── SETTINGS PANEL ──────────────────────────────────────────────────────── */
 /** Volatile preferences — live DOM only, reset on full page reload */
 const volatileSettings = {
-  theme:           'oak-lounge',
+  theme:           'pearl-clinic',
   profileName:     null,
   profileSpecialty:null,
   dailyGoal:       null,
@@ -791,34 +1237,34 @@ function isPearlTheme() {
 function getChartThemeColors() {
   if (isPearlTheme()) {
     return {
-      grid:           '#000000',
-      ticks:          '#000000',
-      axisBorder:     '#000000',
-      centreText:     '#0A0A0A',
-      centreSub:      '#0A0A0A',
-      tooltipBg:      '#FDFCFA',
-      tooltipBorder:  '#000000',
-      tooltipTitle:   '#0A0A0A',
-      tooltipBody:    '#262322',
-      doughnutBorder: '#000000',
-      emptySegment:   '#EAE6DF',
-      pendingSegment: '#D5CFC4',
+      grid:           '#e5e5e5',
+      ticks:          '#737373',
+      axisBorder:     '#e5e5e5',
+      centreText:     '#171717',
+      centreSub:      '#6b6b6b',
+      tooltipBg:      '#ffffff',
+      tooltipBorder:  '#e5e5e5',
+      tooltipTitle:   '#171717',
+      tooltipBody:    '#525252',
+      doughnutBorder: '#ffffff',
+      emptySegment:   '#f4f5f6',
+      pendingSegment: '#d4d4d4',
     };
   }
 
   return {
-    grid:           '#1E2530',
-    ticks:          '#7A8899',
-    axisBorder:     '#1E2530',
-    centreText:     '#E8ECF0',
-    centreSub:      '#7A8899',
-    tooltipBg:      '#1A2030',
-    tooltipBorder:  '#252E3E',
-    tooltipTitle:   '#E8ECF0',
-    tooltipBody:    '#7A8899',
-    doughnutBorder: '#141820',
-    emptySegment:   '#1E2530',
-    pendingSegment: '#252E3E',
+    grid:           '#2a2a2a',
+    ticks:          '#a3a3a3',
+    axisBorder:     '#2a2a2a',
+    centreText:     '#f5f5f5',
+    centreSub:      '#a3a3a3',
+    tooltipBg:      '#1a1a1a',
+    tooltipBorder:  '#2a2a2a',
+    tooltipTitle:   '#f5f5f5',
+    tooltipBody:    '#a3a3a3',
+    doughnutBorder: '#1a1a1a',
+    emptySegment:   '#222222',
+    pendingSegment: '#3a3a3a',
   };
 }
 
@@ -1002,18 +1448,92 @@ function initSecurityManagement() {
 }
 
 /* ── CRM PATIENT SEARCH ──────────────────────────────────────────────────── */
+let crmSearchTimer = null;
+let crmSearchQuery = '';
+
 function initCrmSearch() {
   const searchEl = doctorEl('crm-search');
-  const tbody    = doctorEl('crm-table-body');
-  if (!searchEl || !tbody) return;
+  if (!searchEl || searchEl.dataset.carnetBound === 'true') return;
+  searchEl.dataset.carnetBound = 'true';
 
-  searchEl?.addEventListener('input', () => {
-    const query = searchEl.value.trim().toLowerCase();
-    tbody.querySelectorAll('tr').forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.classList.toggle('is-hidden', query.length > 0 && !text.includes(query));
-    });
+  searchEl.addEventListener('input', () => {
+    clearTimeout(crmSearchTimer);
+    crmSearchTimer = setTimeout(() => {
+      crmSearchQuery = searchEl.value.trim();
+      void loadCarnetDirectory(crmSearchQuery);
+    }, 280);
   });
+}
+
+function formatCarnetWhen(row) {
+  const raw = row?.starts_at || row?.rawDate || row?.startTime;
+  const parsed = raw ? new Date(raw) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return row?.time || '—';
+  return parsed.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Casablanca',
+  });
+}
+
+function groupBookingsForCarnet(rows) {
+  const map = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const phone = String(row.phone || row.patient_phone || '').trim();
+    const name = String(row.name || row.patient_name || '').trim();
+    const key = phone || name.toLowerCase();
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, { id: key, name: name || 'Non spécifié', phone, visits: [] });
+    }
+    const group = map.get(key);
+    if (name && group.name === 'Non spécifié') group.name = name;
+    if (phone && !group.phone) group.phone = phone;
+    group.visits.push(row);
+  });
+  return [...map.values()].map((group) => {
+    group.visits.sort((a, b) => String(b.starts_at || b.rawDate || '').localeCompare(String(a.starts_at || a.rawDate || '')));
+    group.lastVisit = group.visits[0] || null;
+    group.motif = group.lastVisit?.treatment || group.lastVisit?.treatment_name || 'Consultation';
+    group.statut = group.lastVisit?.status || '—';
+    group.lastWhen = formatCarnetWhen(group.lastVisit || {});
+    const fromApi = Number(group.lastVisit?.noshow_90d);
+    group.noshow90 = Number.isFinite(fromApi) && fromApi > 0
+      ? fromApi
+      : group.visits.filter((visit) => /no-?show/i.test(String(visit.status || ''))).length;
+    return group;
+  });
+}
+
+async function loadCarnetDirectory(query) {
+  const tbody = doctorEl('crm-table-body');
+  if (!tbody) return;
+  try {
+    const url = query
+      ? `${CONFIG.ROSTER_PROXY}?q=${encodeURIComponent(query)}`
+      : CONFIG.ROSTER_PROXY;
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ Accept: 'application/json' }),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    const records = parseRosterResponse(unwrapRosterPayload(payload))
+      .map(normalizeDoctorAppointment)
+      .filter(Boolean);
+    renderCRMTable(records);
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    console.error('[Carnet] search failed:', err?.message || err);
+  }
 }
 
 /* ── CRM DOSSIER PATIENT — SLIDE-OVER PANEL ─────────────────────────────── */
@@ -1028,16 +1548,15 @@ function getCrmMotifTagClass(motif) {
 
 function toCrmPatient(record) {
   if (!record) return null;
+  if (record.visits) return record;
   return {
     id: record.id ?? record.rowId,
     name: record.name || 'Non spécifié',
     phone: record.phone || '',
-    email: record.email || '',
     motif: record.treatment || 'Consultation',
     statut: record.status || 'Confirmé',
-    observations: record.observations || 'Aucune observation enregistrée.',
-    insurance: record.insurance || '—',
-    amount: Number(record.amount) || 0,
+    visits: [record],
+    lastWhen: formatCarnetWhen(record),
   };
 }
 
@@ -1045,26 +1564,25 @@ function renderCRMTable(records) {
   const tbody = doctorEl('crm-table-body');
   if (!tbody) return;
 
-  const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+  const groups = groupBookingsForCarnet(records);
   crmPatientsById = {};
   tbody.replaceChildren();
 
-  if (!rows.length) {
+  if (!groups.length) {
     const emptyRow = document.createElement('tr');
     emptyRow.className = 'crm-table-empty';
     const cell = document.createElement('td');
-    cell.colSpan = 4;
-    cell.textContent = 'Aucun patient trouvé';
+    cell.colSpan = 5;
+    cell.textContent = crmSearchQuery
+      ? 'Aucun historique pour cette recherche'
+      : 'Aucun patient aujourd\'hui — recherchez par nom ou téléphone';
     emptyRow.appendChild(cell);
     tbody.appendChild(emptyRow);
     hideSkeleton('crm');
     return;
   }
 
-  rows.forEach((record) => {
-    const patient = toCrmPatient(record);
-    if (!patient?.id) return;
-
+  groups.forEach((patient) => {
     crmPatientsById[String(patient.id)] = patient;
 
     const tr = document.createElement('tr');
@@ -1072,14 +1590,6 @@ function renderCRMTable(records) {
     tr.tabIndex = 0;
     tr.setAttribute('role', 'button');
     tr.dataset.patientId = String(patient.id);
-    tr.dataset.name = patient.name;
-    tr.dataset.phone = patient.phone;
-    tr.dataset.email = patient.email;
-    tr.dataset.motif = patient.motif;
-    tr.dataset.statut = patient.statut;
-    tr.dataset.amount = String(patient.amount);
-    tr.dataset.insurance = patient.insurance;
-    tr.dataset.observations = patient.observations;
 
     const nameCell = document.createElement('td');
     nameCell.textContent = patient.name;
@@ -1087,8 +1597,8 @@ function renderCRMTable(records) {
     const phoneCell = document.createElement('td');
     phoneCell.textContent = patient.phone || '—';
 
-    const emailCell = document.createElement('td');
-    emailCell.textContent = patient.email || '—';
+    const lastCell = document.createElement('td');
+    lastCell.textContent = patient.lastWhen || '—';
 
     const motifCell = document.createElement('td');
     const motifTag = document.createElement('span');
@@ -1097,7 +1607,10 @@ function renderCRMTable(records) {
     motifTag.textContent = patient.motif;
     motifCell.appendChild(motifTag);
 
-    tr.append(nameCell, phoneCell, emailCell, motifCell);
+    const noshowCell = document.createElement('td');
+    noshowCell.textContent = `${Number(patient.noshow90) || 0} (90 j)`;
+
+    tr.append(nameCell, phoneCell, lastCell, motifCell, noshowCell);
     tbody.appendChild(tr);
   });
   hideSkeleton('crm');
@@ -1135,8 +1648,7 @@ function populateCrmSidePanel(patient) {
 
   const subtitleEl = doctorEl('crm-panel-subtitle');
   if (subtitleEl) {
-    const parts = [patient.phone, patient.email].filter(Boolean);
-    subtitleEl.textContent = parts.join(' · ');
+    subtitleEl.textContent = patient.phone || '';
   }
 
   const statutEl = doctorEl('crm-panel-statut');
@@ -1151,10 +1663,38 @@ function populateCrmSidePanel(patient) {
     }
   }
 
-  setText('crm-panel-amount', `${formatMAD(patient.amount)} MAD`);
-  setText('crm-panel-insurance', patient.insurance);
-  setText('crm-panel-motif', patient.motif);
-  setText('crm-panel-observations', patient.observations);
+  const noshowEl = doctorEl('crm-panel-noshows');
+  if (noshowEl) {
+    const count = Number(patient.noshow90) || 0;
+    noshowEl.hidden = false;
+    noshowEl.textContent = `${count} no-show${count > 1 ? 's' : ''} (90 j, par téléphone)`;
+  }
+
+  const visitsHost = doctorEl('crm-panel-visits');
+  if (visitsHost) {
+    visitsHost.replaceChildren();
+    const visits = Array.isArray(patient.visits) ? patient.visits : [];
+    if (!visits.length) {
+      const empty = document.createElement('p');
+      empty.className = 'chair-glance__empty';
+      empty.textContent = 'Aucune visite enregistrée.';
+      visitsHost.appendChild(empty);
+    } else {
+      visits.slice(0, 12).forEach((visit) => {
+        const item = document.createElement('div');
+        item.className = 'carnet-visit';
+        const when = document.createElement('span');
+        when.className = 'carnet-visit__when';
+        when.textContent = formatCarnetWhen(visit);
+        const care = document.createElement('span');
+        care.textContent = visit.treatment || visit.treatment_name || 'Consultation';
+        const status = document.createElement('span');
+        status.textContent = visit.status || '';
+        item.append(when, care, status);
+        visitsHost.appendChild(item);
+      });
+    }
+  }
 }
 
 function openCrmSidePanel(patient, selectedRow) {
@@ -1418,6 +1958,11 @@ function getEmptyDashboardData() {
     no_shows:        0,
     accepted_plans:  0,
     pending_plans:   0,
+    reserved_min:    0,
+    open_min:        CONFIG.OPEN_MINUTES || 660,
+    treatment_mix:   [],
+    returning_phones: 0,
+    new_phones:      0,
   };
 }
 
@@ -1480,13 +2025,23 @@ async function loadDashboard(isSilentSync = false) {
       applySkeletonState();
     }
 
-    const response = await fetch(CONFIG.DATA_URL, {
-      method:  'GET',
-      credentials: 'include',
-      headers: getApiAuthHeaders(),
-      cache:   'no-store',
-      signal:  AbortSignal.timeout(10_000),
-    });
+    const [response, rosterResult] = await Promise.all([
+      fetch(CONFIG.DATA_URL, {
+        method:  'GET',
+        credentials: 'include',
+        headers: getApiAuthHeaders(),
+        cache:   'no-store',
+        signal:  AbortSignal.timeout(10_000),
+      }),
+      loadOverviewRoster().catch((err) => {
+        if (isUnauthorizedError(err)) throw err;
+        console.warn('[Dashboard] Roster list failed:', err?.message || err);
+        lastOverviewRoster = [];
+        renderAppointmentsList([]);
+        return null;
+      }),
+    ]);
+    void rosterResult;
 
     assertAuthorizedResponse(response);
 
@@ -1527,6 +2082,7 @@ async function loadDashboard(isSilentSync = false) {
 
     renderKPICards(data);
     renderCharts(data);
+    if (dashboardCalendar) dashboardCalendar.refetchEvents();
 
     const now = new Date().toLocaleTimeString('fr-MA', {
       hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca',
@@ -1561,7 +2117,11 @@ function normaliseData(raw) {
     if (typeof v === 'number' && Number.isFinite(v)) {
       out[k] = v;
     } else if (Array.isArray(v)) {
-      out[k] = v.map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : asMetric(item)));
+      out[k] = v.map((item) => {
+        if (typeof item === 'number' && Number.isFinite(item)) return item;
+        if (item && typeof item === 'object' && !Array.isArray(item)) return item;
+        return asMetric(item);
+      });
     } else if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
       out[k] = Number(v);
     } else if (typeof v === 'boolean') {
@@ -1679,6 +2239,33 @@ function updateSparkline(pathElement, value, maxValue) {
   setSparklineGeometry(pathElement, dynamicD, `0,${midY} ${qX.toFixed(1)},${peakY.toFixed(1)} ${midX.toFixed(1)},${midY} ${width},${flatY}`);
 }
 
+function updateSparklineSeries(pathElement, values) {
+  if (!pathElement) return;
+  const svg = pathElement.ownerSVGElement;
+  const viewBox = svg?.viewBox?.baseVal;
+  const width = viewBox?.width || 52;
+  const height = viewBox?.height || 22;
+  const nums = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+
+  if (nums.length < 2) {
+    updateSparkline(pathElement, nums[0] || 0, Math.max(nums[0] || 0, 1));
+    return;
+  }
+
+  const max = Math.max(...nums, 1);
+  const min = Math.min(...nums, 0);
+  const span = Math.max(max - min, 1);
+  const step = width / (nums.length - 1);
+  const pts = nums.map((value, index) => {
+    const x = index * step;
+    const y = height - 2 - ((value - min) / span) * (height - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  setSparklineGeometry(pathElement, `M ${pts.join(' L ')}`, pts.join(' '));
+}
+
 function buildSparklineSvg(_values, { width = 52, height = 22, tone = 'gold' } = {}) {
   return `<svg class="pulse-sparkline pulse-sparkline--${tone}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M 0 10 L ${(width / 2).toFixed(1)} 10 L ${width} 10"/></svg>`;
 }
@@ -1752,16 +2339,24 @@ function animatePulseCharts(scope) {
 function bindKpiMicroCharts(data = {}) {
   const patientsToday = asMetric(data.patients_today);
   const noShows = asMetric(data.no_shows);
-  const newPatients = asMetric(data.pending_plans);
+  const week = Array.isArray(data.week_patients) ? data.week_patients : null;
 
   const trendPatientsSvg = doctorQuery('#trend-patients svg');
-  updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
+  if (week && week.length) {
+    updateSparklineSeries(trendPatientsSvg?.querySelector('path, polyline'), week);
+  } else {
+    updateSparkline(trendPatientsSvg?.querySelector('path, polyline'), patientsToday, 24);
+  }
 
   const trendNoshowsSvg = doctorQuery('#trend-noshows svg');
   updateBarChart(trendNoshowsSvg, noShows);
 
   const trendNewSvg = doctorQuery('#trend-new svg');
-  updateSparkline(trendNewSvg?.querySelector('path, polyline'), newPatients, 10);
+  if (week && week.length) {
+    updateSparklineSeries(trendNewSvg?.querySelector('path, polyline'), week);
+  } else {
+    updateSparkline(trendNewSvg?.querySelector('path, polyline'), asMetric(data.pending_plans), 10);
+  }
 
   const kpiScope = doctorQuery('.kpi-row');
   if (kpiScope) animatePulseCharts(kpiScope);
@@ -1998,7 +2593,56 @@ function renderDynamicChart(data, containerId, options = {}) {
 }
 
 function renderDoctorHubCharts(data = {}) {
+  if (!doctorEl('doctor-weekly-trend-chart')) return;
   renderDynamicChart(data, 'doctor-weekly-trend-chart', { unit: 'patients' });
+}
+
+function renderLoadMixFidelity(data = {}) {
+  const reserved = asMetric(data?.reserved_min);
+  const open = asMetric(data?.open_min) || CONFIG.OPEN_MINUTES;
+  const loadEl = doctorEl('load-reserved');
+  if (loadEl) loadEl.textContent = `${reserved} / ${open} min`;
+  const fill = doctorEl('load-meter-fill');
+  if (fill) {
+    fill.style.width = `${Math.min(100, open > 0 ? (reserved / open) * 100 : 0)}%`;
+  }
+
+  const mixHost = doctorEl('treatment-mix-list');
+  if (mixHost) {
+    const mix = Array.isArray(data?.treatment_mix) ? data.treatment_mix : [];
+    mixHost.replaceChildren();
+    if (!mix.length) {
+      const empty = document.createElement('p');
+      empty.className = 'chair-glance__empty';
+      empty.textContent = 'Aucun soin cette semaine.';
+      mixHost.appendChild(empty);
+    } else {
+      const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
+      mix.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'mix-row';
+        const name = document.createElement('span');
+        name.textContent = item.name || 'Non précisé';
+        const count = document.createElement('span');
+        count.textContent = String(item.count || 0);
+        const track = document.createElement('div');
+        track.className = 'mix-row__track';
+        const bar = document.createElement('div');
+        bar.className = 'mix-row__fill';
+        bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
+        track.appendChild(bar);
+        row.append(name, count, track);
+        mixHost.appendChild(row);
+      });
+    }
+  }
+
+  setText('fidelity-returning', String(asMetric(data?.returning_phones)));
+  setText('fidelity-new', String(asMetric(data?.new_phones)));
+
+  const chargeEl = doctorEl('hub-val-charge');
+  if (chargeEl) chargeEl.textContent = `${reserved}/${open}`;
+  setText('hub-delta-charge', 'Temps réservé / ouverture');
 }
 
 function renderKPICards(data) {
@@ -2011,16 +2655,13 @@ function renderKPICards(data) {
   setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
   setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
 
-  const revenueToday = asMetric(data?.revenue_today);
-
   renderDoctorHubCharts(data);
+  renderLoadMixFidelity(data);
   bindKpiMicroCharts(data);
 
   setKPINumber('hub-val-patients', patients_today, true);
   setKPINumber('hub-val-pending', pending_plans, true);
   setKPINumber('hub-val-noshows', no_shows, true);
-  const hubProductionEl = doctorEl('hub-val-production');
-  if (hubProductionEl) hubProductionEl.textContent = formatHubProductionMad(revenueToday);
 
   setText('hub-delta-patients', patients_today > 0 ? 'Aujourd\'hui' : 'Aucun RDV');
   setText('hub-delta-pending', pending_plans > 0
@@ -2029,7 +2670,6 @@ function renderKPICards(data) {
   setText('hub-delta-noshows', no_shows > 0
     ? `${no_shows} créneau${no_shows > 1 ? 'x' : ''} libre${no_shows > 1 ? 's' : ''}`
     : 'Aucune absence');
-  setText('hub-delta-production', 'MAD facturés');
 
   updateRecoveryMetrics(null);
   refreshOperationalCharts(data);
@@ -2244,33 +2884,73 @@ function renderCharts(data) {
   renderAcceptanceChart(data);
 }
 
-/* Bar chart: patient volume by hour */
+/* Bar chart: patient volume by hour / week / month */
+function affluenceBarColors(values) {
+  const maxVal = Math.max(...values, 1);
+  const pearl = isPearlTheme();
+  return values.map((value) => {
+    const intensity = value / maxVal;
+    if (pearl) {
+      if (intensity >= 0.75) return 'rgba(23, 23, 23, 0.92)';
+      if (intensity >= 0.4) return 'rgba(23, 23, 23, 0.42)';
+      return 'rgba(23, 23, 23, 0.14)';
+    }
+    if (intensity >= 0.75) return 'rgba(245, 245, 245, 0.92)';
+    if (intensity >= 0.4) return 'rgba(245, 245, 245, 0.4)';
+    return 'rgba(245, 245, 245, 0.14)';
+  });
+}
+
+function getLast4WeekLabels() {
+  const labels = [];
+  const now = new Date();
+  for (let offset = 3; offset >= 0; offset -= 1) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - offset * 7);
+    labels.push(
+      day.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'Africa/Casablanca',
+      })
+    );
+  }
+  return labels;
+}
+
+function resolveAffluenceSeries(data, period) {
+  if (period === 'week') {
+    const week = Array.isArray(data?.week_patients) ? data.week_patients.map((n) => asMetric(n)) : [];
+    if (week.length < 7) return null;
+    return { labels: getLast7DayLabels(), values: week.slice(-7) };
+  }
+  if (period === 'month') {
+    const month = Array.isArray(data?.month_weeks) ? data.month_weeks.map((n) => asMetric(n)) : [];
+    if (month.length < 4) return null;
+    return { labels: getLast4WeekLabels(), values: month.slice(-4) };
+  }
+  const hours = ['08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h'];
+  const keys = ['hour_08','hour_09','hour_10','hour_11','hour_12',
+                'hour_13','hour_14','hour_15','hour_16','hour_17','hour_18'];
+  const hasHours = keys.some((key) => data?.[key] != null);
+  if (!hasHours) return null;
+  return { labels: hours, values: keys.map((key) => asMetric(data?.[key])) };
+}
+
 function renderHoursChart(data) {
-  const hours  = ['08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h'];
-  const keys   = ['hour_08','hour_09','hour_10','hour_11','hour_12',
-                  'hour_13','hour_14','hour_15','hour_16','hour_17','hour_18'];
   const ctx = doctorEl('chart-hours');
   if (!ctx) return;
 
-  const hasHours = keys.some((key) => data?.[key] != null);
-  if (!hasHours) {
+  setAffluenceCopy(affluencePeriod);
+  const series = resolveAffluenceSeries(data, affluencePeriod);
+  if (!series) {
     if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
     setCanvasChartEmpty(ctx, 'Données insuffisantes');
     return;
   }
   clearCanvasChartEmpty(ctx);
-  const values = keys.map(k => asMetric(data?.[k]));
-  const maxVal = Math.max(...values, 1);
-
-  // Colour bars: accent for busy hours, dimmer for quiet
-  const colors = values.map(v => {
-    const intensity = v / maxVal;
-    return intensity >= 0.75
-      ? 'rgba(232, 201, 122, 0.90)'  // peak
-      : intensity >= 0.4
-      ? 'rgba(184, 150, 90, 0.65)'   // moderate
-      : 'rgba(184, 150, 90, 0.25)';  // quiet
-  });
+  const colors = affluenceBarColors(series.values);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
 
@@ -2279,14 +2959,13 @@ function renderHoursChart(data) {
   hoursChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: hours,
+      labels: series.labels,
       datasets: [{
         label: 'Patients',
-        data:  values,
+        data:  series.values,
         backgroundColor: colors,
-        borderColor:     colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
         borderWidth: 0,
-        borderRadius: 10,
+        borderRadius: 8,
         borderSkipped: false,
       }]
     },
@@ -2294,7 +2973,7 @@ function renderHoursChart(data) {
       responsive: true,
       maintainAspectRatio: false,
       animation: {
-        duration: 700,
+        duration: reduceMotion ? 0 : 220,
         easing: 'easeOutQuart',
       },
       plugins: {
@@ -2306,13 +2985,13 @@ function renderHoursChart(data) {
           titleColor:      chartTheme.tooltipTitle,
           bodyColor:       chartTheme.tooltipBody,
           callbacks: {
-            label: ctx => ` ${ctx.parsed.y} patient${ctx.parsed.y !== 1 ? 's' : ''}`,
+            label: (item) => ` ${item.parsed.y} patient${item.parsed.y !== 1 ? 's' : ''}`,
           }
         },
       },
       scales: {
         x: {
-          grid:  { color: chartTheme.grid, drawBorder: false },
+          grid:  { display: false, drawBorder: false },
           ticks: { color: chartTheme.ticks, font: { family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', size: 11 } },
         },
         y: {
@@ -2906,6 +3585,8 @@ function normalizeDoctorAppointment(raw) {
   const amount = Number(amountRaw);
   const safeAmount = Number.isFinite(amount) ? amount : 0;
 
+  const durationMin = Number(firstPresent(item.duration_min, item.durationMin, item.duration) ?? 0);
+
   return {
     id: bookingId ?? item.id,
     rowId: bookingId,
@@ -2919,6 +3600,12 @@ function normalizeDoctorAppointment(raw) {
     observations,
     insurance,
     amount: safeAmount,
+    duration_min: Number.isFinite(durationMin) && durationMin > 0 ? durationMin : 30,
+    starts_at: rawDate,
+    startTime: rawDate,
+    booking_kind: item.booking_kind || item.bookingKind || 'visit',
+    care_started_at: item.care_started_at || item.careStartedAt || null,
+    noshow_90d: Number(item.noshow_90d) || 0,
   };
 }
 
@@ -3001,7 +3688,7 @@ function animateKineticCounter(elementId, targetValue, suffix = '') {
   });
 }
 
-function setDigestFinalValues({ totalVus, totalAnnules, totalRevenue, progressPercent }) {
+function setDigestFinalValues({ totalVus, totalAnnules, reservedMin, openMin, progressPercent }) {
   const vusEl = doctorEl('digest-patients-vus');
   const annulEl = doctorEl('digest-annulations');
   const revEl = doctorEl('digest-revenue');
@@ -3009,7 +3696,7 @@ function setDigestFinalValues({ totalVus, totalAnnules, totalRevenue, progressPe
 
   if (vusEl) vusEl.textContent = String(totalVus);
   if (annulEl) annulEl.textContent = String(totalAnnules);
-  if (revEl) revEl.textContent = `${totalRevenue} MAD`;
+  if (revEl) revEl.textContent = `${reservedMin} / ${openMin} min`;
   if (progEl) progEl.style.width = `${progressPercent}%`;
 }
 
@@ -3017,7 +3704,7 @@ function startDigestKineticCounters({ instant = false } = {}) {
   if (digestKineticsStarted || !pendingDigestKinetics) return;
   digestKineticsStarted = true;
 
-  const { totalVus, totalAnnules, totalRevenue, progressPercent } = pendingDigestKinetics;
+  const { totalVus, totalAnnules, reservedMin, openMin, progressPercent } = pendingDigestKinetics;
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (instant || prefersReducedMotion) {
@@ -3027,7 +3714,8 @@ function startDigestKineticCounters({ instant = false } = {}) {
 
   animateKineticCounter('digest-patients-vus', totalVus);
   animateKineticCounter('digest-annulations', totalAnnules);
-  animateKineticCounter('digest-revenue', totalRevenue, ' MAD');
+  const revEl = doctorEl('digest-revenue');
+  if (revEl) revEl.textContent = `${reservedMin} / ${openMin} min`;
 
   const progEl = doctorEl('digest-progress');
   if (progEl) {
@@ -3045,9 +3733,12 @@ function computeEndOfDayDigest(records) {
 
   const totalVus = todayRows.filter((record) => isDigestSeenStatus(record.status)).length;
   const totalAnnules = todayRows.filter((record) => isDigestCancelledStatus(record.status)).length;
-  const totalRevenue = totalVus * CONFIG.DIGEST_REVENUE_PER_PATIENT_MAD;
+  const reservedMin = todayRows
+    .filter((record) => !isDigestCancelledStatus(record.status))
+    .reduce((sum, record) => sum + (Number(record.duration_min) || 0), 0);
+  const openMin = CONFIG.OPEN_MINUTES;
 
-  return { totalVus, totalAnnules, totalRevenue };
+  return { totalVus, totalAnnules, reservedMin, openMin };
 }
 
 function formatDoctorAppointmentTime(rawDate) {
@@ -3063,9 +3754,7 @@ function formatDoctorAppointmentTime(rawDate) {
 }
 
 function isDoctorEmergencyRecord(record) {
-  const motif = String(record?.treatment || '').toLowerCase();
-  const status = normalizeDigestStatus(record?.status);
-  return motif.includes('urgence') || status.includes('urgence');
+  return false;
 }
 
 function isDoctorActiveTriageRecord(record) {
@@ -3161,56 +3850,122 @@ function createDoctorTriageRow(record) {
   return tr;
 }
 
-function renderDoctorTriageRoster(records) {
-  const waitingBody = doctorEl('doctor-waiting-room-body');
-  const emergencyBody = doctorEl('doctor-emergencies-body');
-  if (!waitingBody || !emergencyBody) return;
+function renderGlanceRows(hostId, rows, emptyText) {
+  const host = doctorEl(hostId);
+  if (!host) return;
+  host.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'chair-glance__empty';
+    empty.textContent = emptyText;
+    host.appendChild(empty);
+    return;
+  }
+  rows.forEach((record) => {
+    const row = document.createElement('div');
+    row.className = 'chair-glance__row';
+    const time = document.createElement('strong');
+    time.textContent = record.time || formatDoctorAppointmentTime(record.rawDate || record.starts_at);
+    const name = document.createElement('span');
+    name.textContent = record.name || record.patient_name || 'Patient';
+    const care = document.createElement('span');
+    care.textContent = record.treatment || record.treatment_name || '';
+    const extra = document.createElement('span');
+    extra.className = 'chair-glance__elapsed';
+    if (normalizeDigestStatus(record.status) === 'en soin') {
+      const started = record.care_started_at ? new Date(record.care_started_at) : new Date(record.rawDate || record.starts_at);
+      const duration = Number(record.duration_min) > 0 ? Number(record.duration_min) : 30;
+      const scheduled = new Date(record.rawDate || record.starts_at);
+      const expected = Number.isNaN(scheduled.getTime()) ? null : new Date(scheduled.getTime() + duration * 60000);
+      const mins = started && !Number.isNaN(started.getTime())
+        ? Math.max(0, Math.round((Date.now() - started.getTime()) / 60000))
+        : 0;
+      extra.textContent = `Écoulé ${mins} min · fin ${
+        expected
+          ? expected.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Casablanca' })
+          : '—'
+      }`;
+    } else {
+      extra.textContent = '';
+    }
+    row.append(time, name, care);
+    if (extra.textContent) row.appendChild(extra);
+    host.appendChild(row);
+  });
+}
+
+function renderPinnedHandoffGlance() {
+  const host = doctorEl('hub-pinned-handoff');
+  if (!host) return;
+  const pinned = (teamNotesCache || []).filter((note) => note.pinned);
+  host.replaceChildren();
+  if (!pinned.length) {
+    const empty = document.createElement('p');
+    empty.className = 'chair-glance__empty';
+    empty.textContent = 'Aucune note épinglée.';
+    host.appendChild(empty);
+    return;
+  }
+  pinned.slice(0, 4).forEach((note) => {
+    const row = document.createElement('div');
+    row.className = 'chair-glance__row';
+    const who = document.createElement('strong');
+    who.textContent = note.patientName || note.patient_name || note.author || 'Équipe';
+    const text = document.createElement('span');
+    text.textContent = note.text || '';
+    row.append(who, text);
+    host.appendChild(row);
+  });
+}
+
+function renderDoctorLiveGlance(records) {
+  const content = doctorEl('triage-content');
+  if (content) content.hidden = false;
 
   const todayRows = filterTodayAppointments(records)
-    .filter(isDoctorActiveTriageRecord)
+    .filter((record) => (record.booking_kind || 'visit') === 'visit')
     .sort(sortDoctorAppointmentsByTime);
+  const chair = todayRows.filter((record) => normalizeDigestStatus(record.status) === 'en soin');
+  const nowMs = Date.now();
+  const upcoming = todayRows.filter((record) => {
+    const key = normalizeDigestStatus(record.status);
+    if (key === 'annule' || key === 'termine' || key === 'no-show' || key === 'en soin') return false;
+    const waiting = key.includes('salle') && key.includes('attente');
+    if (waiting) return true;
+    if (key !== 'confirme' && key !== 'en attente') return false;
+    const start = new Date(record.rawDate || record.starts_at || 0).getTime();
+    return Number.isFinite(start) && start >= nowMs;
+  }).slice(0, 3);
 
-  const emergencies = todayRows.filter(isDoctorEmergencyRecord);
-  const waiting = todayRows.filter((record) => !isDoctorEmergencyRecord(record));
-
-  waitingBody.replaceChildren();
-  if (!waiting.length) {
-    const emptyRow = document.createElement('tr');
-    emptyRow.className = 'triage-empty';
-    const cell = document.createElement('td');
-    cell.colSpan = 4;
-    cell.textContent = 'Aucun patient en attente';
-    emptyRow.appendChild(cell);
-    waitingBody.appendChild(emptyRow);
-  } else {
-    const fragment = document.createDocumentFragment();
-    waiting.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
-    waitingBody.appendChild(fragment);
-  }
-
-  emergencyBody.replaceChildren();
-  if (!emergencies.length) {
-    const emptyRow = document.createElement('tr');
-    emptyRow.className = 'triage-empty';
-    const cell = document.createElement('td');
-    cell.colSpan = 4;
-    cell.textContent = 'Aucune urgence signalée';
-    emptyRow.appendChild(cell);
-    emergencyBody.appendChild(emptyRow);
-  } else {
-    const fragment = document.createDocumentFragment();
-    emergencies.forEach((record) => fragment.appendChild(createDoctorTriageRow(record)));
-    emergencyBody.appendChild(fragment);
-  }
+  renderGlanceRows('hub-in-chair', chair, 'Personne au fauteuil');
+  renderGlanceRows('hub-next-three', upcoming, 'Aucun prochain rendez-vous');
+  renderPinnedHandoffGlance();
   hideSkeleton('triage');
 }
 
-function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
-  const dailyGoal = CONFIG.DIGEST_DAILY_GOAL_MAD;
-  const progressPercent = Math.min(100, (totalRevenue / dailyGoal) * 100);
+function renderDoctorTriageRoster(records) {
+  renderDoctorLiveGlance(records);
+}
+
+function digestProgress(digest) {
+  const openMin = digest.openMin || CONFIG.OPEN_MINUTES;
+  const reservedMin = Number(digest.reservedMin) || 0;
+  return Math.min(100, openMin > 0 ? (reservedMin / openMin) * 100 : 0);
+}
+
+function renderEndOfDayDigest(digest) {
+  const reservedMin = Number(digest.reservedMin) || 0;
+  const openMin = digest.openMin || CONFIG.OPEN_MINUTES;
+  const progressPercent = digestProgress(digest);
 
   digestKineticsStarted = false;
-  pendingDigestKinetics = { totalVus, totalAnnules, totalRevenue, progressPercent };
+  pendingDigestKinetics = {
+    totalVus: digest.totalVus || 0,
+    totalAnnules: digest.totalAnnules || 0,
+    reservedMin,
+    openMin,
+    progressPercent,
+  };
 
   const vusEl = doctorEl('digest-patients-vus');
   const annulEl = doctorEl('digest-annulations');
@@ -3219,7 +3974,7 @@ function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
 
   if (vusEl) vusEl.textContent = '0';
   if (annulEl) annulEl.textContent = '0';
-  if (revEl) revEl.textContent = '0 MAD';
+  if (revEl) revEl.textContent = `0 / ${openMin} min`;
   if (progEl) progEl.style.width = '0%';
 }
 
@@ -3265,8 +4020,7 @@ async function loadDoctorHubData(isSilentSync = false) {
 
     const digest = computeEndOfDayDigest(records);
     if (isSilentSync) {
-      const progressPercent = Math.min(100, (digest.totalRevenue / CONFIG.DIGEST_DAILY_GOAL_MAD) * 100);
-      setDigestFinalValues({ ...digest, progressPercent });
+      setDigestFinalValues({ ...digest, progressPercent: digestProgress(digest) });
     } else {
       renderEndOfDayDigest(digest);
     }
@@ -3292,7 +4046,7 @@ async function loadDoctorHubData(isSilentSync = false) {
     if (isUnauthorizedError(err)) return;
     console.error('[Doctor Hub] Digest load failed:', err?.message || err);
     if (isSilentSync) return;
-    renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, totalRevenue: 0 });
+    renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, reservedMin: 0, openMin: CONFIG.OPEN_MINUTES });
     renderDoctorTriageRoster([]);
     renderCRMTable([]);
     queueOsBootSequence();
@@ -3512,6 +4266,13 @@ function createTeamNoteElement(note) {
   categorySpan.append(categoryDot, document.createTextNode(note.category || 'Info'));
   meta.appendChild(categorySpan);
 
+  if (note.patientName || note.patient_name) {
+    const patientSpan = document.createElement('span');
+    patientSpan.className = 'team-message__patient';
+    patientSpan.textContent = note.patientName || note.patient_name;
+    meta.appendChild(patientSpan);
+  }
+
   if (note.pinned) {
     const pinSpan = document.createElement('span');
     pinSpan.className = 'team-message__pin';
@@ -3604,6 +4365,7 @@ async function loadTeamNotes() {
     const rawRows = parseTeamNotesResponse(payload);
     teamNotesCache = rawRows.map(normalizeTeamNote).filter(Boolean);
     renderTeamNotesList(teamNotesCache);
+    renderPinnedHandoffGlance();
   } catch (error) {
     if (isUnauthorizedError(error)) return;
     console.error('[Team Notes] Load failed:', error?.message || error);
