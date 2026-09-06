@@ -54,6 +54,10 @@ const APPOINTMENT_STATUSES = Object.freeze([
 
 const WAITLIST_PRIORITIES = Object.freeze(['Faible', 'Moyenne', 'Haute', 'Urgent']);
 
+const BOOKING_KINDS = Object.freeze(['visit', 'block', 'emergency_hold']);
+const CANCEL_REASONS = Object.freeze(['oublie', 'cout', 'reprogramme', 'autre']);
+const ISO_INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 const ERROR_DEFAULTS = {
   UNAUTHORIZED: 'Unauthorized',
   FORBIDDEN: 'Forbidden',
@@ -163,9 +167,18 @@ function requireClinicSession(req, res, options = {}) {
   return { ...payload, clinic_id: clinicId };
 }
 
-function sendDbError(res, err) {
+function sendDbError(res, err, extras = {}) {
   if (err?.code === 'DB_NOT_CONFIGURED') {
     return res.status(503).json(createApiError('SERVER_ERROR', 'Database not configured'));
+  }
+  if (err?.code === '23P01') {
+    return res.status(409).json(
+      createApiError(
+        'OVERLAP',
+        extras.overlapMessage
+          || 'Ce créneau chevauche un rendez-vous, un blocage ou le tampon.'
+      )
+    );
   }
   console.error('[db]', err?.message || err);
   return res.status(500).json(createApiError('SERVER_ERROR'));
@@ -402,6 +415,76 @@ function validatePasswordChange(body = {}) {
   };
 }
 
+function parseStartsAtInput(body = {}) {
+  const iso = String(body.startsAt ?? body.starts_at ?? body.startTime ?? '').trim();
+  if (iso && ISO_INSTANT_RE.test(iso)) {
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  const date = String(body.slotDate ?? body.date ?? '').trim();
+  const time = String(body.slotTime ?? body.time ?? '').trim();
+  if (SLOT_DATE_RE.test(date) && SLOT_TIME_RE.test(time)) {
+    const parsed = new Date(`${date}T${time}:00+01:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
+function validateRosterCreate(body = {}) {
+  const kindRaw = String(body.kind ?? body.booking_kind ?? 'visit').trim().toLowerCase();
+  const kind = kindRaw === 'emergency' || kindRaw === 'hold' ? 'emergency_hold' : kindRaw;
+  if (!BOOKING_KINDS.includes(kind)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'kind must be visit, block, or emergency_hold'),
+    };
+  }
+
+  const walkIn = body.walkIn === true || body.walk_in === true;
+  const confirmDuplicate = body.confirmDuplicate === true || body.confirm_duplicate === true;
+  const patientName = sanitizeString(body.patientName ?? body.patient_name ?? body.name ?? body.nom, 100);
+  const phone = compactPhone(body.phone ?? body.patientPhone ?? body.patient_phone ?? body.telephone ?? '');
+  const treatment = sanitizeString(body.treatment ?? body.treatment_name ?? body.motif, 80);
+  const notes = sanitizeString(body.notes, 500);
+  const blockLabel = sanitizeString(body.blockLabel ?? body.block_label ?? body.label, 80);
+  const durationRaw = Number(body.durationMin ?? body.duration_min);
+  const durationMin = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.round(durationRaw) : null;
+  const startsAt = walkIn ? null : parseStartsAtInput(body);
+
+  if (kind === 'visit') {
+    if (patientName.length < 2 || !NAME_RE.test(patientName)) {
+      return { ok: false, error: createApiError('VALIDATION_ERROR', 'Nom invalide') };
+    }
+    if (!PHONE_RE.test(phone)) {
+      return { ok: false, error: createApiError('VALIDATION_ERROR', 'Téléphone invalide') };
+    }
+    if (!treatment) {
+      return { ok: false, error: createApiError('VALIDATION_ERROR', 'treatment is required') };
+    }
+    if (!walkIn && !startsAt) {
+      return { ok: false, error: createApiError('VALIDATION_ERROR', 'startsAt is required') };
+    }
+  } else if (!walkIn && !startsAt) {
+    return { ok: false, error: createApiError('VALIDATION_ERROR', 'startsAt is required') };
+  }
+
+  return {
+    ok: true,
+    value: {
+      kind,
+      walkIn,
+      confirmDuplicate,
+      patientName,
+      phone,
+      treatment,
+      notes,
+      blockLabel,
+      durationMin,
+      startsAt,
+    },
+  };
+}
+
 function validateStatusUpdate(body = {}) {
   const bookingId = String(body.bookingId ?? body.id ?? body.cal_booking_uid ?? '').trim();
   const rawStatus = body.newStatus ?? body.status;
@@ -425,6 +508,25 @@ function validateStatusUpdate(body = {}) {
     };
   }
 
+  let cancelReason = null;
+  if (resolved.code === 'annule') {
+    const raw = String(body.cancelReason ?? body.cancel_reason ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (!CANCEL_REASONS.includes(raw)) {
+      return {
+        ok: false,
+        error: createApiError(
+          'VALIDATION_ERROR',
+          'cancel_reason is required (oublie, cout, reprogramme, autre)'
+        ),
+      };
+    }
+    cancelReason = raw;
+  }
+
   return {
     ok: true,
     value: {
@@ -433,6 +535,7 @@ function validateStatusUpdate(body = {}) {
       statusCode: resolved.code,
       dbStatus: resolved.dbStatus,
       uiStatus: resolved.uiStatus,
+      cancelReason,
     },
   };
 }
@@ -440,15 +543,19 @@ function validateStatusUpdate(body = {}) {
 module.exports = {
   APPOINTMENT_STATUSES,
   BOOKING_STATUS_CODES,
+  BOOKING_KINDS,
+  CANCEL_REASONS,
   STATUS_CODE_TO_DB,
   STATUS_CODE_TO_UI,
   WAITLIST_PRIORITIES,
+  UUID_RE,
   createApiError,
   requireClinicSession,
   sendDbError,
   validateWaitlistInput,
   validatePasswordChange,
   validateStatusUpdate,
+  validateRosterCreate,
   validatePhone,
   sanitizeString,
   validateTeamNoteInput,
@@ -457,4 +564,5 @@ module.exports = {
   canonicalizeAppointmentStatus,
   resolveBookingStatus,
   compactPhone,
+  casablancaDateTimeParts,
 };

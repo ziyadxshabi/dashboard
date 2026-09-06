@@ -383,6 +383,7 @@ function buildApptCardHTML(appt) {
 /* ── FULLCALENDAR — DASHBOARD MANAGEMENT CALENDAR ───────────────────────── */
 let dashboardCalendar = null;
 let calendarChromeBound = false;
+let inspectorBooking = null;
 let lastOverviewRoster = [];
 let affluencePeriod = 'today';
 
@@ -468,7 +469,94 @@ function closeCalendarInspector() {
   const panel = doctorEl('calendar-inspector');
   if (!panel) return;
   panel.hidden = true;
+  inspectorBooking = null;
   doctorQueryAll('.fc-event.is-selected').forEach((el) => el.classList.remove('is-selected'));
+}
+
+function closeBlockChipSheet() {
+  const sheet = doctorEl('block-chip-sheet');
+  if (sheet) sheet.hidden = true;
+}
+
+function openBlockChipSheet(date, jsEvent) {
+  const sheet = doctorEl('block-chip-sheet');
+  const whenEl = doctorEl('block-chip-when');
+  const actions = doctorEl('block-chip-actions');
+  if (!sheet || !actions || !date) return;
+  const startsAt = date instanceof Date ? date : new Date(date);
+  if (whenEl) {
+    whenEl.textContent = startsAt.toLocaleString('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+  actions.replaceChildren();
+  const options = [
+    { kind: 'block', label: 'Déjeuner', blockLabel: 'Déjeuner', durationMin: 60 },
+    { kind: 'block', label: 'Labo', blockLabel: 'Labo', durationMin: 60 },
+    { kind: 'block', label: 'Absent', blockLabel: 'Absent', durationMin: 120 },
+    { kind: 'emergency_hold', label: 'Urgence réservée', durationMin: 30 },
+  ];
+  options.forEach((option) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = option.label;
+    btn.addEventListener('click', async () => {
+      try {
+        const response = await fetch(CONFIG.ROSTER_PROXY, {
+          method: 'POST',
+          credentials: 'include',
+          headers: getApiAuthHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+          body: JSON.stringify({
+            kind: option.kind,
+            blockLabel: option.blockLabel,
+            durationMin: option.durationMin,
+            startsAt: startsAt.toISOString(),
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        showDashboardToast(`${option.label} posé.`, 'success');
+        closeBlockChipSheet();
+        dashboardCalendar?.refetchEvents();
+      } catch (err) {
+        showDashboardToast(err?.message || 'Impossible de bloquer ce créneau.', 'error');
+      }
+    });
+    actions.appendChild(btn);
+  });
+  sheet.hidden = false;
+  const x = Math.min(window.innerWidth - 260, Math.max(12, jsEvent?.clientX || 24));
+  const y = Math.min(window.innerHeight - 200, Math.max(12, jsEvent?.clientY || 24));
+  sheet.style.left = `${x}px`;
+  sheet.style.top = `${y}px`;
+}
+
+async function deleteInspectorBlock() {
+  if (!inspectorBooking?.id) return;
+  try {
+    const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=delete`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+      body: JSON.stringify({ id: inspectorBooking.id }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    showDashboardToast('Blocage retiré.', 'success');
+    closeCalendarInspector();
+    dashboardCalendar?.refetchEvents();
+  } catch (err) {
+    showDashboardToast(err?.message || 'Impossible de retirer le blocage.', 'error');
+  }
 }
 
 function openCalendarInspector(event, eventEl) {
@@ -504,6 +592,16 @@ function openCalendarInspector(event, eventEl) {
   setTextSafe('cal-insp-phone', phone || '—');
   setTextSafe('cal-insp-duration', duration > 0 ? `${duration} min` : '—');
 
+  inspectorBooking = {
+    id: event.id,
+    kind: props.bookingKind || 'visit',
+  };
+  const actions = doctorEl('cal-insp-actions');
+  if (actions) {
+    const isBlock = inspectorBooking.kind === 'block' || inspectorBooking.kind === 'emergency_hold';
+    actions.hidden = !isBlock;
+  }
+
   panel.hidden = false;
   doctorQueryAll('.fc-event.is-selected').forEach((el) => el.classList.remove('is-selected'));
   eventEl?.classList.add('is-selected');
@@ -518,16 +616,21 @@ function mapRosterRowToCalendarEvent(row) {
   const patientName = row.patient_name || row.name || 'Patient';
   const treatment = row.treatment_name || row.treatment || 'Consultation';
   const cancelled = isCancelledStatus(row.status);
-  const tone = hashTone(treatment);
+  const kind = row.booking_kind || row.bookingKind || 'visit';
+  const tone = kind === 'block' ? 'mist' : kind === 'emergency_hold' ? 'peach' : hashTone(treatment);
   const startLocal = casablancaDateTimeLocal(start);
   const endLocal = casablancaDateTimeLocal(end);
   if (!startLocal || !endLocal) return null;
+  const classNames = ['cal-chip', `cal-chip--${tone}`];
+  if (kind === 'block') classNames.push('cal-chip--block');
+  if (kind === 'emergency_hold') classNames.push('cal-chip--hold');
+  if (cancelled) classNames.push('is-cancelled');
   return {
     id: String(row.id || ''),
-    title: familyNameFromPatient(patientName),
+    title: kind === 'visit' ? familyNameFromPatient(patientName) : (treatment || patientName),
     start: startLocal,
     end: endLocal,
-    classNames: ['cal-chip', `cal-chip--${tone}`, cancelled ? 'is-cancelled' : ''].filter(Boolean),
+    classNames,
     extendedProps: {
       patientName,
       treatment,
@@ -535,6 +638,8 @@ function mapRosterRowToCalendarEvent(row) {
       status: row.status || '',
       durationMin: duration,
       notes: row.notes || '',
+      bookingKind: kind,
+      careStartedAt: row.care_started_at || null,
     },
   };
 }
@@ -588,8 +693,12 @@ function bindCalendarChrome() {
   });
 
   doctorEl('calendar-inspector-close')?.addEventListener('click', closeCalendarInspector);
+  doctorEl('cal-insp-delete')?.addEventListener('click', () => void deleteInspectorBlock());
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeCalendarInspector();
+    if (event.key === 'Escape') {
+      closeCalendarInspector();
+      closeBlockChipSheet();
+    }
   });
 }
 
@@ -681,7 +790,13 @@ function initDashboardCalendar() {
     },
     eventClick(info) {
       info.jsEvent?.preventDefault();
+      closeBlockChipSheet();
       openCalendarInspector(info.event, info.el);
+    },
+    dateClick(info) {
+      info.jsEvent?.preventDefault();
+      closeCalendarInspector();
+      openBlockChipSheet(info.date, info.jsEvent);
     },
     eventDidMount(info) {
       const name = info.event.extendedProps?.patientName || info.event.title;
@@ -1385,6 +1500,10 @@ function groupBookingsForCarnet(rows) {
     group.motif = group.lastVisit?.treatment || group.lastVisit?.treatment_name || 'Consultation';
     group.statut = group.lastVisit?.status || '—';
     group.lastWhen = formatCarnetWhen(group.lastVisit || {});
+    const fromApi = Number(group.lastVisit?.noshow_90d);
+    group.noshow90 = Number.isFinite(fromApi) && fromApi > 0
+      ? fromApi
+      : group.visits.filter((visit) => /no-?show/i.test(String(visit.status || ''))).length;
     return group;
   });
 }
@@ -1453,7 +1572,7 @@ function renderCRMTable(records) {
     const emptyRow = document.createElement('tr');
     emptyRow.className = 'crm-table-empty';
     const cell = document.createElement('td');
-    cell.colSpan = 4;
+    cell.colSpan = 5;
     cell.textContent = crmSearchQuery
       ? 'Aucun historique pour cette recherche'
       : 'Aucun patient aujourd\'hui — recherchez par nom ou téléphone';
@@ -1488,7 +1607,10 @@ function renderCRMTable(records) {
     motifTag.textContent = patient.motif;
     motifCell.appendChild(motifTag);
 
-    tr.append(nameCell, phoneCell, lastCell, motifCell);
+    const noshowCell = document.createElement('td');
+    noshowCell.textContent = `${Number(patient.noshow90) || 0} (90 j)`;
+
+    tr.append(nameCell, phoneCell, lastCell, motifCell, noshowCell);
     tbody.appendChild(tr);
   });
   hideSkeleton('crm');
@@ -1539,6 +1661,13 @@ function populateCrmSidePanel(patient) {
     } else {
       statutEl.textContent = label;
     }
+  }
+
+  const noshowEl = doctorEl('crm-panel-noshows');
+  if (noshowEl) {
+    const count = Number(patient.noshow90) || 0;
+    noshowEl.hidden = false;
+    noshowEl.textContent = `${count} no-show${count > 1 ? 's' : ''} (90 j, par téléphone)`;
   }
 
   const visitsHost = doctorEl('crm-panel-visits');
@@ -3474,6 +3603,9 @@ function normalizeDoctorAppointment(raw) {
     duration_min: Number.isFinite(durationMin) && durationMin > 0 ? durationMin : 30,
     starts_at: rawDate,
     startTime: rawDate,
+    booking_kind: item.booking_kind || item.bookingKind || 'visit',
+    care_started_at: item.care_started_at || item.careStartedAt || null,
+    noshow_90d: Number(item.noshow_90d) || 0,
   };
 }
 
@@ -3738,7 +3870,26 @@ function renderGlanceRows(hostId, rows, emptyText) {
     name.textContent = record.name || record.patient_name || 'Patient';
     const care = document.createElement('span');
     care.textContent = record.treatment || record.treatment_name || '';
+    const extra = document.createElement('span');
+    extra.className = 'chair-glance__elapsed';
+    if (normalizeDigestStatus(record.status) === 'en soin') {
+      const started = record.care_started_at ? new Date(record.care_started_at) : new Date(record.rawDate || record.starts_at);
+      const duration = Number(record.duration_min) > 0 ? Number(record.duration_min) : 30;
+      const scheduled = new Date(record.rawDate || record.starts_at);
+      const expected = Number.isNaN(scheduled.getTime()) ? null : new Date(scheduled.getTime() + duration * 60000);
+      const mins = started && !Number.isNaN(started.getTime())
+        ? Math.max(0, Math.round((Date.now() - started.getTime()) / 60000))
+        : 0;
+      extra.textContent = `Écoulé ${mins} min · fin ${
+        expected
+          ? expected.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Casablanca' })
+          : '—'
+      }`;
+    } else {
+      extra.textContent = '';
+    }
     row.append(time, name, care);
+    if (extra.textContent) row.appendChild(extra);
     host.appendChild(row);
   });
 }
@@ -3771,7 +3922,9 @@ function renderDoctorLiveGlance(records) {
   const content = doctorEl('triage-content');
   if (content) content.hidden = false;
 
-  const todayRows = filterTodayAppointments(records).sort(sortDoctorAppointmentsByTime);
+  const todayRows = filterTodayAppointments(records)
+    .filter((record) => (record.booking_kind || 'visit') === 'visit')
+    .sort(sortDoctorAppointmentsByTime);
   const chair = todayRows.filter((record) => normalizeDigestStatus(record.status) === 'en soin');
   const nowMs = Date.now();
   const upcoming = todayRows.filter((record) => {

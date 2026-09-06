@@ -1,6 +1,6 @@
 /**
  * Fill-gap — clinic-scoped waitlist candidates and optional booking insert.
- * Auth: dentaflow_session cookie. Roles: doctor | assistant.
+ * Auth: dentaflow_session cookie. Role: assistant. Respects buffer + blocks.
  */
 'use strict';
 
@@ -13,6 +13,7 @@ const {
   validateFillGapInput,
   STATUS_CODE_TO_DB,
 } = require('./_lib/validation');
+const { resolveTreatment, clinicBufferMin } = require('./_lib/roster-ops');
 
 const FILL_GAP_CANDIDATES_SQL = `
   SELECT
@@ -47,6 +48,8 @@ const FILL_GAP_INSERT_SQL = `
     notes,
     status,
     duration_min,
+    buffer_min,
+    booking_kind,
     updated_at
   )
   VALUES (
@@ -55,9 +58,11 @@ const FILL_GAP_INSERT_SQL = `
     $3,
     (($4::date + $5::time) AT TIME ZONE 'Africa/Casablanca'),
     $6,
-    $6,
-    $7::appointment_status,
-    30,
+    $7,
+    $8::appointment_status,
+    $9,
+    $10,
+    'visit',
     NOW()
   )
   RETURNING
@@ -68,7 +73,9 @@ const FILL_GAP_INSERT_SQL = `
     patient_phone,
     starts_at,
     treatment_name AS motif,
-    status::text AS status
+    status::text AS status,
+    duration_min,
+    booking_kind
 `;
 
 const FILL_GAP_MARK_FILLED_SQL = `
@@ -119,7 +126,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireClinicSession(req, res, { allowedRoles: ['doctor', 'assistant'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant'] });
   if (!session) return;
 
   const parsed = validateFillGapInput(req.body ?? {});
@@ -140,14 +147,21 @@ module.exports = async function handler(req, res) {
       }
 
       const motif = reason || candidate.notes || 'Créneau comblé';
+      const catalog = resolveTreatment(motif) || resolveTreatment('Consultation');
+      const durationMin = catalog?.duration_min || 20;
+      const bufferMin = await clinicBufferMin(session.clinic_id);
+      const treatmentName = catalog?.name || 'Consultation';
       const inserted = await query(FILL_GAP_INSERT_SQL, [
         session.clinic_id,
         candidate.patient_name,
         candidate.patient_phone,
         slotDate,
         slotTime,
+        treatmentName,
         motif,
         STATUS_CODE_TO_DB.en_attente,
+        durationMin,
+        bufferMin,
       ]);
       booking = mapBooking(inserted.rows[0]);
       await query(FILL_GAP_MARK_FILLED_SQL, [candidate.id, session.clinic_id]);

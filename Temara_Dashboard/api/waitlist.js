@@ -109,7 +109,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
   }
 
-  const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+  const session = requireClinicSession(req, res, { allowedRoles: ['assistant'] });
   if (!session) return;
 
   try {
