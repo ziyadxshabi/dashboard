@@ -664,6 +664,221 @@ async function run() {
     (dash.body?.data?.week_patients || []).every((n) => typeof n === 'number' && Number.isFinite(n))
   );
 
+  console.log('\n[booking-queries]');
+  const bq = require(path.join(DASHBOARD, 'api/_lib/booking-queries.js'));
+  ok('occupancyPct 30/660 is 4.5', bq.occupancyPct(30, 660) === 4.5);
+  ok('occupancyPct empty capacity is 0', bq.occupancyPct(30, 0) === 0);
+  ok('noShowRate with no completed visits is null', bq.noShowRate(0, 0) === null);
+  ok('noShowRate 1 missed and 1 seen is 50', bq.noShowRate(1, 1) === 50);
+  ok('normalizePhoneKey maps 06 to +212', bq.normalizePhoneKey('0611987654') === '+212611987654');
+  ok('normalizePhoneKey maps +212', bq.normalizePhoneKey('+212611987654') === '+212611987654');
+
+  const syntheticDay = '2026-09-06';
+  const tenAm = new Date('2026-09-06T09:00:00.000Z');
+  const eightAm = new Date('2026-09-06T07:00:00.000Z');
+  const syntheticGaps = bq.computeGaps(
+    [
+      { status: 'Confirme', starts_at: tenAm, duration_min: 30 },
+      { status: 'Annule', starts_at: eightAm, duration_min: 30 },
+    ],
+    syntheticDay
+  );
+  ok(
+    'computeGaps leaves 08:00–10:00 around a 30 min booking',
+    syntheticGaps.some((gap) => gap.start === '08:00' && gap.end === '10:00' && gap.duration_min === 120),
+    JSON.stringify(syntheticGaps)
+  );
+  ok(
+    'computeGaps ignores Annule occupancy',
+    !syntheticGaps.some((gap) => gap.start === '08:30'),
+    JSON.stringify(syntheticGaps)
+  );
+  ok(
+    'computeGaps adds afternoon remainder ≥ 30 min',
+    syntheticGaps.some((gap) => gap.start === '10:30' && gap.duration_min >= 30),
+    JSON.stringify(syntheticGaps)
+  );
+
+  const grouped = bq.groupDirectory([
+    {
+      patient_phone: '0611987654',
+      patient_name: 'Amina',
+      patient_email: 'amina@example.com',
+      treatment_name: 'Controle',
+      status: 'Confirme',
+      starts_at: new Date(),
+      duration_min: 30,
+      id: 'a',
+    },
+    {
+      patient_phone: '+212 611-987654',
+      patient_name: 'Amina Bennani',
+      treatment_name: 'Urgence',
+      status: 'Termine',
+      starts_at: new Date(Date.now() - 86400000),
+      duration_min: 30,
+      id: 'b',
+    },
+  ]);
+  ok('groupDirectory collapses the same phone into one patient', grouped.length === 1);
+  ok('groupDirectory visit_count is 2', grouped[0]?.visit_count === 2);
+  ok('groupDirectory keeps email when present', grouped[0]?.email === 'amina@example.com');
+
+  const hoursFlat = bq.flattenHourKeys(bq.hoursFromRows([{ hour: 10, n: 2 }]));
+  ok('flattenHourKeys exposes hour_10', hoursFlat.hour_10 === 2);
+  ok('flattenHourKeys zeroes unused hours', hoursFlat.hour_08 === 0);
+
+  console.log('\n[booking fixtures]');
+  await query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS patient_email TEXT');
+  const stamp = Date.now();
+  const fixturePhone = '0611987654';
+  const fixtureName = `WaveOps ${stamp}`;
+  const fixtureIds = [];
+  const waitlistIds = [];
+  try {
+    const day = bq.casablancaYmd();
+    const yesterday = bq.addDaysYmd(day, -1);
+    const inserts = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, patient_email, treatment_name,
+         status, starts_at, duration_min, notes
+       )
+       VALUES
+         ($1, $2, $3, $4, 'Controle', 'Confirme'::appointment_status,
+          (($5::date + TIME '10:00') AT TIME ZONE 'Africa/Casablanca'), 30, 'fixture-confirme'),
+         ($1, $2, $3, $4, 'Urgence', 'Termine'::appointment_status,
+          (($5::date + TIME '11:00') AT TIME ZONE 'Africa/Casablanca'), 30, 'fixture-termine'),
+         ($1, $6, '0611223344', NULL, 'Detartrage', 'No-show'::appointment_status,
+          (($5::date + TIME '16:00') AT TIME ZONE 'Africa/Casablanca'), 30, 'fixture-noshow'),
+         ($1, $2, $3, $4, 'Controle', 'Termine'::appointment_status,
+          (($7::date + TIME '14:00') AT TIME ZONE 'Africa/Casablanca'), 30, 'fixture-yesterday')
+       RETURNING id`,
+      [clinicId, fixtureName, fixturePhone, 'amina.wave@example.com', day, `${fixtureName} B`, yesterday]
+    );
+    fixtureIds.push(...inserts.rows.map((row) => row.id));
+    ok('inserted fixture bookings', fixtureIds.length === 4);
+
+    const waitlistInsert = await query(
+      `INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status)
+       VALUES
+         ($1, $2, $3, 'Moyenne'::waitlist_priority, 'fixture-active', 'active'),
+         ($1, $4, $3, 'Moyenne'::waitlist_priority, 'fixture-filled', 'filled')
+       RETURNING id, status`,
+      [clinicId, `${fixtureName} Wait`, '0611556677', `${fixtureName} Filled`]
+    );
+    waitlistIds.push(...waitlistInsert.rows.map((row) => row.id));
+    ok('inserted fixture waitlist rows', waitlistIds.length === 2);
+
+    const dashToday = await invoke(
+      handleDashboard,
+      createReq({ method: 'GET', url: '/api/dashboard-data?period=today', headers: doctorCookie })
+    );
+    const metrics = dashToday.body?.data || {};
+    ok('GET /api/dashboard-data?period=today returns 200', dashToday.statusCode === 200);
+    ok('dashboard period is today', metrics.period === 'today');
+    ok('dashboard occupancy.capacity_min is 660', metrics.occupancy?.capacity_min === 660);
+    ok(
+      'dashboard occupancy.booked_min includes fixture minutes',
+      Number(metrics.occupancy?.booked_min) >= 90,
+      `booked_min=${metrics.occupancy?.booked_min}`
+    );
+    ok('dashboard hour_10 is populated', Number(metrics.hour_10) >= 1, `hour_10=${metrics.hour_10}`);
+    ok('dashboard hour_16 is populated', Number(metrics.hour_16) >= 1, `hour_16=${metrics.hour_16}`);
+    ok('dashboard recovered_slots counts fill-gap style rows', Number(metrics.recovered_slots) >= 1);
+    ok('dashboard waitlist_filled is at least 1', Number(metrics.waitlist_filled) >= 1);
+    ok('dashboard waitlist_active is at least 1', Number(metrics.waitlist_active) >= 1);
+    ok(
+      'dashboard status_mix uses enum keys',
+      metrics.status_mix && Object.prototype.hasOwnProperty.call(metrics.status_mix, 'Confirme'),
+      JSON.stringify(metrics.status_mix)
+    );
+    ok(
+      'dashboard no_show_rate is a number or null',
+      metrics.no_show_rate == null || typeof metrics.no_show_rate === 'number'
+    );
+
+    const dashBad = await invoke(
+      handleDashboard,
+      createReq({ method: 'GET', url: '/api/dashboard-data?period=year', headers: doctorCookie })
+    );
+    ok('GET /api/dashboard-data rejects unknown period', dashBad.statusCode === 400);
+
+    const dashWeek = await invoke(
+      handleDashboard,
+      createReq({ method: 'GET', url: '/api/dashboard-data?period=week', headers: doctorCookie })
+    );
+    ok('GET /api/dashboard-data?period=week returns 200', dashWeek.statusCode === 200);
+    ok('week occupancy capacity is 7 clinic days', dashWeek.body?.data?.occupancy?.capacity_min === 660 * 7);
+
+    const range = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?from=${encodeURIComponent(yesterday)}&to=${encodeURIComponent(day)}`,
+        headers: doctorCookie,
+      })
+    );
+    ok('GET /api/roster from/to returns 200', range.statusCode === 200);
+    ok(
+      'GET /api/roster range includes fixture rows',
+      (range.body?.data || []).some((row) => row.patient_name === fixtureName)
+    );
+
+    const tooWide = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?from=${encodeURIComponent(bq.addDaysYmd(day, -100))}&to=${encodeURIComponent(day)}`,
+        headers: doctorCookie,
+      })
+    );
+    ok('GET /api/roster rejects ranges over 92 days', tooWide.statusCode === 400);
+
+    const directory = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?view=directory', headers: doctorCookie })
+    );
+    ok('GET /api/roster?view=directory returns 200', directory.statusCode === 200);
+    const patients = directory.body?.data || [];
+    const groupedPatient = patients.find((row) => row.phone_e164 === '+212611987654' || row.phone === fixturePhone);
+    ok('directory groups the fixture phone', Boolean(groupedPatient), JSON.stringify(groupedPatient));
+    ok(
+      'directory visit_count is at least 2 for the shared phone',
+      Number(groupedPatient?.visit_count) >= 2,
+      `visit_count=${groupedPatient?.visit_count}`
+    );
+    ok('directory exposes email when stored', groupedPatient?.email === 'amina.wave@example.com');
+
+    const gapsRes = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?view=gaps&date=${encodeURIComponent(day)}`,
+        headers: doctorCookie,
+      })
+    );
+    ok('GET /api/roster?view=gaps returns 200', gapsRes.statusCode === 200);
+    const gaps = gapsRes.body?.data?.gaps || [];
+    ok('gaps payload is an array', Array.isArray(gaps));
+    ok(
+      'gaps are at least 30 minutes',
+      gaps.every((gap) => Number(gap.duration_min) >= 30),
+      JSON.stringify(gaps.slice(0, 3))
+    );
+    ok(
+      'gaps include at least one free interval',
+      gaps.length >= 1,
+      JSON.stringify(gaps)
+    );
+  } finally {
+    for (const id of fixtureIds) {
+      await query('DELETE FROM bookings WHERE id = $1', [id]);
+    }
+    for (const id of waitlistIds) {
+      await query('DELETE FROM waitlist WHERE id = $1', [id]);
+    }
+  }
+
   // ── Public clinic ──────────────────────────────────────────────────────
   console.log('\n[public clinic]');
   const clinic = await invoke(
@@ -894,13 +1109,14 @@ async function run() {
     ok('BOOKING_CREATED returns bookingId', Boolean(created.body?.bookingId));
 
     const createdRow = await query(
-      `SELECT id, patient_name, patient_phone, treatment_name, status::text AS status, starts_at
+      `SELECT id, patient_name, patient_phone, patient_email, treatment_name, status::text AS status, starts_at
        FROM bookings WHERE cal_booking_uid = $1 LIMIT 1`,
       [calUid]
     );
     const inserted = createdRow.rows[0];
     ok('BOOKING_CREATED inserted a bookings row', Boolean(inserted));
     ok('BOOKING_CREATED patient_name is stored', inserted?.patient_name === 'Patient Cal Wave2');
+    ok('BOOKING_CREATED patient_email is stored', inserted?.patient_email === 'patient.cal@example.com');
     ok('BOOKING_CREATED status is Confirme', inserted?.status === 'Confirme');
     ok(
       'BOOKING_CREATED starts_at matches payload',
