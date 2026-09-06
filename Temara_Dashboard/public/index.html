@@ -376,6 +376,28 @@
           </div>
         </section>
 
+        <section class="load-mix-row" aria-label="Charge, mix et fidélité">
+          <article class="load-card" aria-labelledby="load-title">
+            <h3 class="chart-title" id="load-title">Charge du jour</h3>
+            <p class="chart-sub">Temps réservé / plage d'ouverture (08:00–19:00)</p>
+            <p class="load-card__value kinetic-value" id="load-reserved">—</p>
+            <div class="load-meter" aria-hidden="true">
+              <div class="load-meter__fill" id="load-meter-fill"></div>
+            </div>
+          </article>
+          <article class="mix-card" aria-labelledby="mix-title">
+            <h3 class="chart-title" id="mix-title">Mix de soins</h3>
+            <p class="chart-sub">Semaine en cours — par traitement</p>
+            <div id="treatment-mix-list" class="mix-list"></div>
+          </article>
+          <article class="fidelity-card" aria-labelledby="fidelity-title">
+            <h3 class="chart-title" id="fidelity-title">Revenus / nouveaux</h3>
+            <p class="chart-sub">Par téléphone · fenêtre 90 jours</p>
+            <p class="fidelity-card__line"><span id="fidelity-returning">—</span> revenus</p>
+            <p class="fidelity-card__line"><span id="fidelity-new">—</span> nouveaux</p>
+          </article>
+        </section>
+
         <section class="team-messages-panel" aria-label="Messages de l'équipe">
           <article class="team-messages-card">
             <header class="team-messages-header">
@@ -442,7 +464,7 @@
 
         <header class="view-page-header">
           <h2 class="view-page-title kinetic-title">Cabinet Live</h2>
-          <p class="view-page-sub">Vue opérationnelle — patients du jour et notes cliniques</p>
+          <p class="view-page-sub">Maintenant — fauteuil, suite, transmissions</p>
         </header>
 
         <div class="doctor-metrics" id="doctor-metrics">
@@ -458,7 +480,7 @@
               <span class="doctor-metric-label kinetic-label">En attente</span>
             </div>
             <span class="doctor-metric-value kinetic-value" id="hub-val-pending">—</span>
-            <span class="doctor-metric-delta" id="hub-delta-pending">Devis à valider</span>
+            <span class="doctor-metric-delta" id="hub-delta-pending">Statut En attente</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
             <div class="doctor-metric-card__head">
@@ -467,122 +489,43 @@
             <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">—</span>
             <span class="doctor-metric-delta doctor-metric-delta--warn" id="hub-delta-noshows">Créneaux libres</span>
           </article>
-          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="production">
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="charge">
             <div class="doctor-metric-card__head">
-              <span class="doctor-metric-label kinetic-label">Production</span>
+              <span class="doctor-metric-label kinetic-label">Charge</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-production">—</span>
-            <span class="doctor-metric-delta" id="hub-delta-production">MAD facturés</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-charge">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-charge">Temps réservé / ouverture</span>
           </article>
         </div>
-
-        <article class="chart-card chart-card--doctor-trend" aria-label="Tendance patients sur 7 jours">
-          <header class="chart-header">
-            <div>
-              <h3 class="chart-title">Tendance 7 jours</h3>
-              <p class="chart-sub">Patients par jour — flux hebdomadaire du cabinet</p>
-            </div>
-          </header>
-          <div
-            id="doctor-weekly-trend-chart"
-            class="oak-dynamic-chart"
-            role="img"
-            aria-label="Graphique en barres — patients sur les 7 derniers jours"
-          ></div>
-        </article>
-
-        <section class="doctor-bento-row" aria-label="Action — message sur-mesure">
-          <article class="superpower-bento-card superpower-bento-card--doctor-custom" aria-labelledby="doctor-custom-sms-title">
-            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
-            <header class="superpower-bento-card__head">
-              <div class="superpower-bento-card__icon" aria-hidden="true">
-                <i data-lucide="message-square-share" aria-hidden="true"></i>
-              </div>
-              <div class="superpower-bento-card__copy">
-                <p class="superpower-bento-card__eyebrow">Action · Diffusion</p>
-                <h2 class="superpower-bento-card__title" id="doctor-custom-sms-title">Message Sur-Mesure</h2>
-                <p class="superpower-bento-card__desc">
-                  Rédigez un SMS personnalisé et diffusez-le à votre base patients active. Idéal pour annonces, rappels ciblés ou communications premium du cabinet.
-                </p>
-              </div>
-            </header>
-            <div class="doctor-custom-sms-compose">
-              <label class="doctor-custom-sms-label" for="doctor-custom-sms-text">Message personnalisé</label>
-              <textarea
-                id="doctor-custom-sms-text"
-                class="doctor-custom-sms-textarea"
-                rows="3"
-                maxlength="320"
-                placeholder="Écrivez votre message personnalisé ici..."
-                aria-describedby="doctor-custom-sms-helper doctor-custom-sms-count"
-              ></textarea>
-              <div class="doctor-custom-sms-meta">
-                <p class="doctor-custom-sms-helper" id="doctor-custom-sms-helper">
-                  Diffusion globale — journal d'audit SMS (aucun envoi automatique).
-                </p>
-                <span class="doctor-custom-sms-counter" id="doctor-custom-sms-count" aria-live="polite">0 / 320</span>
-              </div>
-              <button type="button" id="btn-doctor-custom-sms" class="btn btn-primary doctor-custom-sms-submit">
-                Envoyer le message
-              </button>
-            </div>
-          </article>
-        </section>
 
         <div id="triage-container">
           <div class="skeleton-wrapper" id="triage-skeleton">
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-table-row"></div>
-            <div class="skeleton skeleton-table-row"></div>
-            <div class="skeleton skeleton-table-row"></div>
             <div class="skeleton skeleton-card"></div>
-            <div class="skeleton skeleton-table-row"></div>
-            <div class="skeleton skeleton-table-row"></div>
           </div>
-          <div id="triage-content" class="brutalist-triage-grid" aria-label="Centre de triage" hidden>
-          <article class="brutalist-triage-panel" aria-label="Salle d'attente">
-            <header class="brutalist-triage-panel__header">
-              <h3 class="brutalist-triage-panel__title">Salle d'Attente</h3>
-              <p class="brutalist-triage-panel__sub">Patients confirmés — ordre chronologique</p>
-            </header>
-            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Salle d'attente" tabindex="0">
-              <table class="brutalist-triage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Heure</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Motif</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="doctor-waiting-room-body">
-                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="brutalist-triage-panel" aria-label="Urgences">
-            <header class="brutalist-triage-panel__header">
-              <h3 class="brutalist-triage-panel__title">Urgences</h3>
-              <p class="brutalist-triage-panel__sub">Cas prioritaires — traitement immédiat</p>
-            </header>
-            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Urgences" tabindex="0">
-              <table class="brutalist-triage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Heure</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Motif</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="doctor-emergencies-body">
-                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
+          <div id="triage-content" class="chair-glance" aria-label="Maintenant au cabinet" hidden>
+            <article class="chair-glance__panel" aria-labelledby="hub-chair-title">
+              <header class="chair-glance__head">
+                <h3 class="chair-glance__title" id="hub-chair-title">Au fauteuil</h3>
+                <p class="chair-glance__sub">En soin maintenant</p>
+              </header>
+              <div id="hub-in-chair" class="chair-glance__body"></div>
+            </article>
+            <article class="chair-glance__panel" aria-labelledby="hub-next-title">
+              <header class="chair-glance__head">
+                <h3 class="chair-glance__title" id="hub-next-title">Prochains</h3>
+                <p class="chair-glance__sub">Les 3 suivants</p>
+              </header>
+              <div id="hub-next-three" class="chair-glance__body"></div>
+            </article>
+            <article class="chair-glance__panel" aria-labelledby="hub-handoff-title">
+              <header class="chair-glance__head">
+                <h3 class="chair-glance__title" id="hub-handoff-title">Transmission</h3>
+                <p class="chair-glance__sub">Notes épinglées</p>
+              </header>
+              <div id="hub-pinned-handoff" class="chair-glance__body"></div>
+            </article>
           </div>
         </div>
 
@@ -599,8 +542,8 @@
             </div>
             <div class="digest-metric digest-revenue">
               <div class="rev-header">
-                <span class="metric-label">Objectif Journalier</span>
-                <span class="metric-value" id="digest-revenue">0 MAD</span>
+                <span class="metric-label">Temps réservé</span>
+                <span class="metric-value" id="digest-revenue">—</span>
               </div>
               <div class="rev-progress-bar">
                 <div class="rev-progress-fill" id="digest-progress"></div>
@@ -801,8 +744,8 @@
       <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
         <header class="view-page-header view-page-header--row">
           <div>
-            <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">CRM clinique — fiches et coordonnées patients</p>
+            <h2 class="view-page-title">Carnet</h2>
+            <p class="view-page-sub">Historique des visites — recherche par nom ou téléphone</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -810,7 +753,7 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Rechercher par nom, téléphone ou email…"
+              placeholder="Nom ou téléphone (90 derniers jours)"
               autocomplete="off"
             />
           </div>
@@ -832,8 +775,8 @@
                 <tr>
                   <th scope="col">Nom</th>
                   <th scope="col">Téléphone</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Motif</th>
+                  <th scope="col">Dernière visite</th>
+                  <th scope="col">Soin</th>
                 </tr>
               </thead>
               <tbody id="crm-table-body">
@@ -1209,32 +1152,9 @@
       </header>
 
       <div class="crm-side-panel-body" data-lenis-prevent>
-        <section class="crm-side-panel-section" aria-label="Détails financiers">
-          <h3 class="crm-side-panel-section-title">Détails Financiers</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Montant</dt>
-              <dd id="crm-panel-amount" data-tooltip="Montant facturé pour la dernière visite">—</dd>
-            </div>
-            <div class="crm-side-panel-field">
-              <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="crm-side-panel-section" aria-label="Notes cliniques">
-          <h3 class="crm-side-panel-section-title">Notes Cliniques</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Motif de Consultation</dt>
-              <dd id="crm-panel-motif">—</dd>
-            </div>
-            <div class="crm-side-panel-field crm-side-panel-field--block">
-              <dt>Observations Médicales</dt>
-              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
-            </div>
-          </dl>
+        <section class="crm-side-panel-section" aria-label="Visites">
+          <h3 class="crm-side-panel-section-title">Dernières visites</h3>
+          <div id="crm-panel-visits" class="carnet-visits"></div>
         </section>
       </div>
     </aside>

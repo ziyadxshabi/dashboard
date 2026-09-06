@@ -1168,3 +1168,326 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
     transition: none !important;
   }
 }
+
+/* ── Ops floor: pulse, board, retards, load/mix, carnet ─────────────────── */
+
+.assistant-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pulse-card__meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.late-strip,
+.status-board-section {
+  margin: 20px 0 0;
+}
+
+.late-strip__hint,
+.section-header-inline__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.late-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.late-list__empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.late-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border: var(--border-hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.late-item__time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--danger);
+  min-width: 3.2em;
+}
+
+.late-item__name {
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.late-item__care {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.status-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.status-board__col {
+  min-height: 120px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.status-board__head {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.status-board__cards {
+  display: grid;
+  gap: 8px;
+}
+
+.status-board__empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.board-card {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.board-card__time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.board-card__name {
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.board-card__care {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.handoff-compose__booking {
+  min-width: 9rem;
+  max-width: 14rem;
+  height: 36px;
+  border: var(--border-hairline);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.handoff-note__patient {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ops-chip-sheet {
+  position: fixed;
+  z-index: 40;
+  min-width: 220px;
+  padding: 12px;
+  border: var(--border-hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-hover);
+}
+
+.ops-chip-sheet__who {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.ops-chip-sheet__meta {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ops-chip-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ops-chip-sheet__actions button {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: var(--border-hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.load-mix-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.load-card,
+.mix-card,
+.fidelity-card {
+  padding: var(--card-padding);
+  border: var(--border-hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.load-card__value {
+  margin: 12px 0 8px;
+  font-size: 22px;
+}
+
+.load-meter {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.load-meter__fill {
+  height: 100%;
+  width: 0;
+  background: var(--text-main);
+}
+
+.mix-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mix-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.mix-row__track {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--surface-2);
+}
+
+.mix-row__fill {
+  height: 100%;
+  background: var(--text-main);
+}
+
+.fidelity-card__line {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.fidelity-card__line span {
+  font-variant-numeric: tabular-nums;
+}
+
+.chair-glance {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.chair-glance__panel {
+  padding: var(--card-padding);
+  border: var(--border-hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.chair-glance__title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.chair-glance__sub {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chair-glance__empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.chair-glance__row {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: var(--border-hairline);
+}
+
+.chair-glance__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.carnet-visits {
+  display: grid;
+  gap: 10px;
+}
+
+.carnet-visit {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.carnet-visit__when {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.team-message__patient {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 960px) {
+  .assistant-pulse-grid,
+  .status-board,
+  .load-mix-row,
+  .chair-glance {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
