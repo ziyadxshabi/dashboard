@@ -27,6 +27,26 @@ const STATUS_ANNULE = STATUS_CODE_TO_DB.annule;
 
 const INSERT_CREATED_SQL = `
   INSERT INTO bookings (
+    clinic_id, cal_booking_uid, patient_name, patient_phone, patient_email,
+    treatment_name, status, starts_at, duration_min, notes, updated_at
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7::appointment_status, $8, $9, $10, NOW())
+  ON CONFLICT (cal_booking_uid) DO UPDATE SET
+    clinic_id = EXCLUDED.clinic_id,
+    patient_name = EXCLUDED.patient_name,
+    patient_phone = EXCLUDED.patient_phone,
+    patient_email = COALESCE(EXCLUDED.patient_email, bookings.patient_email),
+    treatment_name = EXCLUDED.treatment_name,
+    status = EXCLUDED.status,
+    starts_at = EXCLUDED.starts_at,
+    duration_min = EXCLUDED.duration_min,
+    notes = EXCLUDED.notes,
+    updated_at = NOW()
+  RETURNING id, cal_booking_uid, status::text AS status, starts_at
+`;
+
+const INSERT_CREATED_SQL_LEGACY = `
+  INSERT INTO bookings (
     clinic_id, cal_booking_uid, patient_name, patient_phone,
     treatment_name, status, starts_at, duration_min, notes, updated_at
   )
@@ -184,9 +204,50 @@ function durationMin(booking) {
 
 function buildNotes(booking) {
   const practitioner = extractPractitioner(booking);
-  const email = extractEmail(booking);
   const extra = firstString(booking.additionalNotes, booking.notes);
-  return [practitioner, email, extra].filter(Boolean).join(' · ') || null;
+  return [practitioner, extra].filter(Boolean).join(' · ') || null;
+}
+
+async function insertCreatedBooking(params) {
+  const {
+    clinicId,
+    uid,
+    name,
+    phone,
+    email,
+    motif,
+    status,
+    startsAt,
+    duration,
+    notes,
+  } = params;
+  try {
+    return await query(INSERT_CREATED_SQL, [
+      clinicId,
+      uid,
+      name,
+      phone,
+      email || null,
+      motif,
+      status,
+      startsAt,
+      duration,
+      notes,
+    ]);
+  } catch (err) {
+    if (err?.code !== '42703') throw err;
+    return query(INSERT_CREATED_SQL_LEGACY, [
+      clinicId,
+      uid,
+      name,
+      phone,
+      motif,
+      status,
+      startsAt,
+      duration,
+      notes,
+    ]);
+  }
 }
 
 async function resolveClinicId(booking, body) {
@@ -265,17 +326,18 @@ module.exports = async function handler(req, res) {
       if (!startsAt) {
         return res.status(400).json(createApiError('VALIDATION_ERROR', 'Missing startTime'));
       }
-      const result = await query(INSERT_CREATED_SQL, [
+      const result = await insertCreatedBooking({
         clinicId,
         uid,
-        extractPatientName(booking),
-        extractPhone(booking),
-        extractMotif(booking),
-        STATUS_CONFIRME,
+        name: extractPatientName(booking),
+        phone: extractPhone(booking),
+        email: extractEmail(booking),
+        motif: extractMotif(booking),
+        status: STATUS_CONFIRME,
         startsAt,
-        durationMin(booking),
-        buildNotes(booking),
-      ]);
+        duration: durationMin(booking),
+        notes: buildNotes(booking),
+      });
       return jsonOk(res, eventType, result.rows[0]?.id);
     }
 
