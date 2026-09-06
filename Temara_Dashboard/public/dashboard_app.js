@@ -490,7 +490,6 @@ function openCalendarInspector(event, eventEl) {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
-        timeZone: 'Africa/Casablanca',
       })
     : '';
 
