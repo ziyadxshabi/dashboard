@@ -2318,7 +2318,7 @@ function getFlowBarColors(count = 6) {
   return Array.from({ length: count }, (_, index) => (index === count - 2 ? gold : muted));
 }
 
-function initOperationalCharts(data = {}) {
+function initOperationalCharts(data = lastKpiPayload || {}) {
   if (typeof Chart === 'undefined') return;
 
   applyChartJsDefaults();

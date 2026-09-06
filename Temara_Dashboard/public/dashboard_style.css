@@ -7130,6 +7130,10 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   font-size: 0.875rem;
 }
 
+.chart-empty[hidden] {
+  display: none !important;
+}
+
 .chart-canvas-wrap.is-empty canvas,
 .is-chart-empty canvas {
   display: none !important;
