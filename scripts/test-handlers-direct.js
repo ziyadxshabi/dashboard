@@ -54,8 +54,15 @@ const handleUpdateStatus = require(path.join(DASHBOARD, 'api/update-status.js'))
 const handleTeamNotes = require(path.join(DASHBOARD, 'api/team-notes.js'));
 const handleFillGap = require(path.join(DASHBOARD, 'api/fill-gap.js'));
 const handleBulkSms = require(path.join(DASHBOARD, 'api/bulk-sms.js'));
+const handleTwilio = require(path.join(DASHBOARD, 'api/webhooks/twilio.js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
+const { toE164MA, isValidMaMobileE164 } = require(path.join(DASHBOARD, 'api/_lib/phone-e164.js'));
+const { waitlistRank, pickWaitlistTopN } = require(path.join(DASHBOARD, 'api/_lib/waitlist-blast.js'));
+const { inReminderWindow, daysBetweenCasablanca } = require(path.join(DASHBOARD, 'api/_lib/cron-notify.js'));
+const { tryAcquireLock } = require(path.join(DASHBOARD, 'api/_lib/notification-locks.js'));
+const { verifyTwilioSignature, timingSafeEqualStrings } = require(path.join(DASHBOARD, 'api/_lib/twilio.js'));
+const templates = require(path.join(DASHBOARD, 'api/_lib/sms-templates.js'));
 
 const CLINIC_SLUG = 'temara';
 const SEED_PASSWORD = 'dentaflow';
@@ -188,6 +195,38 @@ async function restoreSeedPassword(username) {
   );
 }
 
+const FLOOR_OPS_PHONES = ['0655510001', '0655510002', '0655510003', '0655510004', '0655510005'];
+const FLOOR_OPS_NAMES = ['Nadia Floor', 'Omar Floor', 'Walkin Floor', 'Urgence Relachee', 'Docteur Visit'];
+
+async function cleanupFloorOpsBookings() {
+  await query(
+    `DELETE FROM recalls
+     WHERE source_booking_id IN (
+       SELECT id FROM bookings
+       WHERE patient_phone = ANY($1::text[])
+          OR patient_name = ANY($2::text[])
+     )
+        OR patient_name = ANY($2::text[])`,
+    [FLOOR_OPS_PHONES, FLOOR_OPS_NAMES]
+  );
+  await query(
+    `DELETE FROM bookings
+     WHERE patient_phone = ANY($1::text[])
+        OR patient_name = ANY($2::text[])`,
+    [FLOOR_OPS_PHONES, FLOOR_OPS_NAMES]
+  );
+}
+
+function casablancaHourNow() {
+  return Number(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Casablanca',
+      hour: '2-digit',
+      hour12: false,
+    }).format(new Date())
+  );
+}
+
 async function run() {
   console.log('\n== Direct handler tests (PostgreSQL) ==\n');
 
@@ -196,6 +235,13 @@ async function run() {
     Boolean(String(process.env.DATABASE_URL || '').trim())
   );
   ok('JWT_SECRET is configured', Boolean(String(process.env.JWT_SECRET || '').trim()));
+
+  const migrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260906_notification_sms.sql'),
+    'utf8'
+  );
+  await query(migrationSql);
+  ok('notification SMS migration applied', true);
 
   await restoreSeedPassword(DOCTOR_USER);
   await restoreSeedPassword(ASSISTANT_USER);
@@ -925,7 +971,16 @@ async function run() {
       `status=${bulkOk.statusCode} body=${JSON.stringify(bulkOk.body)}`
     );
     ok('POST /api/bulk-sms ok:true', bulkOk.body?.ok === true);
-    ok('POST /api/bulk-sms dispatchedCount is 2', bulkOk.body?.dispatchedCount === 2);
+    ok(
+      'POST /api/bulk-sms does not fake dispatchedCount without Twilio SID',
+      bulkOk.body?.dispatchedCount === 0,
+      `dispatchedCount=${bulkOk.body?.dispatchedCount}`
+    );
+    ok('POST /api/bulk-sms twilioConfigured is false in this env', bulkOk.body?.twilioConfigured === false);
+    ok(
+      'POST /api/bulk-sms skipped invalid-or-unsent recipients',
+      Array.isArray(bulkOk.body?.skipped) && bulkOk.body.skipped.length === 2
+    );
     ok(
       'POST /api/bulk-sms returns sanitized message',
       typeof bulkOk.body?.message === 'string' && bulkOk.body.message.length >= 3
@@ -939,7 +994,10 @@ async function run() {
       [clinicId]
     );
     bulkAuditId = audit.rows[0]?.id || null;
-    ok('sms_dispatch_log row persisted', Boolean(bulkAuditId) && audit.rows[0]?.recipient_count === 2);
+    ok(
+      'sms_dispatch_log is not written as sent when Twilio is off',
+      !bulkAuditId || Number(audit.rows[0]?.recipient_count) === 0
+    );
   } finally {
     if (bulkAuditId) await query('DELETE FROM sms_dispatch_log WHERE id = $1', [bulkAuditId]);
   }
@@ -1319,6 +1377,8 @@ async function run() {
   // ── Assistant floor ops ────────────────────────────────────────────────
   console.log('\n[floor-ops]');
   const floorIds = [];
+  await cleanupFloorOpsBookings();
+  const clinicOpen = casablancaHourNow() >= 8 && casablancaHourNow() < 19;
   try {
     const catalog = await invoke(
       handleRoster,
@@ -1420,9 +1480,21 @@ async function run() {
         },
       })
     );
-    ok('POST /api/roster walk-in returns 201', walkIn.statusCode === 201, `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`);
-    ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
-    if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+    if (clinicOpen) {
+      ok(
+        'POST /api/roster walk-in returns 201',
+        walkIn.statusCode === 201,
+        `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`
+      );
+      ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
+      if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+    } else {
+      ok(
+        'POST /api/roster walk-in after hours is 409 NO_GAP',
+        walkIn.statusCode === 409 && walkIn.body?.code === 'NO_GAP',
+        `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`
+      );
+    }
 
     const doctorVisit = await invoke(
       handleRoster,
@@ -1556,12 +1628,209 @@ async function run() {
     if (floorIds.length) {
       await query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [floorIds]);
     }
-    await query(
-      `DELETE FROM bookings
-       WHERE patient_phone IN ('0655510001','0655510002','0655510003','0655510004','0655510005')
-          OR patient_name IN ('Nadia Floor','Omar Floor','Walkin Floor','Urgence Relachee')`
-    );
+    await cleanupFloorOpsBookings();
   }
+
+  // ── n8n port: E.164, ranking, NX, templates, crons, Twilio inbound ─────
+  console.log('\n[notify-port]');
+  ok('toE164MA converts 06 to +212', toE164MA('0612345678') === '+212612345678');
+  ok('toE164MA keeps +212', toE164MA('+212612345678') === '+212612345678');
+  ok('toE164MA handles 00 prefix', toE164MA('00212612345678') === '+212612345678');
+  ok('isValidMaMobileE164 accepts mobile', isValidMaMobileE164('+212612345678') === true);
+  ok('isValidMaMobileE164 rejects short', isValidMaMobileE164('+21261') === false);
+  ok('waitlistRank Urgent is 0', waitlistRank('Urgent') === 0);
+  ok('waitlistRank Faible is 3', waitlistRank('Faible') === 3);
+  const ranked = pickWaitlistTopN(
+    [
+      { id: 'b', priority: 'Faible', created_at: '2026-01-01' },
+      { id: 'a', priority: 'Urgent', created_at: '2026-01-02' },
+      { id: 'c', priority: 'Haute', created_at: '2026-01-01' },
+      { id: 'd', priority: 'Moyenne', created_at: '2026-01-01' },
+    ],
+    3
+  );
+  ok(
+    'pickWaitlistTopN is Urgent then Haute then Moyenne',
+    ranked.map((row) => row.id).join(',') === 'a,c,d'
+  );
+  ok(
+    'inReminderWindow matches T-24h ± 30m',
+    inReminderWindow(new Date(Date.now() + 24 * 60 * 60 * 1000))
+  );
+  ok(
+    'inReminderWindow rejects 2h from now',
+    inReminderWindow(new Date(Date.now() + 2 * 60 * 60 * 1000)) === false
+  );
+  ok('daysBetweenCasablanca today is 0', daysBetweenCasablanca(new Date()) === 0);
+  ok(
+    'confirm SMS copy is Concierge',
+    templates.confirmSms('NADIA').includes('est bien confirmée')
+  );
+  ok(
+    'waitlist SMS copy is Concierge top-3',
+    templates.waitlistSms('NADIA', 'https://example.test/book/temara').includes("créneau vient de se libérer")
+  );
+
+  const lockKey = `test:lock:${Date.now()}`;
+  const firstLock = await tryAcquireLock(lockKey, 60);
+  const secondLock = await tryAcquireLock(lockKey, 60);
+  ok('NX lock acquires first time', firstLock.acquired === true);
+  ok('NX lock duplicates second time', secondLock.duplicate === true && secondLock.acquired === false);
+  await query('DELETE FROM notification_locks WHERE lock_key = $1', [lockKey]);
+
+  const token = 'twilio-test-token';
+  const twilioBody = { MessageSid: 'SM123', MessageStatus: 'delivered' };
+  const twilioUrl = 'https://example.test/api/webhooks/twilio';
+  const sortedParams = Object.keys(twilioBody)
+    .sort()
+    .map((key) => `${key}${twilioBody[key]}`)
+    .join('');
+  const expectedSig = crypto
+    .createHmac('sha1', token)
+    .update(`${twilioUrl}${sortedParams}`, 'utf8')
+    .digest('base64');
+  const fakeReq = { headers: { 'x-twilio-signature': expectedSig }, body: twilioBody };
+  ok(
+    'Twilio signature timing-safe match',
+    verifyTwilioSignature(fakeReq, token, twilioUrl) === true
+  );
+  fakeReq.headers['x-twilio-signature'] = 'not-the-signature-value-at-all';
+  ok(
+    'Twilio signature rejects mismatch',
+    verifyTwilioSignature(fakeReq, token, twilioUrl) === false
+  );
+  ok('timingSafeEqualStrings same', timingSafeEqualStrings('abc', 'abc') === true);
+
+  const forceSms = await invoke(
+    handleBulkSms,
+    createReq({
+      method: 'POST',
+      url: '/api/bulk-sms?action=force-tomorrow',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: { action: 'force-tomorrow' },
+    })
+  );
+  ok(
+    'POST /api/bulk-sms force-tomorrow returns 200',
+    forceSms.statusCode === 200,
+    `status=${forceSms.statusCode} body=${JSON.stringify(forceSms.body)}`
+  );
+  ok(
+    'force-tomorrow does not fake SIDs',
+    forceSms.body?.ok === true && forceSms.body?.dispatchedCount === 0
+  );
+
+  const cronReminders = await invoke(
+    handleRoster,
+    createReq({
+      method: 'GET',
+      url: '/api/roster?action=cron-reminders',
+      headers: assistantCookie,
+    })
+  );
+  ok(
+    'GET cron-reminders with staff JWT returns 200',
+    cronReminders.statusCode === 200,
+    `status=${cronReminders.statusCode} body=${JSON.stringify(cronReminders.body)}`
+  );
+  ok('cron-reminders ok:true', cronReminders.body?.ok === true);
+
+  const cronLeak = await invoke(
+    handleRoster,
+    createReq({
+      method: 'POST',
+      url: '/api/roster?action=cron-leak',
+      headers: assistantCookie,
+    })
+  );
+  ok('POST cron-leak with staff JWT returns 200', cronLeak.statusCode === 200);
+  ok('cron-leak ok:true', cronLeak.body?.ok === true);
+
+  const twilioStatus = await invoke(
+    handleTwilio,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/twilio',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { MessageSid: `SM-test-${Date.now()}`, MessageStatus: 'delivered' },
+    })
+  );
+  ok(
+    'POST /api/webhooks/twilio SMS status returns 200 when unsigned local',
+    twilioStatus.statusCode === 200,
+    `status=${twilioStatus.statusCode} body=${JSON.stringify(twilioStatus.body)}`
+  );
+
+  const voiceMenu = await invoke(
+    handleTwilio,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/twilio',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: {
+        Digits: '1',
+        From: '+212612345678',
+        CallSid: `CA-test-${Date.now()}`,
+      },
+    })
+  );
+  ok(
+    'POST /api/webhooks/twilio digit 1 returns TwiML',
+    voiceMenu.statusCode === 200 && String(voiceMenu.body || '').includes('lien de réservation'),
+    `status=${voiceMenu.statusCode} body=${String(voiceMenu.body || '').slice(0, 180)}`
+  );
+
+  const fillNotify = await invoke(
+    handleFillGap,
+    createReq({
+      method: 'POST',
+      url: '/api/fill-gap',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: {
+        slotDate: '2026-12-01',
+        slotTime: '10:00',
+        notifyWaitlist: true,
+      },
+    })
+  );
+  ok(
+    'POST /api/fill-gap notifyWaitlist does not 500',
+    fillNotify.statusCode === 200,
+    `status=${fillNotify.statusCode}`
+  );
+
+  const repeatCreatedBody = {
+    triggerEvent: 'BOOKING_CREATED',
+    payload: {
+      uid: `cal-dup-${Date.now()}`,
+      startTime: '2026-12-02T09:00:00.000Z',
+      title: 'Consultation',
+      attendees: [{ name: 'Dup Patient', email: 'dup@example.com', phoneNumber: '0612345678' }],
+      responses: { name: { value: 'Dup Patient' }, phone: { value: '0612345678' } },
+    },
+  };
+  const handleCalRepeat = require(path.join(DASHBOARD, 'api/webhooks/cal.js'));
+  const firstDup = await invoke(
+    handleCalRepeat,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/cal',
+      headers: calWebhookHeaders(repeatCreatedBody),
+      body: repeatCreatedBody,
+    })
+  );
+  const secondDup = await invoke(
+    handleCalRepeat,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/cal',
+      headers: calWebhookHeaders(repeatCreatedBody),
+      body: repeatCreatedBody,
+    })
+  );
+  ok('duplicate CREATED still 200', firstDup.statusCode === 200 && secondDup.statusCode === 200);
+  ok('duplicate CREATED sets duplicate flag', secondDup.body?.duplicate === true);
+  await query('DELETE FROM bookings WHERE cal_booking_uid = $1', [repeatCreatedBody.payload.uid]);
 
   // ── Logout ─────────────────────────────────────────────────────────────
   console.log('\n[auth logout]');
