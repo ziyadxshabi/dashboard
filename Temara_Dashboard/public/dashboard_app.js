@@ -1117,7 +1117,7 @@ function toCrmPatient(record) {
     id: record.id ?? record.phone_e164 ?? record.phone,
     name: record.name || 'Non spécifié',
     phone: record.phone || record.phone_e164 || '',
-    email: record.email || '',
+    email: record.email || record.patient_email || '',
     motif: record.last_treatment || record.treatment || 'Consultation',
     visit_count: Number(record.visit_count) || 0,
     no_show_count: Number(record.no_show_count) || 0,
@@ -1128,6 +1128,29 @@ function toCrmPatient(record) {
     last_visit_label: Ops?.formatDayLabel(record.last_visit) || '—',
     next_visit_label: Ops?.formatDayLabel(record.next_visit) || '—',
   };
+}
+
+function bindCrmRowPatient(row, patient) {
+  if (!row || !patient) return;
+  crmPatientsByRow.set(row, patient);
+  try {
+    row.dataset.record = JSON.stringify(patient);
+  } catch {
+    row.dataset.record = '';
+  }
+}
+
+function readStoredCrmPatient(row) {
+  const attached = crmPatientsByRow.get(row);
+  if (attached) return attached;
+  const raw = row?.dataset?.record;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function renderCRMTable(records) {
@@ -1162,7 +1185,7 @@ function renderCRMTable(records) {
     tr.setAttribute('role', 'button');
     tr.dataset.patientId = String(patient.id);
     tr.dataset.phone = patient.phone || '';
-    crmPatientsByRow.set(tr, patient);
+    bindCrmRowPatient(tr, patient);
 
     const cells = [
       patient.name,
@@ -1191,8 +1214,8 @@ function getCrmStatutTagClass(statut) {
 }
 
 function readCrmRowData(row) {
-  const attached = crmPatientsByRow.get(row);
-  if (attached) return attached;
+  const stored = readStoredCrmPatient(row);
+  if (stored) return stored;
   const patientId = row?.dataset?.patientId;
   if (patientId && crmPatientsById[patientId]) {
     return crmPatientsById[patientId];
@@ -1219,6 +1242,24 @@ function readCrmRowData(row) {
     no_show_count: 0,
     cancel_count: 0,
   };
+}
+
+function relatedTeamNotes(patient) {
+  return (teamNotesCache || []).filter((note) => {
+    const name = String(note.patient_name || '').trim().toLowerCase();
+    const visitIds = new Set((patient.recent_visits || []).map((visit) => String(visit.id)));
+    const bookingMatch = note.booking_id && visitIds.has(String(note.booking_id));
+    return bookingMatch || (name && name === String(patient.name || '').trim().toLowerCase());
+  });
+}
+
+function renderCrmLinkedNotes(patient) {
+  const notesEl = doctorEl('crm-panel-notes');
+  if (!notesEl) return;
+  const related = relatedTeamNotes(patient);
+  notesEl.textContent = related.length
+    ? related.map((note) => `${note.author || 'Équipe'}: ${note.message || note.text}`).join('\n')
+    : 'Aucune note liée à ce patient.';
 }
 
 function populateCrmSidePanel(patient) {
@@ -1265,17 +1306,9 @@ function populateCrmSidePanel(patient) {
     }
   }
 
-  const notesEl = doctorEl('crm-panel-notes');
-  if (notesEl) {
-    const related = (teamNotesCache || []).filter((note) => {
-      const name = String(note.patient_name || '').toLowerCase();
-      const visitIds = new Set((patient.recent_visits || []).map((visit) => String(visit.id)));
-      const bookingMatch = note.booking_id && visitIds.has(String(note.booking_id));
-      return bookingMatch || (name && name === String(patient.name || '').toLowerCase());
-    });
-    notesEl.textContent = related.length
-      ? related.map((note) => `${note.author || 'Équipe'}: ${note.message || note.text}`).join('\n')
-      : 'Aucune note liée à ce patient.';
+  renderCrmLinkedNotes(patient);
+  if (!teamNotesCache.length && typeof loadTeamNotes === 'function') {
+    Promise.resolve(loadTeamNotes()).then(() => renderCrmLinkedNotes(patient));
   }
 }
 

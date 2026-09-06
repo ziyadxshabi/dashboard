@@ -190,6 +190,7 @@ let handoffNotes = [];
   let lastGaps = [];
   let lastWaitlist = [];
   let crmPatientsById = {};
+  const crmPatientsByRow = new WeakMap();
   let crmUnpaidOnly = false;
   let waitlistUrgentOnly = false;
   let selectedPatientIds = [];
@@ -209,8 +210,17 @@ let handoffNotes = [];
     if (root && root !== document) {
       const scoped = root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
       if (scoped) return scoped;
+      // Empty assistant-mount must not steal doctor-shell IDs on the shared page.
+      if (!document.body.classList.contains('mode-assistant')) return null;
     }
     return document.getElementById(id);
+  }
+
+  function isAssistantEvent(event) {
+    if (!document.body.classList.contains('mode-assistant')) return false;
+    const root = assistantRoot();
+    if (!root || root === document) return true;
+    return root.contains(event.target);
   }
 
   function showSkeleton(section) {
@@ -2845,6 +2855,8 @@ let handoffNotes = [];
     document.addEventListener('change', handleDelegatedCheckboxChange);
 
     document.addEventListener('click', (event) => {
+      if (!isAssistantEvent(event)) return;
+
       const copyEl = event.target.closest('.copyable');
       if (copyEl) {
         event.preventDefault();
@@ -4663,7 +4675,7 @@ let handoffNotes = [];
       id: record.id ?? record.phone_e164 ?? record.phone,
       name: record.name || 'Non spécifié',
       phone: record.phone || record.phone_e164 || '',
-      email: record.email || '',
+      email: record.email || record.patient_email || '',
       motif: record.last_treatment || record.treatment || 'Consultation',
       visit_count: Number(record.visit_count) || 0,
       no_show_count: Number(record.no_show_count) || 0,
@@ -4674,6 +4686,29 @@ let handoffNotes = [];
       last_visit_label: Ops?.formatDayLabel(record.last_visit) || '—',
       next_visit_label: Ops?.formatDayLabel(record.next_visit) || '—',
     };
+  }
+
+  function bindCrmRowPatient(row, patient) {
+    if (!row || !patient) return;
+    crmPatientsByRow.set(row, patient);
+    try {
+      row.dataset.record = JSON.stringify(patient);
+    } catch {
+      row.dataset.record = '';
+    }
+  }
+
+  function readStoredCrmPatient(row) {
+    const attached = crmPatientsByRow.get(row);
+    if (attached) return attached;
+    const raw = row?.dataset?.record;
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   function buildStatusPill(label, modifierClass = '') {
@@ -4688,6 +4723,24 @@ let handoffNotes = [];
 
   function buildMotifPill(motif) {
     return buildStatusPill(motif || 'Consultation', 'status-pill--neutral');
+  }
+
+  function linkedHandoffNotes(patientData) {
+    return (handoffNotes || []).filter((note) => {
+      const name = String(note.patient_name || '').trim().toLowerCase();
+      const visitIds = new Set((patientData.recent_visits || []).map((visit) => String(visit.id)));
+      const bookingMatch = note.booking_id && visitIds.has(String(note.booking_id));
+      return bookingMatch || (name && name === String(patientData.name || '').trim().toLowerCase());
+    });
+  }
+
+  function renderCrmLinkedNotes(patientData) {
+    const notesEl = $('crm-panel-notes');
+    if (!notesEl) return;
+    const related = linkedHandoffNotes(patientData);
+    notesEl.textContent = related.length
+      ? related.map((note) => `${note.author || 'Équipe'}: ${note.message || note.text}`).join('\n')
+      : 'Aucune note liée à ce patient.';
   }
 
   function updateCRMSidePanel(patientData) {
@@ -4739,17 +4792,9 @@ let handoffNotes = [];
       }
     }
 
-    const notesEl = $('crm-panel-notes');
-    if (notesEl) {
-      const related = (handoffNotes || []).filter((note) => {
-        const name = String(note.patient_name || '').toLowerCase();
-        const visitIds = new Set((patientData.recent_visits || []).map((visit) => String(visit.id)));
-        const bookingMatch = note.booking_id && visitIds.has(String(note.booking_id));
-        return bookingMatch || (name && name === String(patientData.name || '').toLowerCase());
-      });
-      notesEl.textContent = related.length
-        ? related.map((note) => `${note.author || 'Équipe'}: ${note.message || note.text}`).join('\n')
-        : 'Aucune note liée à ce patient.';
+    renderCrmLinkedNotes(patientData);
+    if (!handoffNotes.length) {
+      Promise.resolve(loadHandoffNotes()).then(() => renderCrmLinkedNotes(patientData));
     }
   }
 
@@ -4786,6 +4831,7 @@ let handoffNotes = [];
       tr.setAttribute('role', 'button');
       tr.dataset.patientId = String(patient.id);
       tr.dataset.phone = patient.phone || '';
+      bindCrmRowPatient(tr, patient);
 
       [patient.name, patient.phone || '—', patient.motif, String(patient.visit_count), patient.last_visit_label, patient.next_visit_label]
         .forEach((text) => {
@@ -4803,6 +4849,8 @@ let handoffNotes = [];
   }
 
   function readCrmRowData(row) {
+    const stored = readStoredCrmPatient(row);
+    if (stored) return stored;
     const patientId = row?.dataset?.patientId;
     if (patientId && crmPatientsById[patientId]) {
       return crmPatientsById[patientId];
@@ -4947,7 +4995,12 @@ let handoffNotes = [];
       activateCrmRow(row);
     }
 
-    tbody?.addEventListener('keydown', (event) => {
+    tbody.addEventListener('click', (event) => {
+      const row = event.target.closest('.crm-table-row');
+      if (row) handleRowActivate(row);
+    });
+
+    tbody.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
       const row = event.target.closest('.crm-table-row');
       if (!row) return;

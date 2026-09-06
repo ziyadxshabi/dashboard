@@ -848,6 +848,11 @@ async function run() {
       `visit_count=${groupedPatient?.visit_count}`
     );
     ok('directory exposes email when stored', groupedPatient?.email === 'amina.wave@example.com');
+    ok(
+      'directory includes recent_visits for the grouped phone',
+      Array.isArray(groupedPatient?.recent_visits) && groupedPatient.recent_visits.length >= 2,
+      `recent_visits=${groupedPatient?.recent_visits?.length}`
+    );
 
     const gapsRes = await invoke(
       handleRoster,
