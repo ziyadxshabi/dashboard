@@ -1293,6 +1293,104 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
   color: var(--text-muted);
 }
 
+.board-card__elapsed,
+.board-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.board-card__actions button,
+.hold-chip button,
+.floor-composer__walkin,
+.floor-composer__slot,
+.calendar-inspector__actions button {
+  border: var(--border-hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-main);
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.floor-composer {
+  margin: 0 0 1.25rem;
+  padding: 12px;
+  border: var(--border-hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.floor-composer__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.floor-composer__slots {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.floor-composer__slot.is-active {
+  background: var(--surface-1);
+  font-weight: 600;
+}
+
+.floor-composer__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.recall-strip,
+.hold-strip {
+  margin: 0 0 1.25rem;
+}
+
+.recall-list,
+.hold-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recall-chip,
+.hold-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+
+#dashboard-cal-inline .cal-chip--block {
+  background: #eceae4 !important;
+  color: #5c584f !important;
+}
+
+#dashboard-cal-inline .cal-chip--hold {
+  background: #f6e6d8 !important;
+  color: #7a3f16 !important;
+}
+
+.calendar-inspector__actions {
+  margin-top: 12px;
+}
+
+@media (max-width: 960px) {
+  .floor-composer__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .handoff-compose__booking {
   min-width: 9rem;
   max-width: 14rem;

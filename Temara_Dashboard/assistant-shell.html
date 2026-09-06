@@ -167,7 +167,26 @@
           </div>
         </header>
 
-        <section class="assistant-pulse" aria-label="Indicateurs opérationnels du jour">
+        <section class="floor-composer" aria-labelledby="floor-composer-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="floor-composer-title">Nouveau RDV</h3>
+            <span class="section-header-inline__meta" id="floor-composer-duration">Durée selon le soin</span>
+          </div>
+          <form id="floor-book-form" class="floor-composer__form">
+            <label class="visually-hidden" for="floor-book-name">Patient</label>
+            <input class="waitlist-input" id="floor-book-name" name="patientName" autocomplete="name" placeholder="Patient" required />
+            <label class="visually-hidden" for="floor-book-phone">Téléphone</label>
+            <input class="waitlist-input" id="floor-book-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="06…" required />
+            <label class="visually-hidden" for="floor-book-treatment">Soin</label>
+            <select class="waitlist-input" id="floor-book-treatment" name="treatment" required>
+              <option value="">Soin</option>
+            </select>
+            <div id="floor-book-slots" class="floor-composer__slots" role="group" aria-label="Prochain créneau"></div>
+            <button type="submit" class="btn-matte-primary" id="floor-book-submit">Poser</button>
+            <button type="button" class="floor-composer__walkin" id="floor-walkin-btn">Walk-in</button>
+          </form>
+          <p class="floor-composer__hint" id="floor-book-hint" hidden></p>
+        </section>
           <div class="assistant-pulse-grid" id="assistant-pulse-grid">
             <!-- rendered by app.js -->
           </div>
@@ -181,6 +200,22 @@
           <div id="late-list" class="late-list" role="list">
             <p class="late-list__empty">Aucun retard sur l'heure prévue.</p>
           </div>
+        </section>
+
+        <section class="recall-strip" id="recall-strip" aria-labelledby="recall-title" hidden>
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="recall-title">À revoir</h3>
+            <span class="section-header-inline__meta">Rappels 6 mois — à placer, pas un SMS</span>
+          </div>
+          <div id="recall-list" class="recall-list" role="list"></div>
+        </section>
+
+        <section class="hold-strip" id="hold-strip" aria-labelledby="hold-title" hidden>
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="hold-title">Urgence réservée</h3>
+            <span class="section-header-inline__meta">Relâcher pour poser un patient</span>
+          </div>
+          <div id="hold-list" class="hold-list" role="list"></div>
         </section>
 
         <section class="status-board-section" aria-labelledby="status-board-title">
@@ -421,7 +456,7 @@
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
             <div class="waitlist-form-header">
               <div class="chart-title">Nouveau Patient</div>
-              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+              <div class="chart-sub">À rappeler / à placer — pas d'envoi SMS automatique</div>
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
@@ -899,6 +934,18 @@
         </section>
       </div>
     </aside>
+  </div>
+
+  <div id="cancel-reason-sheet" class="ops-chip-sheet" hidden>
+    <p class="ops-chip-sheet__who">Motif d'annulation</p>
+    <p class="ops-chip-sheet__meta">Obligatoire — pas un SMS</p>
+    <div class="ops-chip-sheet__actions">
+      <button type="button" data-cancel-reason="oublie">Oubli</button>
+      <button type="button" data-cancel-reason="cout">Coût</button>
+      <button type="button" data-cancel-reason="reprogramme">Reprogrammé</button>
+      <button type="button" data-cancel-reason="autre">Autre</button>
+      <button type="button" data-cancel-dismiss="true">Retour</button>
+    </div>
   </div>
 
   <div id="bulk-action-bar" class="bulk-bar-hidden">

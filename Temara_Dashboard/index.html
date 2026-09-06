@@ -508,7 +508,7 @@
             <article class="chair-glance__panel" aria-labelledby="hub-chair-title">
               <header class="chair-glance__head">
                 <h3 class="chair-glance__title" id="hub-chair-title">Au fauteuil</h3>
-                <p class="chair-glance__sub">En soin maintenant</p>
+                <p class="chair-glance__sub">En soin — écoulé et fin prévue</p>
               </header>
               <div id="hub-in-chair" class="chair-glance__body"></div>
             </article>
@@ -604,7 +604,15 @@
                 <dd id="cal-insp-duration"></dd>
               </div>
             </dl>
+            <div class="calendar-inspector__actions" id="cal-insp-actions" hidden>
+              <button type="button" class="btn-matte-ghost" id="cal-insp-delete">Retirer le blocage</button>
+            </div>
           </aside>
+        </div>
+        <div id="block-chip-sheet" class="ops-chip-sheet" hidden>
+          <p class="ops-chip-sheet__who" id="block-chip-when"></p>
+          <p class="ops-chip-sheet__meta">Bloque le fauteuil dans DentaFlow — pas encore sur Cal.com public</p>
+          <div class="ops-chip-sheet__actions" id="block-chip-actions"></div>
         </div>
       </section>
 
@@ -619,7 +627,7 @@
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
             <div class="waitlist-form-header">
               <div class="chart-title">Nouveau Patient</div>
-              <div class="chart-sub">Notification automatique en cas d'annulation</div>
+              <div class="chart-sub">À rappeler / à placer — pas d'envoi SMS automatique</div>
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
@@ -777,11 +785,12 @@
                   <th scope="col">Téléphone</th>
                   <th scope="col">Dernière visite</th>
                   <th scope="col">Soin</th>
+                  <th scope="col">No-shows (90 j)</th>
                 </tr>
               </thead>
               <tbody id="crm-table-body">
                 <tr class="crm-table-empty">
-                  <td colspan="4">Aucun patient trouvé</td>
+                  <td colspan="5">Aucun patient trouvé</td>
                 </tr>
               </tbody>
             </table>
@@ -998,37 +1007,16 @@
             </div>
           </article>
 
-          <!-- Card: Gestion des Urgences -->
+          <!-- Card: Indisponibilités -->
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <i data-lucide="triangle-alert" aria-hidden="true"></i>
+              <i data-lucide="calendar-off" aria-hidden="true"></i>
             </div>
-            <h3 class="settings-card-title">Gestion des Urgences</h3>
-            <p class="settings-card-desc">Réservez une capacité tampon pour les cas urgents du jour.</p>
-            <div class="settings-toggle-row">
-              <div class="settings-toggle-info">
-                <span class="settings-toggle-label">Garder des créneaux d'urgence</span>
-                <span class="settings-toggle-hint">Slots protégés non réservables en ligne</span>
-              </div>
-              <label class="settings-toggle">
-                <input type="checkbox" id="settings-emergency-buffer-toggle" checked />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-            <div class="settings-field">
-              <label class="settings-label" for="settings-emergency-slots">Nombre de slots par jour</label>
-              <input
-                class="waitlist-input settings-input"
-                type="number"
-                id="settings-emergency-slots"
-                name="emergency_slots"
-                value="2"
-                min="0"
-                max="10"
-                step="1"
-                inputmode="numeric"
-              />
-            </div>
+            <h3 class="settings-card-title">Indisponibilités</h3>
+            <p class="settings-card-desc">
+              Pause, labo, jour off et urgence réservée se posent sur le calendrier.
+              Le portail public Cal.com peut encore proposer ces heures tant que la synchro n'est pas en place.
+            </p>
           </article>
 
           <!-- Card 3: Sécurité -->
@@ -1154,6 +1142,7 @@
       <div class="crm-side-panel-body" data-lenis-prevent>
         <section class="crm-side-panel-section" aria-label="Visites">
           <h3 class="crm-side-panel-section-title">Dernières visites</h3>
+          <p class="chair-glance__empty" id="crm-panel-noshows" hidden></p>
           <div id="crm-panel-visits" class="carnet-visits"></div>
         </section>
       </div>

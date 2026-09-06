@@ -33,6 +33,25 @@ const STATUS_OPTIONS = [
   'Annulé',
 ];
 
+const CANCEL_REASON_LABELS = {
+  oublie: 'Oubli',
+  cout: 'Coût',
+  reprogramme: 'Reprogrammé',
+  autre: 'Autre',
+};
+
+function bookingKindOf(record) {
+  return String(record?.booking_kind || record?.bookingKind || 'visit') || 'visit';
+}
+
+function isVisitBooking(record) {
+  return bookingKindOf(record) === 'visit';
+}
+
+function isHoldBooking(record) {
+  return bookingKindOf(record) === 'emergency_hold';
+}
+
 const VIEW_MAP = {
   overview: 'view-overview',
   calendar: 'view-calendar',
@@ -182,6 +201,7 @@ function computeOperationalPulse(records) {
   const pulse = createEmptyOperationalPulse();
   const rows = Array.isArray(records) ? records.filter(Boolean) : [];
   for (const record of rows) {
+    if (!isVisitBooking(record)) continue;
     if (isPulseCancelledStatus(record.status)) {
       pulse.holes += 1;
       continue;
@@ -645,11 +665,292 @@ let handoffNotes = [];
     return record?.time || '—';
   }
 
+  function pickCancelReason() {
+    return new Promise((resolve) => {
+      const sheet = $('cancel-reason-sheet');
+      if (!sheet) {
+        resolve('autre');
+        return;
+      }
+      sheet.hidden = false;
+      const onClick = (event) => {
+        const dismiss = event.target.closest('[data-cancel-dismiss]');
+        const btn = event.target.closest('[data-cancel-reason]');
+        if (!dismiss && !btn) return;
+        sheet.hidden = true;
+        sheet.removeEventListener('click', onClick);
+        resolve(btn ? btn.getAttribute('data-cancel-reason') : null);
+      };
+      sheet.addEventListener('click', onClick);
+    });
+  }
+
+  async function postRecallForRecord(record) {
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=recall`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: apiHeaders(),
+        body: JSON.stringify({
+          bookingId: record.id,
+          patientName: record.name || record.patient_name,
+          patientPhone: record.phone || record.patient_phone,
+          treatmentName: record.treatment || record.treatment_name,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      showToast('Rappel 6 mois enregistré — à placer, pas un SMS.', 'success');
+      await loadRecallStrip();
+    } catch {
+      showToast('Impossible d\'enregistrer le rappel.', 'error');
+    }
+  }
+
+  function renderHoldStrip(records) {
+    const section = $('hold-strip');
+    const list = $('hold-list');
+    if (!section || !list) return;
+    const holds = (Array.isArray(records) ? records : []).filter(isHoldBooking);
+    section.hidden = holds.length === 0;
+    list.replaceChildren();
+    holds.forEach((record) => {
+      const chip = document.createElement('div');
+      chip.className = 'hold-chip';
+      chip.setAttribute('role', 'listitem');
+      const when = document.createElement('span');
+      when.textContent = formatRosterClock(record);
+      const label = document.createElement('span');
+      label.textContent = record.name || 'Urgence réservée';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Relâcher';
+      btn.addEventListener('click', () => void releaseEmergencyHold(record.id));
+      chip.append(when, label, btn);
+      list.appendChild(chip);
+    });
+  }
+
+  async function loadRecallStrip() {
+    const section = $('recall-strip');
+    const list = $('recall-list');
+    if (!section || !list) return;
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?recalls=open`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: rosterFetchHeaders(),
+        cache: 'no-store',
+      });
+      assertAuthorizedResponse(response);
+      const payload = await response.json();
+      const rows = Array.isArray(payload?.data) ? payload.data : [];
+      section.hidden = rows.length === 0;
+      list.replaceChildren();
+      rows.forEach((row) => {
+        const chip = document.createElement('div');
+        chip.className = 'recall-chip';
+        chip.setAttribute('role', 'listitem');
+        const due = row.due_on ? String(row.due_on).slice(0, 10) : '';
+        chip.textContent = [due, row.patient_name, row.treatment_name, row.patient_phone]
+          .filter(Boolean)
+          .join(' · ');
+        list.appendChild(chip);
+      });
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      section.hidden = true;
+    }
+  }
+
+  async function releaseEmergencyHold(holdId) {
+    const name = $('floor-book-name')?.value.trim();
+    const phone = $('floor-book-phone')?.value.trim();
+    const treatment = $('floor-book-treatment')?.value.trim();
+    if (!name || !phone || !treatment) {
+      showToast('Remplissez Nouveau RDV (nom, téléphone, soin) puis Relâcher.', 'error');
+      return;
+    }
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=release`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: apiHeaders(),
+        body: JSON.stringify({ id: holdId, patientName: name, phone, treatment }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 409 && payload?.code === 'DUPLICATE_HINT') {
+        const ok = await askConfirm('Même téléphone ou même nom sur 90 jours. Poser quand même ?');
+        if (!ok) return;
+        const retry = await fetch(`${CONFIG.ROSTER_PROXY}?action=release`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: apiHeaders(),
+          body: JSON.stringify({
+            id: holdId,
+            patientName: name,
+            phone,
+            treatment,
+            confirmDuplicate: true,
+          }),
+        });
+        const retryPayload = await retry.json().catch(() => ({}));
+        if (!retry.ok || retryPayload?.ok === false) throw new Error(retryPayload?.error || 'release');
+      } else if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      showToast('Urgence relâchée.', 'success');
+      loadPlanning();
+    } catch {
+      showToast('Impossible de relâcher l\'urgence.', 'error');
+    }
+  }
+
+  async function postRosterBooking(body) {
+    const response = await fetch(CONFIG.ROSTER_PROXY, {
+      method: 'POST',
+      credentials: 'include',
+      headers: apiHeaders(),
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 409 && payload?.code === 'DUPLICATE_HINT') {
+      const ok = await askConfirm('Même téléphone ou même nom sur 90 jours (pas un dossier). Poser quand même ?');
+      if (!ok) return null;
+      return postRosterBooking({ ...body, confirmDuplicate: true });
+    }
+    if (response.status === 409 && payload?.code === 'OVERLAP') {
+      showToast(payload.error || 'Créneau déjà pris.', 'error');
+      return null;
+    }
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return payload;
+  }
+
+  function selectedFloorSlotIso() {
+    const active = $('floor-book-slots')?.querySelector('.floor-composer__slot.is-active');
+    return active?.dataset.startsAt || '';
+  }
+
+  async function loadTreatmentCatalog() {
+    const select = $('floor-book-treatment');
+    const slots = $('floor-book-slots');
+    const durationEl = $('floor-composer-duration');
+    if (!select) return;
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?catalog=1`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: rosterFetchHeaders(),
+        cache: 'no-store',
+      });
+      assertAuthorizedResponse(response);
+      const payload = await response.json();
+      const treatments = payload?.data?.treatments || [];
+      const previous = select.value;
+      select.replaceChildren();
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = 'Soin';
+      select.appendChild(blank);
+      treatments.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.name;
+        option.textContent = `${item.name} · ${item.duration_min} min`;
+        option.dataset.duration = String(item.duration_min);
+        select.appendChild(option);
+      });
+      if (previous && [...select.options].some((opt) => opt.value === previous)) {
+        select.value = previous;
+      }
+      if (slots) {
+        slots.replaceChildren();
+        const next = payload?.data?.nextFreeSlot;
+        if (next?.startsAt) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'floor-composer__slot is-active';
+          chip.dataset.startsAt = typeof next.startsAt === 'string'
+            ? next.startsAt
+            : new Date(next.startsAt).toISOString();
+          chip.textContent = next.time ? `Prochain libre ${next.time}` : 'Prochain libre';
+          chip.addEventListener('click', () => {
+            slots.querySelectorAll('.floor-composer__slot').forEach((el) => el.classList.remove('is-active'));
+            chip.classList.add('is-active');
+          });
+          slots.appendChild(chip);
+        }
+      }
+      const syncDuration = () => {
+        const opt = select.selectedOptions[0];
+        const mins = opt?.dataset?.duration;
+        if (durationEl) durationEl.textContent = mins ? `${mins} min` : 'Durée selon le soin';
+      };
+      select.addEventListener('change', syncDuration);
+      syncDuration();
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+    }
+  }
+
+  function initFloorComposer() {
+    const form = $('floor-book-form');
+    if (!form || form.dataset.floorBound === 'true') return;
+    form.dataset.floorBound = 'true';
+    void loadTreatmentCatalog();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const hint = $('floor-book-hint');
+      if (hint) hint.hidden = true;
+      try {
+        const startsAt = selectedFloorSlotIso();
+        if (!startsAt) {
+          showToast('Choisissez le prochain créneau libre.', 'error');
+          return;
+        }
+        await postRosterBooking({
+          kind: 'visit',
+          patientName: $('floor-book-name')?.value.trim(),
+          phone: $('floor-book-phone')?.value.trim(),
+          treatment: $('floor-book-treatment')?.value.trim(),
+          startsAt,
+        });
+        form.reset();
+        showToast('Rendez-vous posé.', 'success');
+        loadPlanning();
+        void loadTreatmentCatalog();
+      } catch (err) {
+        showToast(err?.message || 'Impossible de poser le rendez-vous.', 'error');
+      }
+    });
+    $('floor-walkin-btn')?.addEventListener('click', async () => {
+      try {
+        await postRosterBooking({
+          kind: 'visit',
+          walkIn: true,
+          patientName: $('floor-book-name')?.value.trim(),
+          phone: $('floor-book-phone')?.value.trim(),
+          treatment: $('floor-book-treatment')?.value.trim(),
+        });
+        $('floor-book-form')?.reset();
+        showToast('Walk-in placé en salle d\'attente.', 'success');
+        loadPlanning();
+        void loadTreatmentCatalog();
+      } catch (err) {
+        showToast(err?.message || 'Aucun créneau walk-in.', 'error');
+      }
+    });
+  }
+
   function renderLateList(records) {
     const list = $('late-list');
     if (!list) return;
     const late = (Array.isArray(records) ? records : [])
-      .filter((row) => isLateOnScheduledTime(row))
+      .filter((row) => isVisitBooking(row) && isLateOnScheduledTime(row))
       .sort((a, b) => {
         const aTime = parseStartsAt(a.starts_at || a.startTime)?.getTime() || 0;
         const bTime = parseStartsAt(b.starts_at || b.startTime)?.getTime() || 0;
@@ -702,6 +1003,31 @@ let handoffNotes = [];
     care.className = 'board-card__care';
     care.textContent = record.treatment || record.treatment_name || '';
 
+    card.append(time, name, care);
+
+    if (boardColumnForStatus(record.status) === 'care') {
+      const elapsed = document.createElement('span');
+      elapsed.className = 'board-card__elapsed';
+      const scheduled = parseStartsAt(record.starts_at || record.rawDate);
+      const started = parseStartsAt(record.care_started_at) || scheduled;
+      const duration = Number(record.duration_min) > 0 ? Number(record.duration_min) : 30;
+      const expected = scheduled ? new Date(scheduled.getTime() + duration * 60000) : null;
+      const mins = started ? Math.max(0, Math.round((Date.now() - started.getTime()) / 60000)) : 0;
+      elapsed.textContent = `Écoulé ${mins} min · fin ${expected ? formatRosterClock({ starts_at: expected }) : '—'}`;
+      card.appendChild(elapsed);
+    }
+
+    if (boardColumnForStatus(record.status) === 'done') {
+      const actions = document.createElement('div');
+      actions.className = 'board-card__actions';
+      const recallBtn = document.createElement('button');
+      recallBtn.type = 'button';
+      recallBtn.textContent = '6 mois';
+      recallBtn.addEventListener('click', () => void postRecallForRecord(record));
+      actions.appendChild(recallBtn);
+      card.appendChild(actions);
+    }
+
     const select = document.createElement('select');
     select.className = 'status-select';
     select.dataset.bookingId = String(record.id || '');
@@ -732,6 +1058,7 @@ let handoffNotes = [];
     Object.values(columns).forEach((col) => col.replaceChildren());
     const buckets = { incoming: [], waiting: [], care: [], done: [] };
     (Array.isArray(records) ? records : []).forEach((record) => {
+      if (!isVisitBooking(record)) return;
       const col = boardColumnForStatus(record.status);
       if (col) buckets[col].push(record);
     });
@@ -765,7 +1092,7 @@ let handoffNotes = [];
     general.textContent = 'Note générale';
     select.appendChild(general);
     (Array.isArray(records) ? records : []).forEach((record) => {
-      if (!record?.id) return;
+      if (!record?.id || !isVisitBooking(record)) return;
       if (isPulseCancelledStatus(record.status)) return;
       const option = document.createElement('option');
       option.value = String(record.id);
@@ -2281,6 +2608,12 @@ let handoffNotes = [];
         item['Historique No-Show'] ??
         item['Historique de no-shows']
       ),
+      starts_at: rawDate,
+      duration_min: Number(item.duration_min || item.durationMin) || 30,
+      booking_kind: item.booking_kind || item.bookingKind || 'visit',
+      care_started_at: item.care_started_at || item.careStartedAt || null,
+      cancel_reason: item.cancel_reason || item.cancelReason || null,
+      noshow_90d: Number(item.noshow_90d) || 0,
     };
   }
 
@@ -3536,7 +3869,9 @@ let handoffNotes = [];
 
   function renderPlanning(records) {
     return safeRender('renderPlanning', () => {
-    const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+    const incoming = Array.isArray(records) ? records.filter(Boolean) : [];
+    renderHoldStrip(incoming);
+    const rows = incoming.filter(isVisitBooking);
 
     rosterData = rows.map(record => ({ ...record }));
     selectedPatientIds = [];
@@ -3609,6 +3944,7 @@ let handoffNotes = [];
     renderLateList(rows);
     renderStatusBoard(rows);
     refreshHandoffBookingOptions(rows);
+    void loadRecallStrip();
     refreshInvisibleUIDecorations($('assistant-pulse-grid'));
     renderOverviewTimeline(rows);
     window.refreshLucideIcons?.(document.getElementById('assistant-mount') || document);
@@ -3867,7 +4203,7 @@ let handoffNotes = [];
     }
   }
 
-  async function updateRosterStatus(selectEl, previousStatus) {
+  async function updateRosterStatus(selectEl, previousStatus, extra = {}) {
     const bookingId = selectEl.dataset.bookingId || '';
     const newStatus = selectEl.value;
 
@@ -3876,11 +4212,13 @@ let handoffNotes = [];
     selectEl.classList.remove('status-success', 'status-error');
 
     try {
+      const body = { bookingId, newStatus };
+      if (extra.cancelReason) body.cancelReason = extra.cancelReason;
       const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
         method: 'POST',
         credentials: 'include',
         headers: apiHeaders(),
-        body: JSON.stringify({ bookingId, newStatus }),
+        body: JSON.stringify(body),
       });
 
       const responseText = await response.text();
@@ -3980,13 +4318,19 @@ let handoffNotes = [];
         const patientId = container?.dataset.patientId;
         const patient = rosterData.find((p) => String(p.id) === String(patientId));
         const name = patient?.name || 'ce patient';
-        void askConfirm(`Annuler le rendez-vous de ${name} ? Cette action est irréversible.`).then((ok) => {
+        void askConfirm(`Annuler le rendez-vous de ${name} ?`).then(async (ok) => {
           if (!ok) {
             select.value = previousStatus;
             applyMatteSelectSkin(select, previousStatus);
             return;
           }
-          updateRosterStatus(select, previousStatus);
+          const reason = await pickCancelReason();
+          if (!reason) {
+            select.value = previousStatus;
+            applyMatteSelectSkin(select, previousStatus);
+            return;
+          }
+          updateRosterStatus(select, previousStatus, { cancelReason: reason });
         });
         return;
       }
@@ -4374,12 +4718,17 @@ let handoffNotes = [];
     const endLocal = casablancaDateTimeLocal(end);
     if (!startLocal || !endLocal) return null;
     const cancelled = isPulseCancelledStatus(row.status);
+    const kind = bookingKindOf(row);
+    const classNames = ['cal-chip'];
+    if (kind === 'block') classNames.push('cal-chip--block');
+    if (kind === 'emergency_hold') classNames.push('cal-chip--hold');
+    if (cancelled) classNames.push('is-cancelled');
     return {
       id: String(row.id || ''),
-      title: familyNameFromPatient(patientName),
+      title: kind === 'visit' ? familyNameFromPatient(patientName) : (treatment || patientName),
       start: startLocal,
       end: endLocal,
-      classNames: ['cal-chip', cancelled ? 'is-cancelled' : ''].filter(Boolean),
+      classNames,
       extendedProps: {
         bookingId: String(row.id || ''),
         patientName,
@@ -4388,6 +4737,7 @@ let handoffNotes = [];
         status: row.status || '',
         durationMin: duration,
         startsAt: startRaw,
+        bookingKind: kind,
       },
     };
   }
@@ -4433,11 +4783,17 @@ let handoffNotes = [];
   }
 
   async function applyOpsStatus(bookingId, newStatus) {
+    const body = { bookingId, newStatus };
+    if (newStatus === 'Annulé' || newStatus === 'Annule') {
+      const reason = await pickCancelReason();
+      if (!reason) return;
+      body.cancelReason = reason;
+    }
     const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
       method: 'POST',
       credentials: 'include',
       headers: apiHeaders(),
-      body: JSON.stringify({ bookingId, newStatus }),
+      body: JSON.stringify(body),
     });
     assertAuthorizedResponse(response);
     if (!response.ok) {
@@ -4458,6 +4814,32 @@ let handoffNotes = [];
       .filter(Boolean)
       .join(' · ');
     actions.replaceChildren();
+
+    if (props.bookingKind === 'emergency_hold') {
+      const release = document.createElement('button');
+      release.type = 'button';
+      release.textContent = 'Relâcher';
+      release.addEventListener('click', async () => {
+        await releaseEmergencyHold(props.bookingId || event.id);
+        closeOpsChipSheet();
+      });
+      actions.appendChild(release);
+      sheet.hidden = false;
+      const hx = Math.min(window.innerWidth - 240, Math.max(12, jsEvent?.clientX || 24));
+      const hy = Math.min(window.innerHeight - 180, Math.max(12, jsEvent?.clientY || 24));
+      sheet.style.left = `${hx}px`;
+      sheet.style.top = `${hy}px`;
+      return;
+    }
+
+    if (props.bookingKind === 'block') {
+      const note = document.createElement('p');
+      note.className = 'ops-chip-sheet__meta';
+      note.textContent = 'Blocage docteur — lecture seule ici.';
+      actions.appendChild(note);
+      sheet.hidden = false;
+      return;
+    }
 
     STATUS_OPTIONS.forEach((status) => {
       const btn = document.createElement('button');
@@ -5439,6 +5821,7 @@ let handoffNotes = [];
     });
     runInitStep('keyboardShortcuts', () => initKeyboardShortcuts());
     runInitStep('status', () => initStatusListener());
+    runInitStep('floorOps', () => initFloorComposer());
     runInitStep('quickActions', () => initQuickActions());
     runInitStep('bulkBar', () => initBulkActionBar());
     runInitStep('invisibleUI', () => initInvisibleUI());
