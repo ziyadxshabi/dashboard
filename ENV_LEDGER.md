@@ -15,6 +15,7 @@ This ledger lists **exactly** the variables the running OS reads. Architecture: 
 Supabase **transaction pooler** connection string on **port 6543**.
 
 - Consumer: `Temara_Dashboard/api/_lib/db.js` (`pg` Pool).
+- Production **and Preview** must both have this set. A Vercel preview without `DATABASE_URL` returns 503 on login.
 - Production: TLS (`ssl: { rejectUnauthorized: false }` for the pooler). Direct `db.<ref>.supabase.co:5432` is IPv6-only and is not used here.
 - Local Docker/dev may use `postgres://dentaflow:dentaflow@127.0.0.1:5432/dentaflow` (no TLS).
 
@@ -31,6 +32,7 @@ HS256 signing key for the httpOnly `dentaflow_session` cookie.
 - Consumer: `api/_lib/auth-crypto.js`, `api/auth.js`, `requireClinicSession`.
 - **≥ 32 random bytes** (hex or base64). Rotate independently of the database password.
 - Claims: `sub`, `role`, `clinic_id`, `slug`.
+- Production **and Preview** must both have this set. Missing `JWT_SECRET` makes `POST /api/auth` return 503; anonymous `/api/auth/me` still returns 401.
 
 ### `CLINIC_ID` — default tenant slug
 

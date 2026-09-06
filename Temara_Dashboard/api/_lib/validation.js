@@ -130,13 +130,18 @@ function isAllowedAppointmentStatus(raw) {
 }
 
 function requireClinicSession(req, res, options = {}) {
+  const token = getTokenFromRequest(req);
+  if (!token) {
+    res.status(401).json(createApiError('UNAUTHORIZED'));
+    return null;
+  }
+
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     res.status(503).json(createApiError('SERVER_ERROR', 'Auth not configured'));
     return null;
   }
 
-  const token = getTokenFromRequest(req);
   const payload = verifyJwt(token, secret);
   if (!payload) {
     res.status(401).json(createApiError('UNAUTHORIZED'));

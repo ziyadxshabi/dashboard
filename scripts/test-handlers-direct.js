@@ -245,6 +245,52 @@ async function run() {
   const meAnon = await invoke(handleAuth, createReq({ method: 'GET', url: '/api/auth/me', headers: {} }));
   ok('GET /api/auth/me without cookie returns 401', meAnon.statusCode === 401);
 
+  const savedJwtSecret = process.env.JWT_SECRET;
+  delete process.env.JWT_SECRET;
+  try {
+    const meAnonNoSecret = await invoke(
+      handleAuth,
+      createReq({ method: 'GET', url: '/api/auth/me', headers: {} })
+    );
+    ok(
+      'GET /api/auth/me without cookie still returns 401 when JWT_SECRET is unset',
+      meAnonNoSecret.statusCode === 401,
+      `status=${meAnonNoSecret.statusCode}`
+    );
+
+    const meCookieNoSecret = await invoke(
+      handleAuth,
+      createReq({
+        method: 'GET',
+        url: '/api/auth/me',
+        headers: { cookie: 'dentaflow_session=stale' },
+      })
+    );
+    ok(
+      'GET /api/auth/me with cookie returns 503 when JWT_SECRET is unset',
+      meCookieNoSecret.statusCode === 503,
+      `status=${meCookieNoSecret.statusCode}`
+    );
+
+    const loginNoSecret = await invoke(
+      handleAuth,
+      createReq({
+        method: 'POST',
+        url: '/api/auth',
+        headers: { 'content-type': 'application/json' },
+        body: { username: DOCTOR_USER, password: SEED_PASSWORD, slug: CLINIC_SLUG },
+      })
+    );
+    ok(
+      'POST /api/auth returns 503 when JWT_SECRET is unset',
+      loginNoSecret.statusCode === 503,
+      `status=${loginNoSecret.statusCode}`
+    );
+  } finally {
+    if (savedJwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = savedJwtSecret;
+  }
+
   // ── Roster (Postgres) ──────────────────────────────────────────────────
   console.log('\n[roster]');
   const roster = await invoke(

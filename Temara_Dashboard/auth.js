@@ -207,6 +207,13 @@
         return;
       }
 
+      if (response.status === 503) {
+        showLoginError(
+          'Authentification indisponible sur ce déploiement (JWT_SECRET ou DATABASE_URL manquant).'
+        );
+        return;
+      }
+
       if (!response.ok) {
         showLoginError('Connexion impossible. Réessayez.');
         return;
