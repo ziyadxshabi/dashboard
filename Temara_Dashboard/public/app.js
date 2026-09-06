@@ -1524,7 +1524,6 @@ let handoffNotes = [];
   function guardDeployingFeatureButtons() {
     wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
     wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
-    wireDeployingFeatureButton($('btn-force-sms'), DEPLOYING_FEATURE_NOTICES.forceReminders);
     wireDeployingFeatureButton($('btn-block-slot'), DEPLOYING_FEATURE_NOTICES.blockSlot);
     wireDeployingFeatureButton($('btn-alerte-retard'), DEPLOYING_FEATURE_NOTICES.delayAlert);
     wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
@@ -1702,11 +1701,6 @@ let handoffNotes = [];
       if (looksLikeRosterRecord(payload[key])) return [payload[key]];
     }
 
-    // n8n single-item wrapper: { json: { ... } }
-    if (payload.json && typeof payload.json === 'object' && !Array.isArray(payload.json)) {
-      return [payload.json];
-    }
-
     // Object map of rows: { "0": {...}, "1": {...} }
     const values = Object.values(payload);
     if (values.length && values.every(v => v && typeof v === 'object' && !Array.isArray(v))) {
@@ -1754,9 +1748,6 @@ let handoffNotes = [];
 
   function buildRosterPipeline(payload) {
     const unwrapped = unwrapRosterProxyPayload(payload);
-    const n8nErr = getN8nWebhookErrorMessage(unwrapped);
-    if (n8nErr) throw new Error(n8nErr);
-
     const rawRows = parseRosterResponse(unwrapped);
     const normalized = sortRosterByTime(
       rawRows
@@ -1767,17 +1758,6 @@ let handoffNotes = [];
     const todayRecords = filterTodayRosterRecords(normalized);
 
     return { rawRows, normalized, todayRecords };
-  }
-
-  function getN8nWebhookErrorMessage(payload) {
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-    if (payload.code === 404 && String(payload.message || '').toLowerCase().includes('webhook')) {
-      return 'Erreur de synchronisation avec la base de données';
-    }
-    if (payload.code && payload.message) {
-      return String(payload.message);
-    }
-    return null;
   }
 
   function resolveRosterUrl() {
@@ -2144,6 +2124,19 @@ let handoffNotes = [];
     return parsed ?? { success: true, message: rawText || 'OK' };
   }
 
+  function toastFromSmsResult(result) {
+    const count = Number(result?.dispatchedCount || 0);
+    if (count > 0) {
+      showToast(count === 1 ? 'SMS envoyé.' : `${count} SMS envoyés.`, 'success');
+      return;
+    }
+    if (result?.twilioConfigured === false) {
+      showToast("SMS non envoyé — Twilio n'est pas configuré.", 'warning');
+      return;
+    }
+    showToast('Aucun SMS envoyé.', 'warning');
+  }
+
   async function postBulkStatusUpdates(records, newStatus) {
     const rows = Array.isArray(records) ? records : [];
     if (!rows.length) {
@@ -2381,8 +2374,7 @@ let handoffNotes = [];
     try {
       console.log('[Bulk SMS] Dispatch | RowIDs: ' + (targetRowIds?.length || 0));
       const result = await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: targetRowIds });
-      const message = result?.message || 'SMS groupés envoyés avec succès.';
-      showToast(message, 'success');
+      toastFromSmsResult(result);
     } catch (error) {
       console.error('[Bulk SMS] Failed:', error?.message || error);
       restoreBulkSelection(ids);
@@ -2470,9 +2462,6 @@ let handoffNotes = [];
     }
     if (/503/.test(msg)) {
       return PLANNING_UPSTREAM_ERROR_MESSAGE;
-    }
-    if (msg.includes('not registered') || msg.includes('Webhook n8n inactif')) {
-      return 'Erreur de synchronisation avec la base de données';
     }
     if (/^HTTP 404\b/.test(msg) || msg.includes('HTTP 404')) {
       return 'Erreur de synchronisation avec la base de données';
@@ -2746,8 +2735,8 @@ let handoffNotes = [];
       return;
     }
     try {
-      await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: [parsed] });
-      showToast('SMS envoyé.', 'success');
+      const result = await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { rowIds: [parsed] });
+      toastFromSmsResult(result);
     } catch (error) {
       console.error('[Quick SMS] Failed:', error?.message || error);
       showToast('Échec de l\'envoi SMS.', 'error');
@@ -4039,8 +4028,7 @@ let handoffNotes = [];
     }
 
     if (!response.ok) {
-      const n8nFromBody = getN8nWebhookErrorMessage(payload);
-      throw new Error(n8nFromBody || `HTTP ${response.status}: ${rawText.slice(0, 200)}`);
+      throw new Error(`HTTP ${response.status}: ${rawText.slice(0, 200)}`);
     }
 
     const pipeline = buildRosterPipeline(payload);
@@ -5707,8 +5695,33 @@ let handoffNotes = [];
     wireFillGapButton($('btn-fill-gap'));
   }
 
+  function initForceTomorrowSms() {
+    const button = $('btn-force-sms');
+    if (!button || button.dataset.forceSmsWired === 'true') return;
+    button.dataset.forceSmsWired = 'true';
+    button.disabled = false;
+    button.removeAttribute('aria-disabled');
+    button.classList.remove('v-disabled');
+    button.setAttribute('title', 'Rappel SMS pour les rendez-vous de demain');
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const confirmed = await askConfirm(
+        'Envoyer un rappel SMS à tous les patients de demain ? Cette action est irréversible.'
+      );
+      if (!confirmed) return;
+      try {
+        const result = await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, { action: 'force-tomorrow' });
+        toastFromSmsResult(result);
+      } catch (error) {
+        console.error('[Force SMS] Failed:', error?.message || error);
+        showToast("Échec de l'envoi SMS.", 'error');
+      }
+    });
+  }
+
   function initQuickActions() {
     guardDeployingFeatureButtons();
+    initForceTomorrowSms();
     wireFillGapButtons();
   }
 

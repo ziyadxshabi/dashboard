@@ -2,7 +2,7 @@
 
 > **Classification:** Internal developer reference
 > **Runtime:** Supabase PostgreSQL + Vercel serverless (`Temara_Dashboard`)
-> **Last aligned to codebase:** 2026-09-05
+> **Last aligned to codebase:** 2026-09-06
 
 This document describes the **active** production architecture. Baserow, Google Sheets, ngrok, and n8n proxies are not sources of truth and are not part of the runtime path.
 
@@ -33,7 +33,7 @@ DentaFlow OS is a **multi-tenant clinic operating system** for dental practices.
 │           POST /api/fill-gap  POST /api/bulk-sms  GET|POST /api/team-notes│
 │           GET /api/dashboard-data                                       │
 │  Public   GET /api/public/clinic/:slug   GET /api/health                │
-│  Ingest   POST /api/webhooks/cal                                        │
+│  Ingest   POST /api/webhooks/cal   POST /api/webhooks/twilio              │
 └──────────────┬───────────────────────────────┬──────────────────────────┘
                │ DATABASE_URL :6543            │ HMAC optional
                ▼                               ▼
@@ -90,9 +90,11 @@ Canonical SQL: `supabase/schema.sql`. Access: `Temara_Dashboard/api/_lib/db.js` 
 | `clinics` | Slug, display name, phone, `theme_preset`, `theme_tokens`, Cal.com event type, SMS booking URL |
 | `staff_users` | Per-clinic unique `username`, scrypt `password_hash`, role `doctor` \| `assistant`, `display_name` |
 | `bookings` | Appointments (`cal_booking_uid`, patient, `appointment_status`, `starts_at`) |
-| `waitlist` | Active / filled candidates, `waitlist_priority` |
+| `waitlist` | Active / filled candidates, `waitlist_priority`, `sms_consent`, `last_notified_at` |
 | `team_notes` | Clinic-scoped notes (`author_name` / `content`, `pinned`, `category`) |
-| `sms_dispatch_log` | Bulk SMS audit rows (message, recipient count, JSON recipients) |
+| `sms_dispatch_log` | Bulk SMS audit rows (message, recipient count, JSON recipients) — written only after a SID |
+| `sms_messages` | Per-message Twilio SID, status, purpose (Concierge / reminder / waitlist / voice) |
+| `notification_locks` | NX keys for booking events, waitlist notify, Twilio status, voice 5/60s |
 
 Enums:
 
@@ -106,7 +108,7 @@ Seed clinic slug: `temara` (Clinique Dentaire Témara Mall). Seed usernames in S
 
 ## 4. Vercel serverless APIs
 
-Handlers under `Temara_Dashboard/api/` (Hobby cap 12 functions). `_lib/` and `_archive/` are not deployed as routes.
+Handlers under `Temara_Dashboard/api/` (Hobby **12/12** after `webhooks/twilio.js`). `_lib/` and `_archive/` are not deployed as routes. Do not add a 13th file.
 
 | Route | Auth | Store |
 | --- | --- | --- |
@@ -118,11 +120,12 @@ Handlers under `Temara_Dashboard/api/` (Hobby cap 12 functions). `_lib/` and `_a
 | `POST /api/update-status` / `PATCH /api/roster` | Cookie | Direct `bookings.status` update |
 | `GET` / `POST /api/waitlist` | Cookie | `waitlist` |
 | `POST /api/fill-gap` | Cookie | Waitlist candidates; optional `bookings` insert |
-| `POST /api/bulk-sms` | Cookie | `sms_dispatch_log` (no n8n) |
+| `POST /api/bulk-sms` | Cookie | Twilio send + `sms_dispatch_log` (SID required to count as sent) |
 | `GET` / `POST /api/team-notes` | Cookie | `team_notes` |
 | `GET /api/dashboard-data` | Cookie | KPI aggregations on `bookings` |
 | `GET /api/public/clinic/:slug` | None | Public clinic branding |
-| `POST /api/webhooks/cal` | HMAC optional | Cal.com → `bookings` |
+| `POST /api/webhooks/cal` | HMAC optional | Cal.com → `bookings` + Concierge notify |
+| `POST /api/webhooks/twilio` | Twilio signature | SMS status + Voice digit-1 |
 | `GET /api/health` | None | `SELECT 1` — `{ ok, status, database, timestamp }` only |
 
 Clinic scope for staff routes: `requireClinicSession` → `session.clinic_id`.
@@ -198,12 +201,16 @@ Cal.com  BOOKING_CREATED | BOOKING_RESCHEDULED | BOOKING_CANCELLED
 Resolve clinic_id (event type / slug, fallback clinics.slug = 'temara')
     │
     ├─ CREATED     → INSERT bookings … ON CONFLICT (cal_booking_uid) DO UPDATE
-    │                status Confirme
-    ├─ RESCHEDULED → UPDATE starts_at, status Confirme, updated_at
-    └─ CANCELLED   → UPDATE status Annule, updated_at
+    │                status Confirme → confirm SMS (SID) + email/Slack fail-open
+    ├─ RESCHEDULED → UPDATE starts_at, status Confirme → reschedule SMS
+    └─ CANCELLED   → UPDATE status Annule → Slack/email + waitlist top-3 NX
 ```
 
+NX keys: `lock:booking:${uid}:${event}` (24h). Waitlist: `waitlist:notified:${e164}` (24h). Spec: `n8n/CONCIERGE_BEHAVIOR.md`.
+
 When `CALCOM_WEBHOOK_SECRET` is set, unsigned payloads are rejected. When unset (local), unsigned payloads are accepted for development.
+
+Crons (UTC, Casablanca UTC+1): `GET /api/roster?action=cron-reminders` at 07:00 UTC, `cron-leak` at 08:00 UTC. Auth: `CRON_SECRET` or staff JWT.
 
 ---
 
@@ -244,7 +251,8 @@ Environment policy: `ENV_LEDGER.md`.
 | `Temara_Dashboard/api/_lib/auth-crypto.js` | scrypt, JWT, cookie, optional Redis |
 | `Temara_Dashboard/api/_lib/validation.js` | `requireClinicSession`, validators |
 | `Temara_Dashboard/api/auth.js` | Login / me / logout / password |
-| `Temara_Dashboard/api/webhooks/cal.js` | Cal.com ingest |
+| `Temara_Dashboard/api/webhooks/cal.js` | Cal.com ingest + Concierge notify |
+| `Temara_Dashboard/api/webhooks/twilio.js` | 12th Hobby fn: SMS status + Voice digit-1 |
 | `Temara_Dashboard/api/public/clinic/[slug].js` | Public branding |
 | `supabase/schema.sql` | Canonical schema + Temara seed |
 | `scripts/dev-server.js` | Local Vercel-like server |

@@ -12,6 +12,7 @@ const {
   createApiError,
   sanitizeString,
 } = require('./validation');
+const { createCalBusyBooking, cancelCalBusyBooking, attachCalUid } = require('./cal-busy');
 
 const CLINIC_OPEN = '08:00';
 const CLINIC_CLOSE = '19:00';
@@ -369,11 +370,18 @@ async function handleDeleteBlock(req, res, session) {
      WHERE clinic_id = $1
        AND id::text = $2
        AND booking_kind IN ('block', 'emergency_hold')
-     RETURNING id, booking_kind`,
+     RETURNING id, booking_kind, cal_booking_uid`,
     [session.clinic_id, id]
   );
   if (!deleted.rows[0]) {
     return res.status(404).json(createApiError('NOT_FOUND', 'Blocage introuvable'));
+  }
+  try {
+    if (deleted.rows[0].cal_booking_uid) {
+      await cancelCalBusyBooking(deleted.rows[0].cal_booking_uid);
+    }
+  } catch (err) {
+    console.error('[cal-busy-cancel]', err?.message || err);
   }
   return res.status(200).json({ ok: true, data: deleted.rows[0] });
 }
@@ -464,6 +472,21 @@ async function handleCreate(req, res, session, parsed) {
     kind: value.kind,
     notes: value.notes || null,
   });
+  try {
+    const busy = await createCalBusyBooking({
+      clinicId: session.clinic_id,
+      startsAt: value.startsAt,
+      durationMin,
+      label: patientName,
+      kind: value.kind,
+    });
+    if (busy.ok && busy.uid) {
+      await attachCalUid(row.id, busy.uid);
+      row.cal_booking_uid = busy.uid;
+    }
+  } catch (err) {
+    console.error('[cal-busy]', err?.message || err);
+  }
   return res.status(201).json({ ok: true, data: row });
 }
 

@@ -15,6 +15,7 @@ const {
   sendDbError,
   validateStatusUpdate,
 } = require('./validation');
+const { blastWaitlistSlot } = require('./waitlist-blast');
 
 const UPDATE_STATUS_SQL = `
   UPDATE bookings
@@ -88,6 +89,14 @@ module.exports = async function handleStatusUpdate(req, res) {
 
     if (parsed.value.statusCode === 'annule') {
       payload.triggerCalCancel = true;
+      try {
+        payload.waitlistNotify = await blastWaitlistSlot(session.clinic_id, req, {
+          topN: 3,
+          batchId: `staff-cancel-${updatedBooking.id}`,
+        });
+      } catch (err) {
+        console.error('[status-cancel-blast]', err?.message || err);
+      }
     }
 
     return res.status(200).json(payload);
