@@ -1101,6 +1101,7 @@ function initCrmSearch() {
 
 /* ── CRM DOSSIER PATIENT — SLIDE-OVER PANEL ─────────────────────────────── */
 let crmPatientsById = {};
+const crmPatientsByRow = new WeakMap();
 
 function getCrmMotifTagClass(motif) {
   const normalised = String(motif ?? '').toLowerCase();
@@ -1160,6 +1161,8 @@ function renderCRMTable(records) {
     tr.tabIndex = 0;
     tr.setAttribute('role', 'button');
     tr.dataset.patientId = String(patient.id);
+    tr.dataset.phone = patient.phone || '';
+    crmPatientsByRow.set(tr, patient);
 
     const cells = [
       patient.name,
@@ -1188,21 +1191,33 @@ function getCrmStatutTagClass(statut) {
 }
 
 function readCrmRowData(row) {
+  const attached = crmPatientsByRow.get(row);
+  if (attached) return attached;
   const patientId = row?.dataset?.patientId;
   if (patientId && crmPatientsById[patientId]) {
     return crmPatientsById[patientId];
   }
 
+  const phone = row?.dataset?.phone || row?.cells?.[1]?.textContent.trim() || '';
+  const matched = Object.values(crmPatientsById).find((patient) => (
+    String(patient.id) === String(patientId)
+    || (phone && (patient.phone === phone || patient.phone_e164 === phone))
+  ));
+  if (matched) return matched;
+
   const { dataset } = row;
   return {
-    name:          dataset.name          ?? row.cells[0]?.textContent.trim() ?? '—',
-    phone:         dataset.phone         ?? row.cells[1]?.textContent.trim() ?? '',
-    email:         dataset.email         ?? row.cells[2]?.textContent.trim() ?? '',
-    motif:         dataset.motif         ?? row.cells[3]?.textContent.trim() ?? '—',
-    statut:        dataset.statut        ?? '—',
-    amount:        parseFloat(dataset.amount) || 0,
-    insurance:     dataset.insurance     ?? '—',
-    observations:  dataset.observations  ?? 'Aucune observation enregistrée.',
+    id: patientId || phone,
+    name: dataset.name ?? row.cells[0]?.textContent.trim() ?? '—',
+    phone,
+    email: dataset.email ?? '',
+    motif: dataset.motif ?? row.cells[2]?.textContent.trim() ?? '—',
+    visit_count: Number(dataset.visits ?? row.cells[3]?.textContent) || 0,
+    last_visit_label: row.cells[4]?.textContent.trim() ?? '—',
+    next_visit_label: row.cells[5]?.textContent.trim() ?? '—',
+    recent_visits: [],
+    no_show_count: 0,
+    cancel_count: 0,
   };
 }
 

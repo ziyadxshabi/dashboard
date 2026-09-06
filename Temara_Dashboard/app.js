@@ -4755,7 +4755,7 @@ let handoffNotes = [];
 
   function renderCRMTable(appointmentsArray) {
     return safeRender('renderCRMTable', () => {
-    const tbody = document.getElementById('crm-table-body');
+    const tbody = $('crm-table-body');
     if (!tbody) return;
 
     const rows = Array.isArray(appointmentsArray) ? appointmentsArray.filter(Boolean) : [];
@@ -4785,6 +4785,7 @@ let handoffNotes = [];
       tr.tabIndex = 0;
       tr.setAttribute('role', 'button');
       tr.dataset.patientId = String(patient.id);
+      tr.dataset.phone = patient.phone || '';
 
       [patient.name, patient.phone || '—', patient.motif, String(patient.visit_count), patient.last_visit_label, patient.next_visit_label]
         .forEach((text) => {
@@ -4806,19 +4807,25 @@ let handoffNotes = [];
     if (patientId && crmPatientsById[patientId]) {
       return crmPatientsById[patientId];
     }
+    const phone = row?.dataset?.phone || row?.cells?.[1]?.textContent.trim() || '';
+    const matched = Object.values(crmPatientsById).find((patient) => (
+      String(patient.id) === String(patientId)
+      || (phone && (patient.phone === phone || patient.phone_e164 === phone))
+    ));
+    if (matched) return matched;
 
     const { dataset } = row;
     return {
       name: dataset.name ?? row.cells[0]?.textContent.trim() ?? 'Non spécifié',
-      phone: dataset.phone ?? row.cells[1]?.textContent.trim() ?? '',
-      email: dataset.email ?? row.cells[2]?.textContent.trim() ?? '',
-      motif: dataset.motif ?? row.cells[3]?.textContent.trim() ?? 'Consultation',
-      status: dataset.statut ?? row.cells[5]?.textContent.trim() ?? 'Confirmé',
-      billingStatus: dataset.billingStatus ?? row.cells[4]?.textContent.trim() ?? '',
-      lastVisit: dataset.lastVisit ?? 'Non renseigné',
-      observations: dataset.observations ?? '',
-      insurance: dataset.insurance ?? dataset.coverage ?? '',
-      coverage: dataset.coverage ?? dataset.insurance ?? '',
+      phone,
+      email: dataset.email ?? '',
+      motif: dataset.motif ?? row.cells[2]?.textContent.trim() ?? 'Consultation',
+      visit_count: Number(row.cells[3]?.textContent) || 0,
+      last_visit_label: row.cells[4]?.textContent.trim() ?? '—',
+      next_visit_label: row.cells[5]?.textContent.trim() ?? '—',
+      recent_visits: [],
+      no_show_count: 0,
+      cancel_count: 0,
     };
   }
 
