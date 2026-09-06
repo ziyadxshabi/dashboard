@@ -26,6 +26,8 @@ Store: `notification_locks` (Postgres). Fail-open on lock errors for **ingest** 
 
 Waitlist: `waitlist:notified:${e164}` NX 24h. Twilio status: `lock:twilio-sms:${MessageSid}` NX 24h.
 
+Voice inbound (`POST /api/webhooks/twilio`): no `Digits` + `CallSid` → French `<Gather numDigits="1">` (“Pour réserver en ligne, appuyez sur 1”). Digit `1` → SMS with `/book/:slug`. SMS only (not WhatsApp).
+
 ## Waitlist blast (merged policy)
 
 - Rank: Urgent 0, Haute 1, Moyenne/Normale 2, Faible/Basse 3, then `created_at`, then `id`

@@ -64,7 +64,7 @@ Twilio Programmable SMS. Handlers never report `dispatchedCount > 0` without a S
 
 - Consumers: `api/_lib/twilio.js`, `api/bulk-sms.js`, Concierge notify, crons, `api/webhooks/twilio.js`.
 - `TWILIO_FROM` may be overridden per clinic by `clinics.twilio_from`.
-- Alias accepted: `TWILIO_FROM_NUMBER`, `N8N_TWILIO_AUTH_TOKEN` (do not set n8n names on new projects).
+- Alias accepted: `TWILIO_FROM_NUMBER` only. `N8N_TWILIO_AUTH_TOKEN` is not read.
 
 ### `TWILIO_WEBHOOK_URL` — production required for inbound SMS/voice
 

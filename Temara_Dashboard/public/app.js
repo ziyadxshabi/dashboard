@@ -1648,7 +1648,7 @@ let handoffNotes = [];
   }
 
   /**
-   * Extract HH:mm from Baserow "Date & Heure du RDV" (ISO datetime or parseable string).
+   * Extract HH:mm from appointment datetime (ISO or parseable string).
    * Returns "--:--" when missing or invalid.
    */
   function formatAppointmentTime(rawDate) {
@@ -1737,7 +1737,7 @@ let handoffNotes = [];
     return payload;
   }
 
-  /** Scalar passthrough — Postgres fields are plain strings, not Baserow objects. */
+  /** Scalar passthrough — Postgres fields are plain strings. */
   function extractScalarValue(field) {
     if (field == null) return '';
     if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
@@ -1805,11 +1805,7 @@ let handoffNotes = [];
     return text;
   }
 
-  function parseBaserowRowId(raw) {
-    return parseBookingRowId(raw);
-  }
-
-  function extractBaserowRowId(record) {
+  function extractBookingRowId(record) {
     const id = record?.rowId ?? record?.id;
     return parseBookingRowId(id);
   }
@@ -1825,7 +1821,7 @@ let handoffNotes = [];
 
   function gatherTomorrowPendingRowIds(records) {
     return gatherTomorrowPendingRecords(records)
-      .map(extractBaserowRowId)
+      .map(extractBookingRowId)
       .filter((rowId) => rowId != null);
   }
 
@@ -2024,10 +2020,10 @@ let handoffNotes = [];
   function getSelectedRowIdsForApi(ids = selectedPatientIds) {
     return ids
       .map((id) => {
-        const direct = parseBaserowRowId(id);
+        const direct = parseBookingRowId(id);
         if (direct != null) return direct;
         const record = getRecordsForSelectedIds([id])[0];
-        return record ? extractBaserowRowId(record) : null;
+        return record ? extractBookingRowId(record) : null;
       })
       .filter((rowId) => rowId != null);
   }
@@ -2042,7 +2038,7 @@ let handoffNotes = [];
   function extractCancelMetadataFromRecord(record) {
     const row = document.querySelector(`#planning-timeline .timeline-item[data-patient-id="${String(record.id)}"]`)
       || document.querySelector(`#roster-tbody tr[data-patient-id="${String(record.id)}"]`);
-    const rowId = extractBaserowRowId(record);
+    const rowId = extractBookingRowId(record);
     return {
       rowId,
       calBookingId: row?.dataset?.calBookingId || record.calBookingId || '',
@@ -2073,10 +2069,10 @@ let handoffNotes = [];
 
   function restoreBulkSelection(ids) {
     selectedPatientIds = ids
-      .map((id) => parseBaserowRowId(id))
+      .map((id) => parseBookingRowId(id))
       .filter((rowId) => rowId != null);
     document.querySelectorAll('#planning-timeline .row-checkbox, #roster-tbody .row-checkbox').forEach((checkbox) => {
-      const rowId = parseBaserowRowId(checkbox.dataset.rowId);
+      const rowId = parseBookingRowId(checkbox.dataset.rowId);
       checkbox.checked = rowId != null && selectedPatientIds.includes(rowId);
     });
     updateBulkBarUI();
@@ -2186,7 +2182,7 @@ let handoffNotes = [];
   function getRecordsForSelectedIds(ids = selectedPatientIds) {
     return ids
       .map((id) => {
-        const rowId = parseBaserowRowId(id);
+        const rowId = parseBookingRowId(id);
         if (rowId == null) return null;
         return rosterData.find((record) => isSameRowId(record.id, rowId))
           || allRosterRecords.find((record) => isSameRowId(record.id, rowId));
@@ -2196,7 +2192,7 @@ let handoffNotes = [];
 
   function removeRecordsFromLocalState(ids) {
     const idSet = new Set(
-      ids.map((id) => String(parseBaserowRowId(id) ?? id))
+      ids.map((id) => String(parseBookingRowId(id) ?? id))
     );
     rosterData = rosterData.filter((record) => !idSet.has(String(record.id)));
     allRosterRecords = allRosterRecords.filter((record) => !idSet.has(String(record.id)));
@@ -2393,7 +2389,7 @@ let handoffNotes = [];
     if (!event.target.classList.contains('row-checkbox')) return;
     if (!event.target.closest('#planning-timeline, #roster-tbody')) return;
 
-    const rowId = parseBaserowRowId(event.target.dataset.rowId);
+    const rowId = parseBookingRowId(event.target.dataset.rowId);
     if (rowId == null) return;
 
     if (event.target.checked) {
@@ -2729,7 +2725,7 @@ let handoffNotes = [];
   }
 
   async function sendQuickSmsToRow(rowId) {
-    const parsed = parseBaserowRowId(rowId);
+    const parsed = parseBookingRowId(rowId);
     if (parsed == null) {
       showToast('SMS rapide indisponible pour cette ligne.', 'warning');
       return;
@@ -2822,7 +2818,7 @@ let handoffNotes = [];
     }
 
     const record = context.record || {};
-    const rowId = extractBaserowRowId(record);
+    const rowId = extractBookingRowId(record);
 
     popover.append(
       createPopoverMenuItem('Modifier le statut', ROW_ACTION_SVG.edit, () => {
@@ -3629,7 +3625,7 @@ let handoffNotes = [];
 
   function createPlanningTimelineItem(record) {
     const patientId = String(record.id);
-    const baserowRowId = extractBaserowRowId(record);
+    const bookingRowId = extractBookingRowId(record);
     const scheduleDate = formatScheduleDate(record.rawDate);
 
     const item = document.createElement('article');
@@ -3664,9 +3660,9 @@ let handoffNotes = [];
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'brutalist-checkbox row-checkbox';
-    if (baserowRowId != null) {
-      checkbox.dataset.rowId = String(baserowRowId);
-      checkbox.value = String(baserowRowId);
+    if (bookingRowId != null) {
+      checkbox.dataset.rowId = String(bookingRowId);
+      checkbox.value = String(bookingRowId);
       checkbox.setAttribute('aria-label', `Sélectionner ${record.name}`);
     } else {
       checkbox.disabled = true;
@@ -3704,7 +3700,7 @@ let handoffNotes = [];
   /** @deprecated Legacy table row — kept for backward compatibility */
   function createRosterTableRow(record) {
     const patientId = String(record.id);
-    const baserowRowId = extractBaserowRowId(record);
+    const bookingRowId = extractBookingRowId(record);
     const scheduleDate = formatScheduleDate(record.rawDate);
 
     const tr = document.createElement('tr');
@@ -3721,9 +3717,9 @@ let handoffNotes = [];
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'brutalist-checkbox row-checkbox';
-    if (baserowRowId != null) {
-      checkbox.dataset.rowId = String(baserowRowId);
-      checkbox.value = String(baserowRowId);
+    if (bookingRowId != null) {
+      checkbox.dataset.rowId = String(bookingRowId);
+      checkbox.value = String(bookingRowId);
       checkbox.setAttribute('aria-label', `Sélectionner ${record.name}`);
     } else {
       checkbox.disabled = true;

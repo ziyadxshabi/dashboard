@@ -274,7 +274,10 @@ function validatePhone(value) {
 
 function sanitizeString(value, maxLen) {
   const limit = Number.isFinite(maxLen) && maxLen > 0 ? maxLen : 2000;
-  const text = String(value ?? '').replace(/\u0000/g, '').trim();
+  const text = String(value ?? '')
+    .replace(/\u0000/g, '')
+    .replace(/<[^>]*>/g, '')
+    .trim();
   if (!text) return '';
   return text.length > limit ? text.slice(0, limit) : text;
 }

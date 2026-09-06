@@ -125,7 +125,7 @@ Handlers under `Temara_Dashboard/api/` (Hobby **12/12** after `webhooks/twilio.j
 | `GET /api/dashboard-data` | Cookie | KPI aggregations on `bookings` |
 | `GET /api/public/clinic/:slug` | None | Public clinic branding |
 | `POST /api/webhooks/cal` | HMAC optional | Cal.com → `bookings` + Concierge notify |
-| `POST /api/webhooks/twilio` | Twilio signature | SMS status + Voice digit-1 |
+| `POST /api/webhooks/twilio` | Twilio signature | SMS status + Voice Gather + digit-1 |
 | `GET /api/health` | None | `SELECT 1` — `{ ok, status, database, timestamp }` only |
 
 Clinic scope for staff routes: `requireClinicSession` → `session.clinic_id`.
@@ -252,7 +252,7 @@ Environment policy: `ENV_LEDGER.md`.
 | `Temara_Dashboard/api/_lib/validation.js` | `requireClinicSession`, validators |
 | `Temara_Dashboard/api/auth.js` | Login / me / logout / password |
 | `Temara_Dashboard/api/webhooks/cal.js` | Cal.com ingest + Concierge notify |
-| `Temara_Dashboard/api/webhooks/twilio.js` | 12th Hobby fn: SMS status + Voice digit-1 |
+| `Temara_Dashboard/api/webhooks/twilio.js` | 12th Hobby fn: SMS status + Voice Gather + digit-1 |
 | `Temara_Dashboard/api/public/clinic/[slug].js` | Public branding |
 | `supabase/schema.sql` | Canonical schema + Temara seed |
 | `scripts/dev-server.js` | Local Vercel-like server |

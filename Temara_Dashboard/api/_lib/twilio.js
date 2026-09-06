@@ -15,9 +15,7 @@ function timingSafeEqualStrings(left, right) {
 
 function twilioCredentials() {
   const accountSid = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
-  const authToken = String(
-    process.env.TWILIO_AUTH_TOKEN || process.env.N8N_TWILIO_AUTH_TOKEN || ''
-  ).trim();
+  const authToken = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
   const fromNumber = String(
     process.env.TWILIO_FROM || process.env.TWILIO_FROM_NUMBER || ''
   ).trim();
@@ -53,7 +51,7 @@ function twilioStatusCallbackUrl(req) {
 
 function canonicalTwilioUrl(req, pathSuffix) {
   const base = String(
-    process.env.TWILIO_WEBHOOK_URL || process.env.N8N_WEBHOOK_BASE_URL || publicBaseUrl(req)
+    process.env.TWILIO_WEBHOOK_URL || publicBaseUrl(req)
   )
     .trim()
     .replace(/\/+$/, '')

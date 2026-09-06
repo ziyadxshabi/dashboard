@@ -1,35 +1,35 @@
-# n8n corpus — classification
+# n8n corpus — museum only
 
-These JSON files are **specs**, not the running OS. PostgreSQL is the source of truth. Do not import museum files. Do not restore `N8N_*` / `BASEROW_*` as live env.
+These JSON files are **history**, not the running OS. PostgreSQL is the source of truth. Do not import them. Do not restore `N8N_*` / `BASEROW_*` as live env.
 
-Product logic that still matters is ported in `Temara_Dashboard/api/_lib/` (Twilio, waitlist blast, reminders, leak drip, Cal busy, voice). Canonical behavior: [`CONCIERGE_BEHAVIOR.md`](CONCIERGE_BEHAVIOR.md).
+Product logic lives in `Temara_Dashboard/api/_lib/` (Twilio, waitlist blast, reminders, leak drip, Cal busy, voice). Canonical behavior: [`CONCIERGE_BEHAVIOR.md`](CONCIERGE_BEHAVIOR.md).
 
-## spec-to-port (keep in this folder until the port is live, then freeze)
+## ported (native Vercel / Postgres / Twilio)
 
-| File | Why it stays |
+| File | Native handler |
 | --- | --- |
-| `Production Concierge Engine v2.json` | Cal HMAC, NX, CREATED/CANCELLED/RESCHEDULED SMS+email+Slack, waitlist top-3 |
-| `No-Show Waitlist Engine (1).json` | Ranking + `waitlist:notified:${phone}` NX 24h (merged into Concierge blast) |
-| `Appointment Reminders Engine.json` | Cron `0 8 * * *` Africa/Casablanca, T-24h ± 30 min |
-| `Leak Protection Follow-up Engine.json` | Cron `0 9 * * *`, J+3 / J+7 / J+14 |
-| `Dashboard - Bulk SMS Blast.json` | Real Twilio send, E.164, Slack on bad phones |
-| `Twilio Voice Menu v4.90 - Linear Pro.json` | Twilio signature, 5/60s rate limit, digit 1 → TwiML + SMS |
-| `Agency Master Error Monitor_v1.2.json` | Slack error bus + 5 min Redis dedup (mapped to fail-open Slack) |
-| `Lead Capture Engine.json` | Optional later (abandon funnel) |
-| `Workflow 5 - Bulk Confirm.json` | Batch Confirmé semantics only — **do not port PIN** |
-| `Dashboard - Bulk Cancel.json` | Batch Annulé semantics; app is per-row JWT |
+| `Production Concierge Engine v2.json` | `POST /api/webhooks/cal` + `_lib/notify.js` + waitlist top-3 |
+| `No-Show Waitlist Engine (1).json` | merged into `_lib/waitlist-blast.js` (`waitlist:notified:${e164}` NX 24h) |
+| `Appointment Reminders Engine.json` | `GET /api/roster?action=cron-reminders` |
+| `Leak Protection Follow-up Engine.json` | `POST /api/roster?action=cron-leak` |
+| `Dashboard - Bulk SMS Blast.json` | `POST /api/bulk-sms` |
+| `Twilio Voice Menu v4.90 - Linear Pro.json` | `POST /api/webhooks/twilio` (Gather + digit 1 SMS) |
+| `Agency Master Error Monitor_v1.2.json` | fail-open Slack in `_lib/notify.js` |
+| Superpouvoir Fill / Block / Force (museum wrappers) | `fill-gap.js`, doctor `POST /api/roster` blocks + Cal busy, `bulk-sms?action=force-tomorrow` |
 
-## museum (`_museum/` — do not import)
+## not ported (intentional)
 
-Retired CRUD that Postgres already owns, inactive placeholders, and Superpouvoir **wrappers** (logic inlined in the app).
-
-## do-not-import
-
-| File | Reason |
+| File | Why |
 | --- | --- |
-| `_museum/DEPRECATED_waitlist_blueprint.bak` | Backup, never an n8n workflow |
-| `skills-lock.json` | Cursor lockfile, not a workflow |
+| `Lead Capture Engine.json` | Optional marketing funnel — would be a 13th Hobby function |
+| `Workflow 5 - Bulk Confirm.json` | Per-row JWT status is enough; **do not port PIN** |
+| `Dashboard - Bulk Cancel.json` | Same; staff Annulé already waitlist-blasts |
+| `_museum/*` | Retired Sheets/Baserow CRUD |
+| `_museum/DEPRECATED_waitlist_blueprint.bak` | Never an n8n workflow |
+| `skills-lock.json` | Cursor lockfile |
+
+Waitlist WF4’s unauthenticated add is **not** preserved. Staff waitlist stays JWT.
 
 ## `_snippets/`
 
-Shared n8n Code-node helpers kept as reference (`redis_upstash.js`, auth gates). Runtime equivalents live in `Temara_Dashboard/api/_lib/`.
+n8n Code-node helpers kept as reference. Runtime equivalents live in `Temara_Dashboard/api/_lib/`.
