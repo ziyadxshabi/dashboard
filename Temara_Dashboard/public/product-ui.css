@@ -20,11 +20,11 @@ html[data-theme="pearl-clinic"] {
   --text-hierarchy-tertiary: #737373;
   --divider-subtle: rgba(15, 15, 15, 0.08);
   --surface-row-hover: rgba(15, 15, 15, 0.03);
-  --card-padding: 1.25rem;
+  --card-padding: 16px;
   --tabbar-float-bg: rgba(255, 255, 255, 0.94);
   --tabbar-float-border: rgba(15, 15, 15, 0.08);
   --tabbar-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.05), 0 1px 3px rgba(15, 15, 15, 0.04);
+  --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.04);
   --shadow-hover: 0 2px 8px rgba(15, 15, 15, 0.06);
   --border-hairline: 1px solid rgba(15, 15, 15, 0.08);
   --glass-blur: none;
@@ -64,12 +64,12 @@ html[data-theme="oak-lounge"] {
   --text-hierarchy-tertiary: #737373;
   --divider-subtle: rgba(255, 255, 255, 0.08);
   --surface-row-hover: rgba(255, 255, 255, 0.04);
-  --card-padding: 1.25rem;
+  --card-padding: 16px;
   --tabbar-float-bg: rgba(26, 26, 26, 0.94);
   --tabbar-float-border: rgba(255, 255, 255, 0.1);
   --tabbar-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-card: none;
+  --shadow-hover: none;
   --border-hairline: 1px solid rgba(255, 255, 255, 0.08);
   --glass-blur: none;
   --input-bg: #141414;
@@ -157,7 +157,7 @@ html[data-theme="oak-lounge"] .login-overlay {
   background: var(--login-modal-bg) !important;
   border: 1px solid var(--login-modal-border) !important;
   box-shadow: var(--shadow-card) !important;
-  border-radius: 16px !important;
+  border-radius: 10px !important;
 }
 
 .login-role-toggle {
@@ -443,7 +443,7 @@ body.mode-assistant .assistant-main {
 .pulse-card {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   box-shadow: var(--shadow-card) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -491,17 +491,19 @@ body.mode-assistant .assistant-main {
 .chart-empty {
   color: var(--text-muted);
   font-size: 13px;
-  text-align: center;
-  padding: 32px 16px;
-  border: 1px dashed var(--border-color);
-  border-radius: 10px;
-  background: var(--surface-2);
+  text-align: left;
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .team-messages-empty {
-  border: 1px dashed var(--border-color);
-  border-radius: 10px;
-  background: var(--surface-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .matte-chip,
@@ -520,10 +522,45 @@ body.mode-assistant .assistant-main {
 
 .matte-chip--confirmé,
 .crm-tag--confirmé,
-.status-pill.confirmé {
-  background: rgba(63, 107, 74, 0.1) !important;
-  border-color: rgba(63, 107, 74, 0.2) !important;
+.status-pill.confirmé,
+.status-pill--confirmé,
+.status-pill--confirme {
+  background: rgba(63, 107, 74, 0.12) !important;
+  border-color: rgba(63, 107, 74, 0.22) !important;
   color: var(--success) !important;
+}
+
+.matte-chip--attente,
+.crm-tag--attente,
+.status-pill.attente,
+.status-pill--attente {
+  background: rgba(154, 107, 50, 0.12) !important;
+  border-color: rgba(154, 107, 50, 0.22) !important;
+  color: #8a5a24 !important;
+}
+
+.matte-chip--urgence,
+.crm-tag--urgence,
+.status-pill.urgence,
+.status-pill--urgence {
+  background: rgba(180, 35, 24, 0.1) !important;
+  border-color: rgba(180, 35, 24, 0.22) !important;
+  color: var(--danger) !important;
+}
+
+.matte-chip--annulé,
+.crm-tag--annulé,
+.status-pill.annulé,
+.status-pill--annulé {
+  background: rgba(107, 107, 107, 0.1) !important;
+  border-color: rgba(107, 107, 107, 0.2) !important;
+  color: var(--text-muted) !important;
+}
+
+html[data-theme="oak-lounge"] .matte-chip--attente,
+html[data-theme="oak-lounge"] .status-pill--attente,
+html[data-theme="oak-lounge"] .status-pill.attente {
+  color: #e0c4a0 !important;
 }
 
 .waitlist-input,
@@ -637,7 +674,7 @@ html[data-theme="oak-lounge"] .theme-switch-btn.is-active {
 .doctor-custom-sms-compose {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   box-shadow: var(--shadow-card) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -655,9 +692,9 @@ html[data-theme="oak-lounge"] .theme-switch-btn.is-active {
 
 .empty-state,
 .empty-state-host:not([hidden]) {
-  background: var(--surface-2);
-  border: 1px dashed var(--border-color);
-  border-radius: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .empty-state__icon {
@@ -1317,24 +1354,69 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
 
 .floor-composer {
   margin: 0 0 1.25rem;
-  padding: 12px;
+  padding: 12px 14px 14px;
   border: var(--border-hairline);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--bg-card);
+  box-shadow: var(--shadow-card);
 }
 
 .floor-composer__form {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto;
-  gap: 8px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  gap: 8px 10px;
+  align-items: end;
+}
+
+.floor-composer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.floor-composer__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+}
+
+.floor-composer__form .waitlist-input {
+  height: 36px;
+  min-height: 36px;
+  font-size: 13px;
+  border-radius: 8px !important;
+}
+
+.floor-composer__form #floor-book-submit {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 8px !important;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .floor-composer__slots {
-  grid-column: 1 / -1;
+  grid-column: 1 / 4;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
+  min-height: 32px;
+}
+
+.floor-composer__walkin {
+  grid-column: 4;
+  justify-self: stretch;
+  height: 32px;
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--text-muted) !important;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .floor-composer__slot.is-active {
@@ -1388,6 +1470,12 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
 @media (max-width: 960px) {
   .floor-composer__form {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .floor-composer__slots,
+  .floor-composer__walkin,
+  .floor-composer__form #floor-book-submit {
+    grid-column: 1;
   }
 }
 
@@ -1589,3 +1677,254 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ============================================================
+   Clinical OS restyle — last-wins over brutalist / oak-gold hex.
+   Calendar OS (.calendar-os-*, #dashboard-cal-inline, .fc) is frozen.
+   ============================================================ */
+
+.brand-monogram {
+  width: 28px;
+  height: 28px;
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  stroke: none !important;
+}
+
+.brand-monogram rect,
+.brand-monogram path {
+  stroke: none !important;
+}
+
+.login-viewport-brand-mark,
+.login-mark-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  filter: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-brand-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+}
+
+.login-enterprise-footer-copy,
+.login-enterprise-footer-link {
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  font-weight: 400 !important;
+}
+
+.login-coalesce {
+  box-shadow: none !important;
+}
+
+.kinetic-label,
+.kpi-label,
+.hero-split-subtitle,
+.doctor-metric-label {
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--text-muted) !important;
+}
+
+.kinetic-label:hover,
+.kinetic-value:hover {
+  letter-spacing: inherit !important;
+}
+
+#doctor-shell .chart-title,
+#doctor-shell .view-page-sub,
+#doctor-shell .chart-sub,
+.chart-title {
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+}
+
+#doctor-shell .chart-title {
+  color: var(--text-main) !important;
+  font-size: 15px !important;
+}
+
+#doctor-shell .kpi-card--matte,
+#doctor-shell .doctor-metric-card--matte,
+.kpi-card--matte,
+.doctor-metric-card--matte {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-card) !important;
+  color: var(--text-main) !important;
+}
+
+#doctor-shell .kpi-card--matte .kpi-number,
+#doctor-shell .doctor-metric-card--matte .doctor-metric-value,
+.kpi-card--matte .kpi-number,
+.doctor-metric-card--matte .doctor-metric-value {
+  color: var(--text-main) !important;
+  font-size: 28px !important;
+  font-weight: 600 !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em !important;
+}
+
+#doctor-shell .kpi-card--matte .kpi-sub,
+#doctor-shell .doctor-metric-card--matte .doctor-metric-delta,
+.kpi-card--matte .kpi-sub,
+.doctor-metric-card--matte .doctor-metric-delta {
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+}
+
+.brutalist-digest-container {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color) !important;
+  background: transparent !important;
+}
+
+.digest-title {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  text-transform: none !important;
+  color: var(--text-main) !important;
+  margin: 0 0 12px !important;
+}
+
+.digest-metric,
+.digest-metric.digest-revenue,
+.brutalist-triage-panel {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow-card) !important;
+  color: var(--text-main) !important;
+}
+
+.metric-label,
+.brutalist-triage-panel__title {
+  color: var(--text-muted) !important;
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.metric-value,
+#digest-patients-vus,
+#digest-annulations,
+#digest-revenue {
+  color: var(--text-main) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.brutalist-triage-panel__sub {
+  color: var(--text-muted) !important;
+}
+
+.ghost-select__trigger,
+.ghost-select__list {
+  background: var(--input-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.ghost-select__trigger:hover,
+.ghost-select__trigger[aria-expanded="true"] {
+  background: var(--surface-2) !important;
+  border-color: var(--border-2) !important;
+}
+
+.ghost-select__option {
+  color: var(--text-main) !important;
+}
+
+.ghost-select__option:hover,
+.ghost-select__option.is-focused {
+  background: var(--surface-row-hover) !important;
+}
+
+.load-card,
+.mix-card,
+.fidelity-card,
+.chair-glance__panel {
+  border-radius: 10px !important;
+  padding: 16px;
+}
+
+.chair-glance__row {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.status-board__empty,
+.late-list__empty,
+.empty-state__text,
+.planning-empty-state,
+.schedule-empty,
+.calendar-os-empty {
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.empty-state__icon {
+  opacity: 0.4 !important;
+  color: var(--text-muted) !important;
+}
+
+.rev-progress-bar {
+  background: var(--surface-2) !important;
+}
+
+.rev-progress-fill {
+  background: var(--text-main) !important;
+}
+
+.load-meter {
+  background: var(--surface-2) !important;
+}
+
+.load-meter__fill {
+  background: var(--text-main) !important;
+}
+
+.floor-composer__walkin:hover {
+  color: var(--text-main) !important;
+  background: transparent !important;
+}
+
+.floor-composer__slot {
+  min-height: 32px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.floor-composer__slot.is-active {
+  background: var(--accent-dim) !important;
+  border-color: var(--border-2) !important;
+  color: var(--text-main) !important;
+}
+
+/* Frozen Calendar OS — .calendar-os-* / #dashboard-cal-inline / .fc
+   keep the rules defined earlier in this file. Do not retokenize. */

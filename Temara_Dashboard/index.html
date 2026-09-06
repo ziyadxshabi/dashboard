@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DentaFlow OS — Clinique Dentaire Témara Mall</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%231A1A1F%22/><text x=%2250%22 y=%2250%22 font-family=%22sans-serif%22 font-size=%2250%22 fill=%22%23D5FF00%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>D</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230C0F14'/%3E%3Cpath fill='%23e8c97a' d='M30 26h27c15 0 26 12 26 26s-11 26-26 26H42v18H30V26zm13 13v26h14c7 0 13-6 13-13s-6-13-13-13H43z'/%3E%3C/svg%3E">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DentaFlow">
   <!-- DentaFlow Apple Touch Icon — polished gold monogram -->
@@ -33,6 +33,7 @@
   <link rel="stylesheet" href="./Fonts/fill/style.css" />
   <link rel="stylesheet" href="./Fonts/light/style.css" />
   <script src="theme-boot.js"></script>
+  <link rel="stylesheet" href="dentaflow-shared.css" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="dashboard_style.css" />
   <link rel="stylesheet" href="product-ui.css" />
@@ -50,7 +51,10 @@
     <header class="login-viewport-brand login-coalesce-item" data-coalesce="brand" aria-label="DentaFlow OS">
       <div class="login-viewport-brand-mark" aria-hidden="true">
         <span class="login-mark-icon">
-          <i data-lucide="smile" class="icon-sm" aria-hidden="true"></i>
+          <svg class="brand-monogram" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
+            <rect width="180" height="180" rx="40" fill="#0C0F14"/>
+            <path fill="#c4a574" d="M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z"/>
+          </svg>
         </span>
       </div>
       <div class="login-viewport-brand-text">
@@ -142,7 +146,10 @@
     <aside class="sidebar desktop-nav" aria-label="Navigation principale">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">
-          <i data-lucide="smile" class="nav-icon" aria-hidden="true"></i>
+          <svg class="brand-monogram" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
+            <rect width="180" height="180" rx="40" fill="#0C0F14"/>
+            <path fill="#c4a574" d="M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z"/>
+          </svg>
         </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
@@ -530,7 +537,7 @@
         </div>
 
         <div class="brutalist-digest-container">
-          <h3 class="digest-title">SYNTHÈSE DE FIN DE JOURNÉE</h3>
+          <h3 class="digest-title">Fin de journée</h3>
           <div class="digest-grid">
             <div class="digest-metric">
               <span class="metric-label">Patients Vus</span>

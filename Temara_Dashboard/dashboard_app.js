@@ -2441,7 +2441,7 @@ function renderChartEmptyState(container, message) {
   container.classList.add('is-chart-empty');
   const empty = document.createElement('p');
   empty.className = 'chart-empty';
-  empty.textContent = message || 'Données insuffisantes';
+  empty.textContent = message || 'Pas encore de tendance.';
   container.appendChild(empty);
 }
 
@@ -2521,7 +2521,7 @@ function renderDynamicChart(data, containerId, options = {}) {
 
   const series = normalizeChartSeries(data);
   if (!series || !series.length) {
-    renderChartEmptyState(container, 'Données insuffisantes');
+    renderChartEmptyState(container, 'Pas encore de tendance.');
     return;
   }
   container.classList.remove('is-chart-empty');
@@ -2628,7 +2628,7 @@ function renderLoadMixFidelity(data = {}) {
     if (!mix.length) {
       const empty = document.createElement('p');
       empty.className = 'chair-glance__empty';
-      empty.textContent = 'Aucun soin cette semaine.';
+      empty.textContent = 'Aucun soin planifié cette semaine.';
       mixHost.appendChild(empty);
     } else {
       const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
@@ -2777,7 +2777,7 @@ function setCanvasChartEmpty(canvasEl, message) {
     wrap.appendChild(empty);
   }
   empty.hidden = false;
-  empty.textContent = message || 'Données insuffisantes';
+  empty.textContent = message || 'Pas encore de tendance.';
 }
 
 function clearCanvasChartEmpty(canvasEl) {
@@ -2959,7 +2959,7 @@ function renderHoursChart(data) {
   const series = resolveAffluenceSeries(data, affluencePeriod);
   if (!series) {
     if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
-    setCanvasChartEmpty(ctx, 'Données insuffisantes');
+    setCanvasChartEmpty(ctx, 'Pas encore de tendance.');
     return;
   }
   clearCanvasChartEmpty(ctx);
@@ -3200,7 +3200,7 @@ function updateRecoveryMetrics() {
     patientsEl.classList.remove('skeleton', 'kpi-metric--error');
   }
   if (revenueEl) {
-    revenueEl.textContent = 'Données non disponibles';
+    revenueEl.textContent = 'Non calculé';
     revenueEl.classList.remove('skeleton', 'kpi-metric--error');
   }
 }

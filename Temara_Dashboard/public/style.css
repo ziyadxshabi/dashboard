@@ -912,7 +912,7 @@ body.mode-assistant {
   padding: 0 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  background: #111111;
+  background: var(--input-bg, #ffffff);
   color: var(--text-main);
   font-size: 13px;
   font-family: inherit;
@@ -960,10 +960,10 @@ body.mode-assistant {
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: #111111;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--input-bg, #ffffff);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-card, 0 8px 24px rgba(15, 15, 15, 0.08));
   overscroll-behavior: contain;
 }
 
