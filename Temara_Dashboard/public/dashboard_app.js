@@ -3482,7 +3482,7 @@ function initDoctorHub() {
   });
 }
 
-/* ── End-of-Day Production Digest (Baserow roster) ───────────────────────── */
+/* ── End-of-Day Production Digest (roster) ───────────────────────── */
 
 function looksLikeRosterRecord(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
@@ -3614,12 +3614,6 @@ function normalizeDoctorAppointment(raw) {
     care_started_at: item.care_started_at || item.careStartedAt || null,
     noshow_90d: Number(item.noshow_90d) || 0,
   };
-}
-
-function parseBaserowRowId(raw) {
-  if (raw == null || raw === '') return null;
-  const numericId = Number(raw);
-  return Number.isFinite(numericId) ? numericId : null;
 }
 
 function getTodayDateKeyCasablanca() {

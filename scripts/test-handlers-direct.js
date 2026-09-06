@@ -62,6 +62,7 @@ const { waitlistRank, pickWaitlistTopN } = require(path.join(DASHBOARD, 'api/_li
 const { inReminderWindow, daysBetweenCasablanca } = require(path.join(DASHBOARD, 'api/_lib/cron-notify.js'));
 const { tryAcquireLock } = require(path.join(DASHBOARD, 'api/_lib/notification-locks.js'));
 const { verifyTwilioSignature, timingSafeEqualStrings } = require(path.join(DASHBOARD, 'api/_lib/twilio.js'));
+const { sanitizeString } = require(path.join(DASHBOARD, 'api/_lib/validation.js'));
 const templates = require(path.join(DASHBOARD, 'api/_lib/sms-templates.js'));
 
 const CLINIC_SLUG = 'temara';
@@ -1779,6 +1780,27 @@ async function run() {
     voiceMenu.statusCode === 200 && String(voiceMenu.body || '').includes('lien de réservation'),
     `status=${voiceMenu.statusCode} body=${String(voiceMenu.body || '').slice(0, 180)}`
   );
+
+  const voiceGather = await invoke(
+    handleTwilio,
+    createReq({
+      method: 'POST',
+      url: '/api/webhooks/twilio',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: {
+        From: '+212612345678',
+        CallSid: `CA-gather-${Date.now()}`,
+      },
+    })
+  );
+  const gatherXml = String(voiceGather.body || '');
+  ok(
+    'POST /api/webhooks/twilio inbound call returns Gather',
+    voiceGather.statusCode === 200 && gatherXml.includes('<Gather') && gatherXml.includes('appuyez sur 1'),
+    `status=${voiceGather.statusCode} body=${gatherXml.slice(0, 220)}`
+  );
+  ok('sanitizeString strips HTML tags', sanitizeString('<b>Nadia</b> & co', 80) === 'Nadia & co');
+  ok('sanitizeString keeps French letters', sanitizeString('Béatrice L\'Hôpital', 80) === "Béatrice L'Hôpital");
 
   const fillNotify = await invoke(
     handleFillGap,

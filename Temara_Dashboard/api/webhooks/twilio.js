@@ -18,14 +18,36 @@ const {
 const { dispatchSms, updateSmsStatusBySid } = require('../_lib/notify');
 const { voicePortalSms } = require('../_lib/sms-templates');
 
+function escapeXml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function twiml(say, status = 200) {
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<Response>\n` +
-    `    <Say language="fr-FR" voice="Polly.Celine">${say}</Say>\n` +
+    `    <Say language="fr-FR" voice="Polly.Celine">${escapeXml(say)}</Say>\n` +
     `    <Hangup/>\n` +
     `</Response>`;
   return { status, xml };
+}
+
+function twimlGather(actionUrl) {
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<Response>\n` +
+    `    <Gather numDigits="1" timeout="8" method="POST" action="${escapeXml(actionUrl)}">\n` +
+    `        <Say language="fr-FR" voice="Polly.Celine">${escapeXml('Pour réserver en ligne, appuyez sur 1.')}</Say>\n` +
+    `    </Gather>\n` +
+    `    <Say language="fr-FR" voice="Polly.Celine">${escapeXml("Nous n'avons pas reçu de choix. Au revoir.")}</Say>\n` +
+    `    <Hangup/>\n` +
+    `</Response>`;
+  return { status: 200, xml };
 }
 
 const TWI_OK = twiml('Parfait. Le lien de réservation vient de vous être envoyé par SMS. À très bientôt.');
@@ -107,6 +129,10 @@ module.exports = async function handler(req, res) {
       console.error('[twilio-voice]', err?.message || err);
     }
     return sendXml(res, TWI_OK);
+  }
+
+  if (callSid && !digits) {
+    return sendXml(res, twimlGather(webhookUrl));
   }
 
   return sendXml(res, TWI_FALLBACK);
