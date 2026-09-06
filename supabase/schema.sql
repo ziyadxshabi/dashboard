@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   patient_name    TEXT NOT NULL,
   patient_phone   TEXT NOT NULL,
   treatment_name  TEXT,
+  patient_email   TEXT,
   status          appointment_status DEFAULT 'Confirme',
   starts_at       TIMESTAMPTZ NOT NULL,
   duration_min    INT DEFAULT 30,
@@ -98,6 +99,9 @@ CREATE TABLE IF NOT EXISTS team_notes (
   pinned       BOOLEAN NOT NULL DEFAULT false,
   category     TEXT NOT NULL DEFAULT 'general'
 );
+
+-- Existing databases:
+-- ALTER TABLE bookings ADD COLUMN IF NOT EXISTS patient_email TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_bookings_clinic_starts
   ON bookings (clinic_id, starts_at);

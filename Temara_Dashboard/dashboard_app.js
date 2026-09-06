@@ -66,6 +66,15 @@ function unlockDashboard({ skipDashboardFetch = false } = {}) {
   if (typeof loadDoctorHubData === 'function') {
     loadDoctorHubData();
   }
+  if (typeof loadPatientDirectory === 'function') {
+    loadPatientDirectory();
+  }
+  if (typeof loadWaitlistForOps === 'function') {
+    loadWaitlistForOps();
+  }
+  if (typeof loadGaps === 'function') {
+    loadGaps();
+  }
   if (typeof loadTeamNotes === 'function') {
     loadTeamNotes();
   }
@@ -121,7 +130,7 @@ function doctorQueryAll(selector) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────────────────
  * DATA_URL: GET /api/dashboard-data (clinic-scoped Postgres KPIs).
- * DAILY_GOAL_MAD: Daily revenue target in Moroccan Dirham.
+ * DAILY_GOAL_PATIENTS: Daily patient-count target (localStorage).
  * REFRESH_INTERVAL_MS: Auto-refresh interval (300000 = 5 minutes).
  */
 const DEFAULT_THEME = 'oak-lounge';
@@ -135,7 +144,7 @@ function loadPersistedDailyGoal() {
     const stored = localStorage.getItem(STORAGE_KEYS.DAILY_GOAL);
     if (stored == null) return null;
     const val = parseInt(stored, 10);
-    if (!Number.isFinite(val) || val < 1000) return null;
+    if (!Number.isFinite(val) || val < 1) return null;
     return val;
   } catch {
     return null;
@@ -169,22 +178,22 @@ const CONFIG = {
   ROSTER_PROXY:         '/api/roster',
   UPDATE_STATUS_PROXY:  '/api/update-status',
   TEAM_NOTES_PROXY:     '/api/team-notes',
+  WAITLIST_PROXY:       '/api/waitlist',
+  FILL_GAP_PROXY:       '/api/fill-gap',
   BULK_SMS_PROXY:       '/api/bulk-sms',
-  DAILY_GOAL_MAD:       15000,
+  DAILY_GOAL_PATIENTS:  12,
   REFRESH_INTERVAL_MS:  300_000,
   SMART_SYNC_INTERVAL_MS: 180_000,
   SMART_SYNC_DEBOUNCE_MS: 15_000,
   TEAM_NOTES_REFRESH_MS: 60_000,
   ROSTER_ENDPOINT:      '/api/roster',
-  DIGEST_DAILY_GOAL_MAD: 6000,
-  DIGEST_REVENUE_PER_PATIENT_MAD: 400,
   CURRENCY_LOCALE:      'fr-MA',
   CURRENCY:             'MAD',
 };
 
 const bootDailyGoal = loadPersistedDailyGoal();
 if (bootDailyGoal != null) {
-  CONFIG.DAILY_GOAL_MAD = bootDailyGoal;
+  CONFIG.DAILY_GOAL_PATIENTS = bootDailyGoal;
 }
 
 const SUBMIT_LOCK_MS       = 5000;
@@ -214,6 +223,11 @@ let recoveryOpChart = null;
 let flowOpChart     = null;
 let lastChartData   = null;
 let lastKpiPayload  = null;
+let chartPeriod     = 'today';
+let lastTodayRoster = [];
+let lastDirectory   = [];
+let lastWaitlist    = [];
+let lastGaps        = [];
 let osBootSequencePlayed = false;
 let pendingDigestKinetics = null;
 let digestKineticsStarted = false;
@@ -246,6 +260,8 @@ function initializeDoctorDashboard() {
   initMobileNav();
   initChartToggles();
   initWaitlistForm();
+  initWaitlistAdmin();
+  initStatusBoardFilters();
   initUserProfile();
   initSettings();
   initSecurityManagement();
@@ -398,6 +414,7 @@ function initDashboardCalendar() {
     return;
   }
 
+  const Ops = window.DentaFlowBookingOps;
   el.innerHTML = '';
 
   dashboardCalendar = new FullCalendar.Calendar(el, {
@@ -408,6 +425,7 @@ function initDashboardCalendar() {
       right:  'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
     },
     locale: 'fr',
+    timeZone: 'Africa/Casablanca',
     firstDay: 1,
     height: 'auto',
     expandRows: true,
@@ -415,11 +433,49 @@ function initDashboardCalendar() {
     slotMaxTime: '19:00:00',
     nowIndicator: true,
     allDaySlot: false,
-    events: [],
     eventTimeFormat: {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
+    },
+    datesSet: (info) => {
+      const range = Ops?.ymdFromView(info);
+      if (range) void loadCalendarRange(range.from, range.to);
+    },
+    eventClick: (info) => {
+      const bookingId = info.event.extendedProps?.bookingId;
+      const key = info.event.extendedProps?.statusKey;
+      const nextByKey = {
+        confirme: "En salle d'attente",
+        en_salle: 'En soin',
+        en_soin: 'Termine',
+      };
+      const nextStatus = nextByKey[key];
+      if (!bookingId || !nextStatus) return;
+      void askConfirm(`Passer ce rendez-vous en « ${nextStatus} » ?`).then(async (ok) => {
+        if (!ok) return;
+        try {
+          window.DentaFlowAuth?.requireSession?.();
+          const response = await fetch(CONFIG.UPDATE_STATUS_PROXY, {
+            method: 'POST',
+            credentials: 'include',
+            headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ bookingId, newStatus: nextStatus }),
+          });
+          assertAuthorizedResponse(response);
+          const payload = await response.json();
+          if (!response.ok || payload?.ok === false) {
+            throw new Error(payload?.error || 'Mise à jour du statut impossible');
+          }
+          showDashboardToast('Statut mis à jour.', 'success');
+          await loadDoctorHubData(true);
+          const range = Ops?.ymdFromView(info.view);
+          if (range) void loadCalendarRange(range.from, range.to);
+        } catch (err) {
+          if (isUnauthorizedError(err)) return;
+          showDashboardToast(err?.message || 'Impossible de mettre à jour le statut.', 'error');
+        }
+      });
     },
   });
 
@@ -607,21 +663,48 @@ function initChartToggles() {
   }
 
   buttons.forEach((btn, index) => {
-    btn?.addEventListener('click', () => activate(btn, index));
+    btn?.addEventListener('click', () => {
+      activate(btn, index);
+      const nextPeriod = btn.dataset.period || 'today';
+      if (nextPeriod !== chartPeriod) {
+        chartPeriod = nextPeriod;
+        void loadDashboard();
+      }
+    });
   });
 }
 
 /* ── TODAY'S SCHEDULE FEED ───────────────────────────────────────────────── */
-function renderAppointmentsList() {
+function renderAppointmentsList(records) {
   const container = doctorEl('appointments-list');
   if (!container) return;
+  const rows = Array.isArray(records) ? records : lastTodayRoster;
   container.replaceChildren();
+  hideSkeleton('roster');
+  if (!rows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'schedule-empty';
+    empty.textContent = 'Aucun rendez-vous aujourd’hui.';
+    container.appendChild(empty);
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  rows.forEach((record) => {
+    fragment.appendChild(createApptCardElement({
+      time: record.time,
+      name: record.name,
+      phone: record.phone,
+      treatment: record.treatment,
+      tagClass: record.status,
+    }));
+  });
+  container.appendChild(fragment);
 }
 
-function renderWaitlistPanel() {
+function renderWaitlistPanel(rows) {
   const container = doctorEl('waitlist-panel-list');
   if (!container) return;
-  const waitlist = [];
+  const waitlist = Array.isArray(rows) ? rows : lastWaitlist;
   container.replaceChildren();
 
   const table = container.closest('.waitlist-table');
@@ -700,6 +783,7 @@ function initWaitlistForm() {
         form.reset();
         priorityEl.value = 'Normale';
         prependWaitlistEntry(payload);
+        void loadWaitlistForOps();
 
         setTimeout(() => {
           btn.textContent = lock.defaultLabel;
@@ -916,7 +1000,7 @@ function initAccountCardMenu() {
 function initSettings() {
   const persistedGoal = loadPersistedDailyGoal();
   if (persistedGoal != null) {
-    CONFIG.DAILY_GOAL_MAD = persistedGoal;
+    CONFIG.DAILY_GOAL_PATIENTS = persistedGoal;
   }
 
   const saved = loadSettings();
@@ -926,7 +1010,7 @@ function initSettings() {
       goalEl.value = persistedGoal;
     } else if (saved.dailyGoal) {
       goalEl.value = saved.dailyGoal;
-      CONFIG.DAILY_GOAL_MAD = saved.dailyGoal;
+      CONFIG.DAILY_GOAL_PATIENTS = saved.dailyGoal;
     }
   }
 
@@ -942,11 +1026,10 @@ function initSettings() {
 
 function applyDoctorDailyGoal(value) {
   const val = Number(value);
-  if (!Number.isFinite(val) || val < 1000) return;
-  CONFIG.DAILY_GOAL_MAD = val;
+  if (!Number.isFinite(val) || val < 1) return;
+  CONFIG.DAILY_GOAL_PATIENTS = val;
   saveSettings({ dailyGoal: val });
   persistDailyGoal(val);
-  setText('val-goal', formatMADShort(CONFIG.DAILY_GOAL_MAD));
   if (lastKpiPayload) bindKpiMicroCharts(lastKpiPayload);
 }
 
@@ -1018,6 +1101,7 @@ function initCrmSearch() {
 
 /* ── CRM DOSSIER PATIENT — SLIDE-OVER PANEL ─────────────────────────────── */
 let crmPatientsById = {};
+const crmPatientsByRow = new WeakMap();
 
 function getCrmMotifTagClass(motif) {
   const normalised = String(motif ?? '').toLowerCase();
@@ -1028,17 +1112,45 @@ function getCrmMotifTagClass(motif) {
 
 function toCrmPatient(record) {
   if (!record) return null;
+  const Ops = window.DentaFlowBookingOps;
   return {
-    id: record.id ?? record.rowId,
+    id: record.id ?? record.phone_e164 ?? record.phone,
     name: record.name || 'Non spécifié',
-    phone: record.phone || '',
-    email: record.email || '',
-    motif: record.treatment || 'Consultation',
-    statut: record.status || 'Confirmé',
-    observations: record.observations || 'Aucune observation enregistrée.',
-    insurance: record.insurance || '—',
-    amount: Number(record.amount) || 0,
+    phone: record.phone || record.phone_e164 || '',
+    email: record.email || record.patient_email || '',
+    motif: record.last_treatment || record.treatment || 'Consultation',
+    visit_count: Number(record.visit_count) || 0,
+    no_show_count: Number(record.no_show_count) || 0,
+    cancel_count: Number(record.cancel_count) || 0,
+    last_visit: record.last_visit || null,
+    next_visit: record.next_visit || null,
+    recent_visits: Array.isArray(record.recent_visits) ? record.recent_visits : [],
+    last_visit_label: Ops?.formatDayLabel(record.last_visit) || '—',
+    next_visit_label: Ops?.formatDayLabel(record.next_visit) || '—',
   };
+}
+
+function bindCrmRowPatient(row, patient) {
+  if (!row || !patient) return;
+  crmPatientsByRow.set(row, patient);
+  try {
+    row.dataset.record = JSON.stringify(patient);
+  } catch {
+    row.dataset.record = '';
+  }
+}
+
+function readStoredCrmPatient(row) {
+  const attached = crmPatientsByRow.get(row);
+  if (attached) return attached;
+  const raw = row?.dataset?.record;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function renderCRMTable(records) {
@@ -1053,7 +1165,7 @@ function renderCRMTable(records) {
     const emptyRow = document.createElement('tr');
     emptyRow.className = 'crm-table-empty';
     const cell = document.createElement('td');
-    cell.colSpan = 4;
+    cell.colSpan = 6;
     cell.textContent = 'Aucun patient trouvé';
     emptyRow.appendChild(cell);
     tbody.appendChild(emptyRow);
@@ -1072,32 +1184,22 @@ function renderCRMTable(records) {
     tr.tabIndex = 0;
     tr.setAttribute('role', 'button');
     tr.dataset.patientId = String(patient.id);
-    tr.dataset.name = patient.name;
-    tr.dataset.phone = patient.phone;
-    tr.dataset.email = patient.email;
-    tr.dataset.motif = patient.motif;
-    tr.dataset.statut = patient.statut;
-    tr.dataset.amount = String(patient.amount);
-    tr.dataset.insurance = patient.insurance;
-    tr.dataset.observations = patient.observations;
+    tr.dataset.phone = patient.phone || '';
+    bindCrmRowPatient(tr, patient);
 
-    const nameCell = document.createElement('td');
-    nameCell.textContent = patient.name;
-
-    const phoneCell = document.createElement('td');
-    phoneCell.textContent = patient.phone || '—';
-
-    const emailCell = document.createElement('td');
-    emailCell.textContent = patient.email || '—';
-
-    const motifCell = document.createElement('td');
-    const motifTag = document.createElement('span');
-    const motifMod = getCrmMotifTagClass(patient.motif);
-    motifTag.className = ['crm-tag', motifMod].filter(Boolean).join(' ');
-    motifTag.textContent = patient.motif;
-    motifCell.appendChild(motifTag);
-
-    tr.append(nameCell, phoneCell, emailCell, motifCell);
+    const cells = [
+      patient.name,
+      patient.phone || '—',
+      patient.motif,
+      String(patient.visit_count),
+      patient.last_visit_label,
+      patient.next_visit_label,
+    ];
+    cells.forEach((text) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
     tbody.appendChild(tr);
   });
   hideSkeleton('crm');
@@ -1112,49 +1214,102 @@ function getCrmStatutTagClass(statut) {
 }
 
 function readCrmRowData(row) {
+  const stored = readStoredCrmPatient(row);
+  if (stored) return stored;
   const patientId = row?.dataset?.patientId;
   if (patientId && crmPatientsById[patientId]) {
     return crmPatientsById[patientId];
   }
 
+  const phone = row?.dataset?.phone || row?.cells?.[1]?.textContent.trim() || '';
+  const matched = Object.values(crmPatientsById).find((patient) => (
+    String(patient.id) === String(patientId)
+    || (phone && (patient.phone === phone || patient.phone_e164 === phone))
+  ));
+  if (matched) return matched;
+
   const { dataset } = row;
   return {
-    name:          dataset.name          ?? row.cells[0]?.textContent.trim() ?? '—',
-    phone:         dataset.phone         ?? row.cells[1]?.textContent.trim() ?? '',
-    email:         dataset.email         ?? row.cells[2]?.textContent.trim() ?? '',
-    motif:         dataset.motif         ?? row.cells[3]?.textContent.trim() ?? '—',
-    statut:        dataset.statut        ?? '—',
-    amount:        parseFloat(dataset.amount) || 0,
-    insurance:     dataset.insurance     ?? '—',
-    observations:  dataset.observations  ?? 'Aucune observation enregistrée.',
+    id: patientId || phone,
+    name: dataset.name ?? row.cells[0]?.textContent.trim() ?? '—',
+    phone,
+    email: dataset.email ?? '',
+    motif: dataset.motif ?? row.cells[2]?.textContent.trim() ?? '—',
+    visit_count: Number(dataset.visits ?? row.cells[3]?.textContent) || 0,
+    last_visit_label: row.cells[4]?.textContent.trim() ?? '—',
+    next_visit_label: row.cells[5]?.textContent.trim() ?? '—',
+    recent_visits: [],
+    no_show_count: 0,
+    cancel_count: 0,
   };
 }
 
+function relatedTeamNotes(patient) {
+  return (teamNotesCache || []).filter((note) => {
+    const name = String(note.patient_name || '').trim().toLowerCase();
+    const visitIds = new Set((patient.recent_visits || []).map((visit) => String(visit.id)));
+    const bookingMatch = note.booking_id && visitIds.has(String(note.booking_id));
+    return bookingMatch || (name && name === String(patient.name || '').trim().toLowerCase());
+  });
+}
+
+function renderCrmLinkedNotes(patient) {
+  const notesEl = doctorEl('crm-panel-notes');
+  if (!notesEl) return;
+  const related = relatedTeamNotes(patient);
+  notesEl.textContent = related.length
+    ? related.map((note) => `${note.author || 'Équipe'}: ${note.message || note.text}`).join('\n')
+    : 'Aucune note liée à ce patient.';
+}
+
 function populateCrmSidePanel(patient) {
+  const Ops = window.DentaFlowBookingOps;
   setText('crm-panel-name', patient.name);
 
   const subtitleEl = doctorEl('crm-panel-subtitle');
   if (subtitleEl) {
-    const parts = [patient.phone, patient.email].filter(Boolean);
-    subtitleEl.textContent = parts.join(' · ');
+    subtitleEl.textContent = [patient.phone, patient.email].filter(Boolean).join(' · ');
   }
 
   const statutEl = doctorEl('crm-panel-statut');
   if (statutEl) {
-    const label = patient.statut || '—';
-    const mod = getCrmStatutTagClass(label);
-    statutEl.className = `crm-side-panel-statut status-pill ${mod}`.trim();
-    if (window.DentaFlowDom?.setStatusPill) {
-      window.DentaFlowDom.setStatusPill(statutEl, label);
+    const label = patient.next_visit ? 'Prochain RDV' : (patient.last_visit ? 'Vu' : '—');
+    statutEl.textContent = label;
+  }
+
+  setText('crm-panel-visits', String(patient.visit_count || 0));
+  setText('crm-panel-noshows', String(patient.no_show_count || 0));
+  setText('crm-panel-cancels', String(patient.cancel_count || 0));
+  setText('crm-panel-next', patient.next_visit_label || '—');
+  setText('crm-panel-email', patient.email || '—');
+  setText('crm-panel-motif', patient.motif);
+
+  const timeline = doctorEl('crm-panel-timeline');
+  if (timeline) {
+    timeline.replaceChildren();
+    const visits = patient.recent_visits || [];
+    if (!visits.length) {
+      const empty = document.createElement('li');
+      empty.textContent = 'Aucun historique de rendez-vous.';
+      timeline.appendChild(empty);
     } else {
-      statutEl.textContent = label;
+      visits.forEach((visit) => {
+        const li = document.createElement('li');
+        li.className = 'crm-timeline__item';
+        const when = Ops?.formatDayLabel(visit.starts_at) || '';
+        const time = Ops?.casablancaHm(visit.starts_at) || '';
+        li.innerHTML = `<strong>${Ops?.escapeHtml(visit.treatment_name || 'Consultation')}</strong>
+          <span>${Ops?.escapeHtml(when)} ${Ops?.escapeHtml(time)} · ${Ops?.escapeHtml(visit.status || '')}</span>
+          ${visit.notes ? `<p>${Ops.escapeHtml(visit.notes)}</p>` : ''}`;
+        timeline.appendChild(li);
+      });
     }
   }
 
-  setText('crm-panel-amount', `${formatMAD(patient.amount)} MAD`);
-  setText('crm-panel-insurance', patient.insurance);
-  setText('crm-panel-motif', patient.motif);
-  setText('crm-panel-observations', patient.observations);
+  renderCrmLinkedNotes(patient);
+  if (!teamNotesCache.length && typeof loadTeamNotes === 'function') {
+    Promise.resolve(loadTeamNotes()).then(() => renderCrmLinkedNotes(patient));
+  }
 }
 
 function openCrmSidePanel(patient, selectedRow) {
@@ -1348,7 +1503,7 @@ function applySkeletonState() {
   setSyncState('loading', 'Actualisation…');
   showSkeleton('stats');
   showSkeleton('roster');
-  ['val-patients','val-noshows','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
+  ['val-patients','val-noshows','val-new','banner-occupancy','banner-recovered','banner-noshow-rate'].forEach(id => {
     const el = doctorEl(id);
     if (el) el.classList.add('skeleton');
   });
@@ -1357,7 +1512,7 @@ function applySkeletonState() {
 function clearSkeletonState() {
   hideSkeleton('stats');
   hideSkeleton('roster');
-  ['val-patients','val-noshows','val-new','patients-recovered-count','estimated-revenue-range'].forEach(id => {
+  ['val-patients','val-noshows','val-new','banner-occupancy','banner-recovered','banner-noshow-rate'].forEach(id => {
     const el = doctorEl(id);
     if (el) el.classList.remove('skeleton');
   });
@@ -1480,7 +1635,7 @@ async function loadDashboard(isSilentSync = false) {
       applySkeletonState();
     }
 
-    const response = await fetch(CONFIG.DATA_URL, {
+    const response = await fetch(`${CONFIG.DATA_URL}?period=${encodeURIComponent(chartPeriod)}`, {
       method:  'GET',
       credentials: 'include',
       headers: getApiAuthHeaders(),
@@ -1565,6 +1720,8 @@ function normaliseData(raw) {
     } else if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
       out[k] = Number(v);
     } else if (typeof v === 'boolean') {
+      out[k] = v;
+    } else if (v != null && typeof v === 'object') {
       out[k] = v;
     } else if (v != null && typeof v !== 'object') {
       out[k] = asMetric(v);
@@ -2006,21 +2163,23 @@ function renderKPICards(data) {
   const patients_today    = asMetric(data?.patients_today);
   const no_shows          = asMetric(data?.no_shows);
   const pending_plans     = asMetric(data?.pending_plans ?? data?.pending_quotes);
+  const cancelled         = asMetric(data?.cancelled);
+  const absences          = no_shows + cancelled;
+  const Ops = window.DentaFlowBookingOps;
 
   setKpiTrend('trend-patients', buildSparklineSvg(null, { tone: 'gold' }));
   setKpiTrend('trend-noshows', buildBarChartSvg(null, { tone: 'danger' }));
   setKpiTrend('trend-new', buildSparklineSvg(null, { tone: 'muted' }));
 
-  const revenueToday = asMetric(data?.revenue_today);
-
   renderDoctorHubCharts(data);
   bindKpiMicroCharts(data);
+  updateHonestBanner(data);
 
   setKPINumber('hub-val-patients', patients_today, true);
   setKPINumber('hub-val-pending', pending_plans, true);
   setKPINumber('hub-val-noshows', no_shows, true);
-  const hubProductionEl = doctorEl('hub-val-production');
-  if (hubProductionEl) hubProductionEl.textContent = formatHubProductionMad(revenueToday);
+  const occupancyEl = doctorEl('hub-val-occupancy');
+  if (occupancyEl) occupancyEl.textContent = Ops?.occupancyLabel(data.occupancy) || '—';
 
   setText('hub-delta-patients', patients_today > 0 ? 'Aujourd\'hui' : 'Aucun RDV');
   setText('hub-delta-pending', pending_plans > 0
@@ -2029,26 +2188,33 @@ function renderKPICards(data) {
   setText('hub-delta-noshows', no_shows > 0
     ? `${no_shows} créneau${no_shows > 1 ? 'x' : ''} libre${no_shows > 1 ? 's' : ''}`
     : 'Aucune absence');
-  setText('hub-delta-production', 'MAD facturés');
+  setText('hub-delta-occupancy', data.occupancy
+    ? `${asMetric(data.occupancy.booked_min)} / ${asMetric(data.occupancy.capacity_min)} min`
+    : 'Fauteuil 08h–19h');
 
-  updateRecoveryMetrics(null);
   refreshOperationalCharts(data);
 
+  const overviewPanel = doctorEl('overview-gap-panel');
+  if (overviewPanel) {
+    overviewPanel.hidden = asMetric(data.no_shows) <= 0;
+    if (!overviewPanel.hidden) renderGapList(lastGaps, doctorEl('overview-gap-list'));
+  }
+
   setKPINumber('val-patients', patients_today, true);
-  setText('sub-patients', `Rendez-vous confirmés`);
+  setText('sub-patients', 'Rendez-vous du jour');
 
   const noshowCard = doctorEl('card-noshows');
   if (noshowCard) {
-    if (no_shows > 0) {
+    if (absences > 0) {
       noshowCard.classList.add('kpi-card--danger');
       const el = doctorEl('val-noshows');
       if (el) {
-        el.textContent = no_shows;
+        el.textContent = absences;
         el.style.color = '';
       }
-      setText('sub-noshows', no_shows === 1
-        ? '1 créneau à combler d\'urgence'
-        : `${no_shows} créneaux à combler`
+      setText('sub-noshows', absences === 1
+        ? '1 créneau à combler'
+        : `${absences} créneaux à combler`
       );
     } else {
       noshowCard.classList.remove('kpi-card--danger');
@@ -2100,14 +2266,17 @@ function applyChartJsDefaults() {
 }
 
 function buildOperationalChartPayload(data = {}) {
-  const accepted = asMetric(data.accepted_plans);
-  const pending = asMetric(data.pending_plans);
-  const noShows = asMetric(data.no_shows);
+  const mix = data.status_mix && typeof data.status_mix === 'object' ? data.status_mix : {};
+  const flowLabels = ['Confirmés', 'En salle', 'En soin', 'En attente', 'No-show', 'Annulé'];
+  const flowKeys = ['Confirme', "En salle d'attente", 'En soin', 'En attente', 'No-show', 'Annule'];
   return {
-    recovery: null,
+    recovery: {
+      labels: ['Encore en attente', 'Créneaux placés'],
+      values: [asMetric(data.waitlist_active), asMetric(data.waitlist_filled)],
+    },
     flow: {
-      labels: ['Confirmés', 'En attente', 'No-show'],
-      values: [accepted, pending, noShows],
+      labels: flowLabels,
+      values: flowKeys.map((key) => asMetric(mix[key])),
     },
   };
 }
@@ -2143,11 +2312,13 @@ function createRecoveryAreaGradient(canvas) {
   return gradient;
 }
 
-function getFlowBarColors() {
-  return [OPERATIONAL_CHART_MUTED_BAR, OPERATIONAL_CHART_MUTED_BAR, OPERATIONAL_CHART_GOLD];
+function getFlowBarColors(count = 6) {
+  const gold = OPERATIONAL_CHART_GOLD;
+  const muted = OPERATIONAL_CHART_MUTED_BAR;
+  return Array.from({ length: count }, (_, index) => (index === count - 2 ? gold : muted));
 }
 
-function initOperationalCharts(data = {}) {
+function initOperationalCharts(data = lastKpiPayload || {}) {
   if (typeof Chart === 'undefined') return;
 
   applyChartJsDefaults();
@@ -2159,7 +2330,53 @@ function initOperationalCharts(data = {}) {
       recoveryOpChart.destroy();
       recoveryOpChart = null;
     }
-    setCanvasChartEmpty(recoveryCtx, 'Aucune série de créneaux récupérés n\'est enregistrée.');
+    const recoverySum = payload.recovery.values.reduce((sum, n) => sum + n, 0);
+    if (!recoverySum) {
+      setCanvasChartEmpty(recoveryCtx, 'Aucun patient en liste d\'attente pour l\'instant.');
+    } else {
+      clearCanvasChartEmpty(recoveryCtx);
+      recoveryOpChart = new Chart(recoveryCtx, {
+        type: 'bar',
+        data: {
+          labels: payload.recovery.labels,
+          datasets: [{
+            data: payload.recovery.values,
+            backgroundColor: [OPERATIONAL_CHART_MUTED_BAR, OPERATIONAL_CHART_GOLD],
+            borderWidth: 0,
+            borderRadius: 6,
+            borderSkipped: false,
+            barThickness: 18,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              ...getOperationalChartTooltipOptions(),
+              callbacks: {
+                label: (ctx) => ` ${ctx.label}: ${ctx.parsed.x}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              grid: { display: true, color: OPERATIONAL_CHART_GRID, drawTicks: false },
+              border: { display: false },
+              ticks: { ...getOperationalChartTickStyle(), precision: 0 },
+            },
+            y: {
+              grid: { display: false },
+              border: { display: false },
+              ticks: getOperationalChartTickStyle(),
+            },
+          },
+        },
+      });
+    }
   }
 
   const flowCtx = doctorEl('flowChart');
@@ -2222,19 +2439,11 @@ function initOperationalCharts(data = {}) {
 }
 
 function refreshOperationalCharts(data = {}) {
-  if (!flowOpChart) {
+  if (!flowOpChart && !recoveryOpChart) {
     initOperationalCharts(data);
     return;
   }
-
-  const payload = buildOperationalChartPayload(data);
-  const recoveryCtx = doctorEl('recoveryChart');
-  if (recoveryCtx) setCanvasChartEmpty(recoveryCtx, 'Aucune série de créneaux récupérés n\'est enregistrée.');
-
-  flowOpChart.data.labels = payload.flow.labels;
-  flowOpChart.data.datasets[0].data = payload.flow.values;
-  flowOpChart.data.datasets[0].backgroundColor = getFlowBarColors();
-  flowOpChart.update('none');
+  initOperationalCharts(data);
 }
 
 /* ── CHARTS ─────────────────────────────────────────────────────────────── */
@@ -2499,17 +2708,34 @@ function formatThousandsFR(value) {
  * Updates the hero recovery banner: patient count + estimated MAD revenue range.
  * @param {number} patientCount
  */
-function updateRecoveryMetrics() {
-  const patientsEl = doctorEl('patients-recovered-count');
-  const revenueEl = doctorEl('estimated-revenue-range');
-  if (patientsEl) {
-    patientsEl.textContent = '—';
-    patientsEl.classList.remove('skeleton', 'kpi-metric--error');
-  }
-  if (revenueEl) {
-    revenueEl.textContent = 'Données non disponibles';
-    revenueEl.classList.remove('skeleton', 'kpi-metric--error');
-  }
+function updateHonestBanner(data = {}) {
+  const Ops = window.DentaFlowBookingOps;
+  setText('banner-occupancy', Ops?.occupancyLabel(data.occupancy) || '—');
+  setText(
+    'banner-occupancy-helper',
+    data.occupancy
+      ? `${asMetric(data.occupancy.booked_min)} min réservées / ${asMetric(data.occupancy.capacity_min)} min ouvertes`
+      : 'Minutes réservées / plage 08h–19h'
+  );
+  const recovered = asMetric(data.waitlist_filled);
+  setText('banner-recovered', String(recovered));
+  setText(
+    'banner-recovered-helper',
+    recovered
+      ? `${recovered} patient${recovered > 1 ? 's' : ''} de la liste d'attente placé${recovered > 1 ? 's' : ''} sur un trou`
+      : 'Liste d\'attente placée sur un trou du planning'
+  );
+  setText('banner-noshow-rate', Ops?.rateLabel(data.no_show_rate) || '—');
+  setText(
+    'banner-noshow-helper',
+    data.no_show_rate == null
+      ? 'Pas encore de rendez-vous échus'
+      : `${asMetric(data.no_shows)} no-show / rendez-vous échus`
+  );
+}
+
+function updateRecoveryMetrics(data) {
+  updateHonestBanner(data || lastKpiPayload || {});
 }
 
 function formatMADShort(amount) {
@@ -2915,6 +3141,13 @@ function normalizeDoctorAppointment(raw) {
     rawDate,
     time: formatDoctorAppointmentTime(rawDate),
     phone,
+    duration_min: Number(item.duration_min) || 30,
+    starts_at: rawDate,
+    notes: observations,
+    patient_name: String(patientName).trim() || 'Non spécifié',
+    patient_phone: phone,
+    treatment_name: String(treatment).trim() || 'Consultation',
+    patient_email: email,
     email,
     observations,
     insurance,
@@ -3001,15 +3234,15 @@ function animateKineticCounter(elementId, targetValue, suffix = '') {
   });
 }
 
-function setDigestFinalValues({ totalVus, totalAnnules, totalRevenue, progressPercent }) {
+function setDigestFinalValues({ totalVus, totalAnnules, occupancyPct, progressPercent }) {
   const vusEl = doctorEl('digest-patients-vus');
   const annulEl = doctorEl('digest-annulations');
-  const revEl = doctorEl('digest-revenue');
+  const occEl = doctorEl('digest-occupancy');
   const progEl = doctorEl('digest-progress');
 
   if (vusEl) vusEl.textContent = String(totalVus);
   if (annulEl) annulEl.textContent = String(totalAnnules);
-  if (revEl) revEl.textContent = `${totalRevenue} MAD`;
+  if (occEl) occEl.textContent = `${occupancyPct} %`;
   if (progEl) progEl.style.width = `${progressPercent}%`;
 }
 
@@ -3017,7 +3250,7 @@ function startDigestKineticCounters({ instant = false } = {}) {
   if (digestKineticsStarted || !pendingDigestKinetics) return;
   digestKineticsStarted = true;
 
-  const { totalVus, totalAnnules, totalRevenue, progressPercent } = pendingDigestKinetics;
+  const { totalVus, totalAnnules, occupancyPct, progressPercent } = pendingDigestKinetics;
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (instant || prefersReducedMotion) {
@@ -3027,7 +3260,7 @@ function startDigestKineticCounters({ instant = false } = {}) {
 
   animateKineticCounter('digest-patients-vus', totalVus);
   animateKineticCounter('digest-annulations', totalAnnules);
-  animateKineticCounter('digest-revenue', totalRevenue, ' MAD');
+  animateKineticCounter('digest-occupancy', occupancyPct, ' %');
 
   const progEl = doctorEl('digest-progress');
   if (progEl) {
@@ -3042,12 +3275,35 @@ function startDigestKineticCounters({ instant = false } = {}) {
 
 function computeEndOfDayDigest(records) {
   const todayRows = filterTodayAppointments(records);
+  const Ops = window.DentaFlowBookingOps;
+  const totalVus = todayRows.filter((record) => {
+    const key = Ops?.statusKey(record.status) || '';
+    return key === 'termine' || key === 'en_salle' || key === 'en_soin';
+  }).length;
+  const totalAnnules = todayRows.filter((record) => {
+    const key = Ops?.statusKey(record.status) || '';
+    return key === 'annule' || key === 'no_show';
+  }).length;
+  const occupancyPct = Number(lastKpiPayload?.occupancy?.pct);
+  return { totalVus, totalAnnules, occupancyPct: Number.isFinite(occupancyPct) ? occupancyPct : 0 };
+}
 
-  const totalVus = todayRows.filter((record) => isDigestSeenStatus(record.status)).length;
-  const totalAnnules = todayRows.filter((record) => isDigestCancelledStatus(record.status)).length;
-  const totalRevenue = totalVus * CONFIG.DIGEST_REVENUE_PER_PATIENT_MAD;
+function renderEndOfDayDigest({ totalVus, totalAnnules, occupancyPct }) {
+  const dailyGoal = CONFIG.DAILY_GOAL_PATIENTS || 12;
+  const progressPercent = Math.min(100, (totalVus / dailyGoal) * 100);
 
-  return { totalVus, totalAnnules, totalRevenue };
+  digestKineticsStarted = false;
+  pendingDigestKinetics = { totalVus, totalAnnules, occupancyPct, progressPercent };
+
+  const vusEl = doctorEl('digest-patients-vus');
+  const annulEl = doctorEl('digest-annulations');
+  const occEl = doctorEl('digest-occupancy');
+  const progEl = doctorEl('digest-progress');
+
+  if (vusEl) vusEl.textContent = '0';
+  if (annulEl) annulEl.textContent = '0';
+  if (occEl) occEl.textContent = '0 %';
+  if (progEl) progEl.style.width = '0%';
 }
 
 function formatDoctorAppointmentTime(rawDate) {
@@ -3205,31 +3461,8 @@ function renderDoctorTriageRoster(records) {
   hideSkeleton('triage');
 }
 
-function renderEndOfDayDigest({ totalVus, totalAnnules, totalRevenue }) {
-  const dailyGoal = CONFIG.DIGEST_DAILY_GOAL_MAD;
-  const progressPercent = Math.min(100, (totalRevenue / dailyGoal) * 100);
-
-  digestKineticsStarted = false;
-  pendingDigestKinetics = { totalVus, totalAnnules, totalRevenue, progressPercent };
-
-  const vusEl = doctorEl('digest-patients-vus');
-  const annulEl = doctorEl('digest-annulations');
-  const revEl = doctorEl('digest-revenue');
-  const progEl = doctorEl('digest-progress');
-
-  if (vusEl) vusEl.textContent = '0';
-  if (annulEl) annulEl.textContent = '0';
-  if (revEl) revEl.textContent = '0 MAD';
-  if (progEl) progEl.style.width = '0%';
-}
-
 async function loadDoctorHubData(isSilentSync = false) {
-  const crmPanel = doctorEl('crm-side-panel');
-  const panelWasOpen = Boolean(crmPanel?.classList.contains('is-active'));
-  const selectedPatientId = doctorQuery('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
-
   if (!isSilentSync) {
-    showSkeleton('crm');
     showSkeleton('triage');
   }
 
@@ -3263,27 +3496,24 @@ async function loadDoctorHubData(isSilentSync = false) {
       .map(normalizeDoctorAppointment)
       .filter(Boolean);
 
-    const digest = computeEndOfDayDigest(records);
+    lastTodayRoster = records;
+    const occupancyPct = Number(lastKpiPayload?.occupancy?.pct) || 0;
+    const digest = computeEndOfDayDigest(records, occupancyPct);
     if (isSilentSync) {
-      const progressPercent = Math.min(100, (digest.totalRevenue / CONFIG.DIGEST_DAILY_GOAL_MAD) * 100);
-      setDigestFinalValues({ ...digest, progressPercent });
+      setDigestFinalValues({
+        ...digest,
+        progressPercent: Math.min(100, occupancyPct),
+      });
     } else {
-      renderEndOfDayDigest(digest);
+      renderEndOfDayDigest({ ...digest, occupancyPct });
     }
 
-    renderDoctorTriageRoster(records);
-    renderCRMTable(records);
+    renderStatusBoard(records, doctorEl('status-board-urgence-filter')?.checked);
+    renderAppointmentsList(records);
+    updateOverviewAppointmentCount(records.length);
 
-    if (panelWasOpen && selectedPatientId) {
-      const row = doctorQuery(`.crm-table-row[data-patient-id="${selectedPatientId}"]`);
-      const patient = crmPatientsById[selectedPatientId];
-      if (row && patient) {
-        populateCrmSidePanel(patient);
-        row.classList.add('is-selected');
-        crmPanel.classList.add('is-active');
-        crmPanel.setAttribute('aria-hidden', 'false');
-      }
-    }
+    const occEl = doctorEl('hub-val-occupancy');
+    if (occEl) occEl.textContent = occupancyPct ? `${occupancyPct}%` : '—';
 
     if (!isSilentSync) {
       queueOsBootSequence();
@@ -3292,23 +3522,278 @@ async function loadDoctorHubData(isSilentSync = false) {
     if (isUnauthorizedError(err)) return;
     console.error('[Doctor Hub] Digest load failed:', err?.message || err);
     if (isSilentSync) return;
-    renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, totalRevenue: 0 });
-    renderDoctorTriageRoster([]);
-    renderCRMTable([]);
+    lastTodayRoster = [];
+    renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, occupancyPct: 0 });
+    renderStatusBoard([]);
+    renderAppointmentsList([]);
     queueOsBootSequence();
   } finally {
     if (!isSilentSync) {
-      hideSkeleton('crm');
       hideSkeleton('triage');
     }
   }
 }
 
+async function fetchJsonAuthorized(url) {
+  window.DentaFlowAuth?.requireSession?.();
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'include',
+    headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(12_000),
+  });
+  assertAuthorizedResponse(response);
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload?.details || payload?.error || `HTTP ${response.status}`);
+  }
+  return payload;
+}
+
+async function loadPatientDirectory() {
+  try {
+    const payload = await fetchJsonAuthorized(`${CONFIG.ROSTER_PROXY}?view=directory`);
+    const rows = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+    lastDirectory = rows;
+    renderCRMTable(rows);
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    console.error('[CRM] Directory load failed:', err?.message || err);
+    lastDirectory = [];
+    renderCRMTable([]);
+  }
+}
+
+async function loadCalendarRange(from, to) {
+  if (!dashboardCalendar) return;
+  try {
+    const payload = await fetchJsonAuthorized(
+      `${CONFIG.ROSTER_PROXY}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
+    const unwrapped = unwrapRosterPayload(payload);
+    const records = parseRosterResponse(unwrapped).map(normalizeDoctorAppointment).filter(Boolean);
+    dashboardCalendar.removeAllEvents();
+    records.forEach((record) => {
+      const event = window.DentaFlowBookingOps?.toCalendarEvent(record);
+      if (event) dashboardCalendar.addEvent(event);
+    });
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    console.error('[Calendar] Range load failed:', err?.message || err);
+  }
+}
+
+async function loadWaitlistForOps() {
+  try {
+    const payload = await fetchJsonAuthorized(CONFIG.WAITLIST_PROXY);
+    lastWaitlist = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+    renderWaitlistPanel(lastWaitlist);
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    lastWaitlist = [];
+    renderWaitlistPanel([]);
+  }
+}
+
+async function loadGaps() {
+  try {
+    const payload = await fetchJsonAuthorized(`${CONFIG.ROSTER_PROXY}?view=gaps`);
+    const pack = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+    lastGaps = Array.isArray(pack?.gaps) ? pack.gaps : [];
+    renderGapList(lastGaps, doctorEl('gap-list'));
+    const overviewHost = doctorEl('overview-gap-list');
+    const overviewPanel = doctorEl('overview-gap-panel');
+    const noShows = asMetric(lastKpiPayload?.no_shows);
+    if (overviewPanel) overviewPanel.hidden = noShows <= 0;
+    if (overviewHost && noShows > 0) renderGapList(lastGaps, overviewHost);
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    lastGaps = [];
+    renderGapList([], doctorEl('gap-list'));
+  }
+}
+
+function renderStatusBoard(records, urgencesOnly = false) {
+  const lanes = window.DentaFlowBookingOps.partitionStatusBoard(records, urgencesOnly);
+  const mapping = [
+    ['lane-confirme', 'confirme', lanes.confirme],
+    ['lane-en_salle', 'en_salle', lanes.en_salle],
+    ['lane-en_soin', 'en_soin', lanes.en_soin],
+    ['lane-termine', 'termine', lanes.termine],
+  ];
+  mapping.forEach(([id, key, items]) => {
+    const el = doctorEl(id);
+    if (!el) return;
+    el.innerHTML = '';
+    const countEl = doctorQuery(`.status-board__count[data-count="${key}"]`);
+    if (countEl) countEl.textContent = String(items.length);
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'status-board__empty';
+      empty.textContent = 'Aucun rendez-vous';
+      el.appendChild(empty);
+      return;
+    }
+    items.forEach((record) => el.appendChild(createStatusBoardCard(record)));
+  });
+  const strip = doctorEl('status-board-strip');
+  if (strip) {
+    strip.innerHTML = '';
+    const stripRows = [...(lanes.en_attente || []), ...(lanes.no_show || []), ...(lanes.annule || [])];
+    stripRows.forEach((record) => {
+      strip.appendChild(createStatusBoardChip(record));
+    });
+    if (!stripRows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'status-board__empty';
+      empty.textContent = 'Aucune absence ni annulation aujourd’hui.';
+      strip.appendChild(empty);
+    }
+  }
+}
+
+function createStatusBoardCard(record) {
+  const card = document.createElement('li');
+  card.className = 'status-board__card';
+  card.innerHTML = `
+    <p class="status-board__time">${escapeHtml(record.time || '—')}</p>
+    <p class="status-board__name">${escapeHtml(record.name || record.patientName || 'Patient')}</p>
+    <p class="status-board__motif">${escapeHtml(record.treatment || '—')}</p>
+  `;
+  return card;
+}
+
+function createStatusBoardChip(record) {
+  const chip = document.createElement('span');
+  chip.className = 'status-board__chip';
+  chip.textContent = `${record.time || '—'} · ${record.name || record.patientName || 'Patient'} · ${record.status || ''}`;
+  return chip;
+}
+
+function renderGapList(gaps, host) {
+  if (!host) return;
+  host.innerHTML = '';
+  if (!gaps.length) {
+    const empty = document.createElement('p');
+    empty.className = 'gap-list__empty';
+    empty.textContent = 'Aucun créneau libre ≥ 30 min aujourd’hui.';
+    host.appendChild(empty);
+    return;
+  }
+  gaps.forEach((gap) => {
+    const row = document.createElement('li');
+    row.className = 'gap-list__row';
+    row.innerHTML = `
+      <span>${escapeHtml(gapClockLabel(gap.start))} – ${escapeHtml(gapClockLabel(gap.end))}</span>
+      <span>${Number(gap.duration_min) || 0} min</span>
+    `;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-action-sm';
+    btn.textContent = 'Remplir';
+    btn.addEventListener('click', () => fillGapFromSlot(gap));
+    row.appendChild(btn);
+    host.appendChild(row);
+  });
+}
+
+function gapClockLabel(value) {
+  const text = String(value || '');
+  if (/^\d{2}:\d{2}$/.test(text)) return text;
+  const sliced = text.slice(11, 16);
+  return /^\d{2}:\d{2}$/.test(sliced) ? sliced : (text.slice(0, 5) || '—');
+}
+
+function gapSlotParts(gap) {
+  const date = String(gap.date || '').slice(0, 10);
+  const start = String(gap.start || '');
+  if (/^\d{2}:\d{2}$/.test(start)) {
+    return { slotDate: date, slotTime: start };
+  }
+  return {
+    slotDate: date || start.slice(0, 10),
+    slotTime: gapClockLabel(start),
+  };
+}
+
+async function fillGapFromSlot(gap) {
+  const { slotDate, slotTime } = gapSlotParts(gap);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(slotDate) || !/^\d{2}:\d{2}$/.test(slotTime)) {
+    window.alert('Créneau invalide.');
+    return;
+  }
+  const candidate = lastWaitlist.find((row) => String(row.status || '').toLowerCase() === 'active')
+    || lastWaitlist[0];
+  if (!candidate?.id) {
+    window.alert('Ajoutez d’abord un patient à la liste d’attente.');
+    return;
+  }
+  try {
+    window.DentaFlowAuth?.requireSession?.();
+    const response = await fetch(CONFIG.FILL_GAP_PROXY, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        slotDate,
+        slotTime,
+        candidateId: candidate.id,
+      }),
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || 'Fill-gap a échoué');
+    }
+    showDashboardToast('Créneau comblé depuis la liste d’attente.', 'success');
+    await Promise.all([loadDoctorHubData(true), loadGaps(), loadWaitlistForOps(), loadPatientDirectory()]);
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    console.error('[Fill-gap]', err?.message || err);
+    window.alert(err?.message || 'Impossible de remplir ce créneau.');
+  }
+}
+
+function initStatusBoardFilters() {
+  doctorEl('status-board-urgence-filter')?.addEventListener('change', (event) => {
+    renderStatusBoard(lastTodayRoster, event.target.checked);
+  });
+}
+
+function initWaitlistAdmin() {
+  doctorEl('waitlist-popover-export')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    generateDoctorDailyReport();
+  });
+  doctorEl('waitlist-popover-fill-gap')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const firstGap = lastGaps[0];
+    if (!firstGap) {
+      window.alert('Aucun créneau libre ≥ 30 min aujourd’hui.');
+      return;
+    }
+    await fillGapFromSlot(firstGap);
+  });
+}
+
+function generateDoctorDailyReport() {
+  const Ops = window.DentaFlowBookingOps;
+  if (!Ops?.downloadDailyCsv) return;
+  Ops.downloadDailyCsv(lastTodayRoster, 'roster-temara.csv');
+  Ops.printDailyRoster(lastTodayRoster, { title: 'Liste du jour — Cabinet Témara' });
+}
+
+function updateOverviewAppointmentCount(count) {
+  const el = doctorEl('overview-appointment-count');
+  if (el) el.textContent = String(count || 0);
+}
+
 const DOCTOR_OS_BOOT_SELECTORS = {
   sidebar: '.sidebar',
-  triagePanels: '.brutalist-triage-grid .brutalist-triage-panel',
+  triagePanels: '.status-board .status-board__lane',
   digestTargets: '.brutalist-digest-container, .brutalist-digest-container .digest-metric',
-  triageRows: '#doctor-waiting-room-body tr:not(.triage-empty), #doctor-emergencies-body tr:not(.triage-empty)',
+  triageRows: '.status-board__card',
 };
 
 function collectDoctorOsBootTargets() {
@@ -3651,6 +4136,9 @@ function initSmartSync() {
       await Promise.all([
         loadDashboard(true),
         loadDoctorHubData(true),
+        loadPatientDirectory(),
+        loadWaitlistForOps(),
+        loadGaps(),
       ]);
     } finally {
       smartSyncInFlight = false;

@@ -24,7 +24,9 @@ const TEAM_NOTES_GET_SQL = `
     content AS message,
     created_at AS posted_at,
     COALESCE(pinned, false) AS pinned,
-    COALESCE(NULLIF(category, ''), 'general') AS category
+    COALESCE(NULLIF(category, ''), 'general') AS category,
+    patient_name,
+    booking_id
   FROM team_notes
   WHERE clinic_id = $1
   ORDER BY pinned DESC, posted_at DESC
@@ -60,6 +62,8 @@ function mapTeamNoteRow(row) {
     posted_at: postedAt,
     pinned: Boolean(row.pinned),
     category: row.category || 'general',
+    patient_name: row.patient_name || '',
+    booking_id: row.booking_id || null,
     text: message,
     time: postedAt,
   };

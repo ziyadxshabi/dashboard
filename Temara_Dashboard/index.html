@@ -320,19 +320,24 @@
           </div>
         </header>
 
-        <section class="reclaimed-banner" aria-label="Impact DentaFlow — patients récupérés et revenu estimé">
+        <section class="reclaimed-banner honest-banner" aria-label="Occupation, créneaux récupérés et absences">
           <div class="reclaimed-banner__glow" aria-hidden="true"></div>
           <div class="reclaimed-banner__content">
-            <div class="hero-split-layout">
+            <div class="hero-split-layout honest-banner__grid">
               <div class="hero-split-block hero-split-block--primary">
-                <p class="hero-split-subtitle kinetic-label">PATIENTS RÉCUPÉRÉS PAR DENTAFLOW</p>
-                <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
-                <p class="hero-split-helper">Aucune série de créneaux récupérés n'est enregistrée.</p>
+                <p class="hero-split-subtitle kinetic-label">Occupation du jour</p>
+                <div class="hero-value" id="banner-occupancy" aria-live="polite">—</div>
+                <p class="hero-split-helper" id="banner-occupancy-helper">Minutes réservées / plage 08h–19h</p>
+              </div>
+              <div class="hero-split-block">
+                <p class="hero-split-subtitle kinetic-label">Créneaux récupérés</p>
+                <div class="hero-value" id="banner-recovered" aria-live="polite">0</div>
+                <p class="hero-split-helper" id="banner-recovered-helper">Liste d'attente placée sur un trou du planning</p>
               </div>
               <div class="hero-split-block hero-split-block--secondary">
-                <p class="hero-split-subtitle kinetic-label">REVENU ESTIMÉ GÉNÉRÉ</p>
-                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">—</div>
-                <p class="hero-split-helper">Non calculé — pas de table de créneaux récupérés</p>
+                <p class="hero-split-subtitle kinetic-label">Taux de no-show</p>
+                <div class="hero-value" id="banner-noshow-rate" aria-live="polite">—</div>
+                <p class="hero-split-helper" id="banner-noshow-helper">Absences / rendez-vous échus</p>
               </div>
             </div>
           </div>
@@ -348,16 +353,16 @@
 
           <article class="kpi-card kpi-card--matte" id="card-patients">
             <div class="kpi-card__head">
-              <div class="kpi-label kinetic-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Flux patients</div>
+              <div class="kpi-label kinetic-label" data-tooltip="Rendez-vous du jour hors annulations">Flux patients</div>
               <div class="kpi-trend" id="trend-patients" aria-hidden="true"></div>
             </div>
             <div class="kpi-number kinetic-value" id="val-patients" data-target="0" aria-live="polite">—</div>
-            <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
+            <div class="kpi-sub" id="sub-patients">Rendez-vous du jour</div>
           </article>
 
           <article class="kpi-card kpi-card--matte" id="card-noshows">
             <div class="kpi-card__head">
-              <div class="kpi-label kinetic-label" data-tooltip="Créneaux libérés ou patients absents sans préavis">Absences</div>
+              <div class="kpi-label kinetic-label" data-tooltip="No-shows et annulations du jour">Absences</div>
               <div class="kpi-trend" id="trend-noshows" aria-hidden="true"></div>
             </div>
             <div class="kpi-number kinetic-value" id="val-noshows" data-target="0" aria-live="assertive">—</div>
@@ -429,6 +434,13 @@
                 <div class="schedule-list" id="appointments-list" data-lenis-prevent>
                   <!-- populated by renderAppointmentsList() -->
                 </div>
+                <div class="gap-panel gap-panel--compact" id="overview-gap-panel" hidden>
+                  <div class="gap-panel__head">
+                    <div class="chart-title">Créneaux à combler</div>
+                    <div class="chart-sub">Absences du jour — trous ≥ 30 min</div>
+                  </div>
+                  <ul class="gap-list" id="overview-gap-list"></ul>
+                </div>
               </div>
             </div>
           </article>
@@ -442,7 +454,7 @@
 
         <header class="view-page-header">
           <h2 class="view-page-title kinetic-title">Cabinet Live</h2>
-          <p class="view-page-sub">Vue opérationnelle — patients du jour et notes cliniques</p>
+          <p class="view-page-sub">Vue opérationnelle — flux du jour et occupation du fauteuil</p>
         </header>
 
         <div class="doctor-metrics" id="doctor-metrics">
@@ -458,7 +470,7 @@
               <span class="doctor-metric-label kinetic-label">En attente</span>
             </div>
             <span class="doctor-metric-value kinetic-value" id="hub-val-pending">—</span>
-            <span class="doctor-metric-delta" id="hub-delta-pending">Devis à valider</span>
+            <span class="doctor-metric-delta" id="hub-delta-pending">En attente</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
             <div class="doctor-metric-card__head">
@@ -467,12 +479,12 @@
             <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">—</span>
             <span class="doctor-metric-delta doctor-metric-delta--warn" id="hub-delta-noshows">Créneaux libres</span>
           </article>
-          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="production">
+          <article class="doctor-metric-card doctor-metric-card--matte" data-metric="occupancy">
             <div class="doctor-metric-card__head">
-              <span class="doctor-metric-label kinetic-label">Production</span>
+              <span class="doctor-metric-label kinetic-label">Occupation</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-production">—</span>
-            <span class="doctor-metric-delta" id="hub-delta-production">MAD facturés</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-occupancy">—</span>
+            <span class="doctor-metric-delta" id="hub-delta-occupancy">Fauteuil 08h–19h</span>
           </article>
         </div>
 
@@ -539,50 +551,33 @@
             <div class="skeleton skeleton-table-row"></div>
             <div class="skeleton skeleton-table-row"></div>
           </div>
-          <div id="triage-content" class="brutalist-triage-grid" aria-label="Centre de triage" hidden>
-          <article class="brutalist-triage-panel" aria-label="Salle d'attente">
-            <header class="brutalist-triage-panel__header">
-              <h3 class="brutalist-triage-panel__title">Salle d'Attente</h3>
-              <p class="brutalist-triage-panel__sub">Patients confirmés — ordre chronologique</p>
-            </header>
-            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Salle d'attente" tabindex="0">
-              <table class="brutalist-triage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Heure</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Motif</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="doctor-waiting-room-body">
-                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
-                </tbody>
-              </table>
+          <div id="triage-content" class="status-board-wrap" aria-label="Tableau de statut du jour" hidden>
+            <div class="status-board-toolbar">
+              <p class="chart-sub">Confirmé → salle → soin → terminé. L'urgence filtre le motif.</p>
+              <label class="filter-toggle status-board-filter">
+                <input type="checkbox" id="status-board-urgence-filter" />
+                <span>Urgences uniquement</span>
+              </label>
             </div>
-          </article>
-
-          <article class="brutalist-triage-panel" aria-label="Urgences">
-            <header class="brutalist-triage-panel__header">
-              <h3 class="brutalist-triage-panel__title">Urgences</h3>
-              <p class="brutalist-triage-panel__sub">Cas prioritaires — traitement immédiat</p>
-            </header>
-            <div class="brutalist-triage-panel__table-wrap" data-lenis-prevent role="region" aria-label="Urgences" tabindex="0">
-              <table class="brutalist-triage-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Heure</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col">Motif</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="doctor-emergencies-body">
-                  <tr class="triage-empty"><td colspan="4">Chargement…</td></tr>
-                </tbody>
-              </table>
+            <div class="status-board" id="status-board">
+              <article class="status-board__lane" data-lane="confirme">
+                <header class="status-board__head"><h3>Confirmé</h3><span class="status-board__count" data-count="confirme">0</span></header>
+                <ul class="status-board__list" id="lane-confirme"></ul>
+              </article>
+              <article class="status-board__lane" data-lane="en_salle">
+                <header class="status-board__head"><h3>En salle</h3><span class="status-board__count" data-count="en_salle">0</span></header>
+                <ul class="status-board__list" id="lane-en_salle"></ul>
+              </article>
+              <article class="status-board__lane" data-lane="en_soin">
+                <header class="status-board__head"><h3>En soin</h3><span class="status-board__count" data-count="en_soin">0</span></header>
+                <ul class="status-board__list" id="lane-en_soin"></ul>
+              </article>
+              <article class="status-board__lane" data-lane="termine">
+                <header class="status-board__head"><h3>Terminé</h3><span class="status-board__count" data-count="termine">0</span></header>
+                <ul class="status-board__list" id="lane-termine"></ul>
+              </article>
             </div>
-          </article>
+            <div class="status-board__strip" id="status-board-strip" aria-label="No-shows, annulations et en attente"></div>
           </div>
         </div>
 
@@ -599,8 +594,8 @@
             </div>
             <div class="digest-metric digest-revenue">
               <div class="rev-header">
-                <span class="metric-label">Objectif Journalier</span>
-                <span class="metric-value" id="digest-revenue">0 MAD</span>
+                <span class="metric-label">Occupation</span>
+                <span class="metric-value" id="digest-occupancy">0 %</span>
               </div>
               <div class="rev-progress-bar">
                 <div class="rev-progress-fill" id="digest-progress"></div>
@@ -724,11 +719,18 @@
                   <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
                     Remplir un Créneau Vide
                   </button>
-                  <button type="button" class="actions-popover__item v-disabled" id="waitlist-popover-export" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
+                  <button type="button" class="actions-popover__item" id="waitlist-popover-export" role="menuitem">
                     Générer Rapport Journalier
                   </button>
                 </div>
               </div>
+            </div>
+            <div class="gap-panel" id="gap-panel" aria-label="Créneaux libres du jour">
+              <div class="gap-panel__head">
+                <div class="chart-title">Créneaux libres</div>
+                <div class="chart-sub">Trou ≥ 30 min entre 08h et 19h — placer un patient de la liste d'attente</div>
+              </div>
+              <ul class="gap-list" id="gap-list"></ul>
             </div>
             <div class="waitlist-table-wrap" data-lenis-prevent id="waitlist-container" role="region" aria-label="Patients en liste d'attente" tabindex="0">
               <div class="skeleton-wrapper" id="waitlist-skeleton">
@@ -763,7 +765,7 @@
         <header class="view-page-header view-page-header--row">
           <div>
             <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">CRM clinique — fiches et coordonnées patients</p>
+            <p class="view-page-sub">Identité de réservation — historique des rendez-vous par téléphone</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -771,7 +773,7 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Rechercher par nom, téléphone ou email…"
+              placeholder="Rechercher par nom ou téléphone…"
               autocomplete="off"
             />
           </div>
@@ -793,13 +795,15 @@
                 <tr>
                   <th scope="col">Nom</th>
                   <th scope="col">Téléphone</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Motif</th>
+                  <th scope="col">Dernier motif</th>
+                  <th scope="col">Visites</th>
+                  <th scope="col">Dernier RDV</th>
+                  <th scope="col">Prochain RDV</th>
                 </tr>
               </thead>
               <tbody id="crm-table-body">
                 <tr class="crm-table-empty">
-                  <td colspan="4">Aucun patient trouvé</td>
+                  <td colspan="6">Aucun patient trouvé</td>
                 </tr>
               </tbody>
             </table>
@@ -816,16 +820,16 @@
 
         <div class="charts-grid">
           <article class="chart-card chart-card--analytics chart-card--wide">
-            <h3 class="chart-title">Créneaux récupérés</h3>
-            <p class="chart-sub">Aucune table de rattrapage n'est branchée sur Postgres</p>
+            <h3 class="chart-title">Conversion liste d'attente</h3>
+            <p class="chart-sub">Liste d'attente encore ouverte vs créneaux déjà placés</p>
             <div class="chart-canvas-wrap chart-canvas-wrap--tall">
-              <canvas id="recoveryChart" role="img" aria-label="Créneaux récupérés — données non disponibles"></canvas>
+              <canvas id="recoveryChart" role="img" aria-label="Conversion de la liste d'attente"></canvas>
             </div>
           </article>
 
           <article class="chart-card chart-card--analytics chart-card--square">
             <h3 class="chart-title">Répartition du jour</h3>
-            <p class="chart-sub">Confirmés, en attente et no-shows — mix réel d'aujourd'hui</p>
+            <p class="chart-sub">Statuts réels du planning — mix d'aujourd'hui</p>
             <div class="chart-canvas-wrap chart-canvas-wrap--flow-bars">
               <canvas id="flowChart" role="img" aria-label="Répartition des statuts du jour"></canvas>
             </div>
@@ -937,18 +941,18 @@
             <div class="settings-card-icon" aria-hidden="true">
               <i data-lucide="circle-dollar-sign" aria-hidden="true"></i>
             </div>
-            <h3 class="settings-card-title">Objectif &amp; Clinique</h3>
-            <p class="settings-card-desc">Définissez l'objectif de production journalier affiché sur le tableau de bord.</p>
+            <h3 class="settings-card-title">Objectif du jour</h3>
+            <p class="settings-card-desc">Nombre de patients visé aujourd'hui — affiché sur la synthèse de fin de journée.</p>
             <div class="settings-field">
-              <label class="settings-label" for="settings-daily-goal">Objectif Journalier (MAD)</label>
+              <label class="settings-label" for="settings-daily-goal">Objectif patients</label>
               <input
                 class="waitlist-input settings-input"
                 type="number"
                 id="settings-daily-goal"
                 name="daily_goal"
-                value="15000"
-                min="1000"
-                step="500"
+                value="12"
+                min="1"
+                step="1"
                 inputmode="numeric"
               />
             </div>
@@ -960,12 +964,12 @@
               <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
+            <p class="settings-card-desc">Préférence locale uniquement — l'envoi automatique des rappels n'est pas actif pour le moment.</p>
 
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels SMS</span>
-                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
+                <span class="settings-toggle-hint">Rappel 24h avant — envoi automatique plus tard</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-sms-toggle" checked />
@@ -976,7 +980,7 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
+                <span class="settings-toggle-hint">Préférence enregistrée localement — pas d'envoi pour l'instant</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-email-toggle" checked />
@@ -1170,32 +1174,44 @@
       </header>
 
       <div class="crm-side-panel-body" data-lenis-prevent>
-        <section class="crm-side-panel-section" aria-label="Détails financiers">
-          <h3 class="crm-side-panel-section-title">Détails Financiers</h3>
+        <section class="crm-side-panel-section" aria-label="Identité de réservation">
+          <h3 class="crm-side-panel-section-title">Réservation</h3>
           <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field">
-              <dt>Montant</dt>
-              <dd id="crm-panel-amount" data-tooltip="Montant facturé pour la dernière visite">—</dd>
+              <dt>Visites</dt>
+              <dd id="crm-panel-visits">—</dd>
             </div>
             <div class="crm-side-panel-field">
-              <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
+              <dt>No-shows</dt>
+              <dd id="crm-panel-noshows">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Annulations</dt>
+              <dd id="crm-panel-cancels">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Prochain RDV</dt>
+              <dd id="crm-panel-next">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Email</dt>
+              <dd id="crm-panel-email">—</dd>
+            </div>
+            <div class="crm-side-panel-field">
+              <dt>Dernier motif</dt>
+              <dd id="crm-panel-motif">—</dd>
             </div>
           </dl>
         </section>
 
-        <section class="crm-side-panel-section" aria-label="Notes cliniques">
-          <h3 class="crm-side-panel-section-title">Notes Cliniques</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Motif de Consultation</dt>
-              <dd id="crm-panel-motif">—</dd>
-            </div>
-            <div class="crm-side-panel-field crm-side-panel-field--block">
-              <dt>Observations Médicales</dt>
-              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
-            </div>
-          </dl>
+        <section class="crm-side-panel-section" aria-label="Historique des rendez-vous">
+          <h3 class="crm-side-panel-section-title">Historique</h3>
+          <ol class="crm-timeline" id="crm-panel-timeline"></ol>
+        </section>
+
+        <section class="crm-side-panel-section" aria-label="Notes d'équipe">
+          <h3 class="crm-side-panel-section-title">Notes d'équipe</h3>
+          <div id="crm-panel-notes" class="crm-side-panel-notes">Aucune note liée à ce patient.</div>
         </section>
       </div>
     </aside>
@@ -1218,6 +1234,7 @@
   <script src="auth.js"></script>
   <script src="theme.js"></script>
   <script src="row-ui.js"></script>
+  <script src="booking-ops.js"></script>
   <script src="notes.js"></script>
   <script src="ghost-select.js"></script>
   <script src="dashboard_app.js"></script>

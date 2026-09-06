@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   patient_name    TEXT NOT NULL DEFAULT '',
   patient_phone   TEXT NOT NULL DEFAULT '',
   treatment_name  TEXT NOT NULL DEFAULT '',
+  patient_email   TEXT,
   status          TEXT NOT NULL DEFAULT 'En attente',
   starts_at       TIMESTAMPTZ NOT NULL,
   duration_min    INTEGER,
