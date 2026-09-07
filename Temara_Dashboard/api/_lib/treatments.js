@@ -15,6 +15,32 @@ const TREATMENTS = Object.freeze([
   { name: 'Urgence', duration_min: 20, aliases: ['Urgences'] },
 ]);
 
+/** ANAM-style reference tariffs (MAD). Display remainder only — never a slip. */
+const ANAM_TARIFF_MAD = Object.freeze({
+  Consultation: 150,
+  'Détartrage': 250,
+  Soin: 400,
+  Extraction: 350,
+  'Dévitalisation': 800,
+  Couronne: 2500,
+  Blanchiment: 1500,
+  Urgence: 200,
+});
+
+const PATIENT_SHARE = Object.freeze({
+  none: 1,
+  prive: 1,
+  cnss: 0.3,
+  cnops: 0.2,
+});
+
+const INSURANCE_LABELS = Object.freeze({
+  none: 'Aucun',
+  prive: 'Privé',
+  cnss: 'CNSS',
+  cnops: 'CNOPS',
+});
+
 function foldKey(value) {
   return String(value || '')
     .trim()
@@ -32,7 +58,11 @@ for (const item of TREATMENTS) {
 }
 
 function listTreatments() {
-  return TREATMENTS.map((item) => ({ name: item.name, duration_min: item.duration_min }));
+  return TREATMENTS.map((item) => ({
+    name: item.name,
+    duration_min: item.duration_min,
+    tariff_mad: ANAM_TARIFF_MAD[item.name] || null,
+  }));
 }
 
 function resolveTreatment(raw) {
@@ -41,8 +71,25 @@ function resolveTreatment(raw) {
   return BY_KEY.get(key) || null;
 }
 
+function insuranceLabel(type) {
+  const key = String(type || '').trim().toLowerCase();
+  return INSURANCE_LABELS[key] || '';
+}
+
+function expectedCopayMad(treatmentName, insuranceType) {
+  const shareKey = String(insuranceType || '').trim().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(PATIENT_SHARE, shareKey)) return null;
+  const item = resolveTreatment(treatmentName);
+  const tariff = ANAM_TARIFF_MAD[item?.name || treatmentName];
+  if (!Number.isFinite(tariff)) return null;
+  return Math.round(tariff * PATIENT_SHARE[shareKey]);
+}
+
 module.exports = {
   TREATMENTS,
+  ANAM_TARIFF_MAD,
   listTreatments,
   resolveTreatment,
+  expectedCopayMad,
+  insuranceLabel,
 };

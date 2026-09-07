@@ -60,11 +60,18 @@ const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 const { toE164MA, isValidMaMobileE164 } = require(path.join(DASHBOARD, 'api/_lib/phone-e164.js'));
 const { waitlistRank, pickWaitlistTopN } = require(path.join(DASHBOARD, 'api/_lib/waitlist-blast.js'));
-const { inReminderWindow, daysBetweenCasablanca } = require(path.join(DASHBOARD, 'api/_lib/cron-notify.js'));
+const { inReminderWindow, daysBetweenCasablanca, inUnconfirmedWindow } = require(path.join(DASHBOARD, 'api/_lib/cron-notify.js'));
 const { tryAcquireLock } = require(path.join(DASHBOARD, 'api/_lib/notification-locks.js'));
-const { verifyTwilioSignature, timingSafeEqualStrings } = require(path.join(DASHBOARD, 'api/_lib/twilio.js'));
+const {
+  verifyTwilioSignature,
+  timingSafeEqualStrings,
+  sendTwilioMessage,
+  formatWhatsappAddress,
+  stripWhatsappPrefix,
+} = require(path.join(DASHBOARD, 'api/_lib/twilio.js'));
 const { sanitizeString } = require(path.join(DASHBOARD, 'api/_lib/validation.js'));
 const templates = require(path.join(DASHBOARD, 'api/_lib/sms-templates.js'));
+const { expectedCopayMad } = require(path.join(DASHBOARD, 'api/_lib/treatments.js'));
 
 const CLINIC_SLUG = 'temara';
 const SEED_PASSWORD = 'dentaflow';
@@ -285,6 +292,13 @@ async function run() {
   );
   await query(migrationSql);
   ok('notification SMS migration applied', true);
+
+  const roiMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260907_roi_loops.sql'),
+    'utf8'
+  );
+  await query(roiMigrationSql);
+  ok('ROI loops migration applied', true);
 
   await query(
     `UPDATE clinics
@@ -933,8 +947,8 @@ async function run() {
       })
     );
     ok(
-      'POST /api/fill-gap with candidateId returns 200',
-      fillBook.statusCode === 200,
+      'POST /api/fill-gap with candidateId returns 201/200',
+      fillBook.statusCode === 201 || fillBook.statusCode === 200,
       `status=${fillBook.statusCode} body=${JSON.stringify(fillBook.body)}`
     );
     ok('POST /api/fill-gap inserts a booking', Boolean(fillBook.body?.data?.booking?.id));
@@ -943,12 +957,15 @@ async function run() {
 
     if (fillGapBookingId) {
       const booked = await query(
-        `SELECT patient_name, status::text AS status FROM bookings WHERE id = $1`,
+        `SELECT patient_name, status::text AS status, patient_id FROM bookings WHERE id = $1`,
         [fillGapBookingId]
       );
       ok('fill-gap booking persisted in bookings', booked.rows[0]?.patient_name === fillGapName);
       ok('fill-gap booking DB status is En attente', booked.rows[0]?.status === 'En attente');
+      ok('fill-gap booking attaches patient_id', Boolean(booked.rows[0]?.patient_id));
     }
+    const filledRow = await query(`SELECT status FROM waitlist WHERE id = $1`, [fillGapWaitlistId]);
+    ok('fill-gap marks waitlist filled', filledRow.rows[0]?.status === 'filled');
   } finally {
     if (fillGapBookingId) await query('DELETE FROM bookings WHERE id = $1', [fillGapBookingId]);
     if (fillGapWaitlistId) await query('DELETE FROM waitlist WHERE id = $1', [fillGapWaitlistId]);
@@ -1065,8 +1082,15 @@ async function run() {
     typeof dash.body?.data?.patients_today === 'number' &&
       typeof dash.body?.data?.accepted_plans === 'number' &&
       typeof dash.body?.data?.pending_plans === 'number' &&
-      typeof dash.body?.data?.no_shows === 'number',
+      typeof dash.body?.data?.no_shows === 'number' &&
+      typeof dash.body?.data?.plans_done === 'number' &&
+      typeof dash.body?.data?.plans_open === 'number',
     JSON.stringify(dash.body)
+  );
+  ok(
+    'GET /api/dashboard-data mad_per_hour is null or a number',
+    dash.body?.data?.mad_per_hour == null || typeof dash.body?.data?.mad_per_hour === 'number',
+    `mad_per_hour=${dash.body?.data?.mad_per_hour}`
   );
   ok(
     'GET /api/dashboard-data week_patients has 7 counts',
@@ -1901,7 +1925,586 @@ async function run() {
   );
   ok('duplicate CREATED still 200', firstDup.statusCode === 200 && secondDup.statusCode === 200);
   ok('duplicate CREATED sets duplicate flag', secondDup.body?.duplicate === true);
+  const calPatient = await query(
+    `SELECT patient_id FROM bookings WHERE cal_booking_uid = $1`,
+    [repeatCreatedBody.payload.uid]
+  );
+  ok('Cal ingest attaches patient_id', Boolean(calPatient.rows[0]?.patient_id));
   await query('DELETE FROM bookings WHERE cal_booking_uid = $1', [repeatCreatedBody.payload.uid]);
+
+  // ── ROI loops: channel, inbound, no-show NX, crons, patients, levers ──
+  console.log('\n[roi-loops]');
+  ok(
+    'formatWhatsappAddress prefixes once',
+    formatWhatsappAddress('+212612345678') === 'whatsapp:+212612345678'
+  );
+  ok(
+    'formatWhatsappAddress strips existing prefix',
+    formatWhatsappAddress('whatsapp:+212612345678') === 'whatsapp:+212612345678'
+  );
+  ok('stripWhatsappPrefix restores E.164', stripWhatsappPrefix('whatsapp:+212612345678') === '+212612345678');
+  ok('copay is null without insurance_type', expectedCopayMad('Consultation', null) === null);
+  ok('copay is null when insurance is empty', expectedCopayMad('Consultation', '') === null);
+  ok('copay CNSS remainder is display-only', expectedCopayMad('Consultation', 'cnss') === 45);
+  ok(
+    'reminder copy asks to reply 1 / oui / ok',
+    templates.reminderSms('NADIA', 'https://example.test/book/temara').includes('Répondez 1')
+  );
+  ok(
+    'inUnconfirmedWindow matches T-2h ±15m',
+    inUnconfirmedWindow(new Date(Date.now() + 2 * 60 * 60 * 1000)) === true
+  );
+  ok(
+    'inUnconfirmedWindow rejects T-24h',
+    inUnconfirmedWindow(new Date(Date.now() + 24 * 60 * 60 * 1000)) === false
+  );
+
+  const prevFetch = global.fetch;
+  const prevSid = process.env.TWILIO_ACCOUNT_SID;
+  const prevTok = process.env.TWILIO_AUTH_TOKEN;
+  const prevFrom = process.env.TWILIO_FROM;
+  const prevWa = process.env.TWILIO_WA_FROM;
+  try {
+    process.env.TWILIO_ACCOUNT_SID = 'ACtestxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+    process.env.TWILIO_AUTH_TOKEN = 'test-token';
+    process.env.TWILIO_FROM = '+15551234567';
+    delete process.env.TWILIO_WA_FROM;
+    let captured = null;
+    global.fetch = async (_url, opts) => {
+      captured = String(opts?.body || '');
+      return { ok: true, status: 201, json: async () => ({ sid: 'SMFAKE123', status: 'queued' }) };
+    };
+    captured = null;
+    const smsSend = await sendTwilioMessage({
+      to: '+212612345678',
+      body: 'sms-path',
+      channel: 'sms',
+    });
+    ok('sendTwilioMessage SMS path returns a SID when fetch succeeds', smsSend.ok === true && smsSend.sid === 'SMFAKE123');
+    ok(
+      'sendTwilioMessage SMS path does not prefix whatsapp:',
+      captured != null && !/whatsapp/i.test(captured)
+    );
+
+    captured = 'should-not-post';
+    const missingWa = await sendTwilioMessage({
+      to: '+212612345678',
+      body: 'wa-missing',
+      channel: 'whatsapp',
+    });
+    ok(
+      'missing WA from skips with whatsapp_from_missing',
+      missingWa.skipped === true && missingWa.reason === 'whatsapp_from_missing'
+    );
+    ok('missing WA from does not invent a SID', missingWa.sid == null);
+    ok('missing WA from does not POST to Twilio', captured === 'should-not-post');
+
+    process.env.TWILIO_WA_FROM = '+15559876543';
+    captured = null;
+    const waSend = await sendTwilioMessage({
+      to: '+212612345678',
+      body: 'wa-body',
+      channel: 'whatsapp',
+    });
+    ok('sendTwilioMessage WhatsApp path returns SID', waSend.ok === true && waSend.sid === 'SMFAKE123');
+    ok(
+      'sendTwilioMessage WhatsApp prefixes whatsapp: on To/From',
+      captured != null && /whatsapp%3A%2B212612345678/.test(captured) && /whatsapp%3A%2B15559876543/.test(captured)
+    );
+  } finally {
+    global.fetch = prevFetch;
+    if (prevSid == null) delete process.env.TWILIO_ACCOUNT_SID;
+    else process.env.TWILIO_ACCOUNT_SID = prevSid;
+    if (prevTok == null) delete process.env.TWILIO_AUTH_TOKEN;
+    else process.env.TWILIO_AUTH_TOKEN = prevTok;
+    if (prevFrom == null) delete process.env.TWILIO_FROM;
+    else process.env.TWILIO_FROM = prevFrom;
+    if (prevWa == null) delete process.env.TWILIO_WA_FROM;
+    else process.env.TWILIO_WA_FROM = prevWa;
+  }
+
+  const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [] };
+  try {
+    const confirmPhone = '0611987101';
+    const confirmE164 = '+212611987101';
+    const confirmBooking = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, updated_at
+       )
+       VALUES (
+         $1, 'Roi Confirm', $2, 'Consultation', 'Confirme',
+         NOW() + INTERVAL '26 hours', 20, 'visit', NOW()
+       )
+       RETURNING id`,
+      [clinicId, confirmPhone]
+    );
+    roiIds.bookings.push(confirmBooking.rows[0].id);
+
+    const inboundConfirm = await invoke(
+      handleTwilio,
+      createReq({
+        method: 'POST',
+        url: '/api/webhooks/twilio',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { Body: '1', From: `whatsapp:${confirmE164}` },
+      })
+    );
+    ok(
+      'inbound Body=1 returns confirm action',
+      inboundConfirm.statusCode === 200 && inboundConfirm.body?.action === 'confirm',
+      `status=${inboundConfirm.statusCode} body=${JSON.stringify(inboundConfirm.body)}`
+    );
+    const confirmedAt = await query(
+      `SELECT patient_confirmed_at, confirmation_state FROM bookings WHERE id = $1`,
+      [confirmBooking.rows[0].id]
+    );
+    ok('inbound Body=1 sets patient_confirmed_at', Boolean(confirmedAt.rows[0]?.patient_confirmed_at));
+    ok('inbound Body=1 sets confirmation_state confirmed', confirmedAt.rows[0]?.confirmation_state === 'confirmed');
+
+    const stopPhone = '0611987102';
+    const stopE164 = '+212611987102';
+    const stopPatient = await query(
+      `INSERT INTO patients (clinic_id, phone_e164, display_name, sms_consent)
+       VALUES ($1, $2, 'Roi Stop', true)
+       ON CONFLICT (clinic_id, phone_e164) DO UPDATE SET sms_consent = true, updated_at = NOW()
+       RETURNING id`,
+      [clinicId, stopE164]
+    );
+    roiIds.patients.push(stopPatient.rows[0].id);
+    const stopWait = await query(
+      `INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status, sms_consent)
+       VALUES ($1, 'Roi Stop', $2, 'Moyenne', 'roi-stop', 'active', true)
+       RETURNING id`,
+      [clinicId, stopPhone]
+    );
+    roiIds.waitlist.push(stopWait.rows[0].id);
+    const inboundStop = await invoke(
+      handleTwilio,
+      createReq({
+        method: 'POST',
+        url: '/api/webhooks/twilio',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { Body: 'STOP', From: stopE164 },
+      })
+    );
+    ok(
+      'inbound STOP returns stop action',
+      inboundStop.statusCode === 200 && inboundStop.body?.action === 'stop',
+      `status=${inboundStop.statusCode} body=${JSON.stringify(inboundStop.body)}`
+    );
+    const stopConsent = await query(`SELECT sms_consent FROM patients WHERE id = $1`, [stopPatient.rows[0].id]);
+    const stopWaitConsent = await query(`SELECT sms_consent FROM waitlist WHERE id = $1`, [stopWait.rows[0].id]);
+    ok('STOP clears patients.sms_consent', stopConsent.rows[0]?.sms_consent === false);
+    ok('STOP clears waitlist.sms_consent', stopWaitConsent.rows[0]?.sms_consent === false);
+
+    const nsWait = await query(
+      `INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status, sms_consent)
+       VALUES ($1, 'Roi Wait Blast', '0611987103', 'Urgent', 'roi-blast', 'active', true)
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.waitlist.push(nsWait.rows[0].id);
+    const nsBooking = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, updated_at
+       )
+       VALUES (
+         $1, 'Roi NoShow', '0611987104', 'Consultation', 'Confirme',
+         TIMESTAMPTZ '2026-11-03 08:10:00+01', 20, 'visit', NOW()
+       )
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.bookings.push(nsBooking.rows[0].id);
+    const noShowOnce = await invoke(
+      handleUpdateStatus,
+      createReq({
+        method: 'POST',
+        url: '/api/update-status',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { bookingId: nsBooking.rows[0].id, newStatus: 'no_show' },
+      })
+    );
+    ok(
+      'no_show calls blastWaitlistSlot',
+      noShowOnce.statusCode === 200 && noShowOnce.body?.waitlistNotify?.ok === true,
+      `status=${noShowOnce.statusCode} body=${JSON.stringify(noShowOnce.body?.waitlistNotify)}`
+    );
+    ok(
+      'no_show blast uses staff-noshow batchId',
+      String(noShowOnce.body?.waitlistNotify?.batchId || '').startsWith('staff-noshow-')
+    );
+    const noShowTwice = await invoke(
+      handleUpdateStatus,
+      createReq({
+        method: 'POST',
+        url: '/api/update-status',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { bookingId: nsBooking.rows[0].id, newStatus: 'no_show' },
+      })
+    );
+    ok(
+      'duplicate no_show does not double-text (NX)',
+      noShowTwice.body?.waitlistNotify?.duplicate === true
+        || (noShowTwice.body?.waitlistNotify?.skipped || []).some((row) => row.reason === 'already_notified'),
+      JSON.stringify(noShowTwice.body?.waitlistNotify)
+    );
+
+    const dueRecall = await query(
+      `INSERT INTO recalls (clinic_id, patient_name, patient_phone, due_on, treatment_name, status)
+       VALUES ($1, 'Roi Recall Due', '0611987108', (NOW() AT TIME ZONE 'Africa/Casablanca')::date, 'Consultation', 'open')
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.recalls.push(dueRecall.rows[0].id);
+    const futureRecall = await query(
+      `INSERT INTO recalls (clinic_id, patient_name, patient_phone, due_on, treatment_name, status)
+       VALUES ($1, 'Roi Recall Future', '0611987109', (NOW() AT TIME ZONE 'Africa/Casablanca')::date + 40, 'Consultation', 'open')
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.recalls.push(futureRecall.rows[0].id);
+    const cronRecalls = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?action=cron-recalls',
+        headers: assistantCookie,
+      })
+    );
+    ok(
+      'cron-recalls with staff JWT returns 200',
+      cronRecalls.statusCode === 200 && cronRecalls.body?.ok === true,
+      `status=${cronRecalls.statusCode} body=${JSON.stringify(cronRecalls.body)}`
+    );
+    const recallHits = [
+      ...(cronRecalls.body?.sent || []),
+      ...(cronRecalls.body?.skipped || []),
+    ].map((row) => row.id);
+    ok('cron-recalls includes open due_on <= today', recallHits.includes(dueRecall.rows[0].id));
+    ok('cron-recalls ignores future due_on', !recallHits.includes(futureRecall.rows[0].id));
+
+    const prevCron = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = 'roi-cron-secret';
+    const cronSecretRecalls = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?action=cron-recalls',
+        headers: { 'x-cron-secret': 'roi-cron-secret' },
+      })
+    );
+    ok(
+      'cron-recalls accepts CRON_SECRET',
+      cronSecretRecalls.statusCode === 200 && cronSecretRecalls.body?.ok === true,
+      `status=${cronSecretRecalls.statusCode}`
+    );
+    if (prevCron == null) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevCron;
+
+    const unconfirmedIn = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, updated_at
+       )
+       VALUES (
+         $1, 'Roi Unconfirmed', '0611987105', 'Consultation', 'Confirme',
+         NOW() + INTERVAL '2 hours', 20, 'visit', NOW()
+       )
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.bookings.push(unconfirmedIn.rows[0].id);
+    const unconfirmedOut = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, updated_at
+       )
+       VALUES (
+         $1, 'Roi Outside Window', '0611987106', 'Consultation', 'Confirme',
+         NOW() + INTERVAL '5 hours', 20, 'visit', NOW()
+       )
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.bookings.push(unconfirmedOut.rows[0].id);
+    const cronUnconfirmed = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?action=cron-unconfirmed',
+        headers: assistantCookie,
+      })
+    );
+    ok(
+      'cron-unconfirmed returns 200',
+      cronUnconfirmed.statusCode === 200 && cronUnconfirmed.body?.ok === true,
+      `status=${cronUnconfirmed.statusCode} body=${JSON.stringify(cronUnconfirmed.body)}`
+    );
+    const markedIds = (cronUnconfirmed.body?.marked || []).map((row) => row.id);
+    const skippedOutside = (cronUnconfirmed.body?.skipped || []).some(
+      (row) => row.id === unconfirmedOut.rows[0].id && row.reason === 'outside_window'
+    );
+    ok('cron-unconfirmed marks T-2h visit', markedIds.includes(unconfirmedIn.rows[0].id));
+    ok('cron-unconfirmed skips outside T-2h±15m', skippedOutside || !markedIds.includes(unconfirmedOut.rows[0].id));
+
+    const patientDup = await query(
+      `SELECT clinic_id, phone_e164, COUNT(*)::int AS n
+       FROM patients
+       GROUP BY 1, 2
+       HAVING COUNT(*) > 1`
+    );
+    ok('patient backfill is one row per clinic+phone', patientDup.rows.length === 0);
+
+    const patientGetMissing = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?action=patient&id=00000000-0000-4000-8000-000000000099',
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'cross-clinic / unknown patient id returns 404',
+      patientGetMissing.statusCode === 404,
+      `status=${patientGetMissing.statusCode}`
+    );
+
+    const planPatient = await query(
+      `INSERT INTO patients (clinic_id, phone_e164, display_name, insurance_type)
+       VALUES ($1, '+212611987199', 'Roi Plan', 'cnss')
+       ON CONFLICT (clinic_id, phone_e164) DO UPDATE
+         SET insurance_type = 'cnss', display_name = 'Roi Plan', updated_at = NOW()
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.patients.push(planPatient.rows[0].id);
+    const patientGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok('GET patient returns 200', patientGet.statusCode === 200 && patientGet.body?.ok === true);
+    ok('GET patient stays clinic-scoped', patientGet.body?.data?.id === planPatient.rows[0].id);
+
+    const beforeDash = await invoke(
+      handleDashboard,
+      createReq({ method: 'GET', url: '/api/dashboard-data', headers: doctorCookie })
+    );
+    const acceptedBefore = Number(beforeDash.body?.data?.accepted_plans) || 0;
+    const plansDoneBefore = Number(beforeDash.body?.data?.plans_done) || 0;
+    const planCreate = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=plan',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { patientId: planPatient.rows[0].id, title: 'Couronne Roi', steps: [{ label: 'Empreinte' }] },
+      })
+    );
+    ok(
+      'POST plan returns 201',
+      planCreate.statusCode === 201 && Boolean(planCreate.body?.data?.id),
+      `status=${planCreate.statusCode}`
+    );
+    if (planCreate.body?.data?.id) roiIds.plans.push(planCreate.body.data.id);
+    const stepId = planCreate.body?.data?.steps?.[0]?.id;
+    if (stepId) {
+      const stepDone = await invoke(
+        handleRoster,
+        createReq({
+          method: 'POST',
+          url: '/api/roster?action=plan-step',
+          headers: { ...assistantCookie, 'content-type': 'application/json' },
+          body: { stepId, done: true },
+        })
+      );
+      ok('POST plan-step marks done', stepDone.statusCode === 200 && Boolean(stepDone.body?.data?.done_at));
+    }
+    const afterDash = await invoke(
+      handleDashboard,
+      createReq({ method: 'GET', url: '/api/dashboard-data', headers: doctorCookie })
+    );
+    ok(
+      'plan completion is independent of accepted_plans',
+      Number(afterDash.body?.data?.accepted_plans) === acceptedBefore,
+      `before=${acceptedBefore} after=${afterDash.body?.data?.accepted_plans}`
+    );
+    ok(
+      'plans_done increments from treatment_plans',
+      Number(afterDash.body?.data?.plans_done) >= plansDoneBefore + (stepId ? 1 : 0)
+    );
+
+    const chargeCount = await query(
+      `SELECT COUNT(*) FILTER (WHERE charge_mad IS NOT NULL)::int AS n
+       FROM bookings
+       WHERE clinic_id = $1
+         AND COALESCE(booking_kind, 'visit') = 'visit'
+         AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+           = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+         AND status::text NOT IN ('Annule', 'Annulé')`,
+      [clinicId]
+    );
+    if (Number(chargeCount.rows[0]?.n) === 0) {
+      ok('mad_per_hour stays null when no charge_mad', beforeDash.body?.data?.mad_per_hour == null);
+    }
+    const charged = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, charge_mad, updated_at
+       )
+       VALUES (
+         $1, 'Roi Charge', '0611987107', 'Consultation', 'Termine',
+         ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '18:50') AT TIME ZONE 'Africa/Casablanca',
+         20, 'visit', 200, NOW()
+       )
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.bookings.push(charged.rows[0].id);
+    const chargedDash = await invoke(
+      handleDashboard,
+      createReq({ method: 'GET', url: '/api/dashboard-data', headers: doctorCookie })
+    );
+    ok(
+      'mad_per_hour is computed when charge_mad exists',
+      typeof chargedDash.body?.data?.mad_per_hour === 'number' && chargedDash.body.data.mad_per_hour > 0,
+      `mad_per_hour=${chargedDash.body?.data?.mad_per_hour}`
+    );
+
+    const staffRow = await query(
+      `SELECT id FROM staff_users WHERE clinic_id = $1 ORDER BY role::text DESC LIMIT 1`,
+      [clinicId]
+    );
+    const staffId = staffRow.rows[0]?.id;
+    if (staffId) {
+      await query(`UPDATE bookings SET staff_id = $2 WHERE id = $1`, [charged.rows[0].id, staffId]);
+      const filtered = await invoke(
+        handleRoster,
+        createReq({
+          method: 'GET',
+          url: `/api/roster?staff_id=${staffId}`,
+          headers: assistantCookie,
+        })
+      );
+      ok('GET roster staff_id filter returns 200', filtered.statusCode === 200);
+      ok(
+        'GET roster staff_id filter only that doctor',
+        (filtered.body?.data || []).every((row) => !row.staff_id || row.staff_id === staffId)
+      );
+    }
+
+    const stockUpsert = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=stock',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { name: 'Gants nitrile', qty: 10, reorderAt: 5 },
+      })
+    );
+    ok('POST stock upserts item', stockUpsert.statusCode === 200 && Boolean(stockUpsert.body?.data?.id));
+    if (stockUpsert.body?.data?.id) roiIds.stock.push(stockUpsert.body.data.id);
+    const stockUse = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=stock-use',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { itemId: stockUpsert.body?.data?.id, qty: 1, bookingId: charged.rows[0].id },
+      })
+    );
+    ok('POST stock-use decrements qty', stockUse.statusCode === 200 && (stockUse.body?.data?.applied || []).length >= 1);
+
+    const members = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=memberships', headers: doctorCookie })
+    );
+    ok(
+      'GET memberships lists staff_clinic_memberships',
+      members.statusCode === 200 && Array.isArray(members.body?.data) && members.body.data.length >= 1
+    );
+
+    const referral = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=referral',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { patientId: planPatient.rows[0].id, toPhone: '0611987110', note: 'Endo' },
+      })
+    );
+    ok(
+      'POST referral is text-only and does not fake a SID',
+      referral.statusCode === 200 && referral.body?.ok === true && referral.body?.data?.sid == null,
+      JSON.stringify(referral.body)
+    );
+
+    const tokenRow = await query(
+      `UPDATE bookings SET confirm_token = $2 WHERE id = $1 RETURNING confirm_token`,
+      [confirmBooking.rows[0].id, `roi${Date.now()}`]
+    );
+    const publicConfirm = await invoke(
+      handlePublicClinic,
+      createReq({
+        method: 'GET',
+        url: `/api/public/clinic/temara?confirm=${tokenRow.rows[0].confirm_token}`,
+      })
+    );
+    ok(
+      'public confirm link does not leak clinic id',
+      publicConfirm.statusCode === 200
+        && publicConfirm.body?.confirm?.confirmed === true
+        && !JSON.stringify(publicConfirm.body).includes(clinicId)
+    );
+    const publicConfirmPost = await invoke(
+      handlePublicClinic,
+      createReq({
+        method: 'POST',
+        url: '/api/public/clinic/temara',
+        headers: { 'content-type': 'application/json' },
+        body: { confirm: tokenRow.rows[0].confirm_token, action: 'confirm' },
+      })
+    );
+    ok('POST public confirm returns 200', publicConfirmPost.statusCode === 200 && publicConfirmPost.body?.ok === true);
+
+    const bulkPatients = await invoke(
+      handleBulkSms,
+      createReq({
+        method: 'POST',
+        url: '/api/bulk-sms',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { action: 'patients', customMessage: 'Message cabinet test roi' },
+      })
+    );
+    ok(
+      'POST bulk-sms action=patients does not fake SIDs',
+      bulkPatients.statusCode === 200
+        && bulkPatients.body?.ok === true
+        && Number(bulkPatients.body?.dispatchedCount || 0) === 0
+    );
+  } finally {
+    if (roiIds.plans.length) {
+      await query('DELETE FROM plan_steps WHERE plan_id = ANY($1::uuid[])', [roiIds.plans]);
+      await query('DELETE FROM treatment_plans WHERE id = ANY($1::uuid[])', [roiIds.plans]);
+    }
+    if (roiIds.stock.length) {
+      await query('DELETE FROM stock_uses WHERE item_id = ANY($1::uuid[])', [roiIds.stock]);
+      await query('DELETE FROM stock_items WHERE id = ANY($1::uuid[])', [roiIds.stock]);
+    }
+    if (roiIds.bookings.length) {
+      await query('DELETE FROM stock_uses WHERE booking_id = ANY($1::uuid[])', [roiIds.bookings]);
+      await query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [roiIds.bookings]);
+    }
+    if (roiIds.waitlist.length) await query('DELETE FROM waitlist WHERE id = ANY($1::uuid[])', [roiIds.waitlist]);
+    if (roiIds.recalls.length) await query('DELETE FROM recalls WHERE id = ANY($1::uuid[])', [roiIds.recalls]);
+    if (roiIds.patients.length) await query('DELETE FROM patients WHERE id = ANY($1::uuid[])', [roiIds.patients]);
+  }
 
   // ── Logout ─────────────────────────────────────────────────────────────
   console.log('\n[auth logout]');

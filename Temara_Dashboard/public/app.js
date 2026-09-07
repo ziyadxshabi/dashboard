@@ -187,6 +187,7 @@ function createEmptyOperationalPulse() {
     inChair: 0,
     inWaiting: 0,
     holes: 0,
+    unconfirmed: 0,
   };
 }
 
@@ -212,6 +213,7 @@ function computeOperationalPulse(records) {
     if (isPulseSeenStatus(record.status)) pulse.seen += 1;
     if (isPulseInChairStatus(record.status)) pulse.inChair += 1;
     if (isPulseWaitingRoomStatus(record.status)) pulse.inWaiting += 1;
+    if (String(record.confirmation_state || '') === 'unconfirmed') pulse.unconfirmed += 1;
   }
   return pulse;
 }
@@ -629,6 +631,12 @@ let handoffNotes = [];
         meta: 'Annulé ou absent',
         tip: 'Créneaux libérés aujourd\'hui',
       },
+      {
+        label: 'À confirmer',
+        value: String(data.unconfirmed || 0),
+        meta: 'T-2h sans réponse',
+        tip: 'Visites du jour sans confirmation patient',
+      },
     ];
 
     const fragment = document.createDocumentFragment();
@@ -705,7 +713,7 @@ let handoffNotes = [];
       if (!response.ok || payload?.ok === false) {
         throw new Error(payload?.error || `HTTP ${response.status}`);
       }
-      showToast('Rappel 6 mois enregistré. À placer, pas un SMS.', 'success');
+      showToast('Rappel 6 mois enregistré. Un SMS partira à l\'échéance.', 'success');
       await loadRecallStrip();
     } catch {
       showToast('Impossible d\'enregistrer le rappel.', 'error');
@@ -2578,12 +2586,13 @@ let handoffNotes = [];
     ).trim();
 
     const coverage = String(
-      firstPresent(item.coverage, item.insurance, item['Couverture Médicale']) || ''
+      firstPresent(item.insurance, item.insurance_type, item.coverage) || ''
     ).trim();
 
-    const billingStatus = String(
-      firstPresent(item.billingStatus, item.statutFacturation, item['Statut Facturation']) || ''
-    ).trim();
+    const copayMad = item.copay_mad == null || item.copay_mad === '' ? null : Number(item.copay_mad);
+    const billingStatus = Number.isFinite(copayMad)
+      ? `${copayMad} MAD`
+      : '';
 
     const isNewPatient = parseNewPatientFlag(
       firstPresent(
@@ -2632,6 +2641,12 @@ let handoffNotes = [];
       care_started_at: item.care_started_at || item.careStartedAt || null,
       cancel_reason: item.cancel_reason || item.cancelReason || null,
       noshow_90d: Number(item.noshow_90d) || 0,
+      patient_id: item.patient_id || null,
+      confirmation_state: item.confirmation_state || null,
+      charge_mad: item.charge_mad == null ? null : Number(item.charge_mad),
+      copay_mad: item.copay_mad == null ? null : Number(item.copay_mad),
+      insurance_type: item.insurance_type || null,
+      staff_id: item.staff_id || null,
     };
   }
 
@@ -2839,8 +2854,20 @@ let handoffNotes = [];
           if (VIEW_MAP.waitlist) navigateToView('waitlist');
           $('waitlist-name')?.focus();
         }),
-        createPopoverMenuItem('Envoyer un SMS', ROW_ACTION_SVG.sms, () => {
-          showToast('Notification SMS planifiée.', 'info');
+        createPopoverMenuItem('Envoyer un SMS', ROW_ACTION_SVG.sms, async () => {
+          if (!phone) {
+            showToast('Numéro manquant.', 'warning');
+            return;
+          }
+          try {
+            const result = await postBulkAction(CONFIG.ENDPOINTS.BULK_SMS, {
+              recipients: [phone],
+              customMessage: "Bonjour, un créneau peut se libérer à la Clinique Dentaire Témara Mall. Répondez-nous si vous êtes disponible.",
+            });
+            toastFromSmsResult(result);
+          } catch {
+            showToast("SMS non envoyé.", 'error');
+          }
         }),
         createPopoverMenuItem('Copier le numéro', ROW_ACTION_SVG.copy, () => {
           copyTextToClipboard(phone);
@@ -5375,10 +5402,13 @@ let handoffNotes = [];
 
   function toCrmPatient(record) {
     if (!record) return null;
-    const coverage = record.coverage ?? record.insurance ?? '';
-    const billingStatus = String(record.billingStatus || '').trim();
+    const coverage = record.insurance || record.coverage || '';
+    const billingStatus = Number.isFinite(Number(record.copay_mad))
+      ? `${Number(record.copay_mad)} MAD`
+      : String(record.billingStatus || '').trim();
     return {
-      id: record.id,
+      id: record.patient_id || record.id,
+      patient_id: record.patient_id || null,
       name: record.name || 'Non spécifié',
       phone: record.phone || '',
       email: record.email || '',
@@ -5387,6 +5417,7 @@ let handoffNotes = [];
       observations: record.observations || '',
       coverage,
       insurance: coverage,
+      copay_mad: Number.isFinite(Number(record.copay_mad)) ? Number(record.copay_mad) : null,
       billingStatus,
       lastVisit: formatCrmLastVisit(record.rawDate),
     };
@@ -5412,6 +5443,12 @@ let handoffNotes = [];
     setText('crm-panel-name', patientData.name || 'Non spécifié');
     setCopyableField('crm-panel-phone', patientData.phone, 'Non renseigné');
     setCopyableField('crm-panel-insurance', patientData.insurance, 'Non renseigné');
+    const copayEl = $('crm-panel-copay');
+    if (copayEl) {
+      copayEl.textContent = Number.isFinite(Number(patientData.copay_mad))
+        ? `${Number(patientData.copay_mad)} MAD (indicatif)`
+        : 'Non calculé';
+    }
     setText('crm-panel-last-visit', patientData.lastVisit || 'Non renseigné');
     setText('crm-panel-email', patientData.email || 'Non renseigné');
     setText('crm-panel-motif', patientData.motif || 'Consultation');
@@ -5443,10 +5480,20 @@ let handoffNotes = [];
     if (!tbody) return;
 
     const rows = Array.isArray(appointmentsArray) ? appointmentsArray.filter(Boolean) : [];
+    const grouped = [];
+    const seen = new Set();
+    rows.forEach((record) => {
+      const patient = toCrmPatient(record);
+      if (!patient) return;
+      const key = String(patient.patient_id || patient.phone || patient.id || '');
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      grouped.push(patient);
+    });
     crmPatientsById = {};
     tbody.replaceChildren();
 
-    if (!rows.length) {
+    if (!grouped.length) {
       const emptyHost = $('crm-empty-state');
       const scroll = tbody.closest('.crm-table-scroll');
       if (emptyHost) {
@@ -5455,9 +5502,7 @@ let handoffNotes = [];
         const text = emptyHost.querySelector('.ios-empty__text');
         if (title) title.textContent = 'Aucun dossier à afficher';
         if (text) {
-          text.textContent = $('crm-filter-unpaid')?.getAttribute('aria-pressed') === 'true'
-            ? 'Aucun dossier non payé pour aujourd\'hui. Désactivez le filtre pour voir tous les patients du jour.'
-            : 'Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.';
+          text.textContent = 'Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.';
         }
       }
       if (scroll) scroll.hidden = true;
@@ -5469,8 +5514,7 @@ let handoffNotes = [];
     if (emptyHost) emptyHost.hidden = true;
     if (scroll) scroll.hidden = false;
 
-    rows.forEach((record) => {
-      const patient = toCrmPatient(record);
+    grouped.forEach((patient) => {
       if (!patient?.id) return;
 
       crmPatientsById[String(patient.id)] = patient;
@@ -5513,15 +5557,10 @@ let handoffNotes = [];
       ));
 
       const billingCell = document.createElement('td');
-      const billingLabel = patient.billingStatus || 'Non renseigné';
-      if (billingLabel && billingLabel !== '—' && billingLabel !== 'Non renseigné') {
-        billingCell.appendChild(createStatusPillElement(
-          billingLabel,
-          getBillingStatusPillClass(billingLabel)
-        ));
-      } else {
-        billingCell.textContent = 'Non renseigné';
-      }
+      const billingLabel = Number.isFinite(Number(patient.copay_mad))
+        ? `${Number(patient.copay_mad)} MAD`
+        : (patient.billingStatus && patient.billingStatus !== 'Non renseigné' ? patient.billingStatus : '');
+      billingCell.textContent = billingLabel || '—';
 
       const statusCell = document.createElement('td');
       statusCell.appendChild(createStatusPillElement(
@@ -5572,9 +5611,7 @@ let handoffNotes = [];
     tbody.querySelectorAll('tr.crm-table-row').forEach((row) => {
       const text = row.textContent.toLowerCase();
       const matchesSearch = !query || text.includes(query);
-      const billingStatus = row.dataset.billingStatus || '';
-      const matchesBilling = !crmUnpaidOnly || isUnpaidBillingStatus(billingStatus);
-      row.classList.toggle('is-hidden', !(matchesSearch && matchesBilling));
+      row.classList.toggle('is-hidden', !matchesSearch);
     });
   }
 
@@ -5718,6 +5755,85 @@ let handoffNotes = [];
     showToast('Aucun patient prioritaire sur la liste d\'attente.', 'info');
   }
 
+  async function fetchNextFreeSlot() {
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?catalog=1`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: apiHeaders({ Accept: 'application/json' }),
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => ({}));
+      const slot = payload?.data?.nextFreeSlot;
+      if (!slot?.date || !slot?.time) return null;
+      return { slotDate: slot.date, slotTime: slot.time };
+    } catch {
+      return null;
+    }
+  }
+
+  async function placeFillGapCandidate(candidateId, slot) {
+    const response = await fetch(CONFIG.FILL_GAP_PROXY, {
+      method: 'POST',
+      credentials: 'include',
+      headers: apiHeaders(),
+      body: JSON.stringify({
+        candidateId,
+        slotDate: slot.slotDate,
+        slotTime: slot.slotTime,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return payload;
+  }
+
+  function closeFillGapPicker() {
+    const sheet = $('fill-gap-picker');
+    if (sheet) sheet.hidden = true;
+  }
+
+  function openFillGapPicker(candidates, slot) {
+    const sheet = $('fill-gap-picker');
+    const list = $('fill-gap-picker-list');
+    const meta = $('fill-gap-picker-slot');
+    if (!sheet || !list) return false;
+    list.replaceChildren();
+    if (meta) {
+      meta.textContent = slot
+        ? `Prochain créneau : ${slot.slotDate} à ${slot.slotTime}`
+        : 'Aucun créneau libre aujourd\'hui.';
+    }
+    (candidates || []).forEach((candidate) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = `Placer ${candidate.patient_name || candidate.name || 'le patient'}`;
+      btn.addEventListener('click', async () => {
+        if (!slot) {
+          showToast('Aucun créneau libre à proposer.', 'warning');
+          return;
+        }
+        try {
+          const payload = await placeFillGapCandidate(candidate.id, slot);
+          closeFillGapPicker();
+          toastFillGapResult(payload);
+        } catch {
+          showToast('Impossible de placer ce patient.', 'error');
+        }
+      });
+      list.appendChild(btn);
+    });
+    const cancel = $('fill-gap-picker-cancel');
+    if (cancel && cancel.dataset.wired !== 'true') {
+      cancel.dataset.wired = 'true';
+      cancel.addEventListener('click', closeFillGapPicker);
+    }
+    sheet.hidden = false;
+    return true;
+  }
+
   function wireFillGapButton(button) {
     if (!button || button.dataset.fillGapWired === 'true') return;
     button.dataset.fillGapWired = 'true';
@@ -5729,15 +5845,25 @@ let handoffNotes = [];
       button.classList.add('is-loading');
       button.disabled = true;
       try {
+        const slot = await fetchNextFreeSlot();
         const response = await fetch(
           CONFIG.FILL_GAP_PROXY,
-          { method: 'POST', credentials: 'include', headers: apiHeaders(), body: JSON.stringify({}) }
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: apiHeaders(),
+            body: JSON.stringify(slot ? { slotDate: slot.slotDate, slotTime: slot.slotTime } : {}),
+          }
         );
         const payload = await response.json();
         if (!response.ok || payload?.ok === false) {
           throw new Error(payload?.error || `HTTP ${response.status}`);
         }
 
+        const candidates = Array.isArray(payload?.data?.candidates) ? payload.data.candidates : [];
+        if (candidates.length && openFillGapPicker(candidates, slot)) {
+          return;
+        }
         button.classList.add('is-success');
         toastFillGapResult(payload);
       } catch {

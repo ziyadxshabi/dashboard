@@ -17,11 +17,11 @@ function slotFilledCleanupSms(url) {
 }
 
 function reminderSms(name, url) {
-  return `Bonjour ${name}, nous vous rappelons votre consultation demain à la Clinique Dentaire Témara Mall. Pour gérer, modifier ou reporter votre visite, cliquez sur ce lien sécurisé : ${url}`;
+  return `Bonjour ${name}, nous vous rappelons votre consultation demain à la Clinique Dentaire Témara Mall. Répondez 1, oui ou ok pour confirmer. Pour gérer, modifier ou reporter votre visite : ${url}`;
 }
 
 function forceTomorrowSms(name) {
-  return `Bonjour ${name}, rappel de votre rendez-vous demain à la Clinique Dentaire Témara Mall. Merci de confirmer votre présence.`;
+  return `Bonjour ${name}, rappel de votre rendez-vous demain à la Clinique Dentaire Témara Mall. Merci de confirmer votre présence (répondez 1, oui ou ok).`;
 }
 
 function bulkDefaultSms(name) {
@@ -40,6 +40,20 @@ function leakSms(day, name, url) {
 
 function voicePortalSms(url) {
   return `Bonjour ! 🦷\n\nVoici votre portail patient sécurisé pour réserver ou gérer votre consultation à la clinique :\n${url}\n\nRépondez STOP pour ne plus recevoir de SMS.`;
+}
+
+function recallSms(name, url) {
+  return `Bonjour ${name}, il est temps de planifier votre contrôle à 6 mois à la Clinique Dentaire Témara Mall. Réservez ici : ${url}`;
+}
+
+function referralSms({ name, lastVisit, allergies, note }) {
+  const lines = [
+    `Orientation — ${name || 'Patient'}`,
+    lastVisit ? `Dernière visite : ${lastVisit}` : null,
+    allergies ? `Allergies : ${allergies}` : 'Allergies : non renseignées',
+    note ? String(note) : null,
+  ].filter(Boolean);
+  return lines.join('\n');
 }
 
 function leakEmailSubject(day) {
@@ -85,6 +99,8 @@ module.exports = {
   bulkDefaultSms,
   leakSms,
   voicePortalSms,
+  recallSms,
+  referralSms,
   leakEmailSubject,
   reminderEmailSubject,
   confirmEmailSubject,

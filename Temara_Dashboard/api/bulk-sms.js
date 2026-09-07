@@ -75,6 +75,19 @@ async function loadTomorrowVisits(clinicId) {
   return result.rows || [];
 }
 
+async function loadConsentedPatients(clinicId) {
+  const result = await query(
+    `SELECT id, display_name AS patient_name, phone_e164 AS patient_phone
+     FROM patients
+     WHERE clinic_id = $1
+       AND sms_consent IS NOT FALSE
+       AND phone_e164 <> ''
+     LIMIT 100`,
+    [clinicId]
+  );
+  return result.rows || [];
+}
+
 async function loadTodayVisits(clinicId) {
   const result = await query(
     `SELECT id, patient_name, patient_phone
@@ -103,7 +116,7 @@ async function sendToRows(clinicId, rows, bodyFor, req) {
     const name = displayNameUpper(row.patient_name);
     const sms = await dispatchSms({
       clinicId,
-      bookingId: row.id,
+      bookingId: bodyFor.purpose === 'bulk_patients' ? null : row.id,
       purpose: bodyFor.purpose,
       to: e164,
       body: bodyFor.message(name),
@@ -155,6 +168,10 @@ module.exports = async function handler(req, res) {
       rows = await loadTodayVisits(session.clinic_id);
       messageFn = () => message;
       purpose = 'bulk_today';
+    } else if (action === 'patients') {
+      rows = await loadConsentedPatients(session.clinic_id);
+      messageFn = (name) => message.replace(/\{NAME\}/g, name);
+      purpose = 'bulk_patients';
     } else {
       rows = await resolveBookingRecipients(session.clinic_id, recipients);
       messageFn = useDefaultTemplate ? (name) => bulkDefaultSms(name) : () => message;

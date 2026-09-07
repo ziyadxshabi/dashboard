@@ -186,10 +186,72 @@
     if (error) error.hidden = true;
   }
 
+  function confirmTokenFromLocation() {
+    try {
+      return new URLSearchParams(window.location.search).get('confirm') || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function renderConfirmBanner(confirm, slug, token) {
+    const banner = $('book-confirm-banner');
+    const copy = $('book-confirm-copy');
+    const button = $('book-confirm-btn');
+    if (!banner || !copy || !button) return;
+    if (!confirm || !token) {
+      banner.hidden = true;
+      return;
+    }
+    banner.hidden = false;
+    if (confirm.confirmed) {
+      copy.textContent = 'Présence confirmée. Merci.';
+      button.hidden = true;
+      return;
+    }
+    const when = confirm.starts_at
+      ? new Date(confirm.starts_at).toLocaleString('fr-MA', {
+          timeZone: 'Africa/Casablanca',
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        })
+      : '';
+    copy.textContent = `Confirmer votre rendez-vous${when ? ` du ${when}` : ''} ?`;
+    button.hidden = false;
+    if (button.dataset.wired === 'true') return;
+    button.dataset.wired = 'true';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/public/clinic/${encodeURIComponent(slug)}`, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ confirm: token, action: 'confirm' }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || payload?.ok === false) {
+          copy.textContent = 'Impossible de confirmer ce lien.';
+          return;
+        }
+        copy.textContent = 'Présence confirmée. Merci.';
+        button.hidden = true;
+      } catch {
+        copy.textContent = 'Impossible de confirmer ce lien.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   async function init() {
     const slug = extractSlug();
+    const token = confirmTokenFromLocation();
     try {
-      const response = await fetch(`/api/public/clinic/${encodeURIComponent(slug)}`, {
+      const url = token
+        ? `/api/public/clinic/${encodeURIComponent(slug)}?confirm=${encodeURIComponent(token)}`
+        : `/api/public/clinic/${encodeURIComponent(slug)}`;
+      const response = await fetch(url, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
       });
@@ -199,6 +261,7 @@
         return;
       }
       applyClinic(payload.clinic);
+      renderConfirmBanner(payload.confirm, slug, token);
     } catch {
       showError(FALLBACK_MESSAGE);
     }

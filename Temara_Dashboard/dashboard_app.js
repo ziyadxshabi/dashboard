@@ -1491,14 +1491,22 @@ function groupBookingsForCarnet(rows) {
   (Array.isArray(rows) ? rows : []).forEach((row) => {
     const phone = String(row.phone || row.patient_phone || '').trim();
     const name = String(row.name || row.patient_name || '').trim();
-    const key = phone || name.toLowerCase();
+    const patientId = row.patient_id || row.patientId || '';
+    const key = patientId || phone || name.toLowerCase();
     if (!key) return;
     if (!map.has(key)) {
-      map.set(key, { id: key, name: name || 'Non spécifié', phone, visits: [] });
+      map.set(key, {
+        id: patientId || key,
+        patient_id: patientId || null,
+        name: name || 'Non spécifié',
+        phone,
+        visits: [],
+      });
     }
     const group = map.get(key);
     if (name && group.name === 'Non spécifié') group.name = name;
     if (phone && !group.phone) group.phone = phone;
+    if (patientId) group.patient_id = patientId;
     group.visits.push(row);
   });
   return [...map.values()].map((group) => {
@@ -1874,10 +1882,46 @@ function initSmsCampaign() {
   textarea?.addEventListener('input', updateCounter);
   updateCounter();
 
-  form?.addEventListener('submit', (e) => {
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    console.warn('SMS module not yet wired to backend');
-    alert('La fonction de campagne SMS sera disponible dans la prochaine mise à jour.');
+    const customMessage = textarea.value.trim();
+    if (!customMessage) {
+      showDashboardToast('Saisissez un message avant d\'envoyer.', 'error');
+      textarea.focus();
+      return;
+    }
+    const confirmed = await askConfirm('Envoyer ce SMS aux patients consentants ? Cette action est irréversible.');
+    if (!confirmed) return;
+    submitBtn.disabled = true;
+    try {
+      const response = await fetch(CONFIG.BULK_SMS_PROXY, {
+        method: 'POST',
+        credentials: 'include',
+        headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ customMessage, action: 'patients' }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      assertAuthorizedResponse(response);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      const sent = Number(payload?.dispatchedCount || 0);
+      if (sent > 0) {
+        showDashboardToast('Campagne envoyée.', 'success');
+      } else if (payload?.twilioConfigured === false) {
+        showDashboardToast("SMS non envoyé. Twilio n'est pas configuré.", 'error');
+      } else {
+        showDashboardToast('Aucun destinataire consentant.', 'error');
+      }
+      textarea.value = '';
+      updateCounter();
+    } catch (err) {
+      console.error('[SMS campaign]', err?.message || err);
+      showDashboardToast('Échec de l\'envoi. Réessayez.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 }
 
@@ -2702,7 +2746,7 @@ function renderKPICards(data) {
     ? `${no_shows} créneau${no_shows > 1 ? 'x' : ''} libre${no_shows > 1 ? 's' : ''}`
     : 'Aucune absence');
 
-  updateRecoveryMetrics(null);
+  updateRecoveryMetrics(data);
   refreshOperationalCharts(data);
 
   setKPINumber('val-patients', patients_today, true);
@@ -3209,7 +3253,7 @@ function formatThousandsFR(value) {
  * Updates the hero recovery banner: patient count + estimated MAD revenue range.
  * @param {number} patientCount
  */
-function updateRecoveryMetrics() {
+function updateRecoveryMetrics(data) {
   const patientsEl = doctorEl('patients-recovered-count');
   const revenueEl = doctorEl('estimated-revenue-range');
   if (patientsEl) {
@@ -3217,7 +3261,8 @@ function updateRecoveryMetrics() {
     patientsEl.classList.remove('skeleton', 'kpi-metric--error');
   }
   if (revenueEl) {
-    revenueEl.textContent = 'Non calculé';
+    const mad = data && data.mad_per_hour != null ? Number(data.mad_per_hour) : null;
+    revenueEl.textContent = Number.isFinite(mad) ? `${formatMAD(mad)} MAD / h` : 'Non calculé';
     revenueEl.classList.remove('skeleton', 'kpi-metric--error');
   }
 }
@@ -3430,10 +3475,10 @@ function normalizeDoctorAppointment(raw) {
   ).trim();
 
   const insurance = String(
-    firstPresent(item.coverage, item.insurance, item['Couverture Médicale']) || 'Non renseigné'
+    firstPresent(item.insurance, item.insurance_type, item.coverage) || 'Non renseigné'
   ).trim();
 
-  const amountRaw = firstPresent(item.amount, item.montant, item['Montant (MAD)']) ?? 0;
+  const amountRaw = firstPresent(item.charge_mad, item.copay_mad, item.amount, item.montant);
   const amount = Number(amountRaw);
   const safeAmount = Number.isFinite(amount) ? amount : 0;
 
@@ -3442,6 +3487,7 @@ function normalizeDoctorAppointment(raw) {
   return {
     id: bookingId ?? item.id,
     rowId: bookingId,
+    patient_id: item.patient_id || null,
     name: String(patientName).trim() || 'Non spécifié',
     treatment: String(treatment).trim() || 'Consultation',
     status: String(statusRaw || 'Confirmé').trim(),

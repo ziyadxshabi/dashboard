@@ -133,6 +133,18 @@
       font-weight: 650;
     }
 
+    .book-confirm-banner {
+      margin-top: 1rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--border-color, rgba(227, 193, 143, 0.2));
+      border-radius: 0.85rem;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .book-confirm-banner p {
+      margin: 0 0 0.75rem;
+    }
+
     .book-hero p {
       margin: 0;
       color: var(--text-muted, #9E948C);
@@ -249,6 +261,10 @@
           <span id="book-hero-clinic">votre clinique</span>.
           Confirmation immédiate par SMS.
         </p>
+        <div id="book-confirm-banner" class="book-confirm-banner" hidden>
+          <p id="book-confirm-copy"></p>
+          <button type="button" class="book-call" id="book-confirm-btn">Confirmer ma présence</button>
+        </div>
       </section>
 
       <section class="book-calendar" id="calendrier" aria-labelledby="calendrier-label">

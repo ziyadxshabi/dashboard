@@ -89,19 +89,59 @@ function verifyTwilioSignature(req, authToken, webhookUrl) {
   return timingSafeEqualStrings(String(header).trim(), expected);
 }
 
+function stripWhatsappPrefix(value) {
+  return String(value || '').trim().replace(/^whatsapp:/i, '');
+}
+
+function formatWhatsappAddress(value) {
+  const raw = stripWhatsappPrefix(value);
+  if (!raw) return '';
+  return `whatsapp:${raw}`;
+}
+
+function waContentSidFor(purpose) {
+  const key = String(purpose || '').trim().toLowerCase();
+  const envKey = {
+    reminder: 'TWILIO_WA_CONTENT_REMINDER',
+    confirm: 'TWILIO_WA_CONTENT_CONFIRM',
+    waitlist: 'TWILIO_WA_CONTENT_WAITLIST',
+    recall: 'TWILIO_WA_CONTENT_RECALL',
+    referral: 'TWILIO_WA_CONTENT_REFERRAL',
+    leak_3: 'TWILIO_WA_CONTENT_LEAK',
+    leak_7: 'TWILIO_WA_CONTENT_LEAK',
+    leak_14: 'TWILIO_WA_CONTENT_LEAK',
+    force_tomorrow: 'TWILIO_WA_CONTENT_REMINDER',
+    voice_portal: 'TWILIO_WA_CONTENT_REMINDER',
+  }[key];
+  return envKey ? String(process.env[envKey] || '').trim() : '';
+}
+
 async function loadClinicSmsConfig(clinicId) {
-  if (!clinicId) return { twilioFrom: '', bookingUrl: '', slug: 'temara' };
+  if (!clinicId) {
+    return {
+      twilioFrom: '',
+      bookingUrl: '',
+      slug: 'temara',
+      messagingChannel: 'sms',
+      twilioWaFrom: '',
+    };
+  }
   const result = await query(
-    `SELECT slug, twilio_from, sms_booking_url, name
+    `SELECT slug, twilio_from, sms_booking_url, name, messaging_channel, twilio_wa_from
      FROM clinics WHERE id = $1 LIMIT 1`,
     [clinicId]
   );
   const row = result.rows[0] || {};
+  const channel = String(row.messaging_channel || 'sms').trim().toLowerCase() === 'whatsapp'
+    ? 'whatsapp'
+    : 'sms';
   return {
     slug: row.slug || 'temara',
     twilioFrom: String(row.twilio_from || '').trim(),
     bookingUrl: String(row.sms_booking_url || '').trim(),
     name: row.name || 'Clinique Dentaire Témara Mall',
+    messagingChannel: channel,
+    twilioWaFrom: String(row.twilio_wa_from || process.env.TWILIO_WA_FROM || '').trim(),
   };
 }
 
@@ -149,6 +189,75 @@ async function sendTwilioSms({ to, body, from, statusCallback }) {
   return { ok: true, skipped: false, reason: null, sid, to: e164, status: payload.status || 'queued' };
 }
 
+async function postTwilioMessages(params) {
+  const { accountSid, authToken } = twilioCredentials();
+  const response = await fetch(`${TWILIO_API}/${accountSid}/Messages.json`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  });
+  const payload = await response.json().catch(() => ({}));
+  const sid = payload.sid ? String(payload.sid) : '';
+  return { response, payload, sid };
+}
+
+async function sendTwilioMessage({ to, body, from, statusCallback, channel, contentSid }) {
+  const useWhatsapp = String(channel || 'sms').trim().toLowerCase() === 'whatsapp';
+  if (!useWhatsapp) {
+    return sendTwilioSms({ to, body, from, statusCallback });
+  }
+
+  const { accountSid, authToken } = twilioCredentials();
+  if (!accountSid || !authToken) {
+    return { ok: false, skipped: true, reason: 'twilio_not_configured', sid: null, error: 'Twilio not configured' };
+  }
+
+  const e164 = toE164MA(stripWhatsappPrefix(to));
+  if (!isValidMaMobileE164(e164)) {
+    return { ok: false, skipped: true, reason: 'invalid_phone', sid: null, error: 'invalid_phone', to: e164 };
+  }
+
+  const fromWa = String(from || process.env.TWILIO_WA_FROM || '').trim();
+  if (!fromWa) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'whatsapp_from_missing',
+      sid: null,
+      error: 'WhatsApp from missing',
+      to: e164,
+    };
+  }
+
+  const params = new URLSearchParams();
+  params.set('To', formatWhatsappAddress(e164));
+  params.set('From', formatWhatsappAddress(fromWa));
+  if (contentSid) {
+    params.set('ContentSid', String(contentSid));
+  } else {
+    params.set('Body', String(body || ''));
+  }
+  if (statusCallback) params.set('StatusCallback', statusCallback);
+
+  const { response, payload, sid } = await postTwilioMessages(params);
+  if (!response.ok || !sid) {
+    const error = payload.message || payload.error_message || `Twilio HTTP ${response.status}`;
+    return { ok: false, skipped: false, reason: 'twilio_error', sid: null, error, to: e164 };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    reason: null,
+    sid,
+    to: e164,
+    status: payload.status || 'queued',
+    channel: 'whatsapp',
+  };
+}
+
 module.exports = {
   timingSafeEqualStrings,
   twilioCredentials,
@@ -160,4 +269,8 @@ module.exports = {
   loadClinicSmsConfig,
   clinicBookingUrl,
   sendTwilioSms,
+  sendTwilioMessage,
+  stripWhatsappPrefix,
+  formatWhatsappAddress,
+  waContentSidFor,
 };

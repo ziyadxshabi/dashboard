@@ -637,12 +637,13 @@
         </header>
 
         <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
-          <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
+            <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
             <button
               type="button"
               class="filter-chip"
               id="crm-filter-unpaid"
               aria-pressed="false"
+              hidden
             >
               Non payé
             </button>
@@ -667,7 +668,7 @@
                   <th scope="col">Téléphone</th>
                   <th scope="col">Email</th>
                   <th scope="col">Motif</th>
-                  <th scope="col">Facturation</th>
+                  <th scope="col">Reste à charge</th>
                   <th scope="col">Statut</th>
                 </tr>
               </thead>
@@ -934,6 +935,10 @@
               <dt>Couverture Médicale</dt>
               <dd id="crm-panel-insurance" class="crm-panel-copyable"></dd>
             </div>
+            <div class="crm-side-panel-field">
+              <dt>Reste à charge (indicatif)</dt>
+              <dd id="crm-panel-copay"></dd>
+            </div>
           </dl>
         </section>
 
@@ -967,6 +972,15 @@
       <button type="button" data-cancel-reason="reprogramme">Reprogrammé</button>
       <button type="button" data-cancel-reason="autre">Autre</button>
       <button type="button" data-cancel-dismiss="true">Retour</button>
+    </div>
+  </div>
+
+  <div id="fill-gap-picker" class="ops-chip-sheet" hidden>
+    <p class="ops-chip-sheet__who">Patients en attente</p>
+    <p class="ops-chip-sheet__meta" id="fill-gap-picker-slot">Choisissez qui placer sur le prochain créneau libre.</p>
+    <div id="fill-gap-picker-list" class="ops-chip-sheet__actions"></div>
+    <div class="ops-chip-sheet__actions">
+      <button type="button" id="fill-gap-picker-cancel">Retour</button>
     </div>
   </div>
 

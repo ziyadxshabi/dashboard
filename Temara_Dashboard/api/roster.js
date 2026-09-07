@@ -19,11 +19,14 @@ const {
   requireClinicSession,
   sendDbError,
   validateRosterCreate,
+  UUID_RE,
 } = require('./_lib/validation');
 const handleStatusUpdate = require('./_lib/update-booking-status');
 const rosterOps = require('./_lib/roster-ops');
 const { requireCronOrStaff } = require('./_lib/cron-auth');
-const { runReminders, runRemindersAllClinics, runLeakDrip, runLeakDripAllClinics } = require('./_lib/cron-notify');
+const { runReminders, runRemindersAllClinics, runLeakDrip, runLeakDripAllClinics, runRecalls, runRecallsAllClinics, runUnconfirmed, runUnconfirmedAllClinics } = require('./_lib/cron-notify');
+const roiOps = require('./_lib/roi-ops');
+const { expectedCopayMad, insuranceLabel } = require('./_lib/treatments');
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROSTER_DAYS = 42;
@@ -31,19 +34,26 @@ const SEARCH_LOOKBACK_DAYS = 90;
 const MAX_QUERY_LEN = 80;
 
 const ROSTER_COLUMNS = `
-  id,
-  cal_booking_uid,
-  patient_name,
-  patient_phone,
-  treatment_name,
-  status,
-  starts_at,
-  duration_min,
-  notes,
-  booking_kind,
-  care_started_at,
-  cancel_reason,
-  buffer_min,
+  bookings.id,
+  bookings.cal_booking_uid,
+  bookings.patient_name,
+  bookings.patient_phone,
+  bookings.treatment_name,
+  bookings.status,
+  bookings.starts_at,
+  bookings.duration_min,
+  bookings.notes,
+  bookings.booking_kind,
+  bookings.care_started_at,
+  bookings.cancel_reason,
+  bookings.buffer_min,
+  bookings.patient_id,
+  bookings.patient_confirmed_at,
+  bookings.confirmation_state,
+  bookings.charge_mad,
+  bookings.staff_id,
+  p.insurance_type,
+  p.allergies,
   (
     SELECT COUNT(*)::int
     FROM bookings n
@@ -57,49 +67,58 @@ const ROSTER_COLUMNS = `
   ) AS noshow_90d
 `;
 
+const ROSTER_FROM = `
+  FROM bookings
+  LEFT JOIN patients p ON p.id = bookings.patient_id
+`;
+
 const ROSTER_TODAY_SQL = `
   SELECT ${ROSTER_COLUMNS}
-  FROM bookings
-  WHERE clinic_id = $1
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
-  ORDER BY starts_at ASC
+  ${ROSTER_FROM}
+  WHERE bookings.clinic_id = $1
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+    AND ($2::uuid IS NULL OR bookings.staff_id = $2)
+  ORDER BY bookings.starts_at ASC
 `;
 
 const ROSTER_RANGE_SQL = `
   SELECT ${ROSTER_COLUMNS}
-  FROM bookings
-  WHERE clinic_id = $1
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date >= $2::date
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date <= $3::date
-  ORDER BY starts_at ASC
+  ${ROSTER_FROM}
+  WHERE bookings.clinic_id = $1
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date >= $2::date
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date <= $3::date
+    AND ($4::uuid IS NULL OR bookings.staff_id = $4)
+  ORDER BY bookings.starts_at ASC
 `;
 
 const ROSTER_SEARCH_SQL = `
   SELECT ${ROSTER_COLUMNS}
-  FROM bookings
-  WHERE clinic_id = $1
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+  ${ROSTER_FROM}
+  WHERE bookings.clinic_id = $1
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date
       >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - ${SEARCH_LOOKBACK_DAYS}
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date
       <= (NOW() AT TIME ZONE 'Africa/Casablanca')::date
     AND (
-      patient_name ILIKE $2
-      OR patient_phone ILIKE $2
+      bookings.patient_name ILIKE $2
+      OR bookings.patient_phone ILIKE $2
     )
-  ORDER BY starts_at DESC
+    AND ($3::uuid IS NULL OR bookings.staff_id = $3)
+  ORDER BY bookings.starts_at DESC
 `;
 
 const ROSTER_RANGE_SEARCH_SQL = `
   SELECT ${ROSTER_COLUMNS}
-  FROM bookings
-  WHERE clinic_id = $1
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date >= $2::date
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date <= $3::date
+  ${ROSTER_FROM}
+  WHERE bookings.clinic_id = $1
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date >= $2::date
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date <= $3::date
     AND (
-      patient_name ILIKE $4
-      OR patient_phone ILIKE $4
+      bookings.patient_name ILIKE $4
+      OR bookings.patient_phone ILIKE $4
     )
-  ORDER BY starts_at DESC
+    AND ($5::uuid IS NULL OR bookings.staff_id = $5)
+  ORDER BY bookings.starts_at DESC
 `;
 
 function formatCasablancaHm(startsAt) {
@@ -141,6 +160,15 @@ function mapRosterRow(row) {
     notes: row.notes || '',
     starts_at: row.starts_at,
     startTime: row.starts_at,
+    patient_id: row.patient_id || null,
+    patient_confirmed_at: row.patient_confirmed_at || null,
+    confirmation_state: row.confirmation_state || null,
+    charge_mad: row.charge_mad == null ? null : Number(row.charge_mad),
+    staff_id: row.staff_id || null,
+    insurance_type: row.insurance_type || null,
+    insurance: insuranceLabel(row.insurance_type) || '',
+    allergies: row.allergies || '',
+    copay_mad: expectedCopayMad(treatmentName, row.insurance_type),
   };
 }
 
@@ -233,6 +261,11 @@ function searchParam(req, name) {
   }
 }
 
+function parseStaffId(req) {
+  const raw = searchParam(req, 'staff_id') || searchParam(req, 'staffId');
+  return UUID_RE.test(raw) ? raw : null;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'GET, POST, PATCH, OPTIONS');
@@ -241,7 +274,12 @@ module.exports = async function handler(req, res) {
 
   const action = searchParam(req, 'action');
 
-  if (action === 'cron-reminders' || action === 'cron-leak') {
+  if (
+    action === 'cron-reminders' ||
+    action === 'cron-leak' ||
+    action === 'cron-recalls' ||
+    action === 'cron-unconfirmed'
+  ) {
     applyCors(res, 'GET, POST, OPTIONS');
     const auth = requireCronOrStaff(req, res, requireClinicSession);
     if (!auth) return;
@@ -253,11 +291,36 @@ module.exports = async function handler(req, res) {
             : await runReminders(auth.clinic_id, req);
         return res.status(200).json(payload);
       }
+      if (action === 'cron-leak') {
+        const payload =
+          auth.role === 'cron'
+            ? await runLeakDripAllClinics(req)
+            : await runLeakDrip(auth.clinic_id, req);
+        return res.status(200).json(payload);
+      }
+      if (action === 'cron-recalls') {
+        const payload =
+          auth.role === 'cron'
+            ? await runRecallsAllClinics(req)
+            : await runRecalls(auth.clinic_id, req);
+        return res.status(200).json(payload);
+      }
       const payload =
         auth.role === 'cron'
-          ? await runLeakDripAllClinics(req)
-          : await runLeakDrip(auth.clinic_id, req);
+          ? await runUnconfirmedAllClinics()
+          : await runUnconfirmed(auth.clinic_id);
       return res.status(200).json(payload);
+    } catch (err) {
+      return sendDbError(res, err);
+    }
+  }
+
+  if (req.method === 'PATCH' && action === 'patient') {
+    applyCors(res, 'GET, POST, PATCH, OPTIONS');
+    const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+    if (!session) return;
+    try {
+      return await roiOps.handlePatientPatch(req, res, session);
     } catch (err) {
       return sendDbError(res, err);
     }
@@ -276,6 +339,40 @@ module.exports = async function handler(req, res) {
     if (searchParam(req, 'catalog') === '1') {
       try {
         return await rosterOps.handleCatalog(res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'patient') {
+      req.query = { ...(req.query || {}), id: searchParam(req, 'id'), phone: searchParam(req, 'phone') };
+      try {
+        return await roiOps.handlePatientGet(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'plans') {
+      req.query = { ...(req.query || {}), patientId: searchParam(req, 'patientId') || searchParam(req, 'patient_id') };
+      try {
+        return await roiOps.handlePlansGet(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'stock') {
+      try {
+        return await roiOps.handleStockGet(res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'memberships') {
+      try {
+        return await roiOps.handleMembershipsGet(res, session);
       } catch (err) {
         return sendDbError(res, err);
       }
@@ -300,6 +397,7 @@ module.exports = async function handler(req, res) {
 
     try {
       const like = parsedQuery.q ? `%${parsedQuery.q}%` : '';
+      const staffId = parseStaffId(req);
       let result;
       if (parsedRange.range && like) {
         result = await query(ROSTER_RANGE_SEARCH_SQL, [
@@ -307,17 +405,19 @@ module.exports = async function handler(req, res) {
           parsedRange.range.from,
           parsedRange.range.to,
           like,
+          staffId,
         ]);
       } else if (like) {
-        result = await query(ROSTER_SEARCH_SQL, [session.clinic_id, like]);
+        result = await query(ROSTER_SEARCH_SQL, [session.clinic_id, like, staffId]);
       } else if (parsedRange.range) {
         result = await query(ROSTER_RANGE_SQL, [
           session.clinic_id,
           parsedRange.range.from,
           parsedRange.range.to,
+          staffId,
         ]);
       } else {
-        result = await query(ROSTER_TODAY_SQL, [session.clinic_id]);
+        result = await query(ROSTER_TODAY_SQL, [session.clinic_id, staffId]);
       }
       const appointments = (result.rows || []).map(mapRosterRow);
       return res.status(200).json({ ok: true, data: appointments });
@@ -342,6 +442,24 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'delete') {
       return await rosterOps.handleDeleteBlock(req, res, session);
+    }
+    if (action === 'patient') {
+      return await roiOps.handlePatientPatch(req, res, session);
+    }
+    if (action === 'plan') {
+      return await roiOps.handlePlanCreate(req, res, session);
+    }
+    if (action === 'plan-step') {
+      return await roiOps.handlePlanStepPatch(req, res, session);
+    }
+    if (action === 'stock') {
+      return await roiOps.handleStockUpsert(req, res, session);
+    }
+    if (action === 'stock-use') {
+      return await roiOps.handleStockUse(req, res, session);
+    }
+    if (action === 'referral') {
+      return await roiOps.handleReferral(req, res, session);
     }
 
     const parsed = validateRosterCreate(req.body ?? {});

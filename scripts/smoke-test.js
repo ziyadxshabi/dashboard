@@ -175,6 +175,13 @@ async function restoreSeedPassword(username) {
 
 async function run() {
   console.log(`\n== HTTP smoke tests (${BASE_URL}) ==\n`);
+  const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
+  try {
+    const roiSql = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260907_roi_loops.sql'), 'utf8');
+    await query(roiSql);
+  } catch (err) {
+    console.warn('ROI migration apply:', err?.message || err);
+  }
   await ensureServer();
 
   const doctorJar = {};
@@ -248,6 +255,43 @@ async function run() {
     'GET /api/dashboard-data Postgres aggregations present',
     typeof dash.json?.data?.patients_today === 'number'
   );
+  ok(
+    'GET /api/dashboard-data mad_per_hour is null or a number',
+    dash.json?.data?.mad_per_hour == null || typeof dash.json?.data?.mad_per_hour === 'number'
+  );
+  ok(
+    'GET /api/dashboard-data plans_done is independent of accepted_plans',
+    typeof dash.json?.data?.plans_done === 'number' && typeof dash.json?.data?.accepted_plans === 'number'
+  );
+
+  console.log('\n[roi-loops]');
+  const cronRecalls = await request('/api/roster?action=cron-recalls', { jar: assistantJar });
+  ok(
+    'GET /api/roster?action=cron-recalls returns 200',
+    cronRecalls.status === 200 && cronRecalls.json?.ok === true,
+    `status=${cronRecalls.status} body=${cronRecalls.text}`
+  );
+  const cronUnconfirmed = await request('/api/roster?action=cron-unconfirmed', { jar: assistantJar });
+  ok(
+    'GET /api/roster?action=cron-unconfirmed returns 200',
+    cronUnconfirmed.status === 200 && cronUnconfirmed.json?.ok === true,
+    `status=${cronUnconfirmed.status}`
+  );
+  const fillGap = await request('/api/fill-gap', {
+    method: 'POST',
+    jar: assistantJar,
+    body: { slotDate: '2026-12-18', slotTime: '07:15' },
+  });
+  ok(
+    'POST /api/fill-gap list returns 200',
+    fillGap.status === 200 && Array.isArray(fillGap.json?.data?.candidates),
+    `status=${fillGap.status}`
+  );
+  const patientMissing = await request(
+    '/api/roster?action=patient&id=00000000-0000-4000-8000-000000000099',
+    { jar: doctorJar }
+  );
+  ok('GET unknown patient returns 404', patientMissing.status === 404);
 
   console.log('\n[public clinic]');
   const clinic = await request(`/api/public/clinic/${CLINIC_SLUG}`);

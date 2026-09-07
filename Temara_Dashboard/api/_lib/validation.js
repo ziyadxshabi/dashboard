@@ -380,6 +380,19 @@ function validateBulkSmsInput(body = {}) {
     };
   }
 
+  if (action === 'patients') {
+    if (message.length < 3) {
+      return {
+        ok: false,
+        error: createApiError('VALIDATION_ERROR', 'customMessage must be at least 3 characters'),
+      };
+    }
+    return {
+      ok: true,
+      value: { message, recipients: [], action, useDefaultTemplate: false },
+    };
+  }
+
   const raw = body.recipients ?? body.rowIds ?? body.ids;
   if (!Array.isArray(raw) || raw.length === 0) {
     return {
@@ -506,6 +519,11 @@ function validateRosterCreate(body = {}) {
   const durationRaw = Number(body.durationMin ?? body.duration_min);
   const durationMin = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.round(durationRaw) : null;
   const startsAt = walkIn ? null : parseStartsAtInput(body);
+  const staffRaw = String(body.staffId ?? body.staff_id ?? '').trim();
+  const staffId = UUID_RE.test(staffRaw) ? staffRaw : null;
+  const chargeRaw = body.chargeMad ?? body.charge_mad;
+  const chargeNum = chargeRaw == null || chargeRaw === '' ? null : Number(chargeRaw);
+  const chargeMad = Number.isFinite(chargeNum) && chargeNum >= 0 ? chargeNum : null;
 
   if (kind === 'visit') {
     if (patientName.length < 2 || !NAME_RE.test(patientName)) {
@@ -537,6 +555,8 @@ function validateRosterCreate(body = {}) {
       blockLabel,
       durationMin,
       startsAt,
+      staffId,
+      chargeMad,
     },
   };
 }
