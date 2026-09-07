@@ -233,6 +233,46 @@ const PEOPLE = [
     anesthetic: 'Scandonest',
     xrayDaysAgo: 33,
   },
+  {
+    key: 'kenza',
+    name: 'Kenza Tahiri',
+    phone: '0699100019',
+    insurance: 'prive',
+    allergies: null,
+    chronic: null,
+    anesthetic: 'Articaine',
+    xrayDaysAgo: 9,
+  },
+  {
+    key: 'reda',
+    name: 'Reda Squalli',
+    phone: '0699100020',
+    insurance: 'cnss',
+    allergies: null,
+    chronic: 'Hypertension',
+    anesthetic: 'Lidocaïne',
+    xrayDaysAgo: 16,
+  },
+  {
+    key: 'samira',
+    name: 'Samira Bennis',
+    phone: '0699100021',
+    insurance: 'cnops',
+    allergies: 'Pénicilline',
+    chronic: null,
+    anesthetic: null,
+    xrayDaysAgo: 22,
+  },
+  {
+    key: 'walid',
+    name: 'Walid Chraibi',
+    phone: '0699100022',
+    insurance: 'none',
+    allergies: null,
+    chronic: null,
+    anesthetic: 'Articaine',
+    xrayDaysAgo: 2,
+  },
 ];
 
 function note(text) {
@@ -338,6 +378,17 @@ async function wipeDemo(clinicId) {
   await query(`DELETE FROM recalls WHERE clinic_id = $1 AND patient_phone LIKE '06991%'`, [clinicId]);
   await query(`DELETE FROM waitlist WHERE clinic_id = $1 AND patient_phone LIKE '06991%'`, [clinicId]);
   await query(
+    `DELETE FROM waitlist
+     WHERE clinic_id = $1
+       AND (
+         patient_name LIKE 'Ops Wait%'
+         OR patient_name LIKE 'FillGap %'
+         OR notes = 'wave3-fill-gap'
+         OR (patient_name = 'Amina El Fassi' AND patient_phone NOT LIKE '06991%')
+       )`,
+    [clinicId]
+  );
+  await query(
     `DELETE FROM bookings
      WHERE clinic_id = $1
        AND (notes LIKE $2 OR patient_phone LIKE '06991%')`,
@@ -437,13 +488,20 @@ async function run() {
     { who: 'youssef', treatment: 'Détartrage', charge: 250, time: '08:00' },
     { who: 'nadia', treatment: 'Soin', charge: 400, time: '08:00' },
     { who: 'omar', treatment: 'Urgence', charge: 200, time: '08:00' },
+    { who: 'leila', treatment: 'Extraction', charge: 350, time: '08:00' },
+    { who: 'kenza', treatment: 'Blanchiment', charge: 1500, time: '08:00' },
   ];
   for (let day = 1; day <= 6; day += 1) {
     for (const spec of weekTreatments) {
       await insertVisit(clinicId, people, {
         ...spec,
         day: -day,
-        duration: spec.treatment === 'Détartrage' ? 30 : spec.treatment === 'Soin' ? 40 : 20,
+        duration:
+          spec.treatment === 'Détartrage' ? 30
+          : spec.treatment === 'Soin' ? 40
+          : spec.treatment === 'Extraction' ? 30
+          : spec.treatment === 'Blanchiment' ? 45
+          : 20,
         status: 'Termine',
         confirmed: true,
         optional: true,
@@ -458,6 +516,9 @@ async function run() {
     { who: 'nadia', time: '10:20' },
     { who: 'hassan', time: '11:00' },
     { who: 'leila', time: '11:50' },
+    { who: 'reda', time: '12:30' },
+    { who: 'samira', time: '13:10' },
+    { who: 'walid', time: '14:00' },
   ];
   for (const spec of returning) {
     await insertVisit(clinicId, people, {
@@ -479,6 +540,7 @@ async function run() {
     { who: 'ghita', time: '09:40', treatment: 'Détartrage', duration: 30, charge: 250 },
     { who: 'fatima', time: '10:30', treatment: 'Contrôle', duration: 20, charge: 150 },
     { who: 'hassan', time: '11:10', treatment: 'Couronne', duration: 45, charge: 800, staffId },
+    { who: 'kenza', time: '14:00', treatment: 'Blanchiment', duration: 45, charge: 1500 },
   ];
   for (const spec of tomorrow) {
     await insertVisit(clinicId, people, {
@@ -492,11 +554,29 @@ async function run() {
     });
   }
 
+  const dayAfter = [
+    { who: 'reda', time: '09:00', treatment: 'Consultation', duration: 20, charge: 150 },
+    { who: 'samira', time: '09:40', treatment: 'Soin', duration: 40, charge: 400, staffId },
+    { who: 'walid', time: '10:40', treatment: 'Extraction', duration: 30, charge: 350 },
+  ];
+  for (const spec of dayAfter) {
+    await insertVisit(clinicId, people, {
+      ...spec,
+      day: 2,
+      status: 'Confirme',
+      confirmation: 'unconfirmed',
+      optional: true,
+      notes: 'RDV J+2',
+    });
+  }
+
+  // No Urgent: fill-gap only returns 5 rows, Urgent first. Leaving that
+  // rank empty lets handler tests insert a fresh Urgent and still see it.
   const waitlist = [
-    { who: 'tarik', priority: 'Urgent', notes: 'Douleur 36, créneau dès aujourd\'hui' },
+    { who: 'tarik', priority: 'Haute', notes: 'Douleur 36, créneau dès aujourd\'hui' },
     { who: 'ghita', priority: 'Haute', notes: 'Détartrage reporté deux fois' },
     { who: 'siham', priority: 'Moyenne', notes: 'Contrôle grossesse' },
-    { who: 'nour', priority: 'Urgent', notes: 'Urgence pulpaire si trou' },
+    { who: 'nour', priority: 'Moyenne', notes: 'Urgence pulpaire si trou' },
     { who: 'anas', priority: 'Faible', notes: 'Blanchiment esthétique' },
   ];
   for (const row of waitlist) {
@@ -515,6 +595,7 @@ async function run() {
     { who: 'youssef', days: -3, treatment: 'Contrôle', status: 'open' },
     { who: 'leila', days: 14, treatment: 'Consultation', status: 'open' },
     { who: 'hassan', days: 40, treatment: 'Couronne', status: 'open' },
+    { who: 'kenza', days: 7, treatment: 'Blanchiment', status: 'open' },
   ];
   for (const row of recalls) {
     const person = people[row.who];
@@ -562,12 +643,18 @@ async function run() {
     { label: 'Éviction carieuse', done: true },
     { label: 'Composite', done: true },
   ]);
+  await insertPlan('kenza', 'Blanchiment', 'open', [
+    { label: 'Empreinte teinte', done: true },
+    { label: 'Séance 1', done: false },
+    { label: 'Séance 2', done: false },
+  ]);
 
   const notes = [
     { who: 'mehdi', author: 'Assistante Témara', content: 'Patient au fauteuil, anesthésie posée.', pinned: true, category: 'handoff' },
     { who: 'salma', author: 'Assistante Témara', content: 'Asthme — avoir la ventoline en salle.', pinned: true, category: 'clinical' },
     { who: 'omar', author: 'Dr. Témara', content: 'No-show. Rappeler demain pour replacer.', pinned: false, category: 'ops' },
     { who: 'hassan', author: 'Dr. Témara', content: 'Couronne 26: teinte A2, patient satisfait de l\'essayage.', pinned: false, category: 'clinical' },
+    { who: 'kenza', author: 'Assistante Témara', content: 'Blanchiment prévu demain 14h — consentement photo signé.', pinned: false, category: 'ops' },
   ];
   for (const row of notes) {
     const person = people[row.who];
