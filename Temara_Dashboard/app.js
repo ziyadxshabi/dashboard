@@ -148,7 +148,7 @@ const PLANNING_SERVER_ERROR_MESSAGE =
   }
 
   const EMPTY_STATE_DEFAULT_MESSAGE = RowUI.EMPTY_STATE_DEFAULT_MESSAGE
-    || 'Aucun rendez-vous pour le moment.';
+    || 'Aucun rendez-vous pour aujourd\'hui.';
   const EMPTY_STATE_SVG_CALENDAR = RowUI.EMPTY_STATE_SVG_CALENDAR || lucideIcon('calendar-clock', 'icon-lg');
   const EMPTY_STATE_SVG_INBOX = RowUI.EMPTY_STATE_SVG_INBOX || lucideIcon('inbox', 'icon-lg');
 
@@ -333,7 +333,7 @@ let handoffNotes = [];
     }
     if (response?.status === 401) {
       void window.DentaFlowAuth?.logout?.();
-      const err = new Error('Session expirée — reconnectez-vous.');
+      const err = new Error('Session expirée. Reconnectez-vous.');
       err.code = 'UNAUTHORIZED';
       throw err;
     }
@@ -515,11 +515,12 @@ let handoffNotes = [];
       if (options.errorMessage) {
         window.DentaFlowDom?.appendParagraph(feed, 'handoff-feed__empty', options.errorMessage);
       } else if (!sorted.length) {
-        window.DentaFlowDom?.appendParagraph(
-          feed,
-          'handoff-feed__empty',
-          'Aucune note pour le moment. Ajoutez une transmission d\'équipe ci-dessus.'
-        );
+        const empty = createEmptyState({
+          title: 'Aucune transmission',
+          message: 'Les notes d\'équipe s\'affichent ici.',
+        });
+        empty.classList.add('handoff-feed__empty');
+        feed.appendChild(empty);
       } else {
         const fragment = document.createDocumentFragment();
         sorted.forEach((note) => {
@@ -590,7 +591,7 @@ let handoffNotes = [];
       console.error('[Handoff] Load failed:', error?.message || error);
       handoffNotes = [];
       renderHandoffBoard({
-        errorMessage: 'Impossible de charger les transmissions — erreur de synchronisation avec la base de données.',
+        errorMessage: 'Impossible de charger les transmissions. Erreur de synchronisation avec la base.',
       });
     }
   }
@@ -623,9 +624,9 @@ let handoffNotes = [];
         tip: "Patients en salle d'attente",
       },
       {
-        label: 'Trous',
+        label: 'Créneaux libres',
         value: String(data.holes),
-        meta: 'Annulé · no-show',
+        meta: 'Annulé ou absent',
         tip: 'Créneaux libérés aujourd\'hui',
       },
     ];
@@ -633,7 +634,7 @@ let handoffNotes = [];
     const fragment = document.createDocumentFragment();
     cards.forEach((card) => {
       const article = document.createElement('article');
-      article.className = 'pulse-card pulse-card--matte';
+      article.className = 'pulse-card pulse-card--row';
       const head = document.createElement('div');
       head.className = 'pulse-card__head';
       const label = document.createElement('p');
@@ -664,7 +665,7 @@ let handoffNotes = [];
         timeZone: 'Africa/Casablanca',
       });
     }
-    return record?.time || '—';
+    return record?.time || '';
   }
 
   function pickCancelReason() {
@@ -704,7 +705,7 @@ let handoffNotes = [];
       if (!response.ok || payload?.ok === false) {
         throw new Error(payload?.error || `HTTP ${response.status}`);
       }
-      showToast('Rappel 6 mois enregistré — à placer, pas un SMS.', 'success');
+      showToast('Rappel 6 mois enregistré. À placer, pas un SMS.', 'success');
       await loadRecallStrip();
     } catch {
       showToast('Impossible d\'enregistrer le rappel.', 'error');
@@ -839,10 +840,19 @@ let handoffNotes = [];
   }
 
   async function loadTreatmentCatalog() {
-    const select = $('floor-book-treatment');
+    const hidden = $('floor-book-treatment');
+    const list = $('floor-book-treatment-list');
     const slots = $('floor-book-slots');
     const durationEl = $('floor-composer-duration');
-    if (!select) return;
+    if (!hidden || !list) return;
+
+    const syncDuration = (value) => {
+      const selected = list.querySelector('.ghost-select__option.is-selected')
+        || list.querySelector(`.ghost-select__option[data-value="${CSS.escape(String(value || ''))}"]`);
+      const mins = selected?.dataset?.duration;
+      if (durationEl) durationEl.textContent = mins ? `${mins} min` : 'Durée selon le soin';
+    };
+
     try {
       const response = await fetch(`${CONFIG.ROSTER_PROXY}?catalog=1`, {
         method: 'GET',
@@ -853,22 +863,35 @@ let handoffNotes = [];
       assertAuthorizedResponse(response);
       const payload = await response.json();
       const treatments = payload?.data?.treatments || [];
-      const previous = select.value;
-      select.replaceChildren();
-      const blank = document.createElement('option');
-      blank.value = '';
+      const previous = hidden.value;
+      list.replaceChildren();
+      const blank = document.createElement('li');
+      blank.className = 'ghost-select__option';
+      blank.setAttribute('role', 'option');
+      blank.dataset.value = '';
       blank.textContent = 'Choisir un soin';
-      select.appendChild(blank);
+      list.appendChild(blank);
       treatments.forEach((item) => {
-        const option = document.createElement('option');
-        option.value = item.name;
-        option.textContent = `${item.name} · ${item.duration_min} min`;
+        const option = document.createElement('li');
+        option.className = 'ghost-select__option';
+        option.setAttribute('role', 'option');
+        option.dataset.value = item.name;
         option.dataset.duration = String(item.duration_min);
-        select.appendChild(option);
+        option.dataset.label = `${item.name} · ${item.duration_min} min`;
+        option.textContent = `${item.name} · ${item.duration_min} min`;
+        list.appendChild(option);
       });
-      if (previous && [...select.options].some((opt) => opt.value === previous)) {
-        select.value = previous;
-      }
+      const keepPrevious = previous && treatments.some((item) => item.name === previous);
+      window.DentaFlowSelect?.init?.({
+        rootId: 'floor-book-treatment-root',
+        hiddenId: 'floor-book-treatment',
+        triggerId: 'floor-book-treatment-trigger',
+        listId: 'floor-book-treatment-list',
+        labelId: 'floor-book-treatment-value',
+        defaultValue: '',
+        initialValue: keepPrevious ? previous : '',
+        onSelect: syncDuration,
+      });
       if (slots) {
         slots.replaceChildren();
         const next = payload?.data?.nextFreeSlot;
@@ -887,13 +910,7 @@ let handoffNotes = [];
           slots.appendChild(chip);
         }
       }
-      const syncDuration = () => {
-        const opt = select.selectedOptions[0];
-        const mins = opt?.dataset?.duration;
-        if (durationEl) durationEl.textContent = mins ? `${mins} min` : 'Durée selon le soin';
-      };
-      select.addEventListener('change', syncDuration);
-      syncDuration();
+      syncDuration(hidden.value);
     } catch (err) {
       if (isUnauthorizedError(err)) return;
     }
@@ -914,14 +931,28 @@ let handoffNotes = [];
           showToast('Choisissez le prochain créneau libre.', 'error');
           return;
         }
+        const treatment = $('floor-book-treatment')?.value.trim();
+        if (!treatment) {
+          showToast('Choisissez un soin.', 'error');
+          return;
+        }
         await postRosterBooking({
           kind: 'visit',
           patientName: $('floor-book-name')?.value.trim(),
           phone: $('floor-book-phone')?.value.trim(),
-          treatment: $('floor-book-treatment')?.value.trim(),
+          treatment,
           startsAt,
         });
         form.reset();
+        window.DentaFlowSelect?.init?.({
+          rootId: 'floor-book-treatment-root',
+          hiddenId: 'floor-book-treatment',
+          triggerId: 'floor-book-treatment-trigger',
+          listId: 'floor-book-treatment-list',
+          labelId: 'floor-book-treatment-value',
+          defaultValue: '',
+          initialValue: '',
+        });
         showToast('Rendez-vous posé.', 'success');
         loadPlanning();
         void loadTreatmentCatalog();
@@ -931,14 +962,28 @@ let handoffNotes = [];
     });
     $('floor-walkin-btn')?.addEventListener('click', async () => {
       try {
+        const treatment = $('floor-book-treatment')?.value.trim();
+        if (!treatment) {
+          showToast('Choisissez un soin.', 'error');
+          return;
+        }
         await postRosterBooking({
           kind: 'visit',
           walkIn: true,
           patientName: $('floor-book-name')?.value.trim(),
           phone: $('floor-book-phone')?.value.trim(),
-          treatment: $('floor-book-treatment')?.value.trim(),
+          treatment,
         });
         $('floor-book-form')?.reset();
+        window.DentaFlowSelect?.init?.({
+          rootId: 'floor-book-treatment-root',
+          hiddenId: 'floor-book-treatment',
+          triggerId: 'floor-book-treatment-trigger',
+          listId: 'floor-book-treatment-list',
+          labelId: 'floor-book-treatment-value',
+          defaultValue: '',
+          initialValue: '',
+        });
         showToast('Walk-in placé en salle d\'attente.', 'success');
         loadPlanning();
         void loadTreatmentCatalog();
@@ -1015,7 +1060,7 @@ let handoffNotes = [];
       const duration = Number(record.duration_min) > 0 ? Number(record.duration_min) : 30;
       const expected = scheduled ? new Date(scheduled.getTime() + duration * 60000) : null;
       const mins = started ? Math.max(0, Math.round((Date.now() - started.getTime()) / 60000)) : 0;
-      elapsed.textContent = `Écoulé ${mins} min · fin ${expected ? formatRosterClock({ starts_at: expected }) : '—'}`;
+      elapsed.textContent = `Écoulé ${mins} min · fin ${expected ? formatRosterClock({ starts_at: expected }) : ''}`;
       card.appendChild(elapsed);
     }
 
@@ -1245,7 +1290,7 @@ let handoffNotes = [];
         console.error('[Handoff] POST failed:', error?.message || error);
         handoffNotes = handoffNotes.filter(note => note.id !== tempId);
         renderHandoffBoard();
-        showToast('Échec de la publication — réessayez.', 'error');
+        showToast('Échec de la publication. Réessayez.', 'error');
       }
 
       input?.focus();
@@ -1603,8 +1648,8 @@ let handoffNotes = [];
     const countLabel = rows.length === 1 ? '1 rendez-vous' : `${rows.length} rendez-vous`;
     showToast(
       rows.length
-        ? `Rapport exporté — ${countLabel}.`
-        : 'Rapport exporté — aucun rendez-vous pour aujourd\'hui.',
+        ? `Rapport exporté. ${countLabel}.`
+        : 'Rapport exporté. Aucun rendez-vous pour aujourd\'hui.',
       'success'
     );
   }
@@ -1816,7 +1861,7 @@ let handoffNotes = [];
       window.DentaFlowDom.setStatusPill(node, label);
     } else {
       node.replaceChildren();
-      node.appendChild(document.createTextNode(label || '—'));
+      node.appendChild(document.createTextNode(label || 'Non renseigné'));
     }
   }
 
@@ -2112,7 +2157,7 @@ let handoffNotes = [];
       return;
     }
     if (result?.twilioConfigured === false) {
-      showToast("SMS non envoyé — Twilio n'est pas configuré.", 'warning');
+        showToast("SMS non envoyé. Twilio n'est pas configuré.", 'warning');
       return;
     }
     showToast('Aucun SMS envoyé.', 'warning');
@@ -2435,7 +2480,7 @@ let handoffNotes = [];
     msg = parseUpstreamErrorDetail(msg) || msg;
 
     if (window.location.protocol === 'file:') {
-      return 'Ouvrez le dashboard via un serveur HTTP local (Live Server, Vercel) — file:// bloque les appels API.';
+      return 'Ouvrez le dashboard via un serveur HTTP local (Live Server, Vercel). file:// bloque les appels API.';
     }
 
     if (/service unavailable|upstream http error|upstream timeout|upstream error/i.test(msg)) {
@@ -2454,7 +2499,7 @@ let handoffNotes = [];
       return 'Erreur de synchronisation avec la base de données';
     }
     if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      return 'Impossible de charger le planning — Mode hors-ligne';
+      return 'Impossible de charger le planning. Mode hors-ligne';
     }
     if (/réponse vide|respond to webhook|webhook not registered/i.test(msg)) {
       return 'Aucun rendez-vous trouvé.';
@@ -2465,7 +2510,7 @@ let handoffNotes = [];
     if (msg && msg.length <= 160) {
       return msg;
     }
-    return 'Impossible de charger le planning — Mode hors-ligne';
+    return 'Impossible de charger le planning. Mode hors-ligne';
   }
 
   /**
@@ -2604,7 +2649,7 @@ let handoffNotes = [];
   }
 
   function buildNoShowFlag() {
-    return `<span class="roster-noshow-flag" title="Historique de no-shows — vigilance recommandée" aria-label="Historique de no-shows">${NOSHOW_SVG}</span>`;
+    return `<span class="roster-noshow-flag" title="Historique de no-shows. Vigilance recommandée" aria-label="Historique de no-shows">${NOSHOW_SVG}</span>`;
   }
 
   function applyMatteSelectSkin(selectEl, status) {
@@ -2709,7 +2754,7 @@ let handoffNotes = [];
     }
     navigator.clipboard?.writeText(value)
       .then(() => showToast('Numéro copié dans le presse-papiers.', 'success'))
-      .catch(() => showToast('Copie impossible — sélectionnez le numéro manuellement.', 'error'));
+      .catch(() => showToast('Copie impossible. Sélectionnez le numéro manuellement.', 'error'));
   }
 
   async function sendQuickSmsToRow(rowId) {
@@ -2818,7 +2863,7 @@ let handoffNotes = [];
         else showToast('SMS rapide indisponible pour ce rendez-vous.', 'warning');
       }),
       createPopoverMenuItem('Copier les infos', ROW_ACTION_SVG.copy, () => {
-        copyTextToClipboard(`${record.name || ''} — ${record.time || ''}`);
+        copyTextToClipboard(`${record.name || ''} · ${record.time || ''}`.trim());
       })
     );
 
@@ -3119,7 +3164,7 @@ let handoffNotes = [];
         if (!response.ok || payload?.ok === false) throw new Error(payload?.error || `HTTP ${response.status}`);
         toastFillGapResult(payload);
       } catch {
-        showToast('Impossible de consulter la liste d\'attente — réessayez.', 'error');
+        showToast('Impossible de consulter la liste d\'attente. Réessayez.', 'error');
       } finally {
         fillBtn.disabled = false;
       }
@@ -3259,7 +3304,7 @@ let handoffNotes = [];
     });
   }
 
-  function setCopyableField(elementId, value, fallback = '—') {
+  function setCopyableField(elementId, value, fallback = 'Non renseigné') {
     const el = $(elementId);
     if (!el) return;
     const raw = String(value || '').trim();
@@ -3306,7 +3351,7 @@ let handoffNotes = [];
 
     if (write?.then) {
       write.then(onSuccess).catch(() => {
-        showToast('Copie impossible — sélectionnez la valeur manuellement.', 'error');
+        showToast('Copie impossible. Sélectionnez la valeur manuellement.', 'error');
       });
     } else {
       onSuccess();
@@ -3518,7 +3563,7 @@ let handoffNotes = [];
         const phone = String(row.dataset.phone || phoneCell.textContent || '').trim();
         phoneCell.replaceChildren();
         if (phone) phoneCell.appendChild(createCopyableSpan(phone));
-        else phoneCell.textContent = '—';
+        else phoneCell.textContent = 'Non renseigné';
       }
     });
   }
@@ -3724,7 +3769,7 @@ let handoffNotes = [];
     if (record.noShow) {
       const flagSpan = document.createElement('span');
       flagSpan.className = 'roster-noshow-flag';
-      flagSpan.title = 'Historique de no-shows — vigilance recommandée';
+      flagSpan.title = 'Historique de no-shows. Vigilance recommandée';
       flagSpan.setAttribute('aria-label', 'Historique de no-shows');
       flagSpan.innerHTML = NOSHOW_SVG;
       patientWrap.appendChild(flagSpan);
@@ -3793,7 +3838,7 @@ let handoffNotes = [];
 
     const timeCol = document.createElement('div');
     timeCol.className = 'timeline-card__time';
-    timeCol.textContent = record.time || '—';
+    timeCol.textContent = record.time || '';
 
     const infoCol = document.createElement('div');
     infoCol.className = 'timeline-card__info';
@@ -3893,7 +3938,10 @@ let handoffNotes = [];
     if (cards) {
       cards.replaceChildren();
       if (!rows.length) {
-        const empty = createEmptyState({ message: emptyMessage });
+        const empty = createEmptyState({
+          title: 'Aucun rendez-vous',
+          message: emptyMessage || 'Les rendez-vous du jour apparaissent ici.',
+        });
         empty.classList.add('roster-cards__empty');
         cards.appendChild(empty);
         initEmptyStatePulse(empty);
@@ -3931,7 +3979,7 @@ let handoffNotes = [];
     showSkeleton('crm');
   }
 
-  function showTableError(message = 'Impossible de charger le planning — Mode hors-ligne') {
+  function showTableError(message = 'Impossible de charger le planning. Mode hors-ligne') {
     hideSkeleton('roster');
     hideSkeleton('crm');
     const friendlyMessage = typeof message === 'string' && message.includes('Erreur de connexion au serveur')
@@ -4255,9 +4303,9 @@ let handoffNotes = [];
       selectEl.disabled = false;
       const msg = String(error?.message || '');
       if (msg.includes('Session expirée')) {
-        alert('Session expirée — veuillez vous reconnecter.');
+        alert('Session expirée. Veuillez vous reconnecter.');
       } else {
-        alert('Échec de la mise à jour du statut — réessayez.');
+        alert('Échec de la mise à jour du statut. Réessayez.');
       }
       setTimeout(() => {
         selectEl.classList.remove('status-error');
@@ -4647,7 +4695,7 @@ let handoffNotes = [];
 
   function setText(id, text) {
     const el = $(id);
-    if (el) el.textContent = text ?? '—';
+    if (el) el.textContent = text ?? '';
   }
 
   let dashboardCalendar = null;
@@ -4816,7 +4864,7 @@ let handoffNotes = [];
     if (props.bookingKind === 'block') {
       const note = document.createElement('p');
       note.className = 'ops-chip-sheet__meta';
-      note.textContent = 'Blocage docteur — lecture seule ici.';
+      note.textContent = 'Blocage docteur. Lecture seule ici.';
       actions.appendChild(note);
       sheet.hidden = false;
       return;
@@ -4846,7 +4894,7 @@ let handoffNotes = [];
     if (isPulseCancelledStatus(props.status)) {
       const fill = document.createElement('button');
       fill.type = 'button';
-      fill.textContent = 'Combler le créneau';
+      fill.textContent = 'Proposer un patient';
       fill.addEventListener('click', async () => {
         const confirmed = await askConfirm('Remplacer ce créneau avec un patient de la liste d\'attente ?');
         if (!confirmed) return;
@@ -5075,8 +5123,8 @@ let handoffNotes = [];
     const table = container.closest('.waitlist-table');
     if (!waitlist.length) {
       mountEmptyState('waitlist-empty-state', {
-        message: EMPTY_STATE_DEFAULT_MESSAGE,
-        iconSvg: EMPTY_STATE_SVG_INBOX,
+        title: 'Liste d\'attente vide',
+        message: 'Ajoutez un nom ci-dessus pour un créneau libéré.',
       });
       if (table) table.hidden = true;
       hideSkeleton('waitlist');
@@ -5208,7 +5256,7 @@ let handoffNotes = [];
     const tagClass = priorite === 'Haute' || priorite === 'Urgence' ? 'urgence' : 'consultation';
     const row = createWaitlistTableRow({
       name: nom,
-      phone: telephone || '—',
+      phone: telephone || 'Non renseigné',
       treatment: priorite,
       tagClass,
       priorite,
@@ -5345,7 +5393,7 @@ let handoffNotes = [];
   }
 
   function buildStatusPill(label, modifierClass = '') {
-    const safeLabel = escapeHtml(label || '—');
+    const safeLabel = escapeHtml(label || 'Non renseigné');
     const classes = ['status-pill', modifierClass].filter(Boolean).join(' ');
     return `<span class="${classes}"><span class="status-pill__dot" aria-hidden="true"></span>${safeLabel}</span>`;
   }
@@ -5399,15 +5447,27 @@ let handoffNotes = [];
     tbody.replaceChildren();
 
     if (!rows.length) {
-      const emptyRow = document.createElement('tr');
-      emptyRow.className = 'crm-table-empty';
-      const cell = document.createElement('td');
-      cell.colSpan = 6;
-      cell.textContent = 'Aucun patient pour aujourd\'hui.';
-      emptyRow.appendChild(cell);
-      tbody.appendChild(emptyRow);
+      const emptyHost = $('crm-empty-state');
+      const scroll = tbody.closest('.crm-table-scroll');
+      if (emptyHost) {
+        emptyHost.hidden = false;
+        const title = emptyHost.querySelector('.ios-empty__title');
+        const text = emptyHost.querySelector('.ios-empty__text');
+        if (title) title.textContent = 'Aucun dossier à afficher';
+        if (text) {
+          text.textContent = $('crm-filter-unpaid')?.getAttribute('aria-pressed') === 'true'
+            ? 'Aucun dossier non payé pour aujourd\'hui. Désactivez le filtre pour voir tous les patients du jour.'
+            : 'Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.';
+        }
+      }
+      if (scroll) scroll.hidden = true;
       return;
     }
+
+    const emptyHost = $('crm-empty-state');
+    const scroll = tbody.closest('.crm-table-scroll');
+    if (emptyHost) emptyHost.hidden = true;
+    if (scroll) scroll.hidden = false;
 
     rows.forEach((record) => {
       const patient = toCrmPatient(record);
@@ -5444,7 +5504,7 @@ let handoffNotes = [];
       }
 
       const emailCell = document.createElement('td');
-      emailCell.textContent = patient.email || '—';
+      emailCell.textContent = patient.email || 'Non renseigné';
 
       const motifCell = document.createElement('td');
       motifCell.appendChild(createStatusPillElement(
@@ -5453,14 +5513,14 @@ let handoffNotes = [];
       ));
 
       const billingCell = document.createElement('td');
-      const billingLabel = patient.billingStatus || '—';
-      if (billingLabel && billingLabel !== '—') {
+      const billingLabel = patient.billingStatus || 'Non renseigné';
+      if (billingLabel && billingLabel !== '—' && billingLabel !== 'Non renseigné') {
         billingCell.appendChild(createStatusPillElement(
           billingLabel,
           getBillingStatusPillClass(billingLabel)
         ));
       } else {
-        billingCell.textContent = '—';
+        billingCell.textContent = 'Non renseigné';
       }
 
       const statusCell = document.createElement('td');
@@ -5681,7 +5741,7 @@ let handoffNotes = [];
         button.classList.add('is-success');
         toastFillGapResult(payload);
       } catch {
-        showToast('Impossible de consulter la liste d\'attente — réessayez.', 'error');
+        showToast('Impossible de consulter la liste d\'attente. Réessayez.', 'error');
       } finally {
         button.classList.remove('is-loading');
         button.disabled = false;

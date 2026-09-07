@@ -2,7 +2,7 @@
    DentaFlow OS — shared tokens, themes, reset
    Loaded before each dashboard stylesheet. Vanilla CSS only.
 
-   Dashboard shells (index.html) use Linear/Jane/Healthie tokens.
+   Dashboard shells use iOS grouped-list tokens (paper cards, hairlines).
    Public book portal keeps its own theme via html.book-portal.
    ============================================================ */
 
@@ -395,6 +395,7 @@ html.book-portal h3 {
   height: 28px;
   flex-shrink: 0;
   border-radius: 8px;
+  object-fit: cover;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -410,4 +411,150 @@ html.book-portal h3 {
   .sync-dot,
   .reclaimed-banner { animation: none; }
   * { animation-duration: 0.001ms !important; }
+}
+
+/* ── iOS grouped lists (dashboards only; skip book portal + Calendar OS) ── */
+html:not(.book-portal) .ios-group {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+html:not(.book-portal) .ios-group__row,
+html:not(.book-portal) .ios-group > .settings-toggle-row,
+html:not(.book-portal) .ios-group > .form-consent-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-bottom: var(--border-hairline);
+}
+
+html:not(.book-portal) .ios-group > :last-child {
+  border-bottom: 0;
+}
+
+html:not(.book-portal) .ios-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 28px 20px;
+  background: transparent;
+  border: 0;
+}
+
+html:not(.book-portal) .ios-empty__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+html:not(.book-portal) .ios-empty__text {
+  margin: 0;
+  max-width: 36em;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .df-confirm-overlay {
+  background: rgba(15, 15, 15, 0.36);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+html:not(.book-portal) .df-confirm-dialog {
+  width: min(400px, 100%);
+  padding: 22px 20px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: var(--border-hairline);
+  box-shadow: 0 18px 48px rgba(15, 15, 15, 0.22);
+  color: var(--text-main);
+}
+
+html:not(.book-portal) .df-confirm-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+html:not(.book-portal) .df-confirm-message {
+  margin: 0 0 18px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .df-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+html:not(.book-portal) .df-confirm-btn {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+html:not(.book-portal) .df-confirm-btn--cancel {
+  color: var(--text-main);
+  background: var(--accent-dim);
+  border: 0;
+}
+
+html:not(.book-portal) .df-confirm-btn--confirm {
+  color: #fff;
+  background: var(--text-main);
+  border: 0;
+}
+
+html:not(.book-portal) .df-confirm-btn--danger {
+  color: #fff;
+  background: var(--danger);
+  border: 0;
+}
+
+html:not(.book-portal) .sms-capability {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+html:not(.book-portal) .sms-capability__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+html:not(.book-portal) .sms-capability__text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .sms-composer-meta,
+html:not(.book-portal) .sms-composer-risk {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }

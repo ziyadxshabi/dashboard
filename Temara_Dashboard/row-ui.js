@@ -15,7 +15,7 @@
   const NOSHOW_SVG = lucideIcon('alert-triangle', 'icon-sm');
   const EMPTY_STATE_SVG_CALENDAR = lucideIcon('calendar-clock', 'icon-lg');
   const EMPTY_STATE_SVG_INBOX = lucideIcon('inbox', 'icon-lg');
-  const EMPTY_STATE_DEFAULT_MESSAGE = 'Aucun rendez-vous pour le moment.';
+  const EMPTY_STATE_DEFAULT_MESSAGE = 'Les rendez-vous du jour apparaissent ici.';
 
   function extractInitials(fullName) {
     const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
@@ -60,7 +60,7 @@
   function createMatteChip(label) {
     const chip = document.createElement('span');
     chip.className = `matte-chip matte-chip--${getMatteChipModifier(label)}`;
-    chip.textContent = label || '—';
+    chip.textContent = label || '';
     return chip;
   }
 
@@ -84,7 +84,7 @@
     if (showNoShow) {
       const flagSpan = document.createElement('span');
       flagSpan.className = 'roster-noshow-flag';
-      flagSpan.dataset.tooltip = 'Historique de no-shows — vigilance recommandée';
+      flagSpan.dataset.tooltip = 'Historique de no-shows. Vigilance recommandée';
       flagSpan.setAttribute('aria-label', 'Historique de no-shows');
       flagSpan.innerHTML = NOSHOW_SVG;
       window.refreshLucideIcons?.(flagSpan);
@@ -150,7 +150,7 @@
     const raw = String(value || '').trim();
     span.className = 'copyable';
     span.dataset.value = raw;
-    span.textContent = displayLabel ?? (raw || '—');
+    span.textContent = displayLabel ?? (raw || 'Non renseigné');
     span.setAttribute('role', 'button');
     span.setAttribute('tabindex', '0');
     span.setAttribute('aria-label', `Copier ${span.textContent}`);
@@ -190,7 +190,7 @@
     if (phoneValue) {
       phoneTd.appendChild(createCopyableSpan(phoneValue));
     } else {
-      phoneTd.textContent = '—';
+      phoneTd.textContent = 'Non renseigné';
     }
 
     const priorityTd = document.createElement('td');
@@ -202,23 +202,24 @@
 
   function createEmptyState(options = {}) {
     const {
+      title = '',
       message = EMPTY_STATE_DEFAULT_MESSAGE,
-      iconSvg = EMPTY_STATE_SVG_CALENDAR,
     } = options;
 
     const wrap = document.createElement('div');
-    wrap.className = 'empty-state';
+    wrap.className = 'ios-empty';
 
-    const icon = document.createElement('div');
-    icon.className = 'empty-state__icon';
-    icon.innerHTML = iconSvg;
-    window.refreshLucideIcons?.(icon);
+    if (title) {
+      const heading = document.createElement('p');
+      heading.className = 'ios-empty__title';
+      heading.textContent = title;
+      wrap.appendChild(heading);
+    }
 
     const text = document.createElement('p');
-    text.className = 'empty-state__text';
+    text.className = 'ios-empty__text';
     text.textContent = message;
-
-    wrap.append(icon, text);
+    wrap.appendChild(text);
     return wrap;
   }
 
@@ -229,7 +230,6 @@
     const state = createEmptyState(options);
     host.appendChild(state);
     host.hidden = false;
-    initEmptyStatePulse(state);
     return state;
   }
 

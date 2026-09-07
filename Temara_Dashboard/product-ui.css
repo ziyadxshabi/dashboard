@@ -725,7 +725,7 @@ html[data-theme="oak-lounge"] .theme-switch-btn.is-active {
   font-weight: 500 !important;
   text-transform: none !important;
   letter-spacing: 0.01em !important;
-  background: var(--surface-2) !important;
+  background: transparent !important;
   border-bottom: 1px solid var(--border-color) !important;
 }
 
@@ -1689,12 +1689,25 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
   display: block;
   border-radius: 8px;
   overflow: hidden;
+  object-fit: cover;
   stroke: none !important;
+}
+
+img.brand-monogram {
+  width: 28px;
+  height: 28px;
+  filter: none;
 }
 
 .brand-monogram rect,
 .brand-monogram path {
   stroke: none !important;
+}
+
+.sidebar-brand-icon img.brand-monogram,
+.login-mark-icon img.brand-monogram {
+  width: 28px;
+  height: 28px;
 }
 
 .login-viewport-brand-mark,
@@ -1928,6 +1941,264 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
   background: var(--accent-dim) !important;
   border-color: var(--border-2) !important;
   color: var(--text-main) !important;
+}
+
+html:not(.book-portal) #stats-content.kpi-row {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  grid-template-columns: none !important;
+  background: var(--bg-card);
+  border: var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+html:not(.book-portal) #stats-content .kpi-card,
+html:not(.book-portal) #stats-content .kpi-card--matte {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0 !important;
+  border-bottom: var(--border-hairline) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+html:not(.book-portal) #stats-content .kpi-card:last-child {
+  border-bottom: 0 !important;
+}
+
+html:not(.book-portal) #stats-content .kpi-card::before {
+  display: none;
+}
+
+html:not(.book-portal) #stats-content .kpi-number {
+  font-size: 1.5rem !important;
+  color: var(--text-main) !important;
+}
+
+html:not(.book-portal) .reclaimed-banner,
+html:not(.book-portal) .reclaimed-banner--quiet {
+  padding: 0;
+  background: var(--bg-card) !important;
+  border: var(--border-hairline) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+html:not(.book-portal) .reclaimed-banner .hero-split-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+html:not(.book-portal) .reclaimed-banner .hero-split-block {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+html:not(.book-portal) .reclaimed-banner .hero-split-block--secondary {
+  border-left: 0;
+  border-top: var(--border-hairline);
+  padding-left: 16px;
+}
+
+html:not(.book-portal) .reclaimed-banner .hero-value,
+html:not(.book-portal) .reclaimed-banner .hero-value--revenue {
+  font-size: 1.375rem !important;
+  color: var(--text-main) !important;
+}
+
+html:not(.book-portal) .reclaimed-banner .hero-split-helper {
+  margin: 0;
+  max-width: none;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .assistant-pulse-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--bg-card);
+  border: var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+html:not(.book-portal) .assistant-pulse-grid .pulse-card,
+html:not(.book-portal) .assistant-pulse-grid .pulse-card--matte {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: var(--border-hairline);
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html:not(.book-portal) .assistant-pulse-grid .pulse-card:last-child {
+  border-bottom: 0;
+}
+
+html:not(.book-portal) .assistant-pulse-grid .pulse-card__head {
+  margin: 0;
+}
+
+html:not(.book-portal) .assistant-pulse-grid .pulse-card__value {
+  font-size: 1.25rem;
+  color: var(--text-main) !important;
+}
+
+html:not(.book-portal) .assistant-pulse-grid .pulse-card__meta {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+html:not(.book-portal) .btn-account-menu {
+  width: 44px;
+  height: 44px;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--rail-muted) !important;
+  border-radius: 10px;
+}
+
+html:not(.book-portal) .btn-account-menu:hover,
+html:not(.book-portal) .btn-account-menu:focus-visible {
+  color: var(--rail-text) !important;
+  background: var(--rail-hover) !important;
+}
+
+html:not(.book-portal) .btn-icon-menu {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted) !important;
+}
+
+html:not(.book-portal) .actions-popover,
+html:not(.book-portal) .ghost-select__list {
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--bg-card) !important;
+  border: var(--border-hairline) !important;
+  box-shadow: 0 12px 40px rgba(15, 15, 15, 0.16);
+  backdrop-filter: none !important;
+}
+
+html:not(.book-portal) .actions-popover__item,
+html:not(.book-portal) .ghost-select__option {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+html:not(.book-portal) .actions-popover__item--danger {
+  color: var(--danger) !important;
+}
+
+html:not(.book-portal) body.mode-assistant .superpower-bento-card {
+  gap: 12px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+}
+
+html:not(.book-portal) body.mode-assistant .superpower-bento-card__glow,
+html:not(.book-portal) body.mode-assistant .superpower-bento-card__icon {
+  display: none !important;
+}
+
+html:not(.book-portal) .btn-gold,
+html:not(.book-portal) .waitlist-submit-btn,
+html:not(.book-portal) .security-form__submit {
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  min-height: 44px;
+}
+
+html:not(.book-portal) body.mode-assistant .superpower-bento-card__cta {
+  align-self: flex-start !important;
+  width: auto !important;
+  min-height: 44px !important;
+  padding: 0 16px !important;
+  color: #fff !important;
+  background: var(--text-main) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  border-radius: 10px !important;
+}
+
+html:not(.book-portal) .sms-campaign-panel {
+  max-width: 720px;
+}
+
+html:not(.book-portal) .crm-table-empty td {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+html:not(.book-portal) .crm-table tbody tr {
+  background: transparent;
+}
+
+html:not(.book-portal) .waitlist-form .ios-group,
+html:not(.book-portal) .sms-campaign-panel.ios-group {
+  margin-top: 8px;
+}
+
+html:not(.book-portal) .waitlist-form .ios-group {
+  border: 0;
+  border-top: var(--border-hairline);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html:not(.book-portal) .settings-card .ios-group {
+  margin-top: 4px;
+}
+
+html:not(.book-portal) .floor-composer__field .ghost-select,
+html:not(.book-portal) .floor-composer__field .ghost-select__trigger {
+  width: 100%;
+}
+
+html:not(.book-portal) #stats-content .kpi-card__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+html:not(.book-portal) .crm-table-scroll[hidden],
+html:not(.book-portal) .ios-empty[hidden] {
+  display: none !important;
 }
 
 /* Frozen Calendar OS — .calendar-os-* / #dashboard-cal-inline / .fc

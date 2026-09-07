@@ -13,10 +13,7 @@
     <aside class="sidebar assistant-sidebar desktop-nav" aria-label="Navigation assistante">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon" aria-hidden="true">
-          <svg class="brand-monogram" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
-            <rect width="180" height="180" rx="40" fill="#0C0F14"/>
-            <path fill="#c4a574" d="M54 46h48c26 0 46 22 46 48s-20 48-46 48H76v32H54V46zm24 24v48h24c14 0 24-12 24-24s-10-24-24-24H78z"/>
-          </svg>
+          <img class="brand-monogram" src="./brand/dentaflow-mark.png" alt="" width="28" height="28">
         </span>
         <div class="sidebar-brand-text">
           <span class="sidebar-brand-name">DentaFlow OS</span>
@@ -107,12 +104,12 @@
           aria-controls="account-menu-popover"
           aria-label="Menu compte"
         >
-          <i data-lucide="ellipsis-vertical" aria-hidden="true"></i>
+          <i data-lucide="chevron-right" aria-hidden="true"></i>
         </button>
         <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
           <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
             <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
-            Paramètres
+            Réglages
           </button>
           <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
             <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
@@ -151,7 +148,7 @@
           <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
           <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
           <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
-          <a href="#settings" class="nav-link" data-nav="settings">Paramètres</a>
+          <a href="#settings" class="nav-link" data-nav="settings">Réglages</a>
         </nav>
       </div>
 
@@ -160,7 +157,7 @@
         <header class="assistant-header">
           <div>
             <h1 class="assistant-header__title kinetic-title">Bonjour, <span id="hero-profile-name"></span></h1>
-            <p class="assistant-header__sub" id="assistant-date">—</p>
+            <p class="assistant-header__sub" id="assistant-date"></p>
           </div>
           <div class="assistant-header__meta">
             <div class="hero-sync">
@@ -185,10 +182,25 @@
               <input class="waitlist-input" id="floor-book-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="06 12 34 56" required />
             </div>
             <div class="floor-composer__field">
-              <label class="floor-composer__label" for="floor-book-treatment">Soin</label>
-              <select class="waitlist-input" id="floor-book-treatment" name="treatment" required>
-                <option value="">Choisir un soin</option>
-              </select>
+              <label class="floor-composer__label" for="floor-book-treatment-trigger">Soin</label>
+              <div class="ghost-select" id="floor-book-treatment-root" data-ghost-select>
+                <input type="hidden" id="floor-book-treatment" name="treatment" value="" />
+                <button
+                  type="button"
+                  class="ghost-select__trigger waitlist-input"
+                  id="floor-book-treatment-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="floor-book-treatment-list"
+                  aria-labelledby="floor-book-treatment-value"
+                >
+                  <span class="ghost-select__value" id="floor-book-treatment-value">Choisir un soin</span>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                </button>
+                <ul class="ghost-select__list" id="floor-book-treatment-list" role="listbox" aria-label="Soin" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="" aria-selected="true" tabindex="-1">Choisir un soin</li>
+                </ul>
+              </div>
             </div>
             <button type="submit" class="btn-matte-primary" id="floor-book-submit">Poser</button>
             <div id="floor-book-slots" class="floor-composer__slots" role="group" aria-label="Prochain créneau"></div>
@@ -204,7 +216,7 @@
         <section class="late-strip" aria-labelledby="late-title">
           <div class="section-header-inline">
             <h3 class="section-header-inline__title" id="late-title">En retard sur l'heure prévue</h3>
-            <span class="late-strip__hint">Heure planifiée — pas l'arrivée</span>
+            <span class="late-strip__hint">Selon l'heure prévue au planning</span>
           </div>
           <div id="late-list" class="late-list" role="list">
             <p class="late-list__empty">Aucun retard sur l'heure prévue.</p>
@@ -214,7 +226,7 @@
         <section class="recall-strip" id="recall-strip" aria-labelledby="recall-title" hidden>
           <div class="section-header-inline">
             <h3 class="section-header-inline__title" id="recall-title">À revoir</h3>
-            <span class="section-header-inline__meta">Rappels 6 mois — à placer, pas un SMS</span>
+            <span class="section-header-inline__meta">Rappels 6 mois, à placer, pas un SMS</span>
           </div>
           <div id="recall-list" class="recall-list" role="list"></div>
         </section>
@@ -230,7 +242,7 @@
         <section class="status-board-section" aria-labelledby="status-board-title">
           <div class="section-header-inline">
             <h3 class="section-header-inline__title" id="status-board-title">Board du jour</h3>
-            <span class="section-header-inline__meta">Statuts — salle et fauteuil</span>
+            <span class="section-header-inline__meta">Salle et fauteuil</span>
           </div>
           <div class="status-board" id="status-board">
             <div class="status-board__col" data-board-col="incoming">
@@ -262,28 +274,19 @@
           </div>
         </section>
 
-        <section class="assistant-bento-row" aria-label="Action — combler un créneau">
+        <section class="assistant-bento-row" aria-label="Placer un patient en attente">
           <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
-            <div class="superpower-bento-card__glow" aria-hidden="true"></div>
             <header class="superpower-bento-card__head">
-              <div class="superpower-bento-card__icon" aria-hidden="true">
-                <i data-lucide="zap" aria-hidden="true"></i>
-              </div>
               <div class="superpower-bento-card__copy">
-                <p class="superpower-bento-card__eyebrow">Action · Trous</p>
-                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Combler un trou</h2>
+                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Placer un patient en attente</h2>
                 <p class="superpower-bento-card__desc">
-                  Propose un patient de la liste d'attente pour un créneau libéré aujourd'hui. Pas d'envoi SMS — la liste est celle du cabinet.
+                  Quand un créneau se libère, choisissez quelqu'un sur la liste d'attente du cabinet. Aucun SMS n'est envoyé.
                 </p>
               </div>
             </header>
             <button type="button" class="btn-super superpower-bento-card__cta" id="btn-super-fill-gap">
-              <span class="btn-super__icon" aria-hidden="true">
-                <i data-lucide="zap" aria-hidden="true"></i>
-              </span>
               <span class="btn-super__text">
-                <span class="btn-super__label">Combler le créneau vide</span>
-                <span class="btn-super__hint">1 clic · liste d'attente</span>
+                <span class="btn-super__label">Proposer un patient</span>
               </span>
             </button>
           </article>
@@ -294,8 +297,8 @@
         <section class="assistant-panel assistant-panel--roster" aria-labelledby="roster-title">
           <div class="assistant-panel__head">
             <div>
-              <h2 class="assistant-panel__title" id="roster-title">Planning du Jour</h2>
-              <p class="assistant-panel__desc">Vue prioritaire — ordre chronologique des rendez-vous</p>
+              <h2 class="assistant-panel__title" id="roster-title">Planning du jour</h2>
+              <p class="assistant-panel__desc">Ordre chronologique des rendez-vous</p>
             </div>
             <div class="roster-panel-controls">
               <span class="assistant-panel__badge">Priorité</span>
@@ -361,7 +364,7 @@
         <section class="assistant-panel assistant-panel--handoff" aria-labelledby="handoff-title">
           <div class="assistant-panel__head">
             <div>
-              <h2 class="assistant-panel__title" id="handoff-title">Tableau de Transmission</h2>
+              <h2 class="assistant-panel__title" id="handoff-title">Transmissions</h2>
               <p class="assistant-panel__desc">Notes d'équipe et événements système pour la relève</p>
             </div>
           </div>
@@ -465,7 +468,7 @@
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
             <div class="waitlist-form-header">
               <div class="chart-title">Nouveau Patient</div>
-              <div class="chart-sub">À rappeler / à placer — pas d'envoi SMS automatique</div>
+              <div class="chart-sub">À rappeler ou à placer. Aucun SMS automatique.</div>
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
@@ -530,7 +533,7 @@
                 </button>
               </div>
 
-              <div class="form-consent-row">
+              <div class="form-consent-row ios-group">
                 <label class="form-consent-label" for="waitlist-sms-consent">
                   <input
                     type="checkbox"
@@ -549,7 +552,7 @@
             <div class="schedule-header schedule-header--with-actions">
               <div>
                 <div class="chart-title">Patients Prioritaires</div>
-                <div class="chart-sub">Classés par urgence — synchronisé avec la base de données</div>
+                <div class="chart-sub">Classés par urgence, synchronisés avec la base</div>
               </div>
               <div class="waitlist-header-actions">
                 <button
@@ -578,7 +581,7 @@
                 </button>
                 <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
                   <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
-                    Remplir un Créneau Vide
+                    Proposer un patient
                   </button>
                   <button type="button" class="actions-popover__item" id="waitlist-popover-export" role="menuitem">
                     Générer Rapport Journalier
@@ -619,7 +622,7 @@
         <header class="view-page-header view-page-header--row">
           <div>
             <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">Coordonnées patients et statut des rendez-vous</p>
+            <p class="view-page-sub">Coordonnées et statut des rendez-vous. Le filtre Non payé n'affiche que les dossiers concernés.</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -652,6 +655,10 @@
             <div class="skeleton skeleton-table-row"></div>
           </div>
           <div id="crm-content" hidden>
+          <div id="crm-empty-state" class="ios-empty" hidden>
+            <p class="ios-empty__title">Aucun dossier à afficher</p>
+            <p class="ios-empty__text">Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.</p>
+          </div>
           <div class="crm-table-scroll" role="region" aria-label="Tableau des dossiers patients" tabindex="0">
             <table class="crm-table" id="crm-patient-table">
               <thead>
@@ -673,10 +680,10 @@
         </article>
       </section>
 
-      <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
+      <section id="view-settings" class="dashboard-view" aria-label="Réglages" aria-hidden="true">
         <header class="view-page-header">
-          <h2 class="view-page-title">Paramètres</h2>
-          <p class="view-page-sub">Préférences assistante, ergonomie du poste et alertes locales</p>
+          <h2 class="view-page-title">Réglages</h2>
+          <p class="view-page-sub">Poste assistante, alertes locales et préférences.</p>
         </header>
 
         <div class="settings-grid">
@@ -740,12 +747,13 @@
               <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients.</p>
 
+            <div class="ios-group">
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels SMS</span>
-                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
+                <span class="settings-toggle-hint">Rappel SMS 24 h avant le rendez-vous</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-sms-toggle" checked />
@@ -756,12 +764,13 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
+                <span class="settings-toggle-hint">Confirmations et relances par e-mail</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-email-toggle" checked />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
+            </div>
             </div>
           </article>
 
@@ -800,8 +809,9 @@
               <i data-lucide="volume-2" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Alertes Sonores</h3>
-            <p class="settings-card-desc">Signaux discrets sur le poste assistante — sans notification patient.</p>
+            <p class="settings-card-desc">Signaux discrets sur le poste assistante, sans notification patient.</p>
 
+            <div class="ios-group">
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Nouveau message d'équipe</span>
@@ -823,6 +833,7 @@
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
             </div>
+            </div>
           </article>
 
           <article class="settings-card">
@@ -830,7 +841,7 @@
               <i data-lucide="keyboard" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Raccourcis Clavier</h3>
-            <p class="settings-card-desc">Commandes rapides — lecture seule.</p>
+            <p class="settings-card-desc">Commandes rapides, lecture seule.</p>
             <ul class="settings-shortcuts" aria-label="Raccourcis clavier">
               <li><span>Rechercher un patient</span><kbd>Espace</kbd></li>
               <li><span>Aller au planning</span><kbd>G</kbd></li>
@@ -872,9 +883,9 @@
         <i data-lucide="users" class="tab-icon" aria-hidden="true"></i>
         <span>Listes</span>
       </a>
-      <a href="#" class="tab-link" data-nav="settings" aria-label="Paramètres">
+      <a href="#" class="tab-link" data-nav="settings" aria-label="Réglages">
         <i data-lucide="settings" class="tab-icon" aria-hidden="true"></i>
-        <span>Paramètres</span>
+        <span>Réglages</span>
       </a>
     </nav>
   </div>
@@ -896,9 +907,9 @@
 
       <header class="crm-side-panel-header">
         <p class="crm-side-panel-eyebrow">Dossier Patient</p>
-        <h2 class="crm-side-panel-name" id="crm-panel-name">—</h2>
+        <h2 class="crm-side-panel-name" id="crm-panel-name"></h2>
         <p class="crm-side-panel-subtitle" id="crm-panel-subtitle"></p>
-        <span class="crm-side-panel-statut crm-tag" id="crm-panel-status">—</span>
+        <span class="crm-side-panel-statut crm-tag" id="crm-panel-status"></span>
       </header>
 
       <div class="crm-side-panel-body">
@@ -907,11 +918,11 @@
           <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field">
               <dt>Téléphone</dt>
-              <dd id="crm-panel-phone">—</dd>
+              <dd id="crm-panel-phone"></dd>
             </div>
             <div class="crm-side-panel-field">
               <dt>Email</dt>
-              <dd id="crm-panel-email">—</dd>
+              <dd id="crm-panel-email"></dd>
             </div>
           </dl>
         </section>
@@ -921,7 +932,7 @@
           <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field crm-side-panel-field--coverage">
               <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance" class="crm-panel-copyable">—</dd>
+              <dd id="crm-panel-insurance" class="crm-panel-copyable"></dd>
             </div>
           </dl>
         </section>
@@ -931,15 +942,15 @@
           <dl class="crm-side-panel-dl">
             <div class="crm-side-panel-field">
               <dt>Date du rendez-vous</dt>
-              <dd id="crm-panel-last-visit">—</dd>
+              <dd id="crm-panel-last-visit"></dd>
             </div>
             <div class="crm-side-panel-field">
               <dt>Motif de Consultation</dt>
-              <dd id="crm-panel-motif">—</dd>
+              <dd id="crm-panel-motif"></dd>
             </div>
             <div class="crm-side-panel-field crm-side-panel-field--block">
               <dt>Notes</dt>
-              <dd id="crm-panel-observations" class="crm-side-panel-notes">—</dd>
+              <dd id="crm-panel-observations" class="crm-side-panel-notes"></dd>
             </div>
           </dl>
         </section>
@@ -949,7 +960,7 @@
 
   <div id="cancel-reason-sheet" class="ops-chip-sheet" hidden>
     <p class="ops-chip-sheet__who">Motif d'annulation</p>
-    <p class="ops-chip-sheet__meta">Obligatoire — pas un SMS</p>
+    <p class="ops-chip-sheet__meta">Obligatoire. Ce n'est pas un SMS.</p>
     <div class="ops-chip-sheet__actions">
       <button type="button" data-cancel-reason="oublie">Oubli</button>
       <button type="button" data-cancel-reason="cout">Coût</button>
