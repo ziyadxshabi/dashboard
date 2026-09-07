@@ -15,7 +15,7 @@
   const NOSHOW_SVG = lucideIcon('alert-triangle', 'icon-sm');
   const EMPTY_STATE_SVG_CALENDAR = lucideIcon('calendar-clock', 'icon-lg');
   const EMPTY_STATE_SVG_INBOX = lucideIcon('inbox', 'icon-lg');
-  const EMPTY_STATE_DEFAULT_MESSAGE = 'Aucun rendez-vous pour aujourd\'hui.';
+  const EMPTY_STATE_DEFAULT_MESSAGE = 'Les rendez-vous du jour apparaissent ici.';
 
   function extractInitials(fullName) {
     const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);

@@ -515,11 +515,12 @@ let handoffNotes = [];
       if (options.errorMessage) {
         window.DentaFlowDom?.appendParagraph(feed, 'handoff-feed__empty', options.errorMessage);
       } else if (!sorted.length) {
-        window.DentaFlowDom?.appendParagraph(
-          feed,
-          'handoff-feed__empty',
-          'Aucune transmission pour le moment. Ajoutez une note d\'équipe ci-dessus.'
-        );
+        const empty = createEmptyState({
+          title: 'Aucune transmission',
+          message: 'Les notes d\'équipe s\'affichent ici.',
+        });
+        empty.classList.add('handoff-feed__empty');
+        feed.appendChild(empty);
       } else {
         const fragment = document.createDocumentFragment();
         sorted.forEach((note) => {
@@ -3937,7 +3938,10 @@ let handoffNotes = [];
     if (cards) {
       cards.replaceChildren();
       if (!rows.length) {
-        const empty = createEmptyState({ message: emptyMessage });
+        const empty = createEmptyState({
+          title: 'Aucun rendez-vous',
+          message: emptyMessage || 'Les rendez-vous du jour apparaissent ici.',
+        });
         empty.classList.add('roster-cards__empty');
         cards.appendChild(empty);
         initEmptyStatePulse(empty);
