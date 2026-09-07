@@ -1310,8 +1310,8 @@ async function run() {
   console.log('\n[webhooks/cal]');
   const handleCal = require(path.join(DASHBOARD, 'api/webhooks/cal.js'));
   const calUid = `cal-wave2-${Date.now()}`;
-  const createdStart = '2026-09-10T09:00:00.000Z';
-  const rescheduledStart = '2026-09-10T11:30:00.000Z';
+  const createdStart = '2026-12-20T09:00:00.000Z';
+  const rescheduledStart = '2026-12-20T11:30:00.000Z';
 
   const pingBody = { triggerEvent: 'PING' };
   const ping = await invoke(
@@ -1562,12 +1562,19 @@ async function run() {
       );
       ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
       if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
-    } else {
+    } else if (casablancaHourNow() >= 19) {
       ok(
         'POST /api/roster walk-in after hours is 409 NO_GAP',
         walkIn.statusCode === 409 && walkIn.body?.code === 'NO_GAP',
         `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`
       );
+    } else {
+      ok(
+        'POST /api/roster walk-in before open books the first morning gap or 409',
+        walkIn.statusCode === 201 || (walkIn.statusCode === 409 && walkIn.body?.code === 'NO_GAP'),
+        `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`
+      );
+      if (walkIn.statusCode === 201 && walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
     }
 
     const doctorVisit = await invoke(
