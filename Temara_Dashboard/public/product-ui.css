@@ -1689,12 +1689,25 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
   display: block;
   border-radius: 8px;
   overflow: hidden;
+  object-fit: cover;
   stroke: none !important;
+}
+
+img.brand-monogram {
+  width: 28px;
+  height: 28px;
+  filter: none;
 }
 
 .brand-monogram rect,
 .brand-monogram path {
   stroke: none !important;
+}
+
+.sidebar-brand-icon img.brand-monogram,
+.login-mark-icon img.brand-monogram {
+  width: 28px;
+  height: 28px;
 }
 
 .login-viewport-brand-mark,
