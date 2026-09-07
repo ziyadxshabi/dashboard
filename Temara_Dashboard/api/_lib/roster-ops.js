@@ -13,6 +13,7 @@ const {
   sanitizeString,
 } = require('./validation');
 const { createCalBusyBooking, cancelCalBusyBooking, attachCalUid } = require('./cal-busy');
+const { ensurePatient } = require('./patients');
 
 const CLINIC_OPEN = '08:00';
 const CLINIC_CLOSE = '19:00';
@@ -51,10 +52,13 @@ const INSERT_BOOKING_SQL = `
     buffer_min,
     booking_kind,
     notes,
+    patient_id,
+    staff_id,
+    charge_mad,
     updated_at
   )
   VALUES (
-    $1, $2, $3, $4, $5::appointment_status, $6, $7, $8, $9, $10, NOW()
+    $1, $2, $3, $4, $5::appointment_status, $6, $7, $8, $9, $10, $11, $12, $13, NOW()
   )
   RETURNING
     id,
@@ -69,7 +73,10 @@ const INSERT_BOOKING_SQL = `
     booking_kind,
     care_started_at,
     cancel_reason,
-    notes
+    notes,
+    patient_id,
+    staff_id,
+    charge_mad
 `;
 
 const DUPLICATE_SQL = `
@@ -185,6 +192,14 @@ function blockDisplayName(label) {
 
 async function createBookingRow(clinicId, fields) {
   const bufferMin = fields.bufferMin != null ? fields.bufferMin : await clinicBufferMin(clinicId);
+  let patientId = fields.patientId || null;
+  if (!patientId && fields.patientPhone) {
+    const patient = await ensurePatient(clinicId, {
+      name: fields.patientName,
+      phone: fields.patientPhone,
+    });
+    patientId = patient?.id || null;
+  }
   const result = await query(INSERT_BOOKING_SQL, [
     clinicId,
     fields.patientName,
@@ -196,6 +211,9 @@ async function createBookingRow(clinicId, fields) {
     bufferMin,
     fields.kind,
     fields.notes || null,
+    patientId,
+    fields.staffId || null,
+    fields.chargeMad == null ? null : fields.chargeMad,
   ]);
   return result.rows[0];
 }
@@ -280,10 +298,10 @@ async function handleRecallCreate(req, res, session) {
 
   const inserted = await query(
     `INSERT INTO recalls (
-       clinic_id, patient_name, patient_phone, due_on, treatment_name, source_booking_id, status
+       clinic_id, patient_name, patient_phone, due_on, treatment_name, source_booking_id, status, patient_id
      )
-     VALUES ($1, $2, $3, $4::date, $5, $6, 'open')
-     RETURNING id, patient_name, patient_phone, due_on, treatment_name, source_booking_id, status`,
+     VALUES ($1, $2, $3, $4::date, $5, $6, 'open', $7)
+     RETURNING id, patient_name, patient_phone, due_on, treatment_name, source_booking_id, status, patient_id`,
     [
       session.clinic_id,
       patientName,
@@ -291,6 +309,7 @@ async function handleRecallCreate(req, res, session) {
       dueOn,
       treatmentName || null,
       bookingId || null,
+      (await ensurePatient(session.clinic_id, { name: patientName, phone: patientPhone }))?.id || null,
     ]
   );
   return res.status(200).json({ ok: true, data: inserted.rows[0] });
@@ -445,6 +464,8 @@ async function handleCreate(req, res, session, parsed) {
       bufferMin,
       kind: 'visit',
       notes: value.notes || null,
+      staffId: value.staffId || null,
+      chargeMad: value.chargeMad,
     });
     return res.status(201).json({ ok: true, data: row });
   }

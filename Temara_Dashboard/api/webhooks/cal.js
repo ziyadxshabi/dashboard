@@ -25,6 +25,7 @@ const {
   notifyBookingCancelled,
 } = require('../_lib/notify');
 const { blastWaitlistSlot } = require('../_lib/waitlist-blast');
+const { ensurePatient } = require('../_lib/patients');
 
 const DEFAULT_SLUG = 'temara';
 const DEFAULT_DURATION_MIN = 30;
@@ -316,6 +317,19 @@ module.exports = async function handler(req, res) {
         buildNotes(booking),
       ]);
       const row = result.rows[0];
+      if (row) {
+        const patient = await ensurePatient(clinicId, {
+          name: row.patient_name,
+          phone: row.patient_phone,
+        });
+        if (patient?.id) {
+          await query(
+            `UPDATE bookings SET patient_id = $1, updated_at = NOW() WHERE id = $2 AND patient_id IS NULL`,
+            [patient.id, row.id]
+          );
+          row.patient_id = patient.id;
+        }
+      }
       const notify = await maybeNotify(`lock:booking:${uid}:${eventType}`, async () => {
         await notifyBookingCreated(row, req);
       });

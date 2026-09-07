@@ -1,15 +1,18 @@
 'use strict';
 
 const { query } = require('./db');
-const { displayNameUpper } = require('./phone-e164');
+const { displayNameUpper, toE164MA } = require('./phone-e164');
 const { tryAcquireLock } = require('./notification-locks');
 const {
   isTwilioConfigured,
   sendTwilioSms,
+  sendTwilioMessage,
   twilioStatusCallbackUrl,
   loadClinicSmsConfig,
   clinicBookingUrl,
+  waContentSidFor,
 } = require('./twilio');
+const { hasOpenMessagingSession } = require('./patients');
 const templates = require('./sms-templates');
 
 function resendConfigured() {
@@ -114,7 +117,7 @@ async function persistSmsRow({
   return result.rows[0] || null;
 }
 
-async function dispatchSms({
+async function dispatchOutbound({
   clinicId,
   bookingId,
   waitlistId,
@@ -143,12 +146,42 @@ async function dispatchSms({
   }
 
   const clinic = await loadClinicSmsConfig(clinicId);
-  const sent = await sendTwilioSms({
-    to,
-    body,
-    from: from || clinic.twilioFrom,
-    statusCallback: twilioStatusCallbackUrl(req),
-  });
+  const channel = clinic.messagingChannel === 'whatsapp' ? 'whatsapp' : 'sms';
+  let sent;
+
+  if (channel === 'whatsapp') {
+    const waFrom = from || clinic.twilioWaFrom;
+    if (!String(waFrom || '').trim()) {
+      return { ok: false, skipped: true, reason: 'whatsapp_from_missing', sid: null };
+    }
+    const sessionOpen = await hasOpenMessagingSession(toE164MA(to));
+    const contentSid = sessionOpen ? '' : waContentSidFor(purpose);
+    if (!sessionOpen && !contentSid) {
+      sent = await sendTwilioSms({
+        to,
+        body,
+        from: from || clinic.twilioFrom,
+        statusCallback: twilioStatusCallbackUrl(req),
+      });
+      if (sent.ok) sent.fallback = 'sms';
+    } else {
+      sent = await sendTwilioMessage({
+        to,
+        body,
+        from: waFrom,
+        statusCallback: twilioStatusCallbackUrl(req),
+        channel: 'whatsapp',
+        contentSid: contentSid || undefined,
+      });
+    }
+  } else {
+    sent = await sendTwilioSms({
+      to,
+      body,
+      from: from || clinic.twilioFrom,
+      statusCallback: twilioStatusCallbackUrl(req),
+    });
+  }
 
   if (sent.ok && sent.sid) {
     await persistSmsRow({
@@ -161,7 +194,14 @@ async function dispatchSms({
       sid: sent.sid,
       status: sent.status || 'queued',
     });
-    return { ok: true, skipped: false, sid: sent.sid, to: sent.to };
+    return {
+      ok: true,
+      skipped: false,
+      sid: sent.sid,
+      to: sent.to,
+      channel,
+      fallback: sent.fallback || null,
+    };
   }
 
   if (!sent.skipped) {
@@ -190,6 +230,10 @@ async function dispatchSms({
     error: sent.error,
     to: sent.to,
   };
+}
+
+async function dispatchSms(opts) {
+  return dispatchOutbound(opts);
 }
 
 async function notifyBookingCreated(booking, req) {
@@ -302,6 +346,7 @@ module.exports = {
   brandedEmailHtml,
   persistSmsRow,
   dispatchSms,
+  dispatchOutbound,
   notifyBookingCreated,
   notifyBookingRescheduled,
   notifyBookingCancelled,

@@ -87,15 +87,30 @@ module.exports = async function handleStatusUpdate(req, res) {
       },
     };
 
-    if (parsed.value.statusCode === 'annule') {
-      payload.triggerCalCancel = true;
+    if (parsed.value.statusCode === 'annule' || parsed.value.statusCode === 'no_show') {
+      if (parsed.value.statusCode === 'annule') {
+        payload.triggerCalCancel = true;
+      }
       try {
+        const kind = parsed.value.statusCode === 'no_show' ? 'staff-noshow' : 'staff-cancel';
         payload.waitlistNotify = await blastWaitlistSlot(session.clinic_id, req, {
           topN: 3,
-          batchId: `staff-cancel-${updatedBooking.id}`,
+          batchId: `${kind}-${updatedBooking.id}`,
         });
       } catch (err) {
-        console.error('[status-cancel-blast]', err?.message || err);
+        console.error('[status-waitlist-blast]', err?.message || err);
+      }
+    }
+
+    if (parsed.value.statusCode === 'termine') {
+      try {
+        const { applyStockUses } = require('./roi-ops');
+        const uses = Array.isArray(req.body?.stockUses) ? req.body.stockUses : [];
+        if (uses.length) {
+          payload.stock = await applyStockUses(session.clinic_id, updatedBooking.id, uses);
+        }
+      } catch (err) {
+        console.error('[status-stock]', err?.message || err);
       }
     }
 

@@ -16,6 +16,7 @@ const {
   sanitizeString,
   validateTeamNoteInput,
 } = require('./_lib/validation');
+const { ensurePatient } = require('./_lib/patients');
 
 const TEAM_NOTES_GET_SQL = `
   SELECT
@@ -34,8 +35,8 @@ const TEAM_NOTES_GET_SQL = `
 `;
 
 const TEAM_NOTES_INSERT_SQL = `
-  INSERT INTO team_notes (clinic_id, author_name, content, created_at, pinned, category, booking_id, patient_name)
-  VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)
+  INSERT INTO team_notes (clinic_id, author_name, content, created_at, pinned, category, booking_id, patient_name, patient_id)
+  VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7, $8)
   RETURNING
     id,
     author_name AS author,
@@ -44,7 +45,8 @@ const TEAM_NOTES_INSERT_SQL = `
     pinned,
     category,
     booking_id,
-    patient_name
+    patient_name,
+    patient_id
 `;
 
 const STAFF_DISPLAY_NAME_SQL = `
@@ -103,6 +105,27 @@ async function handlePost(req, res, session) {
 
   const { note, patientName, bookingId, author, category, pinned } = parsed.value;
   const authorName = await resolveAuthorName(session, author);
+  let patientId = null;
+  if (bookingId) {
+    const linked = await query(
+      `SELECT patient_id, patient_name, patient_phone FROM bookings WHERE clinic_id = $1 AND id::text = $2 LIMIT 1`,
+      [session.clinic_id, bookingId]
+    );
+    patientId = linked.rows[0]?.patient_id || null;
+    if (!patientId && linked.rows[0]?.patient_phone) {
+      const patient = await ensurePatient(session.clinic_id, {
+        name: linked.rows[0].patient_name || patientName,
+        phone: linked.rows[0].patient_phone,
+      });
+      patientId = patient?.id || null;
+    }
+  } else if (patientName) {
+    const found = await query(
+      `SELECT id FROM patients WHERE clinic_id = $1 AND lower(display_name) = lower($2) LIMIT 1`,
+      [session.clinic_id, patientName]
+    );
+    patientId = found.rows[0]?.id || null;
+  }
 
   const result = await query(TEAM_NOTES_INSERT_SQL, [
     session.clinic_id,
@@ -112,6 +135,7 @@ async function handlePost(req, res, session) {
     category,
     bookingId,
     patientName,
+    patientId,
   ]);
   const newNote = mapTeamNoteRow(result.rows[0]);
 

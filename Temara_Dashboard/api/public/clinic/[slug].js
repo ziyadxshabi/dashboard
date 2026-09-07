@@ -8,6 +8,7 @@
 const { applyCors } = require('../../_lib/auth-crypto');
 const { query } = require('../../_lib/db');
 const { createApiError, sendDbError } = require('../../_lib/validation');
+const { loadConfirmByToken, confirmByToken } = require('../../_lib/booking-confirm');
 
 const DEFAULT_SLUG = 'temara';
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -88,17 +89,32 @@ function toPublicClinic(row) {
   };
 }
 
+function confirmParam(req) {
+  try {
+    return new URL(String(req.url || ''), 'http://localhost').searchParams.get('confirm') || '';
+  } catch {
+    return '';
+  }
+}
+
+function publicConfirmView(row) {
+  if (!row) return null;
+  const firstName = String(row.patient_name || '').trim().split(/\s+/)[0] || 'Patient';
+  return {
+    starts_at: row.starts_at,
+    treatment_name: row.treatment_name || '',
+    first_name: firstName,
+    confirmed: Boolean(row.patient_confirmed_at) || row.confirmation_state === 'confirmed',
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    applyCors(res, 'GET, OPTIONS');
+    applyCors(res, 'GET, POST, OPTIONS');
     return res.status(204).end();
   }
 
-  applyCors(res, 'GET, OPTIONS');
-
-  if (req.method !== 'GET') {
-    return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
-  }
+  applyCors(res, 'GET, POST, OPTIONS');
 
   const slug = extractSlug(req);
   if (!slug) {
@@ -112,9 +128,45 @@ module.exports = async function handler(req, res) {
       return res.status(404).json(createApiError('NOT_FOUND', 'Clinic not found'));
     }
 
+    if (req.method === 'POST') {
+      const token = String(req.body?.confirm || req.body?.token || '').trim();
+      const action = String(req.body?.action || 'confirm').trim().toLowerCase();
+      if (!token) {
+        return res.status(400).json(createApiError('VALIDATION_ERROR', 'confirm token is required'));
+      }
+      if (action !== 'confirm') {
+        return res.status(400).json(createApiError('VALIDATION_ERROR', 'Only confirm is supported'));
+      }
+      const updated = await confirmByToken(token, row.id);
+      if (!updated) {
+        return res.status(404).json(createApiError('NOT_FOUND', 'Lien de confirmation invalide'));
+      }
+      return res.status(200).json({
+        ok: true,
+        clinic: toPublicClinic(row),
+        confirm: publicConfirmView({
+          ...updated,
+          patient_confirmed_at: updated.patient_confirmed_at,
+          confirmation_state: updated.confirmation_state,
+        }),
+      });
+    }
+
+    if (req.method !== 'GET') {
+      return res.status(405).json(createApiError('METHOD_NOT_ALLOWED'));
+    }
+
+    const token = confirmParam(req);
+    let confirm = null;
+    if (token) {
+      const booking = await loadConfirmByToken(token, row.id);
+      confirm = publicConfirmView(booking);
+    }
+
     return res.status(200).json({
       ok: true,
       clinic: toPublicClinic(row),
+      confirm,
     });
   } catch (err) {
     return sendDbError(res, err);

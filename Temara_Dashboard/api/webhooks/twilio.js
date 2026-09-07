@@ -1,5 +1,5 @@
 /**
- * Twilio inbound — SMS status callbacks + Voice IVR (Hobby 12th function).
+ * Twilio inbound — SMS/WhatsApp Body, status callbacks, Voice IVR (Hobby 12th function).
  * Public endpoint. Auth: X-Twilio-Signature (fail-closed when token is set).
  *
  * POST /api/webhooks/twilio
@@ -8,15 +8,29 @@
 
 const { query } = require('../_lib/db');
 const { tryAcquireLock, incrementRateLimit } = require('../_lib/notification-locks');
+const { toE164MA, isValidMaMobileE164 } = require('../_lib/phone-e164');
 const {
   twilioCredentials,
   canonicalTwilioUrl,
   verifyTwilioSignature,
   clinicBookingUrl,
   loadClinicSmsConfig,
+  stripWhatsappPrefix,
 } = require('../_lib/twilio');
-const { dispatchSms, updateSmsStatusBySid } = require('../_lib/notify');
+const { dispatchSms, updateSmsStatusBySid, persistSmsRow } = require('../_lib/notify');
 const { voicePortalSms } = require('../_lib/sms-templates');
+const { markInboundAt, setSmsConsentByPhone } = require('../_lib/patients');
+
+const DELIVERY_STATUSES = new Set([
+  'queued',
+  'accepted',
+  'sending',
+  'sent',
+  'delivered',
+  'undelivered',
+  'failed',
+  'read',
+]);
 
 function escapeXml(value) {
   return String(value || '')
@@ -64,6 +78,99 @@ async function defaultClinicId() {
   return result.rows[0]?.id || null;
 }
 
+function foldInbound(text) {
+  return String(text || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function inboundIntent(text) {
+  const folded = foldInbound(text);
+  if (!folded) return 'ignored';
+  if (folded === 'stop' || folded === 'arret' || folded === 'unsubscribe') return 'stop';
+  if (folded === '1' || folded === 'oui' || folded === 'ok' || folded === 'confirme' || folded === 'yes') {
+    return 'confirm';
+  }
+  return 'ignored';
+}
+
+async function clinicIdForPhone(e164) {
+  const result = await query(
+    `SELECT clinic_id FROM bookings
+     WHERE COALESCE(booking_kind, 'visit') = 'visit'
+       AND starts_at > NOW()
+       AND status::text = 'Confirme'
+       AND (
+         public.normalize_ma_e164(patient_phone) = $1
+         OR regexp_replace(COALESCE(patient_phone, ''), '[^0-9+]', '', 'g') = $1
+       )
+     ORDER BY starts_at ASC
+     LIMIT 1`,
+    [e164]
+  );
+  if (result.rows[0]?.clinic_id) return result.rows[0].clinic_id;
+  const patient = await query(
+    `SELECT clinic_id FROM patients WHERE phone_e164 = $1 ORDER BY updated_at DESC LIMIT 1`,
+    [e164]
+  );
+  return patient.rows[0]?.clinic_id || (await defaultClinicId());
+}
+
+async function confirmNextVisit(clinicId, e164) {
+  const updated = await query(
+    `UPDATE bookings
+     SET patient_confirmed_at = COALESCE(patient_confirmed_at, NOW()),
+         confirmation_state = 'confirmed',
+         updated_at = NOW()
+     WHERE id = (
+       SELECT id FROM bookings
+       WHERE clinic_id = $1
+         AND COALESCE(booking_kind, 'visit') = 'visit'
+         AND status::text = 'Confirme'
+         AND starts_at > NOW()
+         AND (
+           public.normalize_ma_e164(patient_phone) = $2
+           OR regexp_replace(COALESCE(patient_phone, ''), '[^0-9+]', '', 'g') = $2
+         )
+       ORDER BY starts_at ASC
+       LIMIT 1
+     )
+     RETURNING id, starts_at, patient_confirmed_at`,
+    [clinicId, e164]
+  );
+  return updated.rows[0] || null;
+}
+
+async function handleInboundBody({ e164, text, req }) {
+  const clinicId = await clinicIdForPhone(e164);
+  await markInboundAt(clinicId, e164);
+  try {
+    await persistSmsRow({
+      clinicId,
+      purpose: 'inbound',
+      toPhone: e164,
+      body: text,
+      sid: null,
+      status: 'received',
+    });
+  } catch {
+    // fail-open
+  }
+
+  const intent = inboundIntent(text);
+  if (intent === 'stop') {
+    const consent = await setSmsConsentByPhone(e164, false);
+    return { ok: true, action: 'stop', ...consent };
+  }
+  if (intent === 'confirm') {
+    const booking = await confirmNextVisit(clinicId, e164);
+    return { ok: true, action: 'confirm', bookingId: booking?.id || null };
+  }
+  return { ok: true, action: 'ignored' };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -82,9 +189,30 @@ module.exports = async function handler(req, res) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const messageSid = String(body.MessageSid || body.SmsSid || '').trim();
   const messageStatus = String(body.MessageStatus || body.SmsStatus || '').trim();
+  const inboundText = String(body.Body ?? '').trim();
   const digits = String(body.Digits || '').trim();
-  const fromPhone = String(body.From || '').trim();
+  const fromRaw = String(body.From || '').trim();
+  const fromPhone = toE164MA(stripWhatsappPrefix(fromRaw));
   const callSid = String(body.CallSid || '').trim();
+  const isDelivery = DELIVERY_STATUSES.has(messageStatus.toLowerCase());
+
+  if (inboundText && !callSid && !isDelivery) {
+    const e164 = isValidMaMobileE164(fromPhone) ? fromPhone : toE164MA(fromRaw);
+    if (!isValidMaMobileE164(e164)) {
+      return res.status(200).json({ ok: false, action: 'ignored', reason: 'invalid_phone' });
+    }
+    const rate = await incrementRateLimit(`ratelimit:twilio-sms:${e164}`, 8, 60);
+    if (rate.ok && rate.blocked) {
+      return res.status(200).json({ ok: false, action: 'rate_limited' });
+    }
+    try {
+      const result = await handleInboundBody({ e164, text: inboundText, req });
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('[twilio-inbound]', err?.message || err);
+      return res.status(500).json({ ok: false, error: 'Inbound parse failed' });
+    }
+  }
 
   if (messageSid && !callSid) {
     const lock = await tryAcquireLock(`lock:twilio-sms:${messageSid}`, 86400);
@@ -100,7 +228,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, messageSid, status: messageStatus || 'unknown' });
   }
 
-  const rate = await incrementRateLimit(`ratelimit:twilio:${fromPhone || 'unknown'}`, 5, 60);
+  const rate = await incrementRateLimit(`ratelimit:twilio:${fromPhone || fromRaw || 'unknown'}`, 5, 60);
   if (rate.ok && rate.blocked) {
     return sendXml(res, TWI_ERROR);
   }

@@ -12,9 +12,10 @@ const {
   sendDbError,
   validateWaitlistInput,
 } = require('./_lib/validation');
+const { ensurePatient } = require('./_lib/patients');
 
 const WAITLIST_GET_SQL = `
-  SELECT id, patient_name, patient_phone, priority, notes, status, created_at, sms_consent, last_notified_at
+  SELECT id, patient_name, patient_phone, patient_id, priority, notes, status, created_at, sms_consent, last_notified_at
   FROM waitlist
   WHERE clinic_id = $1 AND status = 'active'
   ORDER BY
@@ -29,8 +30,8 @@ const WAITLIST_GET_SQL = `
 `;
 
 const WAITLIST_INSERT_SQL = `
-  INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status, sms_consent, consent_at)
-  VALUES ($1, $2, $3, $4, $5, 'active', $6, CASE WHEN $6 THEN NOW() ELSE NULL END)
+  INSERT INTO waitlist (clinic_id, patient_name, patient_phone, priority, notes, status, sms_consent, consent_at, patient_id)
+  VALUES ($1, $2, $3, $4, $5, 'active', $6, CASE WHEN $6 THEN NOW() ELSE NULL END, $7)
   RETURNING id
 `;
 
@@ -42,6 +43,7 @@ function mapWaitlistRow(row) {
 
   return {
     id: row.id,
+    patient_id: row.patient_id || null,
     nom: patientName,
     patient_name: patientName,
     name: patientName,
@@ -73,6 +75,11 @@ async function handlePost(req, res, session) {
   }
 
   const { patientName, phone, priority, notes, smsConsent } = parsed.value;
+  const patient = await ensurePatient(session.clinic_id, {
+    name: patientName,
+    phone,
+    smsConsent: smsConsent !== false,
+  });
   const result = await query(WAITLIST_INSERT_SQL, [
     session.clinic_id,
     patientName,
@@ -80,6 +87,7 @@ async function handlePost(req, res, session) {
     priority,
     notes,
     smsConsent !== false,
+    patient?.id || null,
   ]);
   const insertedRow = result.rows[0];
 

@@ -77,6 +77,26 @@ const HOURLY_TODAY_SQL = `
   GROUP BY 1
 `;
 
+const CHARGE_TODAY_SQL = `
+  SELECT
+    COALESCE(SUM(charge_mad), 0)::numeric AS charge_sum,
+    COUNT(*) FILTER (WHERE charge_mad IS NOT NULL)::int AS charge_rows
+  FROM bookings
+  WHERE clinic_id = $1
+    AND COALESCE(booking_kind, 'visit') = 'visit'
+    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
+      = (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+    AND status::text NOT IN ('Annule', 'Annulé')
+`;
+
+const PLANS_SQL = `
+  SELECT
+    COUNT(*) FILTER (WHERE status = 'done')::int AS plans_done,
+    COUNT(*) FILTER (WHERE status = 'open')::int AS plans_open
+  FROM treatment_plans
+  WHERE clinic_id = $1
+`;
+
 const OPEN_MINUTES = 11 * 60; // 08:00–19:00 Casablanca clinic grid
 
 const RESERVED_TODAY_SQL = `
@@ -210,7 +230,7 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   try {
-    const [kpiResult, weekResult, hourlyResult, monthResult, reservedResult, mixResult, fidelityResult] =
+    const [kpiResult, weekResult, hourlyResult, monthResult, reservedResult, mixResult, fidelityResult, chargeResult, plansResult] =
       await Promise.all([
         query(DASHBOARD_KPI_SQL, [session.clinic_id]),
         query(WEEK_PATIENTS_SQL, [session.clinic_id]),
@@ -219,6 +239,8 @@ module.exports = async function handler(req, res) {
         query(RESERVED_TODAY_SQL, [session.clinic_id]),
         query(TREATMENT_MIX_SQL, [session.clinic_id]),
         query(PHONE_FIDELITY_SQL, [session.clinic_id]),
+        query(CHARGE_TODAY_SQL, [session.clinic_id]),
+        query(PLANS_SQL, [session.clinic_id]),
       ]);
     const row = kpiResult.rows[0] || {};
     const weekPatients = (weekResult.rows || []).map((entry) => Number(entry.patients) || 0);
@@ -226,6 +248,13 @@ module.exports = async function handler(req, res) {
     const monthWeeks = (monthResult.rows || []).map((entry) => Number(entry.patients) || 0);
     while (monthWeeks.length < 4) monthWeeks.unshift(0);
     const reservedMin = Number(reservedResult.rows[0]?.reserved_min) || 0;
+    const chargeRow = chargeResult.rows[0] || {};
+    const chargeRows = Number(chargeRow.charge_rows) || 0;
+    const chargeSum = Number(chargeRow.charge_sum) || 0;
+    const madPerHour = chargeRows > 0 && reservedMin > 0
+      ? Math.round((chargeSum / (reservedMin / 60)) * 100) / 100
+      : null;
+    const plans = plansResult.rows[0] || {};
     const fidelity = fidelityResult.rows[0] || {};
     const treatmentMix = (mixResult.rows || []).map((entry) => ({
       name: String(entry.name || 'Non précisé'),
@@ -241,6 +270,9 @@ module.exports = async function handler(req, res) {
         no_shows: Number(row.no_shows) || 0,
         reserved_min: reservedMin,
         open_min: OPEN_MINUTES,
+        mad_per_hour: madPerHour,
+        plans_done: Number(plans.plans_done) || 0,
+        plans_open: Number(plans.plans_open) || 0,
         treatment_mix: treatmentMix,
         returning_phones: Number(fidelity.returning_phones) || 0,
         new_phones: Number(fidelity.new_phones) || 0,

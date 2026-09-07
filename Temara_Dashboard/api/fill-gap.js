@@ -15,6 +15,7 @@ const {
 } = require('./_lib/validation');
 const { resolveTreatment, clinicBufferMin } = require('./_lib/roster-ops');
 const { blastWaitlistSlot, notifySlotFilledCleanup } = require('./_lib/waitlist-blast');
+const { ensurePatient } = require('./_lib/patients');
 
 const FILL_GAP_CANDIDATES_SQL = `
   SELECT
@@ -51,6 +52,7 @@ const FILL_GAP_INSERT_SQL = `
     duration_min,
     buffer_min,
     booking_kind,
+    patient_id,
     updated_at
   )
   VALUES (
@@ -64,6 +66,7 @@ const FILL_GAP_INSERT_SQL = `
     $9,
     $10,
     'visit',
+    $11,
     NOW()
   )
   RETURNING
@@ -76,7 +79,8 @@ const FILL_GAP_INSERT_SQL = `
     treatment_name AS motif,
     status::text AS status,
     duration_min,
-    booking_kind
+    booking_kind,
+    patient_id
 `;
 
 const FILL_GAP_MARK_FILLED_SQL = `
@@ -152,6 +156,10 @@ module.exports = async function handler(req, res) {
       const durationMin = catalog?.duration_min || 20;
       const bufferMin = await clinicBufferMin(session.clinic_id);
       const treatmentName = catalog?.name || 'Consultation';
+      const patient = await ensurePatient(session.clinic_id, {
+        name: candidate.patient_name,
+        phone: candidate.patient_phone,
+      });
       const inserted = await query(FILL_GAP_INSERT_SQL, [
         session.clinic_id,
         candidate.patient_name,
@@ -163,6 +171,7 @@ module.exports = async function handler(req, res) {
         STATUS_CODE_TO_DB.en_attente,
         durationMin,
         bufferMin,
+        patient?.id || null,
       ]);
       booking = mapBooking(inserted.rows[0]);
       await query(FILL_GAP_MARK_FILLED_SQL, [candidate.id, session.clinic_id]);
@@ -187,7 +196,7 @@ module.exports = async function handler(req, res) {
     }
 
     const candidates = await loadCandidates(session.clinic_id);
-    return res.status(200).json({
+    return res.status(booking ? 201 : 200).json({
       ok: true,
       data: { candidates, booking, waitlistNotify },
     });

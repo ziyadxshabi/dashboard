@@ -58,6 +58,19 @@ async function blastWaitlistSlot(clinicId, req, options = {}) {
   const topN = options.topN == null ? 3 : options.topN;
   const excludeIds = new Set((options.excludeIds || []).map(String));
   const batchId = options.batchId || `wl-${Date.now()}`;
+  if (options.batchId) {
+    const blastLock = await tryAcquireLock(`waitlist:blast:${batchId}`, 86400);
+    if (blastLock.duplicate) {
+      return {
+        ok: true,
+        batchId,
+        notified: [],
+        skipped: [{ reason: 'already_notified' }],
+        duplicate: true,
+        bookingUrl: '',
+      };
+    }
+  }
   const clinic = await loadClinicSmsConfig(clinicId);
   const url = clinicBookingUrl(clinic, req);
   const rows = (await loadActiveWaitlist(clinicId)).filter((row) => !excludeIds.has(String(row.id)));
