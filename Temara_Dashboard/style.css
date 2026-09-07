@@ -2669,9 +2669,9 @@ html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-daygrid-event:hover {
   gap: 12px;
   cursor: pointer;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   transition: var(--transition);
 }
 
@@ -3095,15 +3095,15 @@ html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-daygrid-event:hover {
 }
 
 .settings-card-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
+  width: auto;
+  height: auto;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--accent-dim);
-  border: 1px solid rgba(227, 193, 143, 0.18);
-  color: var(--accent-gold);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
 }
 
 .settings-card-icon svg,
@@ -3147,9 +3147,9 @@ html[data-theme="pearl-clinic"] #dashboard-cal-inline .fc-daygrid-event:hover {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .settings-toggle-label {

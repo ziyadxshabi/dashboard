@@ -16,7 +16,7 @@ function assertAuthorizedResponse(response) {
   }
   if (response?.status === 401) {
     void window.DentaFlowAuth?.logout?.();
-    const err = new Error('Session expirée — reconnectez-vous.');
+    const err = new Error('Session expirée. Reconnectez-vous.');
     err.code = 'UNAUTHORIZED';
     throw err;
   }
@@ -282,7 +282,7 @@ window.initializeDoctorDashboard = initializeDoctorDashboard;
 window.bootDoctorDashboard = initializeDoctorDashboard;
 
 function buildStatusPill(label, modifierClass = '') {
-  const safeLabel = escapeHtml(label || '—');
+  const safeLabel = escapeHtml(label || 'Non renseigné');
   const classes = ['status-pill', modifierClass].filter(Boolean).join(' ');
   return `<span class="${classes}"><span class="status-pill__dot" aria-hidden="true"></span>${safeLabel}</span>`;
 }
@@ -352,7 +352,7 @@ function createApptCardElement(appt) {
 
   const phoneEl = document.createElement('span');
   phoneEl.className = 'appt-phone col-numeric';
-  phoneEl.textContent = appt.phone || '—';
+  phoneEl.textContent = appt.phone || 'Non renseigné';
   if (appt.phone) phoneEl.title = appt.phone;
 
   const statusWrap = document.createElement('div');
@@ -989,12 +989,12 @@ function setAffluenceCopy(period) {
   const sub = doctorEl('affluence-chart-sub');
   if (period === 'week') {
     if (title) title.textContent = 'Affluence 7 jours';
-    if (sub) sub.textContent = 'Patients par jour — semaine glissante';
+    if (sub) sub.textContent = 'Patients par jour, semaine glissante';
     return;
   }
   if (period === 'month') {
     if (title) title.textContent = 'Affluence mensuelle';
-    if (sub) sub.textContent = 'Patients par semaine — 4 dernières semaines';
+    if (sub) sub.textContent = 'Patients par semaine, 4 dernières semaines';
     return;
   }
   if (title) title.textContent = 'Affluence horaire';
@@ -1079,8 +1079,8 @@ function renderWaitlistPanel() {
   if (!waitlist.length) {
     if (ui?.mountEmptyState) {
       ui.mountEmptyState('waitlist-empty-state', {
-        message: ui.EMPTY_STATE_DEFAULT_MESSAGE,
-        iconSvg: ui.EMPTY_STATE_SVG_INBOX,
+        title: 'Liste d\'attente vide',
+        message: 'Ajoutez un nom ci-dessus pour un créneau libéré.',
       });
     }
     if (table) table.hidden = true;
@@ -1159,7 +1159,7 @@ function initWaitlistForm() {
     } catch (err) {
       console.error('[Waitlist] Submission failed:', err?.message || err);
       setTimeout(() => {
-        btn.textContent = 'Erreur — Réessayer';
+        btn.textContent = 'Erreur. Réessayer';
         btn.classList.add('is-error');
         setTimeout(() => {
           btn.textContent = lock.defaultLabel;
@@ -1197,7 +1197,7 @@ function prependWaitlistEntry({ nom, telephone, priorite }) {
   const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
   container.prepend(createWaitlistTableRow({
     name: nom,
-    phone: telephone || '—',
+    phone: telephone || 'Non renseigné',
     treatment: priorite,
     tagClass,
     priorite,
@@ -1475,7 +1475,7 @@ function initCrmSearch() {
 function formatCarnetWhen(row) {
   const raw = row?.starts_at || row?.rawDate || row?.startTime;
   const parsed = raw ? new Date(raw) : null;
-  if (!parsed || Number.isNaN(parsed.getTime())) return row?.time || '—';
+  if (!parsed || Number.isNaN(parsed.getTime())) return row?.time || '';
   return parsed.toLocaleString('fr-FR', {
     day: '2-digit',
     month: 'short',
@@ -1505,7 +1505,7 @@ function groupBookingsForCarnet(rows) {
     group.visits.sort((a, b) => String(b.starts_at || b.rawDate || '').localeCompare(String(a.starts_at || a.rawDate || '')));
     group.lastVisit = group.visits[0] || null;
     group.motif = group.lastVisit?.treatment || group.lastVisit?.treatment_name || 'Consultation';
-    group.statut = group.lastVisit?.status || '—';
+    group.statut = group.lastVisit?.status || 'Non renseigné';
     group.lastWhen = formatCarnetWhen(group.lastVisit || {});
     const fromApi = Number(group.lastVisit?.noshow_90d);
     group.noshow90 = Number.isFinite(fromApi) && fromApi > 0
@@ -1576,18 +1576,28 @@ function renderCRMTable(records) {
   tbody.replaceChildren();
 
   if (!groups.length) {
-    const emptyRow = document.createElement('tr');
-    emptyRow.className = 'crm-table-empty';
-    const cell = document.createElement('td');
-    cell.colSpan = 5;
-    cell.textContent = crmSearchQuery
-      ? 'Aucun historique pour cette recherche'
-      : 'Aucun patient aujourd\'hui — recherchez par nom ou téléphone';
-    emptyRow.appendChild(cell);
-    tbody.appendChild(emptyRow);
+    const emptyHost = doctorEl('crm-empty-state');
+    const scroll = tbody.closest('.crm-table-scroll');
+    if (emptyHost) {
+      emptyHost.hidden = false;
+      const title = emptyHost.querySelector('.ios-empty__title');
+      const text = emptyHost.querySelector('.ios-empty__text');
+      if (title) title.textContent = 'Aucun dossier à afficher';
+      if (text) {
+        text.textContent = crmSearchQuery
+          ? 'Aucun historique pour cette recherche. Essayez un autre nom ou téléphone.'
+          : 'Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.';
+      }
+    }
+    if (scroll) scroll.hidden = true;
     hideSkeleton('crm');
     return;
   }
+
+  const emptyHost = doctorEl('crm-empty-state');
+  const scroll = tbody.closest('.crm-table-scroll');
+  if (emptyHost) emptyHost.hidden = true;
+  if (scroll) scroll.hidden = false;
 
   groups.forEach((patient) => {
     crmPatientsById[String(patient.id)] = patient;
@@ -1602,10 +1612,10 @@ function renderCRMTable(records) {
     nameCell.textContent = patient.name;
 
     const phoneCell = document.createElement('td');
-    phoneCell.textContent = patient.phone || '—';
+    phoneCell.textContent = patient.phone || 'Non renseigné';
 
     const lastCell = document.createElement('td');
-    lastCell.textContent = patient.lastWhen || '—';
+    lastCell.textContent = patient.lastWhen || 'Non renseigné';
 
     const motifCell = document.createElement('td');
     const motifTag = document.createElement('span');
@@ -1639,13 +1649,13 @@ function readCrmRowData(row) {
 
   const { dataset } = row;
   return {
-    name:          dataset.name          ?? row.cells[0]?.textContent.trim() ?? '—',
+    name:          dataset.name          ?? row.cells[0]?.textContent.trim() ?? 'Non renseigné',
     phone:         dataset.phone         ?? row.cells[1]?.textContent.trim() ?? '',
     email:         dataset.email         ?? row.cells[2]?.textContent.trim() ?? '',
-    motif:         dataset.motif         ?? row.cells[3]?.textContent.trim() ?? '—',
-    statut:        dataset.statut        ?? '—',
+    motif:         dataset.motif         ?? row.cells[3]?.textContent.trim() ?? 'Non renseigné',
+    statut:        dataset.statut        ?? 'Non renseigné',
     amount:        parseFloat(dataset.amount) || 0,
-    insurance:     dataset.insurance     ?? '—',
+    insurance:     dataset.insurance     ?? 'Non renseigné',
     observations:  dataset.observations  ?? 'Aucune observation enregistrée.',
   };
 }
@@ -1660,7 +1670,7 @@ function populateCrmSidePanel(patient) {
 
   const statutEl = doctorEl('crm-panel-statut');
   if (statutEl) {
-    const label = patient.statut || '—';
+    const label = patient.statut || 'Non renseigné';
     const mod = getCrmStatutTagClass(label);
     statutEl.className = `crm-side-panel-statut status-pill ${mod}`.trim();
     if (window.DentaFlowDom?.setStatusPill) {
@@ -1827,7 +1837,7 @@ function initDoctorCustomSms() {
       if (sent > 0) {
         showDashboardToast('Message personnalisé envoyé avec succès.', 'success');
       } else if (payload?.twilioConfigured === false) {
-        showDashboardToast("SMS non envoyé — Twilio n'est pas configuré.", 'error');
+        showDashboardToast("SMS non envoyé. Twilio n'est pas configuré.", 'error');
       } else {
         showDashboardToast('Aucun destinataire SMS pour aujourd’hui.', 'error');
       }
@@ -1835,7 +1845,7 @@ function initDoctorCustomSms() {
       updateCounter();
     } catch (err) {
       console.error('[Doctor Custom SMS] Failed:', err?.message || err);
-      showDashboardToast('Échec de l\'envoi — réessayez.', 'error');
+      showDashboardToast('Échec de l\'envoi. Réessayez.', 'error');
     } finally {
       submitBtn.classList.remove('is-loading');
       setTimeout(() => {
@@ -1955,7 +1965,7 @@ function describeConnectionError(err) {
 
 function showOfflineBanner(errorBanner, message) {
   if (!errorBanner) return;
-  errorBanner.textContent = message || 'Mode hors-ligne — connexion serveur indisponible.';
+  errorBanner.textContent = message || 'Mode hors-ligne. Connexion serveur indisponible.';
   errorBanner.hidden = false;
 }
 
@@ -1980,7 +1990,7 @@ function getEmptyDashboardData() {
   };
 }
 
-/** Pristine empty UI — em-dashes in stat cards, zeroed charts, no error strings in KPIs. */
+/** Pristine empty UI: zeros in stat cards, catalog mix at 0, no error strings in KPIs. */
 function renderDashboardFallback() {
   clearSkeletonState();
 
@@ -1990,19 +2000,20 @@ function renderDashboardFallback() {
   ['patients-recovered-count', 'estimated-revenue-range', 'val-patients', 'val-noshows', 'val-new'].forEach((id) => {
     const el = doctorEl(id);
     if (el) {
-      el.textContent = '—';
+      el.textContent = '0';
       el.classList.remove('skeleton', 'kpi-metric--error');
     }
   });
 
   updateRecoveryMetrics(0);
 
-  setText('sub-patients', 'En attente de connexion');
-  setText('sub-noshows', '—');
-  setText('sub-new', '—');
+  setText('sub-patients', 'Rendez-vous confirmés');
+  setText('sub-noshows', 'Créneaux à replacer');
+  setText('sub-new', 'À confirmer');
 
   renderCharts(getEmptyDashboardData());
   refreshOperationalCharts(getEmptyDashboardData());
+  renderLoadMixFidelity(getEmptyDashboardData());
 }
 
 function handleDashboardLoadError(err, errorBanner) {
@@ -2010,7 +2021,7 @@ function handleDashboardLoadError(err, errorBanner) {
 
   document.body.classList.add('dashboard-offline');
   setSyncState('error', 'Mode hors-ligne');
-  showOfflineBanner(errorBanner, 'Mode hors-ligne — connexion serveur indisponible.');
+  showOfflineBanner(errorBanner, 'Mode hors-ligne. Connexion serveur indisponible.');
   renderDashboardFallback();
 }
 
@@ -2068,9 +2079,9 @@ async function loadDashboard(isSilentSync = false) {
       try {
         const errBody = await response.clone().json();
         if (typeof errBody?.details === 'string' && errBody.details.trim()) {
-          msg = `Erreur de synchronisation avec la base de données — ${errBody.details.slice(0, 160)}`;
+          msg = `Erreur de synchronisation avec la base de données. ${errBody.details.slice(0, 160)}`;
         } else if (typeof errBody?.error === 'string' && errBody.error.trim()) {
-          msg = `Erreur de synchronisation avec la base de données — ${errBody.error}`;
+          msg = `Erreur de synchronisation avec la base de données. ${errBody.error}`;
         }
       } catch { /* keep generic status message */ }
       throw new Error(msg);
@@ -2085,7 +2096,7 @@ async function loadDashboard(isSilentSync = false) {
     if (raw && raw.ok === false) {
       const detail = typeof raw.details === 'string' ? raw.details.slice(0, 160) : '';
 
-      throw new Error(detail ? `Erreur de synchronisation avec la base de données — ${detail}` : (raw.error || 'Erreur de synchronisation avec la base de données'));
+      throw new Error(detail ? `Erreur de synchronisation avec la base de données. ${detail}` : (raw.error || 'Erreur de synchronisation avec la base de données'));
     }
 
     const data = normaliseData(raw);
@@ -2621,34 +2632,40 @@ function renderLoadMixFidelity(data = {}) {
     fill.style.width = `${Math.min(100, open > 0 ? (reserved / open) * 100 : 0)}%`;
   }
 
+  const DEFAULT_TREATMENT_MIX = [
+    { name: 'Consultation', count: 0 },
+    { name: 'Détartrage', count: 0 },
+    { name: 'Soin', count: 0 },
+    { name: 'Extraction', count: 0 },
+    { name: 'Dévitalisation', count: 0 },
+    { name: 'Couronne', count: 0 },
+    { name: 'Blanchiment', count: 0 },
+    { name: 'Urgence', count: 0 },
+  ];
+
   const mixHost = doctorEl('treatment-mix-list');
   if (mixHost) {
-    const mix = Array.isArray(data?.treatment_mix) ? data.treatment_mix : [];
+    const mix = Array.isArray(data?.treatment_mix) && data.treatment_mix.length
+      ? data.treatment_mix
+      : DEFAULT_TREATMENT_MIX;
     mixHost.replaceChildren();
-    if (!mix.length) {
-      const empty = document.createElement('p');
-      empty.className = 'chair-glance__empty';
-      empty.textContent = 'Aucun soin planifié cette semaine.';
-      mixHost.appendChild(empty);
-    } else {
-      const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
-      mix.forEach((item) => {
-        const row = document.createElement('div');
-        row.className = 'mix-row';
-        const name = document.createElement('span');
-        name.textContent = item.name || 'Non précisé';
-        const count = document.createElement('span');
-        count.textContent = String(item.count || 0);
-        const track = document.createElement('div');
-        track.className = 'mix-row__track';
-        const bar = document.createElement('div');
-        bar.className = 'mix-row__fill';
-        bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
-        track.appendChild(bar);
-        row.append(name, count, track);
-        mixHost.appendChild(row);
-      });
-    }
+    const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
+    mix.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'mix-row';
+      const name = document.createElement('span');
+      name.textContent = item.name || 'Non précisé';
+      const count = document.createElement('span');
+      count.textContent = String(item.count || 0);
+      const track = document.createElement('div');
+      track.className = 'mix-row__track';
+      const bar = document.createElement('div');
+      bar.className = 'mix-row__fill';
+      bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
+      track.appendChild(bar);
+      row.append(name, count, track);
+      mixHost.appendChild(row);
+    });
   }
 
   setText('fidelity-returning', String(asMetric(data?.returning_phones)));
@@ -3086,7 +3103,7 @@ function renderAcceptanceChart(data) {
         const { width, height, ctx } = chart;
         ctx.save();
         const pct = total > 0 ? Math.round((accepted / total) * 100) : 0;
-        const displayText = isEmpty ? '—' : `${pct}%`;
+        const displayText = isEmpty ? '0%' : `${pct}%`;
         const subText = isEmpty ? 'données' : 'acceptés';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
@@ -3173,7 +3190,7 @@ function setKPINumber(id, target, isInteger = true, formatter = null) {
 function setText(id, text) {
   const el = doctorEl(id);
   if (!el) return;
-  const safe = text == null ? '—' : String(text);
+  const safe = text == null ? '' : String(text);
   el.textContent = safe;
   el.classList.toggle('kpi-metric--error', false);
 }
@@ -3196,7 +3213,7 @@ function updateRecoveryMetrics() {
   const patientsEl = doctorEl('patients-recovered-count');
   const revenueEl = doctorEl('estimated-revenue-range');
   if (patientsEl) {
-    patientsEl.textContent = '—';
+    patientsEl.textContent = '0';
     patientsEl.classList.remove('skeleton', 'kpi-metric--error');
   }
   if (revenueEl) {
@@ -3413,7 +3430,7 @@ function normalizeDoctorAppointment(raw) {
   ).trim();
 
   const insurance = String(
-    firstPresent(item.coverage, item.insurance, item['Couverture Médicale']) || '—'
+    firstPresent(item.coverage, item.insurance, item['Couverture Médicale']) || 'Non renseigné'
   ).trim();
 
   const amountRaw = firstPresent(item.amount, item.montant, item['Montant (MAD)']) ?? 0;
@@ -3571,9 +3588,9 @@ function computeEndOfDayDigest(records) {
 }
 
 function formatDoctorAppointmentTime(rawDate) {
-  if (rawDate == null || rawDate === '') return '—';
+  if (rawDate == null || rawDate === '') return '';
   const parsed = new Date(rawDate);
-  if (Number.isNaN(parsed.getTime())) return '—';
+  if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toLocaleTimeString('fr-FR', {
     hour: '2-digit',
     minute: '2-digit',
@@ -3712,7 +3729,7 @@ function renderGlanceRows(hostId, rows, emptyText) {
       extra.textContent = `Écoulé ${mins} min · fin ${
         expected
           ? expected.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Casablanca' })
-          : '—'
+          : ''
       }`;
     } else {
       extra.textContent = '';
@@ -4136,7 +4153,10 @@ function renderTeamNotesList(notes, { errorMessage = null } = {}) {
   const sorted = sortTeamNotes(notes);
 
   if (!sorted.length) {
-    window.DentaFlowDom?.appendParagraph(listEl, 'team-messages-empty', 'Aucun message de l\'équipe pour le moment.');
+    listEl.insertAdjacentHTML(
+      'beforeend',
+      '<div class="ios-empty"><p class="ios-empty__title">Aucune transmission</p><p class="ios-empty__text">Les transmissions s\'affichent ici.</p></div>'
+    );
     if (syncEl) syncEl.textContent = 'À jour';
     return;
   }
@@ -4203,7 +4223,7 @@ async function loadTeamNotes() {
       if (syncEl) syncEl.textContent = 'Sync partielle';
     } else {
       renderTeamNotesList([], {
-        errorMessage: 'Impossible de charger les messages — erreur de synchronisation avec la base de données.',
+        errorMessage: 'Impossible de charger les messages. Erreur de synchronisation avec la base.',
       });
     }
   }

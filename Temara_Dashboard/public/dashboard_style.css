@@ -777,15 +777,15 @@ h1, h2, h3,
   gap: 12px;
   cursor: pointer;
   padding: 14px 16px;
-  background: rgba(12, 15, 20, 0.45);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   transition: var(--transition);
 }
 
 .form-consent-label:hover {
-  border-color: var(--border-2);
-  background: rgba(12, 15, 20, 0.6);
+  border-color: transparent;
+  background: var(--surface-row-hover);
 }
 
 .form-consent-checkbox {
@@ -811,8 +811,8 @@ h1, h2, h3,
 }
 
 .form-consent-label:has(.form-consent-checkbox:checked) {
-  border-color: rgba(184, 150, 90, 0.28);
-  background: var(--accent-dim);
+  border-color: transparent;
+  background: transparent;
 }
 
 .form-consent-label:has(.form-consent-checkbox:checked) .form-consent-text {
@@ -931,15 +931,15 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
 }
 
 .settings-card-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
+  width: auto;
+  height: auto;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--accent-dim);
-  border: 1px solid rgba(184, 150, 90, 0.18);
-  color: var(--accent-2);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -1065,15 +1065,15 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  background: rgba(12, 15, 20, 0.45);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   transition: var(--transition);
 }
 
 .settings-toggle-row:hover {
-  border-color: rgba(184, 150, 90, 0.2);
-  background: rgba(12, 15, 20, 0.6);
+  border-color: transparent;
+  background: var(--surface-row-hover);
 }
 
 .settings-toggle-info {
@@ -4098,9 +4098,9 @@ body.auth-gate-active #assistant-shell {
 
 .crm-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 8px;
-  padding: 8px 16px 16px;
+  border-collapse: collapse;
+  border-spacing: 0;
+  padding: 0;
 }
 
 .crm-table thead th {
@@ -4400,10 +4400,10 @@ body.auth-gate-active #assistant-shell {
 }
 
 .crm-side-panel-notes {
-  padding: 14px 16px;
-  background: rgba(12, 15, 20, 0.45);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   font-size: 14px;
 }
 
@@ -6878,15 +6878,16 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   }
 
   #doctor-shell #view-settings .settings-card-icon {
-    width: 32px;
-    height: 32px;
+    width: auto;
+    height: auto;
+    background: transparent;
   }
 
   #doctor-shell #view-settings .settings-card-icon svg,
   #doctor-shell #view-settings .settings-card-icon [data-lucide],
   #doctor-shell #view-settings .settings-card-icon .lucide {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
   }
 
   #doctor-shell #view-settings .settings-card-title {
@@ -7066,7 +7067,7 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
   align-items: center;
   justify-content: center;
   padding: var(--space-4, 16px);
-  background: var(--login-overlay-bg, rgba(20, 18, 17, 0.85));
+  background: rgba(15, 15, 15, 0.36);
 }
 
 .df-confirm-overlay[hidden] {
@@ -7074,57 +7075,64 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 }
 
 .df-confirm-dialog {
-  width: min(420px, 100%);
-  padding: var(--space-5, 24px);
-  border-radius: var(--radius-md, 16px);
-  background: var(--login-modal-bg, var(--bg-elevated, #1C1917));
-  border: 1px solid var(--login-modal-border, var(--border-color));
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
-  color: var(--text-main, #F4F1EE);
+  width: min(400px, 100%);
+  padding: 22px 20px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: var(--border-hairline);
+  box-shadow: 0 18px 48px rgba(15, 15, 15, 0.22);
+  color: var(--text-main);
 }
 
 .df-confirm-title {
-  margin: 0 0 var(--space-3, 12px);
+  margin: 0 0 8px;
   font-family: var(--font-primary);
-  font-size: 1.125rem;
+  font-size: 17px;
   font-weight: 600;
-  color: var(--text-main, inherit);
+  letter-spacing: -0.02em;
+  color: var(--text-main);
 }
 
 .df-confirm-message {
-  margin: 0 0 var(--space-5, 24px);
+  margin: 0 0 18px;
   font-family: var(--font-primary);
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  color: var(--text-dim, inherit);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .df-confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3, 12px);
+  gap: 8px;
 }
 
 .df-confirm-btn {
-  min-height: 40px;
+  min-height: 44px;
   padding: 8px 16px;
   font-family: var(--font-primary);
-  font-size: 0.875rem;
+  font-size: 15px;
   font-weight: 600;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: 10px;
   cursor: pointer;
 }
 
 .df-confirm-btn--cancel {
-  color: var(--text-main, inherit);
-  background: transparent;
-  border: 1px solid var(--border-color, rgba(227, 193, 143, 0.25));
+  color: var(--text-main);
+  background: var(--accent-dim);
+  border: 0;
 }
 
 .df-confirm-btn--confirm {
   color: #fff;
-  background: var(--login-terracotta, #D96B27);
-  border: 1px solid transparent;
+  background: var(--text-main);
+  border: 0;
+}
+
+.df-confirm-btn--danger {
+  color: #fff;
+  background: var(--danger);
+  border: 0;
 }
 
 /* ── Mobile hamburger + slide-out drawer (< 768px) ──────────────────────── */

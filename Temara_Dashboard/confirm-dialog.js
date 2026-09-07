@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  var TITLE = 'Confirmer l\'action';
+  var TITLE = 'Confirmer';
   var overlayEl = null;
   var dialogEl = null;
   var messageEl = null;
@@ -109,9 +109,13 @@
       };
       lastFocus = document.activeElement;
       messageEl.textContent = String(message || '');
+      var isLogout = /d[ée]connecter/i.test(String(message || ''));
+      confirmBtn.classList.toggle('df-confirm-btn--danger', isLogout);
+      confirmBtn.classList.toggle('df-confirm-btn--confirm', !isLogout);
+      confirmBtn.textContent = isLogout ? 'Se déconnecter' : 'Confirmer';
       overlayEl.hidden = false;
       overlayEl.classList.add('is-open');
-      confirmBtn.focus();
+      (isLogout ? cancelBtn : confirmBtn).focus();
     });
   }
 

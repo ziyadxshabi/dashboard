@@ -35,7 +35,7 @@
   function setStatusPill(node, label) {
     clear(node);
     node.appendChild(el('span', 'status-pill__dot', { 'aria-hidden': 'true' }));
-    node.appendChild(text(label || '—'));
+    node.appendChild(text(label || 'Non renseigné'));
   }
 
   function appendParagraph(parent, className, message) {

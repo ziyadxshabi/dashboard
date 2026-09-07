@@ -219,7 +219,7 @@
         <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
         <a href="#analytics" class="nav-link" data-nav="analytics">Performances</a>
         <a href="#sms" class="nav-link" data-nav="sms">Campagnes SMS</a>
-        <a href="#settings" class="nav-link" data-nav="settings">Paramètres</a>
+        <a href="#settings" class="nav-link" data-nav="settings">Réglages</a>
       </nav>
     </div>
 
@@ -242,12 +242,12 @@
           aria-controls="account-menu-popover"
           aria-label="Menu compte"
         >
-          <i data-lucide="ellipsis-vertical" aria-hidden="true"></i>
+          <i data-lucide="chevron-right" aria-hidden="true"></i>
         </button>
         <div class="actions-popover account-menu-popover actions-popover--drop-up" id="account-menu-popover" role="menu" hidden>
           <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
             <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
-            Paramètres
+            Réglages
           </button>
           <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
             <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
@@ -291,9 +291,9 @@
         <i data-lucide="messages-square" class="tab-icon" aria-hidden="true"></i>
         <span>Campagnes SMS</span>
       </a>
-      <a href="#settings" class="tab-link" data-nav="settings" aria-label="Paramètres">
+      <a href="#settings" class="tab-link" data-nav="settings" aria-label="Réglages">
         <i data-lucide="settings" class="tab-icon" aria-hidden="true"></i>
-        <span>Paramètres</span>
+        <span>Réglages</span>
       </a>
     </nav>
 
@@ -318,7 +318,7 @@
           <div class="hero-header__primary">
             <div class="hero-text">
               <h1 class="hero-title kinetic-title"><span id="greeting-time">Bonjour</span>, <span id="hero-profile-name"></span></h1>
-              <p class="hero-date" id="hero-date">—</p>
+              <p class="hero-date" id="hero-date"></p>
             </div>
           </div>
           <div class="hero-sync">
@@ -334,12 +334,12 @@
               <div class="hero-split-block hero-split-block--primary">
                 <p class="hero-split-subtitle kinetic-label">Patients récupérés</p>
                 <div class="hero-value" id="patients-recovered-count" aria-live="polite">0</div>
-                <p class="hero-split-helper">Aucune série de créneaux récupérés n'est enregistrée.</p>
+                <p class="hero-split-helper">Aucun créneau récupéré enregistré.</p>
               </div>
               <div class="hero-split-block hero-split-block--secondary">
                 <p class="hero-split-subtitle kinetic-label">Revenu estimé</p>
-                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">—</div>
-                <p class="hero-split-helper">Non calculé — pas de table de créneaux récupérés</p>
+                <div class="hero-value hero-value--revenue" id="estimated-revenue-range" aria-live="polite">0</div>
+                <p class="hero-split-helper">Pas encore de table de créneaux récupérés.</p>
               </div>
             </div>
           </div>
@@ -351,33 +351,33 @@
             <div class="skeleton skeleton-card"></div>
             <div class="skeleton skeleton-card"></div>
           </div>
-          <div id="stats-content" class="kpi-row" hidden>
+          <div id="stats-content" class="kpi-row ios-group ios-group--day" hidden>
 
           <article class="kpi-card kpi-card--matte" id="card-patients">
             <div class="kpi-card__head">
-              <div class="kpi-label kinetic-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Flux patients</div>
+              <div class="kpi-label kinetic-label" data-tooltip="Nombre total de rendez-vous confirmés pour aujourd'hui">Patients du jour</div>
               <div class="kpi-trend" id="trend-patients" aria-hidden="true"></div>
+              <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
             </div>
-            <div class="kpi-number kinetic-value" id="val-patients" data-target="0" aria-live="polite">—</div>
-            <div class="kpi-sub" id="sub-patients">Rendez-vous confirmés</div>
+            <div class="kpi-number kinetic-value" id="val-patients" data-target="0" aria-live="polite">0</div>
           </article>
 
           <article class="kpi-card kpi-card--matte" id="card-noshows">
             <div class="kpi-card__head">
               <div class="kpi-label kinetic-label" data-tooltip="Créneaux libérés ou patients absents sans préavis">Absences</div>
               <div class="kpi-trend" id="trend-noshows" aria-hidden="true"></div>
+              <div class="kpi-sub" id="sub-noshows">Créneaux à replacer</div>
             </div>
-            <div class="kpi-number kinetic-value" id="val-noshows" data-target="0" aria-live="assertive">—</div>
-            <div class="kpi-sub" id="sub-noshows">Créneaux à combler</div>
+            <div class="kpi-number kinetic-value" id="val-noshows" data-target="0" aria-live="assertive">0</div>
           </article>
 
           <article class="kpi-card kpi-card--matte" id="card-new">
             <div class="kpi-card__head">
               <div class="kpi-label kinetic-label" data-tooltip="Rendez-vous au statut En attente aujourd'hui">En attente</div>
               <div class="kpi-trend" id="trend-new" aria-hidden="true"></div>
+              <div class="kpi-sub" id="sub-new">À confirmer</div>
             </div>
-            <div class="kpi-number kinetic-value" id="val-new" data-target="0" aria-live="polite">—</div>
-            <div class="kpi-sub" id="sub-new">Rendez-vous en attente</div>
+            <div class="kpi-number kinetic-value" id="val-new" data-target="0" aria-live="polite">0</div>
           </article>
 
           </div>
@@ -386,22 +386,22 @@
         <section class="load-mix-row" aria-label="Charge, mix et fidélité">
           <article class="load-card" aria-labelledby="load-title">
             <h3 class="chart-title" id="load-title">Charge du jour</h3>
-            <p class="chart-sub">Temps réservé / plage d'ouverture (08:00–19:00)</p>
-            <p class="load-card__value kinetic-value" id="load-reserved">—</p>
+            <p class="chart-sub">Temps réservé, 8 h à 19 h.</p>
+            <p class="load-card__value kinetic-value" id="load-reserved">0 / 660 min</p>
             <div class="load-meter" aria-hidden="true">
               <div class="load-meter__fill" id="load-meter-fill"></div>
             </div>
           </article>
           <article class="mix-card" aria-labelledby="mix-title">
             <h3 class="chart-title" id="mix-title">Mix de soins</h3>
-            <p class="chart-sub">Semaine en cours — par traitement</p>
+            <p class="chart-sub">Répartition des soins cette semaine</p>
             <div id="treatment-mix-list" class="mix-list"></div>
           </article>
           <article class="fidelity-card" aria-labelledby="fidelity-title">
             <h3 class="chart-title" id="fidelity-title">Revenus / nouveaux</h3>
             <p class="chart-sub">Par téléphone · fenêtre 90 jours</p>
-            <p class="fidelity-card__line"><span id="fidelity-returning">—</span> revenus</p>
-            <p class="fidelity-card__line"><span id="fidelity-new">—</span> nouveaux</p>
+            <p class="fidelity-card__line"><span id="fidelity-returning">0</span> revenus</p>
+            <p class="fidelity-card__line"><span id="fidelity-new">0</span> nouveaux</p>
           </article>
         </section>
 
@@ -410,7 +410,7 @@
             <header class="team-messages-header">
               <div>
                 <h3 class="chart-title">Messages de l'équipe</h3>
-                <p class="chart-sub">Transmissions assistante — synchronisation automatique</p>
+                <p class="chart-sub">Notes de l'assistante, synchronisées en direct</p>
               </div>
               <span class="team-messages-sync" id="team-notes-sync" aria-live="polite">Chargement…</span>
             </header>
@@ -445,7 +445,7 @@
           <article class="schedule-widget schedule-widget--wide" aria-label="Prochains rendez-vous">
             <div class="schedule-header">
               <div class="chart-title">Prochains Rendez-vous</div>
-              <div class="chart-sub">Aujourd'hui — ordre chronologique</div>
+              <div class="chart-sub">Ordre chronologique du jour</div>
             </div>
             <div id="roster-container">
               <div class="skeleton-wrapper" id="roster-skeleton">
@@ -471,7 +471,7 @@
 
         <header class="view-page-header">
           <h2 class="view-page-title kinetic-title">Cabinet Live</h2>
-          <p class="view-page-sub">Maintenant — fauteuil, suite, transmissions</p>
+          <p class="view-page-sub">Fauteuil, suite et transmissions</p>
         </header>
 
         <div class="doctor-metrics" id="doctor-metrics">
@@ -479,28 +479,28 @@
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">Patients</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-patients">—</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-patients">0</span>
             <span class="doctor-metric-delta doctor-metric-delta--up" id="hub-delta-patients">Aujourd'hui</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="pending">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">En attente</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-pending">—</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-pending">0</span>
             <span class="doctor-metric-delta" id="hub-delta-pending">Statut En attente</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="noshows">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">No-shows</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">—</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-noshows">0</span>
             <span class="doctor-metric-delta doctor-metric-delta--warn" id="hub-delta-noshows">Créneaux libres</span>
           </article>
           <article class="doctor-metric-card doctor-metric-card--matte" data-metric="charge">
             <div class="doctor-metric-card__head">
               <span class="doctor-metric-label kinetic-label">Charge</span>
             </div>
-            <span class="doctor-metric-value kinetic-value" id="hub-val-charge">—</span>
+            <span class="doctor-metric-value kinetic-value" id="hub-val-charge">0</span>
             <span class="doctor-metric-delta" id="hub-delta-charge">Temps réservé / ouverture</span>
           </article>
         </div>
@@ -515,7 +515,7 @@
             <article class="chair-glance__panel" aria-labelledby="hub-chair-title">
               <header class="chair-glance__head">
                 <h3 class="chair-glance__title" id="hub-chair-title">Au fauteuil</h3>
-                <p class="chair-glance__sub">En soin — écoulé et fin prévue</p>
+                <p class="chair-glance__sub">Temps écoulé et fin prévue</p>
               </header>
               <div id="hub-in-chair" class="chair-glance__body"></div>
             </article>
@@ -550,7 +550,7 @@
             <div class="digest-metric digest-revenue">
               <div class="rev-header">
                 <span class="metric-label">Temps réservé</span>
-                <span class="metric-value" id="digest-revenue">—</span>
+                <span class="metric-value" id="digest-revenue">0</span>
               </div>
               <div class="rev-progress-bar">
                 <div class="rev-progress-fill" id="digest-progress"></div>
@@ -618,7 +618,7 @@
         </div>
         <div id="block-chip-sheet" class="ops-chip-sheet" hidden>
           <p class="ops-chip-sheet__who" id="block-chip-when"></p>
-          <p class="ops-chip-sheet__meta">Bloque le fauteuil dans DentaFlow — pas encore sur Cal.com public</p>
+          <p class="ops-chip-sheet__meta">Bloque le fauteuil dans DentaFlow. Pas encore sur Cal.com public.</p>
           <div class="ops-chip-sheet__actions" id="block-chip-actions"></div>
         </div>
       </section>
@@ -626,7 +626,7 @@
       <section id="view-waitlist" class="dashboard-view" aria-label="Liste d'attente" aria-hidden="true">
         <header class="view-page-header">
           <h2 class="view-page-title kinetic-title">Gestion de la Liste d'Attente</h2>
-          <p class="view-page-sub">No-Show Recovery — inscrivez les patients pour le prochain créneau libéré</p>
+          <p class="view-page-sub">Inscrivez les patients pour le prochain créneau libéré</p>
         </header>
 
         <div class="waitlist-layout">
@@ -634,7 +634,7 @@
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
             <div class="waitlist-form-header">
               <div class="chart-title">Nouveau Patient</div>
-              <div class="chart-sub">À rappeler / à placer — pas d'envoi SMS automatique</div>
+              <div class="chart-sub">À rappeler ou à placer. Aucun SMS automatique.</div>
             </div>
 
             <form id="waitlist-form" class="waitlist-form" novalidate>
@@ -679,7 +679,7 @@
                 </select>
               </div>
 
-              <div class="form-consent-row">
+              <div class="form-consent-row ios-group">
                 <label class="form-consent-label" for="waitlist-sms-consent">
                   <input
                     type="checkbox"
@@ -703,7 +703,7 @@
             <div class="schedule-header schedule-header--with-actions">
               <div>
                 <div class="chart-title">Patients Prioritaires</div>
-                <div class="chart-sub">Classés par urgence — synchronisé avec la base de données</div>
+                <div class="chart-sub">Classés par urgence, synchronisés avec la base</div>
               </div>
               <div class="panel-actions" data-popover-root>
                 <button
@@ -719,7 +719,7 @@
                 </button>
                 <div id="waitlist-admin-popover" class="actions-popover" role="menu" aria-labelledby="waitlist-admin-trigger" hidden>
                   <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
-                    Remplir un Créneau Vide
+                    Proposer un patient
                   </button>
                   <button type="button" class="actions-popover__item v-disabled" id="waitlist-popover-export" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
                     Générer Rapport Journalier
@@ -760,7 +760,7 @@
         <header class="view-page-header view-page-header--row">
           <div>
             <h2 class="view-page-title">Carnet</h2>
-            <p class="view-page-sub">Historique des visites — recherche par nom ou téléphone</p>
+            <p class="view-page-sub">Recherche par nom ou téléphone.</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -784,6 +784,10 @@
             <div class="skeleton skeleton-table-row"></div>
           </div>
           <div id="crm-content" hidden>
+          <div id="crm-empty-state" class="ios-empty" hidden>
+            <p class="ios-empty__title">Aucun dossier à afficher</p>
+            <p class="ios-empty__text">Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.</p>
+          </div>
           <div class="crm-table-scroll" data-lenis-prevent role="region" aria-label="Tableau des dossiers patients" tabindex="0">
             <table class="crm-table" id="crm-patient-table">
               <thead>
@@ -795,11 +799,7 @@
                   <th scope="col">No-shows (90 j)</th>
                 </tr>
               </thead>
-              <tbody id="crm-table-body">
-                <tr class="crm-table-empty">
-                  <td colspan="5">Aucun patient trouvé</td>
-                </tr>
-              </tbody>
+              <tbody id="crm-table-body"></tbody>
             </table>
           </div>
           </div>
@@ -808,8 +808,8 @@
 
       <section id="view-analytics" class="dashboard-view" aria-label="Performances opérationnelles" aria-hidden="true">
         <header class="view-page-header">
-          <h2 class="view-page-title">Intelligence Opérationnelle</h2>
-          <p class="view-page-sub">Analyse des flux patients et efficacité du moteur DentaFlow.</p>
+          <h2 class="view-page-title">Performances</h2>
+          <p class="view-page-sub">Flux patients et créneaux récupérés.</p>
         </header>
 
         <div class="charts-grid">
@@ -817,13 +817,13 @@
             <h3 class="chart-title">Créneaux récupérés</h3>
             <p class="chart-sub">Aucune table de rattrapage n'est branchée sur Postgres</p>
             <div class="chart-canvas-wrap chart-canvas-wrap--tall">
-              <canvas id="recoveryChart" role="img" aria-label="Créneaux récupérés — données non disponibles"></canvas>
+              <canvas id="recoveryChart" role="img" aria-label="Créneaux récupérés, données non disponibles"></canvas>
             </div>
           </article>
 
           <article class="chart-card chart-card--analytics chart-card--square">
             <h3 class="chart-title">Répartition du jour</h3>
-            <p class="chart-sub">Confirmés, en attente et no-shows — mix réel d'aujourd'hui</p>
+            <p class="chart-sub">Confirmés, en attente et absences du jour</p>
             <div class="chart-canvas-wrap chart-canvas-wrap--flow-bars">
               <canvas id="flowChart" role="img" aria-label="Répartition des statuts du jour"></canvas>
             </div>
@@ -834,13 +834,34 @@
       <section id="view-sms" class="dashboard-view" aria-label="Campagnes SMS" aria-hidden="true">
         <header class="view-page-header">
           <h2 class="view-page-title">Campagnes SMS</h2>
-          <p class="view-page-sub">Diffusion globale — rappels et communications patients</p>
+          <p class="view-page-sub">Un message à toute la base patients active. Les rappels automatiques restent dans Réglages.</p>
         </header>
+
+        <article class="sms-campaign-panel ios-group" aria-label="Ce que fait une campagne">
+          <div class="ios-group__row">
+            <div class="sms-capability">
+              <span class="sms-capability__title">Rappel de rendez-vous</span>
+              <span class="sms-capability__text">Les rappels 24 h avant le RDV s'activent dans Réglages. Cette page n'envoie pas ce rappel automatique.</span>
+            </div>
+          </div>
+          <div class="ios-group__row">
+            <div class="sms-capability">
+              <span class="sms-capability__title">Message cabinet</span>
+              <span class="sms-capability__text">Fermeture, changement d'horaires ou information pour toute la clinique.</span>
+            </div>
+          </div>
+          <div class="ios-group__row">
+            <div class="sms-capability">
+              <span class="sms-capability__title">Relance liste d'attente</span>
+              <span class="sms-capability__text">Pour un créneau libéré, placez d'abord un patient depuis la liste d'attente. Aucun SMS n'est envoyé depuis cette action.</span>
+            </div>
+          </div>
+        </article>
 
         <article class="sms-campaign-panel" aria-label="Composer une campagne SMS">
           <div class="sms-campaign-header">
-            <div class="chart-title">Nouvelle Campagne</div>
-            <div class="chart-sub">Message diffusé à l'ensemble de la base patients active</div>
+            <div class="chart-title">Nouveau message</div>
+            <p class="sms-composer-meta">Destinataires: toute la base patients active.</p>
           </div>
 
           <form id="sms-campaign-form" class="sms-campaign-form" novalidate>
@@ -860,17 +881,18 @@
                 <span id="sms-char-count">0</span> / 320 caractères
               </div>
             </div>
+            <p class="sms-composer-risk">L'envoi est irréversible.</p>
             <button type="submit" class="btn-gold" id="sms-campaign-submit">
-              Envoyer la Campagne (Diffusion globale)
+              Envoyer à la base active
             </button>
           </form>
         </article>
       </section>
 
-      <section id="view-settings" class="dashboard-view" aria-label="Paramètres" aria-hidden="true">
+      <section id="view-settings" class="dashboard-view" aria-label="Réglages" aria-hidden="true">
         <header class="view-page-header">
-          <h2 class="view-page-title">Paramètres du Système</h2>
-          <p class="view-page-sub">Configuration de la clinique, notifications et règles opérationnelles</p>
+          <h2 class="view-page-title">Réglages</h2>
+          <p class="view-page-sub">Clinique, notifications et règles du cabinet.</p>
         </header>
 
         <div class="settings-grid">
@@ -960,12 +982,13 @@
               <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients via le moteur DentaFlow.</p>
+            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients.</p>
 
+            <div class="ios-group">
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels SMS</span>
-                <span class="settings-toggle-hint">Réseau Sécurisé — rappels 24h avant le RDV</span>
+                <span class="settings-toggle-hint">Rappel SMS 24 h avant le rendez-vous</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-sms-toggle" checked />
@@ -976,12 +999,13 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Serveur Dentaflow — confirmations et relances</span>
+                <span class="settings-toggle-hint">Confirmations et relances par e-mail</span>
               </div>
               <label class="settings-toggle">
                 <input type="checkbox" id="settings-email-toggle" checked />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
+            </div>
             </div>
           </article>
 
@@ -1034,7 +1058,7 @@
               <i data-lucide="lock" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Sécurité</h3>
-            <p class="settings-card-desc">Contrôle d'accès — rotation des identifiants Docteur et Assistante.</p>
+            <p class="settings-card-desc">Rotation des identifiants Docteur et Assistante.</p>
 
             <form id="security-access-form" class="security-form" data-password-change="true" novalidate>
               <div class="settings-field">
@@ -1143,9 +1167,9 @@
 
       <header class="crm-side-panel-header">
         <p class="crm-side-panel-eyebrow">Dossier Patient</p>
-        <h2 class="crm-side-panel-name" id="crm-panel-name">—</h2>
+        <h2 class="crm-side-panel-name" id="crm-panel-name"></h2>
         <p class="crm-side-panel-subtitle" id="crm-panel-subtitle"></p>
-        <span class="crm-side-panel-statut crm-tag" id="crm-panel-statut">—</span>
+        <span class="crm-side-panel-statut crm-tag" id="crm-panel-statut"></span>
       </header>
 
       <div class="crm-side-panel-body" data-lenis-prevent>
