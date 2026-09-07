@@ -23,7 +23,8 @@
   "scripts": {
     "test": "node scripts/check-static-mirrors.js && node scripts/test-handlers-direct.js",
     "sync-static": "node scripts/sync-static-mirrors.js",
-    "smoke": "node scripts/smoke-test.js"
+    "smoke": "node scripts/smoke-test.js",
+    "seed:demo": "node scripts/seed-demo-clinic.js"
   },
   "repository": {
     "type": "git",
