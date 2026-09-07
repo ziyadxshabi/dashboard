@@ -1507,6 +1507,15 @@ html[data-theme="oak-lounge"] #dashboard-cal-inline .cal-chip--mist { background
   box-shadow: var(--shadow-hover);
 }
 
+#fill-gap-picker.ops-chip-sheet {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10040;
+  min-width: min(340px, calc(100vw - 32px));
+  max-width: min(420px, calc(100vw - 24px));
+}
+
 .ops-chip-sheet__who {
   margin: 0;
   font-size: 14px;

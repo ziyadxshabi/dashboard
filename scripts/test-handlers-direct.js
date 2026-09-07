@@ -2062,6 +2062,41 @@ async function run() {
     ok('inbound Body=1 sets patient_confirmed_at', Boolean(confirmedAt.rows[0]?.patient_confirmed_at));
     ok('inbound Body=1 sets confirmation_state confirmed', confirmedAt.rows[0]?.confirmation_state === 'confirmed');
 
+    const ouiPhone = '0611987111';
+    const ouiE164 = '+212611987111';
+    const ouiBooking = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, updated_at
+       )
+       VALUES (
+         $1, 'Roi Oui', $2, 'Consultation', 'Confirme',
+         NOW() + INTERVAL '28 hours', 20, 'visit', NOW()
+       )
+       RETURNING id`,
+      [clinicId, ouiPhone]
+    );
+    roiIds.bookings.push(ouiBooking.rows[0].id);
+    const inboundOui = await invoke(
+      handleTwilio,
+      createReq({
+        method: 'POST',
+        url: '/api/webhooks/twilio',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { Body: 'oui', From: ouiE164 },
+      })
+    );
+    ok(
+      'inbound Body=oui returns confirm action',
+      inboundOui.statusCode === 200 && inboundOui.body?.action === 'confirm',
+      `status=${inboundOui.statusCode} body=${JSON.stringify(inboundOui.body)}`
+    );
+    const ouiConfirmed = await query(
+      `SELECT patient_confirmed_at FROM bookings WHERE id = $1`,
+      [ouiBooking.rows[0].id]
+    );
+    ok('inbound Body=oui sets patient_confirmed_at', Boolean(ouiConfirmed.rows[0]?.patient_confirmed_at));
+
     const stopPhone = '0611987102';
     const stopE164 = '+212611987102';
     const stopPatient = await query(

@@ -4946,8 +4946,13 @@ let handoffNotes = [];
           if (!response.ok || payload?.ok === false) {
             throw new Error(payload?.error || `HTTP ${response.status}`);
           }
-          toastFillGapResult(payload);
+          const candidates = Array.isArray(payload?.data?.candidates) ? payload.data.candidates : [];
+          const slot = slotDate && slotTime ? { slotDate, slotTime } : null;
           closeOpsChipSheet();
+          if (candidates.length && openFillGapPicker(candidates, slot)) {
+            return;
+          }
+          toastFillGapResult(payload);
           dashboardCalendar?.refetchEvents();
           loadPlanning();
         } catch {
@@ -5795,6 +5800,12 @@ let handoffNotes = [];
     if (sheet) sheet.hidden = true;
   }
 
+  function refreshAfterFillGap() {
+    dashboardCalendar?.refetchEvents();
+    loadPlanning();
+    loadWaitlistPanel();
+  }
+
   function openFillGapPicker(candidates, slot) {
     const sheet = $('fill-gap-picker');
     const list = $('fill-gap-picker-list');
@@ -5819,6 +5830,7 @@ let handoffNotes = [];
           const payload = await placeFillGapCandidate(candidate.id, slot);
           closeFillGapPicker();
           toastFillGapResult(payload);
+          refreshAfterFillGap();
         } catch {
           showToast('Impossible de placer ce patient.', 'error');
         }
@@ -5830,6 +5842,10 @@ let handoffNotes = [];
       cancel.dataset.wired = 'true';
       cancel.addEventListener('click', closeFillGapPicker);
     }
+    sheet.style.left = '50%';
+    sheet.style.top = '50%';
+    sheet.style.transform = 'translate(-50%, -50%)';
+    sheet.style.zIndex = '10040';
     sheet.hidden = false;
     return true;
   }
