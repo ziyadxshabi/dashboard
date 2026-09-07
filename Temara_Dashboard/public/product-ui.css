@@ -2131,11 +2131,13 @@ html:not(.book-portal) body.mode-assistant .superpower-bento-card__cta {
   align-self: flex-start !important;
   width: auto !important;
   min-height: 44px !important;
-  color: var(--text-main) !important;
-  background: var(--accent-dim) !important;
+  padding: 0 16px !important;
+  color: #fff !important;
+  background: var(--text-main) !important;
   border: 0 !important;
   box-shadow: none !important;
   text-transform: none !important;
+  border-radius: 10px !important;
 }
 
 html:not(.book-portal) .sms-campaign-panel {
