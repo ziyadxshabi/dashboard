@@ -300,6 +300,35 @@ async function run() {
   await query(roiMigrationSql);
   ok('ROI loops migration applied', true);
 
+  const hoursMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260908_clinic_hours.sql'),
+    'utf8'
+  );
+  await query(hoursMigrationSql);
+  ok('clinic hours migration applied', true);
+
+  const { findNextGap } = require(path.join(DASHBOARD, 'api/_lib/roster-ops.js'));
+  const gapAfterClose = findNextGap({
+    now: new Date('2026-09-08T17:30:00.000+01:00'),
+    dateIso: '2026-09-08',
+    durationMin: 30,
+    bufferMin: 10,
+    busyRows: [],
+    openTime: '08:00',
+    closeTime: '18:00',
+  });
+  ok('findNextGap returns null after day_end', gapAfterClose == null);
+  const gapExtendedHours = findNextGap({
+    now: new Date('2026-09-08T17:30:00.000+01:00'),
+    dateIso: '2026-09-08',
+    durationMin: 30,
+    bufferMin: 10,
+    busyRows: [],
+    openTime: '08:00',
+    closeTime: '20:00',
+  });
+  ok('findNextGap uses extended day_end', Boolean(gapExtendedHours?.startsAt));
+
   await query(
     `UPDATE clinics
      SET cal_event_type_id = COALESCE(NULLIF(btrim(cal_event_type_id), ''), 'dentaflow/temara')
@@ -2333,6 +2362,89 @@ async function run() {
     );
     ok('GET patient returns 200', patientGet.statusCode === 200 && patientGet.body?.ok === true);
     ok('GET patient stays clinic-scoped', patientGet.body?.data?.id === planPatient.rows[0].id);
+
+    const directoryGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?directory=1',
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET /api/roster?directory=1 returns 200',
+      directoryGet.statusCode === 200 && directoryGet.body?.ok === true,
+      `status=${directoryGet.statusCode}`
+    );
+    ok('directory payload is an array', Array.isArray(directoryGet.body?.data));
+
+    const settingsGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?action=clinic-settings',
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET clinic-settings returns 200',
+      settingsGet.statusCode === 200 && settingsGet.body?.ok === true,
+      `status=${settingsGet.statusCode} body=${JSON.stringify(settingsGet.body)}`
+    );
+
+    const settingsPatch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=clinic-settings',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { day_start: '08:30', day_end: '20:00', sms_reminders_enabled: false },
+      })
+    );
+    ok(
+      'PATCH clinic-settings returns 200',
+      settingsPatch.statusCode === 200 && settingsPatch.body?.ok === true,
+      `status=${settingsPatch.statusCode} body=${JSON.stringify(settingsPatch.body)}`
+    );
+    ok('PATCH clinic-settings persists day_end', settingsPatch.body?.data?.day_end === '20:00');
+    ok(
+      'PATCH clinic-settings persists SMS pause',
+      settingsPatch.body?.data?.sms_reminders_enabled === false
+    );
+
+    const settingsRestore = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=clinic-settings',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { day_start: '08:00', day_end: '19:00', sms_reminders_enabled: true },
+      })
+    );
+    ok('clinic-settings restore returns 200', settingsRestore.statusCode === 200);
+
+    const patientPatch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: planPatient.rows[0].id,
+          name: 'Roi Plan',
+          allergies: 'Pénicilline',
+          notes: 'Note clinique carnet',
+          smsConsent: false,
+        },
+      })
+    );
+    ok(
+      'PATCH patient clinical fields returns 200',
+      patientPatch.statusCode === 200 && patientPatch.body?.ok === true,
+      `status=${patientPatch.statusCode} body=${JSON.stringify(patientPatch.body)}`
+    );
+    ok('PATCH patient persists allergies', patientPatch.body?.data?.allergies === 'Pénicilline');
+    ok('PATCH patient persists notes', patientPatch.body?.data?.clinical_notes === 'Note clinique carnet');
 
     const beforeDash = await invoke(
       handleDashboard,

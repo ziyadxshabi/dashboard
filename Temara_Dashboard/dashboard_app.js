@@ -247,8 +247,7 @@ function initializeDoctorDashboard() {
   initThemeSwitcher();
   initAccountCardMenu();
   window.initSettingsPrefsState?.();
-  initCrmSearch();
-  initCrmSidePanel();
+  window.DentaFlowCarnet?.init?.();
   initSmsCampaign();
   initDoctorHub();
   initDoctorCustomSms();
@@ -256,7 +255,7 @@ function initializeDoctorDashboard() {
   renderDoctorHubCharts();
   bindKpiMicroCharts({});
   renderAppointmentsList();
-  renderWaitlistPanel();
+  void loadDoctorWaitlistPanel();
   initTeamNotesSync();
   initSmartSync();
   window.initProgressiveDisclosure?.();
@@ -901,6 +900,10 @@ function switchTab(hashId) {
     });
   }
 
+  if (viewKey === 'crm') {
+    window.DentaFlowCarnet?.init?.();
+  }
+
   if (viewKey === 'doctor-hub') {
     requestAnimationFrame(() => {
       if (osBootSequencePlayed) animateDoctorHubMetrics();
@@ -1067,10 +1070,12 @@ async function loadOverviewRoster() {
   renderAppointmentsList(lastOverviewRoster);
 }
 
+let doctorWaitlistEntries = [];
+
 function renderWaitlistPanel() {
   const container = doctorEl('waitlist-panel-list');
   if (!container) return;
-  const waitlist = [];
+  const waitlist = Array.isArray(doctorWaitlistEntries) ? doctorWaitlistEntries : [];
   container.replaceChildren();
 
   const table = container.closest('.waitlist-table');
@@ -1092,9 +1097,37 @@ function renderWaitlistPanel() {
   if (table) table.hidden = false;
 
   const fragment = document.createDocumentFragment();
-  waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow(appt)));
+  waitlist.forEach((appt) => fragment.appendChild(createWaitlistTableRow({
+    ...appt,
+    name: appt.name || appt.nom || appt.patient_name,
+    phone: appt.phone || appt.telephone || appt.patient_phone,
+    priorite: appt.priorite || appt.priority,
+  })));
   container.appendChild(fragment);
   hideSkeleton('waitlist');
+}
+
+async function loadDoctorWaitlistPanel() {
+  showSkeleton('waitlist');
+  try {
+    const response = await fetch('/api/waitlist', {
+      method: 'GET',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ Accept: 'application/json' }),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    doctorWaitlistEntries = Array.isArray(payload?.data) ? payload.data : [];
+  } catch (err) {
+    if (isUnauthorizedError(err)) return;
+    console.error('[Waitlist] GET failed:', err?.message || err);
+    doctorWaitlistEntries = [];
+  }
+  renderWaitlistPanel();
 }
 
 /* ── NO-SHOW RECOVERY — WAITLIST FORM ────────────────────────────────────── */
@@ -1191,17 +1224,16 @@ async function submitWaitlistEntry(data) {
 }
 
 function prependWaitlistEntry({ nom, telephone, priorite }) {
-  const container = doctorEl('waitlist-panel-list');
-  if (!container) return;
-
-  const tagClass = priorite === 'Haute' ? 'urgence' : 'consultation';
-  container.prepend(createWaitlistTableRow({
+  doctorWaitlistEntries.unshift({
+    nom,
+    telephone,
+    priorite,
     name: nom,
     phone: telephone || 'Non renseigné',
-    treatment: priorite,
-    tagClass,
-    priorite,
-  }));
+    patient_name: nom,
+    patient_phone: telephone,
+  });
+  renderWaitlistPanel();
 }
 
 /* ── SETTINGS PANEL ──────────────────────────────────────────────────────── */
@@ -1366,6 +1398,35 @@ function initAccountCardMenu() {
   });
 }
 
+function renderDoctorBlockedSlots(rows) {
+  const list = doctorEl('settings-blocked-slots');
+  if (!list) return;
+  list.replaceChildren();
+  const blocked = (Array.isArray(rows) ? rows : []).filter((row) => {
+    const kind = String(row.booking_kind || row.bookingKind || 'visit');
+    const status = String(row.status || '');
+    return kind === 'block' || /annul/i.test(status);
+  });
+  if (!blocked.length) {
+    const empty = document.createElement('li');
+    empty.className = 'settings-blocked-empty';
+    empty.textContent = 'Aucun créneau bloqué ou annulé aujourd\'hui. Les pauses se posent dans Cal.com.';
+    list.appendChild(empty);
+    return;
+  }
+  blocked.forEach((row) => {
+    const item = document.createElement('li');
+    const when = formatCarnetWhen(row) || row.time || '';
+    const label = row.treatment || row.treatment_name || row.name || 'Indisponible';
+    const left = document.createElement('span');
+    left.textContent = when || '—';
+    const right = document.createElement('span');
+    right.textContent = label;
+    item.append(left, right);
+    list.appendChild(item);
+  });
+}
+
 function initSettings() {
   const persistedGoal = loadPersistedDailyGoal();
   if (persistedGoal != null) {
@@ -1388,8 +1449,10 @@ function initSettings() {
   if (smsToggle && smsToggle.dataset.prefsBound !== 'true') {
     smsToggle.checked = saved.smsReminders !== false;
   }
-  if (emailToggle && emailToggle.dataset.prefsBound !== 'true') {
-    emailToggle.checked = saved.emailReminders !== false;
+  if (emailToggle) {
+    emailToggle.checked = false;
+    emailToggle.disabled = true;
+    emailToggle.setAttribute('aria-disabled', 'true');
   }
 }
 
@@ -1421,9 +1484,15 @@ const SECURITY_ACCOUNT_LABELS = {
 let securityToastTimer = null;
 
 function showDashboardToast(message, type = 'info') {
-  const toast = doctorEl('assistant-toast');
+  const toast = doctorEl('assistant-toast') || document.getElementById('assistant-toast');
   if (!toast) return;
-  toast.textContent = message;
+  const text = String(message || '').trim();
+  if (!text) {
+    toast.textContent = '';
+    toast.classList.remove('is-visible', 'is-error', 'is-success', 'is-warning');
+    return;
+  }
+  toast.textContent = text;
   toast.classList.remove('is-error', 'is-success', 'is-warning');
   if (type === 'error') toast.classList.add('is-error');
   if (type === 'success') toast.classList.add('is-success');
@@ -1432,6 +1501,7 @@ function showDashboardToast(message, type = 'info') {
   clearTimeout(securityToastTimer);
   securityToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
 }
+window.showToast = showDashboardToast;
 
 function initSecurityAccountSelect() {
   return window.DentaFlowSelect?.init?.({
@@ -3876,7 +3946,6 @@ async function loadDoctorHubData(isSilentSync = false) {
   const selectedPatientId = doctorQuery('.crm-table-row.is-selected')?.dataset?.patientId ?? null;
 
   if (!isSilentSync) {
-    showSkeleton('crm');
     showSkeleton('triage');
   }
 
@@ -3918,7 +3987,7 @@ async function loadDoctorHubData(isSilentSync = false) {
     }
 
     renderDoctorTriageRoster(records);
-    renderCRMTable(records);
+    renderDoctorBlockedSlots(records);
 
     if (panelWasOpen && selectedPatientId) {
       const row = doctorQuery(`.crm-table-row[data-patient-id="${selectedPatientId}"]`);
@@ -3940,11 +4009,10 @@ async function loadDoctorHubData(isSilentSync = false) {
     if (isSilentSync) return;
     renderEndOfDayDigest({ totalVus: 0, totalAnnules: 0, reservedMin: 0, openMin: CONFIG.OPEN_MINUTES });
     renderDoctorTriageRoster([]);
-    renderCRMTable([]);
+    renderDoctorBlockedSlots([]);
     queueOsBootSequence();
   } finally {
     if (!isSilentSync) {
-      hideSkeleton('crm');
       hideSkeleton('triage');
     }
   }
@@ -4307,6 +4375,7 @@ function initSmartSync() {
       await Promise.all([
         loadDashboard(true),
         loadDoctorHubData(true),
+        loadDoctorWaitlistPanel(),
       ]);
     } finally {
       smartSyncInFlight = false;

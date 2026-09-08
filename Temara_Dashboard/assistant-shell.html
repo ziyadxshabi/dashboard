@@ -26,6 +26,14 @@
           <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
           <span>Vue du jour</span>
         </a>
+        <a href="#" class="nav-link" data-nav="planning">
+          <i data-lucide="calendar-range" class="nav-icon" aria-hidden="true"></i>
+          <span>Planning</span>
+        </a>
+        <a href="#" class="nav-link" data-nav="handoff">
+          <i data-lucide="message-square-dashed" class="nav-icon" aria-hidden="true"></i>
+          <span>Transmissions</span>
+        </a>
         <a href="#" class="nav-link" data-nav="calendar">
           <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
           <span>Calendrier</span>
@@ -38,53 +46,6 @@
           <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
           <span>Dossiers Patients</span>
         </a>
-
-        <div class="sidebar-superpouvoirs" id="superpouvoirs-panel">
-          <div
-            id="superpouvoirs-header"
-            class="nav-accordion-header"
-            role="button"
-            tabindex="0"
-            aria-expanded="false"
-            aria-controls="superpouvoirs-accordion"
-          >
-            <span class="nav-accordion-header__label" id="actions-title">Actions</span>
-            <i data-lucide="chevron-down" class="nav-accordion-header__chevron icon-xs" aria-hidden="true"></i>
-          </div>
-          <div class="superpouvoirs-accordion" id="superpouvoirs-accordion">
-            <div class="superpouvoirs-content">
-              <div class="superpowers-grid" id="superpowers-grid">
-            <button type="button" class="btn-super btn-super--compact" id="btn-export-excel">
-              <span class="btn-super__icon" aria-hidden="true">
-                <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Générer Rapport Journalier</span>
-                <span class="btn-super__hint">Export Excel de la journée</span>
-              </span>
-            </button>
-            <button type="button" class="btn-super btn-super--compact" id="btn-force-sms">
-              <span class="btn-super__icon" aria-hidden="true">
-                <i data-lucide="bell-ring" aria-hidden="true"></i>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Forcer Rappels</span>
-                <span class="btn-super__hint">SMS patients de demain</span>
-              </span>
-            </button>
-            <button type="button" class="btn-super btn-super--compact" id="btn-block-slot">
-              <span class="btn-super__icon" aria-hidden="true">
-                <i data-lucide="calendar-x-2" aria-hidden="true"></i>
-              </span>
-              <span class="btn-super__text">
-                <span class="btn-super__label">Bloquer Créneau Urgence</span>
-                <span class="btn-super__hint">Réserver un slot prioritaire</span>
-              </span>
-            </button>
-              </div>
-            </div>
-          </div>
-        </div>
       </nav>
 
       <div class="account-card" data-popover-root>
@@ -110,10 +71,6 @@
           <button type="button" class="actions-popover__item" id="account-menu-settings" role="menuitem">
             <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
             Réglages
-          </button>
-          <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
-            <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
-            Facturation
           </button>
           <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
             <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
@@ -145,6 +102,8 @@
         <button type="button" id="asst-mobile-close-btn" class="mobile-drawer__close" aria-label="Fermer le menu">✕</button>
         <nav class="mobile-drawer__nav" role="navigation" aria-label="Navigation">
           <a href="#overview" class="nav-link" data-nav="overview">Vue du jour</a>
+          <a href="#planning" class="nav-link" data-nav="planning">Planning</a>
+          <a href="#handoff" class="nav-link" data-nav="handoff">Transmissions</a>
           <a href="#calendar" class="nav-link" data-nav="calendar">Calendrier</a>
           <a href="#waitlist" class="nav-link" data-nav="waitlist">Liste d'attente</a>
           <a href="#crm" class="nav-link" data-nav="crm">Dossiers Patients</a>
@@ -202,9 +161,11 @@
                 </ul>
               </div>
             </div>
-            <button type="submit" class="btn-matte-primary" id="floor-book-submit">Poser</button>
             <div id="floor-book-slots" class="floor-composer__slots" role="group" aria-label="Prochain créneau"></div>
-            <button type="button" class="floor-composer__walkin" id="floor-walkin-btn">Walk-in</button>
+            <div class="floor-composer__actions">
+              <button type="submit" class="btn-matte-primary" id="floor-book-submit">Poser</button>
+              <button type="button" class="btn-matte-secondary" id="floor-walkin-btn">Walk-in</button>
+            </div>
           </form>
           <p class="floor-composer__hint" id="floor-book-hint" hidden></p>
         </section>
@@ -212,6 +173,113 @@
         <div class="assistant-pulse-grid" id="assistant-pulse-grid">
           <!-- rendered by app.js -->
         </div>
+
+        <section class="status-board-section" aria-labelledby="status-board-title">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title" id="status-board-title">Board du jour</h3>
+            <span class="section-header-inline__meta">Salle et fauteuil</span>
+          </div>
+          <div class="status-board" id="status-board">
+            <div class="status-board__col" data-board-col="incoming">
+              <h4 class="status-board__head">À venir</h4>
+              <div class="status-board__cards" id="board-incoming" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="waiting">
+              <h4 class="status-board__head">En salle</h4>
+              <div class="status-board__cards" id="board-waiting" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="care">
+              <h4 class="status-board__head">Au fauteuil</h4>
+              <div class="status-board__cards" id="board-care" role="list"></div>
+            </div>
+            <div class="status-board__col" data-board-col="done">
+              <h4 class="status-board__head">Terminé</h4>
+              <div class="status-board__cards" id="board-done" role="list"></div>
+            </div>
+          </div>
+        </section>
+
+      </section>
+
+      <section id="view-planning" class="dashboard-view" aria-label="Planning" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Planning</h2>
+          <p class="view-page-sub">Rendez-vous du jour, dans l'ordre.</p>
+        </header>
+
+        <section class="overview-timeline-section" aria-label="Planning d'aujourd'hui">
+          <div class="section-header-inline">
+            <h3 class="section-header-inline__title">Planning d'Aujourd'hui</h3>
+            <span class="live-indicator-dot" aria-hidden="true"></span>
+          </div>
+          <div id="overview-timeline-container" class="timeline-scroll-axis" role="list">
+            <!-- rendered by app.js -->
+          </div>
+        </section>
+
+        <section class="assistant-panel assistant-panel--roster" aria-labelledby="roster-title">
+          <div class="assistant-panel__head">
+            <div>
+              <h2 class="assistant-panel__title" id="roster-title">Planning du jour</h2>
+              <p class="assistant-panel__desc">Ordre chronologique des rendez-vous</p>
+            </div>
+            <div class="roster-panel-controls">
+              <span class="assistant-panel__badge">Priorité</span>
+              <div class="panel-actions" data-popover-root>
+                <button
+                  type="button"
+                  class="btn-icon-menu"
+                  id="roster-admin-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="roster-admin-popover"
+                  aria-label="Actions administratives du planning"
+                >
+                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
+                </button>
+                <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
+                  <button type="button" class="actions-popover__item" id="btn-alerte-retard" data-action="doctor-delayed" role="menuitem">
+                    Alerte Retard Praticien
+                  </button>
+                  <div class="actions-popover__divider" role="separator"></div>
+                  <button type="button" class="actions-popover__item actions-popover__item--danger" id="btn-bulk-cancel" role="menuitem">
+                    Annuler la sélection
+                  </button>
+                  <button type="button" class="actions-popover__item" id="btn-bulk-sms" role="menuitem">
+                    Envoyer SMS groupé
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="planning-timeline-wrap" data-lenis-prevent id="roster-container" role="region" aria-label="Planning du jour" tabindex="0">
+            <div class="skeleton-wrapper" id="roster-skeleton">
+              <div class="skeleton skeleton-text"></div>
+              <div class="skeleton skeleton-text short"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-table-row"></div>
+              <div class="skeleton skeleton-table-row"></div>
+            </div>
+            <div id="roster-content" hidden>
+            <div id="planning-empty-state" class="empty-state-host" hidden></div>
+            <div class="planning-timeline" id="planning-timeline" aria-labelledby="roster-title" role="list">
+              <!-- rendered by app.js — vertical chronological timeline -->
+            </div>
+            <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
+              <!-- rendered by app.js -->
+            </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-handoff" class="dashboard-view" aria-label="Transmissions" aria-hidden="true">
+        <header class="view-page-header">
+          <h2 class="view-page-title">Transmissions</h2>
+          <p class="view-page-sub">Retards, rappels, urgences réservées et notes d'équipe.</p>
+        </header>
 
         <section class="late-strip" aria-labelledby="late-title">
           <div class="section-header-inline">
@@ -239,133 +307,11 @@
           <div id="hold-list" class="hold-list" role="list"></div>
         </section>
 
-        <section class="status-board-section" aria-labelledby="status-board-title">
-          <div class="section-header-inline">
-            <h3 class="section-header-inline__title" id="status-board-title">Board du jour</h3>
-            <span class="section-header-inline__meta">Salle et fauteuil</span>
-          </div>
-          <div class="status-board" id="status-board">
-            <div class="status-board__col" data-board-col="incoming">
-              <h4 class="status-board__head">À venir</h4>
-              <div class="status-board__cards" id="board-incoming" role="list"></div>
-            </div>
-            <div class="status-board__col" data-board-col="waiting">
-              <h4 class="status-board__head">En salle</h4>
-              <div class="status-board__cards" id="board-waiting" role="list"></div>
-            </div>
-            <div class="status-board__col" data-board-col="care">
-              <h4 class="status-board__head">Au fauteuil</h4>
-              <div class="status-board__cards" id="board-care" role="list"></div>
-            </div>
-            <div class="status-board__col" data-board-col="done">
-              <h4 class="status-board__head">Terminé</h4>
-              <div class="status-board__cards" id="board-done" role="list"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="overview-timeline-section" aria-label="Planning d'aujourd'hui">
-          <div class="section-header-inline">
-            <h3 class="section-header-inline__title">Planning d'Aujourd'hui</h3>
-            <span class="live-indicator-dot" aria-hidden="true"></span>
-          </div>
-          <div id="overview-timeline-container" class="timeline-scroll-axis" role="list">
-            <!-- rendered by app.js -->
-          </div>
-        </section>
-
-        <section class="assistant-bento-row" aria-label="Placer un patient en attente">
-          <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
-            <header class="superpower-bento-card__head">
-              <div class="superpower-bento-card__copy">
-                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Placer un patient en attente</h2>
-                <p class="superpower-bento-card__desc">
-                  Quand un créneau se libère, choisissez quelqu'un sur la liste d'attente du cabinet. Aucun SMS n'est envoyé.
-                </p>
-              </div>
-            </header>
-            <button type="button" class="btn-super superpower-bento-card__cta" id="btn-super-fill-gap">
-              <span class="btn-super__text">
-                <span class="btn-super__label">Proposer un patient</span>
-              </span>
-            </button>
-          </article>
-        </section>
-
-        <div class="assistant-grid">
-
-        <section class="assistant-panel assistant-panel--roster" aria-labelledby="roster-title">
-          <div class="assistant-panel__head">
-            <div>
-              <h2 class="assistant-panel__title" id="roster-title">Planning du jour</h2>
-              <p class="assistant-panel__desc">Ordre chronologique des rendez-vous</p>
-            </div>
-            <div class="roster-panel-controls">
-              <span class="assistant-panel__badge">Priorité</span>
-              <div class="panel-actions" data-popover-root>
-                <button
-                  type="button"
-                  class="btn-icon-menu"
-                  id="roster-admin-trigger"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  aria-controls="roster-admin-popover"
-                  aria-label="Actions administratives du planning"
-                >
-                  <i data-lucide="ellipsis-vertical" class="icon-sm" aria-hidden="true"></i>
-                </button>
-                <div id="roster-admin-popover" class="actions-popover" role="menu" aria-labelledby="roster-admin-trigger" hidden>
-                  <button type="button" class="actions-popover__item v-disabled" id="btn-daily-report" role="menuitem" disabled aria-disabled="true" title="Génération du rapport bientôt disponible" data-tooltip="Génération du rapport bientôt disponible">
-                    Générer Rapport Journalier
-                  </button>
-                  <button type="button" class="actions-popover__item" id="btn-alerte-retard" data-action="doctor-delayed" role="menuitem">
-                    Alerte Retard Praticien
-                  </button>
-                  <button type="button" class="actions-popover__item v-disabled" id="btn-force-reminders" role="menuitem" disabled aria-disabled="true" title="Rappels automatiques bientôt disponibles" data-tooltip="Rappels automatiques bientôt disponibles">
-                    Forcer Rappels (Demain)
-                  </button>
-                  <div class="actions-popover__divider" role="separator"></div>
-                  <button type="button" class="actions-popover__item actions-popover__item--danger" id="btn-bulk-cancel" role="menuitem">
-                    Annuler la sélection
-                  </button>
-                  <button type="button" class="actions-popover__item" id="btn-bulk-sms" role="menuitem">
-                    Envoyer SMS groupé
-                  </button>
-                  <p role="note" style="display:flex;align-items:flex-start;gap:6px;margin:8px 12px 4px;padding:0;font-size:11px;line-height:1.45;color:#8C8C9A;">
-                    <i data-lucide="info" class="icon-xs" aria-hidden="true" style="flex-shrink:0;margin-top:1px;opacity:0.85"></i>
-                    <span>Remarque&nbsp;: En cas d'annulation multiple, la synchronisation avec la base de données peut accuser un léger retard.</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="planning-timeline-wrap" data-lenis-prevent id="roster-container" role="region" aria-label="Planning du jour" tabindex="0">
-            <div class="skeleton-wrapper" id="roster-skeleton">
-              <div class="skeleton skeleton-text"></div>
-              <div class="skeleton skeleton-text short"></div>
-              <div class="skeleton skeleton-card"></div>
-              <div class="skeleton skeleton-card"></div>
-              <div class="skeleton skeleton-table-row"></div>
-              <div class="skeleton skeleton-table-row"></div>
-            </div>
-            <div id="roster-content" hidden>
-            <div id="planning-empty-state" class="empty-state-host" hidden></div>
-            <div class="planning-timeline" id="planning-timeline" aria-labelledby="roster-title" role="list">
-              <!-- rendered by app.js — vertical chronological timeline -->
-            </div>
-            <div class="roster-cards" id="roster-cards" aria-label="Planning du jour (cartes)">
-              <!-- rendered by app.js -->
-            </div>
-            </div>
-          </div>
-        </section>
-
         <section class="assistant-panel assistant-panel--handoff" aria-labelledby="handoff-title">
           <div class="assistant-panel__head">
             <div>
-              <h2 class="assistant-panel__title" id="handoff-title">Transmissions</h2>
-              <p class="assistant-panel__desc">Notes d'équipe et événements système pour la relève</p>
+              <h2 class="assistant-panel__title" id="handoff-title">Notes d'équipe</h2>
+              <p class="assistant-panel__desc">Pour la relève du cabinet</p>
             </div>
           </div>
 
@@ -417,12 +363,10 @@
             <!-- rendered by app.js -->
           </div>
         </section>
-
-        </div>
-
       </section>
 
       <section id="view-calendar" class="dashboard-view" aria-label="Calendrier" aria-hidden="true">
+
         <header class="calendar-os-header">
           <div class="calendar-os-heading">
             <h2 class="calendar-os-title" id="asst-calendar-title">Planning</h2>
@@ -463,6 +407,24 @@
           <h2 class="view-page-title">Liste d'attente</h2>
           <p class="view-page-sub">Gestion des urgences et patients en attente de créneau</p>
         </header>
+
+        <section class="assistant-bento-row" aria-label="Placer un patient en attente">
+          <article class="superpower-bento-card" aria-labelledby="recovery-campaign-title">
+            <header class="superpower-bento-card__head">
+              <div class="superpower-bento-card__copy">
+                <h2 class="superpower-bento-card__title" id="recovery-campaign-title">Placer un patient en attente</h2>
+                <p class="superpower-bento-card__desc">
+                  Quand un créneau se libère, choisissez quelqu'un sur la liste d'attente du cabinet. Aucun SMS n'est envoyé.
+                </p>
+              </div>
+            </header>
+            <button type="button" class="btn-super superpower-bento-card__cta" id="btn-super-fill-gap">
+              <span class="btn-super__text">
+                <span class="btn-super__label">Proposer un patient</span>
+              </span>
+            </button>
+          </article>
+        </section>
 
         <div class="waitlist-layout">
           <article class="waitlist-form-panel" aria-label="Ajouter un patient à la liste d'attente">
@@ -583,7 +545,7 @@
                   <button type="button" class="actions-popover__item" id="waitlist-popover-fill-gap" role="menuitem">
                     Proposer un patient
                   </button>
-                  <button type="button" class="actions-popover__item" id="waitlist-popover-export" role="menuitem">
+                  <button type="button" class="actions-popover__item v-disabled" id="waitlist-popover-export" role="menuitem" disabled aria-disabled="true" title="Aucun rapport n'est généré depuis DentaFlow">
                     Générer Rapport Journalier
                   </button>
                 </div>
@@ -622,7 +584,7 @@
         <header class="view-page-header view-page-header--row">
           <div>
             <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">Coordonnées et statut des rendez-vous. Le filtre Non payé n'affiche que les dossiers concernés.</p>
+            <p class="view-page-sub">90 derniers jours. Cliquez une ligne pour ouvrir et modifier le dossier.</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -630,24 +592,13 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Rechercher par nom, téléphone ou email…"
+              placeholder="Nom ou téléphone (90 derniers jours)"
               autocomplete="off"
             />
           </div>
         </header>
 
         <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
-            <div class="crm-filter-bar" role="toolbar" aria-label="Filtres dossiers patients">
-            <button
-              type="button"
-              class="filter-chip"
-              id="crm-filter-unpaid"
-              aria-pressed="false"
-              hidden
-            >
-              Non payé
-            </button>
-          </div>
           <div class="skeleton-wrapper" id="crm-skeleton">
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text short"></div>
@@ -658,7 +609,7 @@
           <div id="crm-content" hidden>
           <div id="crm-empty-state" class="ios-empty" hidden>
             <p class="ios-empty__title">Aucun dossier à afficher</p>
-            <p class="ios-empty__text">Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.</p>
+            <p class="ios-empty__text">Recherchez un nom ou un téléphone sur les 90 derniers jours.</p>
           </div>
           <div class="crm-table-scroll" role="region" aria-label="Tableau des dossiers patients" tabindex="0">
             <table class="crm-table" id="crm-patient-table">
@@ -666,14 +617,13 @@
                 <tr>
                   <th scope="col">Nom</th>
                   <th scope="col">Téléphone</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Motif</th>
-                  <th scope="col">Reste à charge</th>
-                  <th scope="col">Statut</th>
+                  <th scope="col">Dernière visite</th>
+                  <th scope="col">Soin</th>
+                  <th scope="col">Solde</th>
+                  <th scope="col">No-shows (90 j)</th>
                 </tr>
               </thead>
               <tbody id="crm-table-body">
-                <!-- populated by renderCRMTable() from Vue du jour data -->
               </tbody>
             </table>
           </div>
@@ -745,10 +695,29 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
+              <i data-lucide="clock" aria-hidden="true"></i>
+            </div>
+            <h3 class="settings-card-title">Horaires d'ouverture</h3>
+            <p class="settings-card-desc">Utilisés pour le Walk-in et les créneaux libres.</p>
+            <div class="settings-time-fields">
+              <div class="settings-field">
+                <label class="settings-label" for="settings-day-start">Ouverture</label>
+                <input class="waitlist-input settings-input" type="time" id="settings-day-start" name="day_start" value="08:00">
+              </div>
+              <div class="settings-field">
+                <label class="settings-label" for="settings-day-end">Fermeture</label>
+                <input class="waitlist-input settings-input" type="time" id="settings-day-end" name="day_end" value="19:00">
+              </div>
+            </div>
+            <button type="button" class="btn-matte-secondary" id="settings-hours-save">Enregistrer les horaires</button>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-icon" aria-hidden="true">
               <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients.</p>
+            <p class="settings-card-desc">Pause cabinet des rappels SMS. Le consentement patient reste dans le dossier.</p>
 
             <div class="ios-group">
             <div class="settings-toggle-row">
@@ -765,10 +734,10 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Confirmations et relances par e-mail</span>
+                <span class="settings-toggle-hint">Les e-mails ne sont pas envoyés depuis DentaFlow.</span>
               </div>
               <label class="settings-toggle">
-                <input type="checkbox" id="settings-email-toggle" checked />
+                <input type="checkbox" id="settings-email-toggle" disabled aria-disabled="true" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
             </div>
@@ -777,32 +746,11 @@
 
           <article class="settings-card">
             <div class="settings-card-icon" aria-hidden="true">
-              <i data-lucide="calendar-clock" aria-hidden="true"></i>
+              <i data-lucide="calendar-off" aria-hidden="true"></i>
             </div>
-            <h3 class="settings-card-title">Ergonomie du Planning</h3>
-            <p class="settings-card-desc">Vue par défaut du planning du jour à l'ouverture.</p>
-            <div class="settings-field">
-              <span class="settings-label" id="settings-planning-view-label">Vue par défaut</span>
-              <div class="ghost-select" id="settings-planning-view-root" data-ghost-select>
-                <input type="hidden" id="settings-planning-view" name="planning_view" value="chronologique" />
-                <button
-                  type="button"
-                  class="ghost-select__trigger"
-                  id="settings-planning-view-trigger"
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                  aria-controls="settings-planning-view-list"
-                  aria-labelledby="settings-planning-view-label"
-                >
-                  <span class="ghost-select__value" id="settings-planning-view-label-value">Chronologique</span>
-                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
-                </button>
-                <ul class="ghost-select__list" id="settings-planning-view-list" role="listbox" aria-label="Vue du planning" hidden>
-                  <li class="ghost-select__option is-selected" role="option" data-value="chronologique" data-label="Chronologique" aria-selected="true" tabindex="-1">Vue par défaut : Chronologique</li>
-                  <li class="ghost-select__option" role="option" data-value="priorite" data-label="Priorité" aria-selected="false" tabindex="-1">Vue par défaut : Priorité</li>
-                </ul>
-              </div>
-            </div>
+            <h3 class="settings-card-title">Indisponibilités du jour</h3>
+            <p class="settings-card-desc">Créneaux bloqués ou annulés aujourd'hui. Les pauses se posent dans Cal.com.</p>
+            <ul class="settings-blocked-list" id="settings-blocked-slots"></ul>
           </article>
 
           <article class="settings-card">
@@ -810,7 +758,7 @@
               <i data-lucide="volume-2" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Alertes Sonores</h3>
-            <p class="settings-card-desc">Signaux discrets sur le poste assistante, sans notification patient.</p>
+            <p class="settings-card-desc">Signaux discrets sur cet appareil uniquement, sans notification patient.</p>
 
             <div class="ios-group">
             <div class="settings-toggle-row">
@@ -835,20 +783,6 @@
               </label>
             </div>
             </div>
-          </article>
-
-          <article class="settings-card">
-            <div class="settings-card-icon" aria-hidden="true">
-              <i data-lucide="keyboard" aria-hidden="true"></i>
-            </div>
-            <h3 class="settings-card-title">Raccourcis Clavier</h3>
-            <p class="settings-card-desc">Commandes rapides, lecture seule.</p>
-            <ul class="settings-shortcuts" aria-label="Raccourcis clavier">
-              <li><span>Rechercher un patient</span><kbd>Espace</kbd></li>
-              <li><span>Aller au planning</span><kbd>G</kbd></li>
-              <li><span>Publier une note d'équipe</span><kbd>Ctrl</kbd><span class="settings-shortcuts__plus">+</span><kbd>Entrée</kbd></li>
-              <li><span>Ouvrir les dossiers patients</span><kbd>Ctrl</kbd><span class="settings-shortcuts__plus">+</span><kbd>K</kbd></li>
-            </ul>
           </article>
         </div>
       </section>
@@ -876,7 +810,7 @@
         <i data-lucide="calendar-clock" class="tab-icon" aria-hidden="true"></i>
         <span>Planning</span>
       </a>
-      <a href="#" class="tab-link" data-nav="transmission" aria-label="Tableau de transmission">
+      <a href="#" class="tab-link" data-nav="handoff" aria-label="Tableau de transmission">
         <i data-lucide="message-square-dashed" class="tab-icon" aria-hidden="true"></i>
         <span>Transmission</span>
       </a>
@@ -890,8 +824,6 @@
       </a>
     </nav>
   </div>
-
-  <div class="assistant-toast" id="assistant-toast" role="status" aria-live="polite"></div>
 
   <div id="crm-side-panel" class="crm-side-panel-root crm-modal-root" aria-hidden="true">
     <div class="crm-side-panel-overlay crm-modal-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
@@ -913,51 +845,73 @@
         <span class="crm-side-panel-statut crm-tag" id="crm-panel-status"></span>
       </header>
 
-      <div class="crm-side-panel-body">
-        <section class="crm-side-panel-section" aria-label="Coordonnées">
-          <h3 class="crm-side-panel-section-title">Coordonnées</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Téléphone</dt>
-              <dd id="crm-panel-phone"></dd>
+      <div class="crm-side-panel-body" data-lenis-prevent>
+        <form class="crm-edit-grid" id="crm-edit-form">
+          <input type="hidden" id="crm-edit-id" value="">
+          <section class="crm-side-panel-section" aria-label="Identité">
+            <h3 class="crm-side-panel-section-title">Identité</h3>
+            <div class="crm-edit-field">
+              <label for="crm-edit-name">Nom</label>
+              <input class="waitlist-input" type="text" id="crm-edit-name" autocomplete="name">
             </div>
-            <div class="crm-side-panel-field">
-              <dt>Email</dt>
-              <dd id="crm-panel-email"></dd>
+            <div class="crm-edit-field">
+              <label for="crm-edit-phone">Téléphone</label>
+              <input class="waitlist-input" type="tel" id="crm-edit-phone" autocomplete="tel">
             </div>
-          </dl>
-        </section>
-
-        <section class="crm-side-panel-section" aria-label="Couverture médicale">
-          <h3 class="crm-side-panel-section-title">Couverture</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field crm-side-panel-field--coverage">
-              <dt>Couverture Médicale</dt>
-              <dd id="crm-panel-insurance" class="crm-panel-copyable"></dd>
+            <div class="crm-edit-field">
+              <label for="crm-edit-email">E-mail</label>
+              <input class="waitlist-input" type="email" id="crm-edit-email" autocomplete="email">
             </div>
-            <div class="crm-side-panel-field">
-              <dt>Reste à charge (indicatif)</dt>
-              <dd id="crm-panel-copay"></dd>
+          </section>
+          <section class="crm-side-panel-section" aria-label="Clinique">
+            <h3 class="crm-side-panel-section-title">Clinique</h3>
+            <div class="crm-edit-field">
+              <label for="crm-edit-allergies">Allergies</label>
+              <input class="waitlist-input" type="text" id="crm-edit-allergies">
             </div>
-          </dl>
-        </section>
-
-        <section class="crm-side-panel-section" aria-label="Rendez-vous">
-          <h3 class="crm-side-panel-section-title">Rendez-vous</h3>
-          <dl class="crm-side-panel-dl">
-            <div class="crm-side-panel-field">
-              <dt>Date du rendez-vous</dt>
-              <dd id="crm-panel-last-visit"></dd>
+            <div class="crm-edit-field">
+              <label for="crm-edit-chronic">Pathologies chroniques</label>
+              <input class="waitlist-input" type="text" id="crm-edit-chronic">
             </div>
-            <div class="crm-side-panel-field">
-              <dt>Motif de Consultation</dt>
-              <dd id="crm-panel-motif"></dd>
+            <div class="crm-edit-field">
+              <label for="crm-edit-anesthetic">Anesthésie préférée</label>
+              <input class="waitlist-input" type="text" id="crm-edit-anesthetic">
             </div>
-            <div class="crm-side-panel-field crm-side-panel-field--block">
-              <dt>Notes</dt>
-              <dd id="crm-panel-observations" class="crm-side-panel-notes"></dd>
+            <div class="crm-edit-field">
+              <label for="crm-edit-xray">Dernière radio</label>
+              <input class="waitlist-input" type="date" id="crm-edit-xray">
             </div>
-          </dl>
+            <div class="crm-edit-field">
+              <label for="crm-edit-notes">Notes</label>
+              <textarea class="waitlist-input" id="crm-edit-notes" rows="3"></textarea>
+            </div>
+          </section>
+          <section class="crm-side-panel-section" aria-label="Comptes">
+            <h3 class="crm-side-panel-section-title">Comptes</h3>
+            <dl class="crm-side-panel-dl">
+              <div class="crm-side-panel-field">
+                <dt>Reste à charge (indicatif)</dt>
+                <dd id="crm-panel-copay">—</dd>
+              </div>
+            </dl>
+          </section>
+          <section class="crm-side-panel-section" aria-label="Consentement SMS">
+            <h3 class="crm-side-panel-section-title">Consentement SMS</h3>
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Accepte les rappels SMS</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="crm-edit-sms" checked>
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </section>
+          <button type="submit" class="btn-matte-primary crm-edit-save" id="crm-edit-save">Enregistrer</button>
+        </form>
+        <section class="crm-side-panel-section" aria-label="Dernières visites">
+          <h3 class="crm-side-panel-section-title">Dernières visites</h3>
+          <div id="crm-panel-visits" class="carnet-visits"></div>
         </section>
       </div>
     </aside>

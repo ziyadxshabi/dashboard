@@ -18,6 +18,7 @@ const { ensurePatient } = require('./patients');
 const CLINIC_OPEN = '08:00';
 const CLINIC_CLOSE = '19:00';
 const SLOT_STEP_MIN = 5;
+const HM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DUPLICATE_LOOKBACK_DAYS = 90;
 const DEFAULT_BLOCK_MIN = 60;
 const DEFAULT_HOLD_MIN = 30;
@@ -128,10 +129,43 @@ function formatHm(date) {
   });
 }
 
+function normalizeHm(raw, fallback) {
+  const value = String(raw || '').trim();
+  const match = value.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
+  if (!match) return fallback;
+  return `${String(match[1]).padStart(2, '0')}:${match[2]}`;
+}
+
+async function clinicHours(clinicId) {
+  const fallback = {
+    bufferMin: 10,
+    dayStart: CLINIC_OPEN,
+    dayEnd: CLINIC_CLOSE,
+    smsRemindersEnabled: true,
+  };
+  if (!clinicId) return fallback;
+  try {
+    const result = await query(
+      `SELECT buffer_min, day_start, day_end, sms_reminders_enabled
+       FROM clinics WHERE id = $1 LIMIT 1`,
+      [clinicId]
+    );
+    const row = result.rows[0] || {};
+    const buffer = Number(row.buffer_min);
+    return {
+      bufferMin: Number.isFinite(buffer) && buffer >= 0 ? buffer : 10,
+      dayStart: normalizeHm(row.day_start, CLINIC_OPEN),
+      dayEnd: normalizeHm(row.day_end, CLINIC_CLOSE),
+      smsRemindersEnabled: row.sms_reminders_enabled !== false,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 async function clinicBufferMin(clinicId) {
-  const result = await query('SELECT buffer_min FROM clinics WHERE id = $1 LIMIT 1', [clinicId]);
-  const value = Number(result.rows[0]?.buffer_min);
-  return Number.isFinite(value) && value >= 0 ? value : 10;
+  const hours = await clinicHours(clinicId);
+  return hours.bufferMin;
 }
 
 function busyEnd(row) {
@@ -145,9 +179,9 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && aEnd > bStart;
 }
 
-function findNextGap({ now, dateIso, durationMin, bufferMin, busyRows, fromTime }) {
-  const open = casablancaWallDate(dateIso, CLINIC_OPEN);
-  const close = casablancaWallDate(dateIso, CLINIC_CLOSE);
+function findNextGap({ now, dateIso, durationMin, bufferMin, busyRows, fromTime, openTime, closeTime }) {
+  const open = casablancaWallDate(dateIso, normalizeHm(openTime, CLINIC_OPEN));
+  const close = casablancaWallDate(dateIso, normalizeHm(closeTime, CLINIC_CLOSE));
   const needed = Math.max(1, durationMin) + Math.max(0, bufferMin);
   let cursor = fromTime
     ? casablancaWallDate(dateIso, fromTime)
@@ -219,7 +253,7 @@ async function createBookingRow(clinicId, fields) {
 }
 
 async function handleCatalog(res, session) {
-  const bufferMin = await clinicBufferMin(session.clinic_id);
+  const hours = await clinicHours(session.clinic_id);
   const today = casablancaDateTimeParts();
   const busy = await loadBusyForDate(session.clinic_id, today.date);
   const consultation = resolveTreatment('Consultation');
@@ -229,14 +263,19 @@ async function handleCatalog(res, session) {
     now,
     dateIso: today.date,
     durationMin,
-    bufferMin,
+    bufferMin: hours.bufferMin,
     busyRows: busy,
+    openTime: hours.dayStart,
+    closeTime: hours.dayEnd,
   });
   return res.status(200).json({
     ok: true,
     data: {
       treatments: listTreatments(),
-      buffer_min: bufferMin,
+      buffer_min: hours.bufferMin,
+      day_start: hours.dayStart,
+      day_end: hours.dayEnd,
+      sms_reminders_enabled: hours.smsRemindersEnabled,
       nextFreeSlot,
     },
   });
@@ -407,7 +446,8 @@ async function handleDeleteBlock(req, res, session) {
 
 async function handleCreate(req, res, session, parsed) {
   const value = parsed.value;
-  const bufferMin = await clinicBufferMin(session.clinic_id);
+  const hours = await clinicHours(session.clinic_id);
+  const bufferMin = hours.bufferMin;
 
   if (value.kind === 'visit') {
     if (session.role !== 'assistant') {
@@ -446,9 +486,14 @@ async function handleCreate(req, res, session, parsed) {
         durationMin: treatment.duration_min,
         bufferMin,
         busyRows: busy,
+        openTime: hours.dayStart,
+        closeTime: hours.dayEnd,
       });
       if (!gap) {
-        return res.status(409).json(createApiError('NO_GAP', "Aucun créneau libre aujourd'hui"));
+        return res.status(409).json(createApiError(
+          'NO_GAP',
+          'Aucun créneau libre aujourd\'hui (ouverture–fermeture).'
+        ));
       }
       startsAt = gap.startsAt;
       status = "En salle d'attente";
@@ -516,6 +561,8 @@ module.exports = {
   CLINIC_CLOSE,
   overlapError,
   clinicBufferMin,
+  clinicHours,
+  normalizeHm,
   findNextGap,
   loadBusyForDate,
   handleCatalog,

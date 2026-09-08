@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS clinics (
   twilio_from      TEXT,
   sms_booking_url  TEXT,
   buffer_min       INT NOT NULL DEFAULT 10,
+  day_start        TEXT NOT NULL DEFAULT '08:00',
+  day_end          TEXT NOT NULL DEFAULT '19:00',
+  sms_reminders_enabled BOOLEAN NOT NULL DEFAULT true,
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
@@ -250,6 +253,8 @@ CREATE TABLE IF NOT EXISTS patients (
   last_xray_on DATE,
   insurance_type TEXT,
   sms_consent BOOLEAN NOT NULL DEFAULT true,
+  email TEXT,
+  clinical_notes TEXT,
   last_inbound_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -24,6 +24,7 @@ function mapPatient(row) {
     clinic_id: row.clinic_id,
     phone_e164: row.phone_e164,
     display_name: row.display_name,
+    email: row.email || '',
     allergies: row.allergies || '',
     chronic_conditions: row.chronic_conditions || '',
     preferred_anesthetic: row.preferred_anesthetic || '',
@@ -31,6 +32,7 @@ function mapPatient(row) {
     insurance_type: row.insurance_type || null,
     insurance_label: insuranceLabel(row.insurance_type),
     sms_consent: row.sms_consent !== false,
+    clinical_notes: row.clinical_notes || '',
     last_inbound_at: row.last_inbound_at || null,
   };
 }
@@ -66,31 +68,167 @@ async function handlePatientPatch(req, res, session) {
     ? normalizeInsurance(body.insurance_type ?? body.insuranceType)
     : existing.insurance_type;
 
+  let phoneE164 = existing.phone_e164;
+  const phoneRaw = body.phone || body.phone_e164 || body.phoneE164 || body.telephone;
+  if (phoneRaw != null && String(phoneRaw).trim()) {
+    const nextPhone = toE164MA(phoneRaw);
+    if (!isValidMaMobileE164(nextPhone)) {
+      return res.status(400).json(createApiError('VALIDATION_ERROR', 'Numéro de téléphone invalide'));
+    }
+    if (nextPhone !== existing.phone_e164) {
+      const clash = await findPatientByPhone(session.clinic_id, nextPhone);
+      if (clash && String(clash.id) !== String(existing.id)) {
+        return res.status(409).json(createApiError('CONFLICT', 'Un dossier existe déjà avec ce numéro'));
+      }
+      phoneE164 = nextPhone;
+    }
+  }
+
+  const displayName = sanitizeString(body.display_name ?? body.displayName ?? body.name, 100);
+  const email = Object.prototype.hasOwnProperty.call(body, 'email')
+    ? (sanitizeString(body.email, 160) || null)
+    : existing.email;
+  const notes = Object.prototype.hasOwnProperty.call(body, 'clinical_notes')
+    || Object.prototype.hasOwnProperty.call(body, 'clinicalNotes')
+    || Object.prototype.hasOwnProperty.call(body, 'notes')
+    ? (sanitizeString(body.clinical_notes ?? body.clinicalNotes ?? body.notes, 1000) || null)
+    : existing.clinical_notes;
+
   const updated = await query(
     `UPDATE patients
      SET display_name = COALESCE(NULLIF($3, ''), display_name),
-         allergies = $4,
-         chronic_conditions = $5,
-         preferred_anesthetic = $6,
-         last_xray_on = $7::date,
-         insurance_type = $8,
-         sms_consent = COALESCE($9, sms_consent),
+         phone_e164 = $4,
+         email = $5,
+         allergies = $6,
+         chronic_conditions = $7,
+         preferred_anesthetic = $8,
+         last_xray_on = $9::date,
+         insurance_type = $10,
+         sms_consent = COALESCE($11, sms_consent),
+         clinical_notes = $12,
          updated_at = NOW()
      WHERE clinic_id = $1 AND id = $2
      RETURNING *`,
     [
       session.clinic_id,
       existing.id,
-      sanitizeString(body.display_name ?? body.displayName ?? body.name, 100),
-      sanitizeString(body.allergies, 500) || null,
-      sanitizeString(body.chronic_conditions ?? body.chronicConditions, 500) || null,
-      sanitizeString(body.preferred_anesthetic ?? body.preferredAnesthetic, 120) || null,
-      body.last_xray_on || body.lastXrayOn || null,
+      displayName,
+      phoneE164,
+      email,
+      Object.prototype.hasOwnProperty.call(body, 'allergies')
+        ? (sanitizeString(body.allergies, 500) || null)
+        : existing.allergies,
+      Object.prototype.hasOwnProperty.call(body, 'chronic_conditions') || Object.prototype.hasOwnProperty.call(body, 'chronicConditions')
+        ? (sanitizeString(body.chronic_conditions ?? body.chronicConditions, 500) || null)
+        : existing.chronic_conditions,
+      Object.prototype.hasOwnProperty.call(body, 'preferred_anesthetic') || Object.prototype.hasOwnProperty.call(body, 'preferredAnesthetic')
+        ? (sanitizeString(body.preferred_anesthetic ?? body.preferredAnesthetic, 120) || null)
+        : existing.preferred_anesthetic,
+      Object.prototype.hasOwnProperty.call(body, 'last_xray_on') || Object.prototype.hasOwnProperty.call(body, 'lastXrayOn')
+        ? (body.last_xray_on || body.lastXrayOn || null)
+        : existing.last_xray_on,
       insurance,
       typeof body.sms_consent === 'boolean' ? body.sms_consent : (typeof body.smsConsent === 'boolean' ? body.smsConsent : null),
+      notes,
     ]
   );
+
+  if (displayName) {
+    await query(
+      `UPDATE bookings
+       SET patient_name = $3, updated_at = NOW()
+       WHERE clinic_id = $1 AND patient_id = $2`,
+      [session.clinic_id, existing.id, displayName]
+    );
+  }
+  if (phoneE164 !== existing.phone_e164) {
+    await query(
+      `UPDATE bookings
+       SET patient_phone = $3, updated_at = NOW()
+       WHERE clinic_id = $1 AND patient_id = $2`,
+      [session.clinic_id, existing.id, phoneE164]
+    );
+  }
+
   return res.status(200).json({ ok: true, data: mapPatient(updated.rows[0]) });
+}
+
+function normalizeHmSetting(raw, fallback) {
+  const value = String(raw || '').trim();
+  const match = value.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
+  if (!match) return fallback;
+  return `${String(match[1]).padStart(2, '0')}:${match[2]}`;
+}
+
+async function handleClinicSettingsGet(_req, res, session) {
+  try {
+    const result = await query(
+      `SELECT buffer_min, day_start, day_end, sms_reminders_enabled
+       FROM clinics WHERE id = $1 LIMIT 1`,
+      [session.clinic_id]
+    );
+    const row = result.rows[0] || {};
+    return res.status(200).json({
+      ok: true,
+      data: {
+        buffer_min: Number(row.buffer_min) || 10,
+        day_start: normalizeHmSetting(row.day_start, '08:00'),
+        day_end: normalizeHmSetting(row.day_end, '19:00'),
+        sms_reminders_enabled: row.sms_reminders_enabled !== false,
+      },
+    });
+  } catch (err) {
+    return res.status(200).json({
+      ok: true,
+      data: {
+        buffer_min: 10,
+        day_start: '08:00',
+        day_end: '19:00',
+        sms_reminders_enabled: true,
+        degraded: true,
+        error: err?.message || 'settings_unavailable',
+      },
+    });
+  }
+}
+
+async function handleClinicSettingsPatch(req, res, session) {
+  const body = req.body ?? {};
+  const current = await query(
+    `SELECT buffer_min, day_start, day_end, sms_reminders_enabled
+     FROM clinics WHERE id = $1 LIMIT 1`,
+    [session.clinic_id]
+  );
+  const row = current.rows[0] || {};
+  const dayStart = Object.prototype.hasOwnProperty.call(body, 'day_start') || Object.prototype.hasOwnProperty.call(body, 'dayStart')
+    ? normalizeHmSetting(body.day_start ?? body.dayStart, row.day_start || '08:00')
+    : normalizeHmSetting(row.day_start, '08:00');
+  const dayEnd = Object.prototype.hasOwnProperty.call(body, 'day_end') || Object.prototype.hasOwnProperty.call(body, 'dayEnd')
+    ? normalizeHmSetting(body.day_end ?? body.dayEnd, row.day_end || '19:00')
+    : normalizeHmSetting(row.day_end, '19:00');
+  const smsEnabled = typeof body.sms_reminders_enabled === 'boolean'
+    ? body.sms_reminders_enabled
+    : (typeof body.smsRemindersEnabled === 'boolean'
+      ? body.smsRemindersEnabled
+      : row.sms_reminders_enabled !== false);
+
+  const updated = await query(
+    `UPDATE clinics
+     SET day_start = $2, day_end = $3, sms_reminders_enabled = $4
+     WHERE id = $1
+     RETURNING buffer_min, day_start, day_end, sms_reminders_enabled`,
+    [session.clinic_id, dayStart, dayEnd, smsEnabled]
+  );
+  const saved = updated.rows[0] || {};
+  return res.status(200).json({
+    ok: true,
+    data: {
+      buffer_min: Number(saved.buffer_min) || 10,
+      day_start: saved.day_start,
+      day_end: saved.day_end,
+      sms_reminders_enabled: saved.sms_reminders_enabled !== false,
+    },
+  });
 }
 
 async function handlePlansGet(req, res, session) {
@@ -328,6 +466,8 @@ module.exports = {
   mapPatient,
   handlePatientGet,
   handlePatientPatch,
+  handleClinicSettingsGet,
+  handleClinicSettingsPatch,
   handlePlansGet,
   handlePlanCreate,
   handlePlanStepPatch,

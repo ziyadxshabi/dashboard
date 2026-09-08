@@ -41,21 +41,38 @@ function inUnconfirmedWindow(startsAt, now = new Date()) {
 
 async function runReminders(clinicId, req) {
   const clinic = await loadClinicSmsConfig(clinicId);
+  try {
+    const pause = await query(
+      `SELECT sms_reminders_enabled FROM clinics WHERE id = $1 LIMIT 1`,
+      [clinicId]
+    );
+    if (pause.rows[0] && pause.rows[0].sms_reminders_enabled === false) {
+      return { ok: true, sent: [], skipped: [{ reason: 'sms_paused' }], window: 'T-24h±30m' };
+    }
+  } catch {
+    // Column may be missing before migration; continue sending.
+  }
   const url = clinicBookingUrl(clinic, req);
   const result = await query(
-    `SELECT id, clinic_id, patient_name, patient_phone, patient_email, starts_at, status::text AS status
-     FROM bookings
-     WHERE clinic_id = $1
-       AND COALESCE(booking_kind, 'visit') = 'visit'
-       AND status::text IN ('Confirme')
-       AND starts_at > NOW()
-       AND starts_at < NOW() + INTERVAL '36 hours'`,
+    `SELECT b.id, b.clinic_id, b.patient_name, b.patient_phone, b.patient_email, b.starts_at,
+            b.status::text AS status, p.sms_consent
+     FROM bookings b
+     LEFT JOIN patients p ON p.id = b.patient_id
+     WHERE b.clinic_id = $1
+       AND COALESCE(b.booking_kind, 'visit') = 'visit'
+       AND b.status::text IN ('Confirme')
+       AND b.starts_at > NOW()
+       AND b.starts_at < NOW() + INTERVAL '36 hours'`,
     [clinicId]
   );
   const due = (result.rows || []).filter((row) => inReminderWindow(row.starts_at));
   const sent = [];
   const skipped = [];
   for (const row of due) {
+    if (row.sms_consent === false) {
+      skipped.push({ id: row.id, reason: 'no_consent' });
+      continue;
+    }
     const e164 = toE164MA(row.patient_phone);
     if (!isValidMaMobileE164(e164)) {
       skipped.push({ id: row.id, reason: 'invalid_phone' });
