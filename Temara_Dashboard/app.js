@@ -4933,6 +4933,7 @@ let handoffNotes = [];
   }
 
   async function applyOpsStatus(bookingId, newStatus) {
+    if (!bookingId) return;
     const body = { bookingId, newStatus };
     if (newStatus === 'Annulé' || newStatus === 'Annule') {
       const reason = await pickCancelReason();

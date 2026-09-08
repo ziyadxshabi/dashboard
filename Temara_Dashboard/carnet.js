@@ -25,8 +25,7 @@
   function $(id) {
     const root = carnetRoot();
     if (root && root !== document) {
-      const scoped = root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
-      if (scoped) return scoped;
+      return root.querySelector('[id="' + String(id).replace(/"/g, '\\"') + '"]');
     }
     return document.getElementById(id);
   }

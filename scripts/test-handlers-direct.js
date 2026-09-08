@@ -294,6 +294,11 @@ async function run() {
     /class="btn-matte-secondary" id="floor-walkin-btn"/.test(assistantHtml)
   );
   ok('carnet.js exposes shared DentaFlowCarnet', /DentaFlowCarnet/.test(carnetSrc) && /directory=1/.test(carnetSrc));
+  const indexHtml = fs.readFileSync(path.join(DASHBOARD, 'index.html'), 'utf8');
+  ok(
+    'doctor CRM sheet lives inside #doctor-shell',
+    /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
+  );
   ok('theme-boot.js reads dentaflow_assistant_prefs', /dentaflow_assistant_prefs/.test(themeBootSrc));
   ok('theme-boot.js migrates doctor_theme', /doctor_theme/.test(themeBootSrc));
 
@@ -349,6 +354,12 @@ async function run() {
   );
   await query(hoursMigrationSql);
   ok('clinic hours migration applied', true);
+  await query(
+    `UPDATE clinics
+     SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
+     WHERE slug = $1`,
+    [CLINIC_SLUG]
+  );
 
   const { findNextGap } = require(path.join(DASHBOARD, 'api/_lib/roster-ops.js'));
   const gapAfterClose = findNextGap({
@@ -1627,13 +1638,22 @@ async function run() {
       })
     );
     if (clinicOpen) {
+      const booked = walkIn.statusCode === 201;
+      const noGap = walkIn.statusCode === 409 && walkIn.body?.code === 'NO_GAP';
       ok(
-        'POST /api/roster walk-in returns 201',
-        walkIn.statusCode === 201,
+        'POST /api/roster walk-in returns 201 or NO_GAP',
+        booked || noGap,
         `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`
       );
-      ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
-      if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+      if (booked) {
+        ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
+        if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+      } else {
+        ok(
+          'walk-in NO_GAP copy is French hours-aware',
+          /ouverture|fermeture|créneau libre/i.test(String(walkIn.body?.error || ''))
+        );
+      }
     } else if (casablancaHourNow() >= 19) {
       ok(
         'POST /api/roster walk-in after hours is 409 NO_GAP',

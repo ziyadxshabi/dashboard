@@ -3732,6 +3732,7 @@ function sortDoctorAppointmentsByTime(a, b) {
 
 async function updateRosterStatus(selectEl, previousStatus) {
   const bookingId = selectEl.dataset.bookingId || '';
+  if (!bookingId) return;
   const newStatus = selectEl.value;
 
   selectEl.disabled = true;
