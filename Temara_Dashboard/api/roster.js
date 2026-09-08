@@ -54,6 +54,13 @@ const ROSTER_COLUMNS = `
   bookings.staff_id,
   p.insurance_type,
   p.allergies,
+  p.chronic_conditions,
+  p.preferred_anesthetic,
+  p.last_xray_on,
+  p.sms_consent,
+  p.email AS patient_email,
+  p.clinical_notes,
+  p.display_name AS patient_display_name,
   (
     SELECT COUNT(*)::int
     FROM bookings n
@@ -102,8 +109,23 @@ const ROSTER_SEARCH_SQL = `
     AND (
       bookings.patient_name ILIKE $2
       OR bookings.patient_phone ILIKE $2
+      OR COALESCE(p.email, '') ILIKE $2
+      OR COALESCE(p.display_name, '') ILIKE $2
     )
     AND ($3::uuid IS NULL OR bookings.staff_id = $3)
+  ORDER BY bookings.starts_at DESC
+`;
+
+const ROSTER_DIRECTORY_SQL = `
+  SELECT ${ROSTER_COLUMNS}
+  ${ROSTER_FROM}
+  WHERE bookings.clinic_id = $1
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date
+      >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - ${SEARCH_LOOKBACK_DAYS}
+    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date
+      <= (NOW() AT TIME ZONE 'Africa/Casablanca')::date
+    AND COALESCE(bookings.booking_kind, 'visit') = 'visit'
+    AND ($2::uuid IS NULL OR bookings.staff_id = $2)
   ORDER BY bookings.starts_at DESC
 `;
 
@@ -116,6 +138,8 @@ const ROSTER_RANGE_SEARCH_SQL = `
     AND (
       bookings.patient_name ILIKE $4
       OR bookings.patient_phone ILIKE $4
+      OR COALESCE(p.email, '') ILIKE $4
+      OR COALESCE(p.display_name, '') ILIKE $4
     )
     AND ($5::uuid IS NULL OR bookings.staff_id = $5)
   ORDER BY bookings.starts_at DESC
@@ -168,6 +192,13 @@ function mapRosterRow(row) {
     insurance_type: row.insurance_type || null,
     insurance: insuranceLabel(row.insurance_type) || '',
     allergies: row.allergies || '',
+    chronic_conditions: row.chronic_conditions || '',
+    preferred_anesthetic: row.preferred_anesthetic || '',
+    last_xray_on: row.last_xray_on || null,
+    sms_consent: row.sms_consent !== false,
+    patient_email: row.patient_email || '',
+    email: row.patient_email || '',
+    clinical_notes: row.clinical_notes || '',
     copay_mad: expectedCopayMad(treatmentName, row.insurance_type),
   };
 }
@@ -326,6 +357,17 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  if (req.method === 'PATCH' && action === 'clinic-settings') {
+    applyCors(res, 'GET, POST, PATCH, OPTIONS');
+    const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
+    if (!session) return;
+    try {
+      return await roiOps.handleClinicSettingsPatch(req, res, session);
+    } catch (err) {
+      return sendDbError(res, err);
+    }
+  }
+
   if (req.method === 'PATCH' || (req.method === 'POST' && action === 'status')) {
     return handleStatusUpdate(req, res);
   }
@@ -348,6 +390,14 @@ module.exports = async function handler(req, res) {
       req.query = { ...(req.query || {}), id: searchParam(req, 'id'), phone: searchParam(req, 'phone') };
       try {
         return await roiOps.handlePatientGet(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'clinic-settings') {
+      try {
+        return await roiOps.handleClinicSettingsGet(req, res, session);
       } catch (err) {
         return sendDbError(res, err);
       }
@@ -398,6 +448,7 @@ module.exports = async function handler(req, res) {
     try {
       const like = parsedQuery.q ? `%${parsedQuery.q}%` : '';
       const staffId = parseStaffId(req);
+      const directory = searchParam(req, 'directory') === '1';
       let result;
       if (parsedRange.range && like) {
         result = await query(ROSTER_RANGE_SEARCH_SQL, [
@@ -409,6 +460,8 @@ module.exports = async function handler(req, res) {
         ]);
       } else if (like) {
         result = await query(ROSTER_SEARCH_SQL, [session.clinic_id, like, staffId]);
+      } else if (directory) {
+        result = await query(ROSTER_DIRECTORY_SQL, [session.clinic_id, staffId]);
       } else if (parsedRange.range) {
         result = await query(ROSTER_RANGE_SQL, [
           session.clinic_id,
@@ -445,6 +498,9 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'patient') {
       return await roiOps.handlePatientPatch(req, res, session);
+    }
+    if (action === 'clinic-settings') {
+      return await roiOps.handleClinicSettingsPatch(req, res, session);
     }
     if (action === 'plan') {
       return await roiOps.handlePlanCreate(req, res, session);

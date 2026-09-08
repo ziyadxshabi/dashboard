@@ -228,10 +228,6 @@
             <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
             Réglages
           </button>
-          <button type="button" class="actions-popover__item v-disabled" id="account-menu-billing" role="menuitem" disabled title="Fonctionnalité en déploiement">
-            <i data-lucide="credit-card" class="nav-icon" aria-hidden="true"></i>
-            Facturation
-          </button>
           <button type="button" class="actions-popover__item actions-popover__item--danger" id="account-menu-logout" role="menuitem">
             <i data-lucide="log-out" class="nav-icon" aria-hidden="true"></i>
             Déconnexion
@@ -738,8 +734,8 @@
       <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
         <header class="view-page-header view-page-header--row">
           <div>
-            <h2 class="view-page-title">Carnet</h2>
-            <p class="view-page-sub">Recherche par nom ou téléphone.</p>
+            <h2 class="view-page-title">Dossiers Patients</h2>
+            <p class="view-page-sub">90 derniers jours. Cliquez une ligne pour ouvrir et modifier le dossier.</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -765,7 +761,7 @@
           <div id="crm-content" hidden>
           <div id="crm-empty-state" class="ios-empty" hidden>
             <p class="ios-empty__title">Aucun dossier à afficher</p>
-            <p class="ios-empty__text">Les rendez-vous du jour apparaissent ici. Recherchez un nom ou un téléphone pour ouvrir un historique.</p>
+            <p class="ios-empty__text">Recherchez un nom ou un téléphone sur les 90 derniers jours.</p>
           </div>
           <div class="crm-table-scroll" data-lenis-prevent role="region" aria-label="Tableau des dossiers patients" tabindex="0">
             <table class="crm-table" id="crm-patient-table">
@@ -775,6 +771,7 @@
                   <th scope="col">Téléphone</th>
                   <th scope="col">Dernière visite</th>
                   <th scope="col">Soin</th>
+                  <th scope="col">Solde</th>
                   <th scope="col">No-shows (90 j)</th>
                 </tr>
               </thead>
@@ -961,7 +958,7 @@
               <i data-lucide="bell" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Notifications</h3>
-            <p class="settings-card-desc">Activez les rappels automatiques envoyés aux patients.</p>
+            <p class="settings-card-desc">Pause cabinet des rappels SMS. Le consentement patient reste dans le dossier. Les alertes sonores, s'il y en a, restent locales à cet appareil.</p>
 
             <div class="ios-group">
             <div class="settings-toggle-row">
@@ -978,10 +975,10 @@
             <div class="settings-toggle-row">
               <div class="settings-toggle-info">
                 <span class="settings-toggle-label">Rappels Email</span>
-                <span class="settings-toggle-hint">Confirmations et relances par e-mail</span>
+                <span class="settings-toggle-hint">Les e-mails ne sont pas envoyés depuis DentaFlow.</span>
               </div>
               <label class="settings-toggle">
-                <input type="checkbox" id="settings-email-toggle" checked />
+                <input type="checkbox" id="settings-email-toggle" disabled aria-disabled="true" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
             </div>
@@ -994,7 +991,7 @@
               <i data-lucide="clock" aria-hidden="true"></i>
             </div>
             <h3 class="settings-card-title">Horaires d'Ouverture</h3>
-            <p class="settings-card-desc">Plage horaire affichée sur le planning et les créneaux réservables.</p>
+            <p class="settings-card-desc">Utilisés pour le Walk-in, le prochain créneau libre et les créneaux posables.</p>
             <div class="settings-time-fields">
               <div class="settings-field">
                 <label class="settings-label" for="settings-day-start">Début de journée</label>
@@ -1003,7 +1000,7 @@
                   type="time"
                   id="settings-day-start"
                   name="day_start"
-                  value="09:00"
+                  value="08:00"
                 />
               </div>
               <div class="settings-field">
@@ -1013,10 +1010,11 @@
                   type="time"
                   id="settings-day-end"
                   name="day_end"
-                  value="18:00"
+                  value="19:00"
                 />
               </div>
             </div>
+            <button type="button" class="btn-matte-secondary" id="settings-hours-save">Enregistrer les horaires</button>
           </article>
 
           <!-- Card: Indisponibilités -->
@@ -1026,9 +1024,10 @@
             </div>
             <h3 class="settings-card-title">Indisponibilités</h3>
             <p class="settings-card-desc">
-              Pause, labo, jour off et urgence réservée se posent sur le calendrier.
-              Le portail public Cal.com peut encore proposer ces heures tant que la synchro n'est pas en place.
+              Créneaux bloqués ou annulés aujourd'hui. Les pauses se posent dans Cal.com.
+              Le portail public peut encore proposer ces heures tant que la synchro n'est pas en place.
             </p>
+            <ul class="settings-blocked-list" id="settings-blocked-slots"></ul>
           </article>
 
           <!-- Card 3: Sécurité -->
@@ -1108,29 +1107,12 @@
             </form>
           </article>
 
-          <!-- Card: Sauvegarde & Synchronisation -->
-          <article class="settings-card settings-card--wide">
-            <div class="settings-card-icon" aria-hidden="true">
-              <i data-lucide="cloud" aria-hidden="true"></i>
-            </div>
-            <h3 class="settings-card-title">Sauvegarde &amp; Synchronisation</h3>
-            <p class="settings-card-desc">État de la connexion entre le cabinet et l'infrastructure DentaFlow Cloud.</p>
-            <div class="settings-sync-status" role="status" aria-live="polite">
-              <span class="sync-dot ok settings-sync-status__dot" aria-hidden="true"></span>
-              <div class="settings-sync-status__text">
-                <span class="settings-sync-status__label">Statut de la base de données</span>
-                <span class="settings-sync-status__value">Connecté au Cloud</span>
-              </div>
-            </div>
-          </article>
-
         </div>
       </section>
 
     </main>
-  </div>
 
-  <!-- CRM — Dossier Patient slide-over panel -->
+  <!-- CRM — Dossier Patient slide-over panel (inside doctor-shell so assistant login cannot leave duplicate ids) -->
   <div id="crm-side-panel" class="crm-side-panel-root crm-modal-root" aria-hidden="true">
     <div class="crm-side-panel-overlay crm-modal-overlay" id="crm-side-panel-overlay" aria-hidden="true"></div>
     <aside
@@ -1152,6 +1134,69 @@
       </header>
 
       <div class="crm-side-panel-body" data-lenis-prevent>
+        <form class="crm-edit-grid" id="crm-edit-form">
+          <input type="hidden" id="crm-edit-id" value="">
+          <section class="crm-side-panel-section" aria-label="Identité">
+            <h3 class="crm-side-panel-section-title">Identité</h3>
+            <div class="crm-edit-field">
+              <label for="crm-edit-name">Nom</label>
+              <input class="waitlist-input" type="text" id="crm-edit-name" autocomplete="name">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-phone">Téléphone</label>
+              <input class="waitlist-input" type="tel" id="crm-edit-phone" autocomplete="tel">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-email">E-mail</label>
+              <input class="waitlist-input" type="email" id="crm-edit-email" autocomplete="email">
+            </div>
+          </section>
+          <section class="crm-side-panel-section" aria-label="Clinique">
+            <h3 class="crm-side-panel-section-title">Clinique</h3>
+            <div class="crm-edit-field">
+              <label for="crm-edit-allergies">Allergies</label>
+              <input class="waitlist-input" type="text" id="crm-edit-allergies">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-chronic">Pathologies chroniques</label>
+              <input class="waitlist-input" type="text" id="crm-edit-chronic">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-anesthetic">Anesthésie préférée</label>
+              <input class="waitlist-input" type="text" id="crm-edit-anesthetic">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-xray">Dernière radio</label>
+              <input class="waitlist-input" type="date" id="crm-edit-xray">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-notes">Notes</label>
+              <textarea class="waitlist-input" id="crm-edit-notes" rows="3"></textarea>
+            </div>
+          </section>
+          <section class="crm-side-panel-section" aria-label="Comptes">
+            <h3 class="crm-side-panel-section-title">Comptes</h3>
+            <dl class="crm-side-panel-dl">
+              <div class="crm-side-panel-field">
+                <dt>Reste à charge (indicatif)</dt>
+                <dd id="crm-panel-copay">—</dd>
+              </div>
+            </dl>
+          </section>
+          <section class="crm-side-panel-section" aria-label="Consentement SMS">
+            <h3 class="crm-side-panel-section-title">Consentement SMS</h3>
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-info">
+                <span class="settings-toggle-label">Accepte les rappels SMS</span>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="crm-edit-sms" checked>
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </section>
+          <button type="submit" class="btn-matte-primary crm-edit-save" id="crm-edit-save">Enregistrer</button>
+        </form>
         <section class="crm-side-panel-section" aria-label="Visites">
           <h3 class="crm-side-panel-section-title">Dernières visites</h3>
           <p class="chair-glance__empty" id="crm-panel-noshows" hidden></p>
@@ -1159,6 +1204,7 @@
         </section>
       </div>
     </aside>
+  </div>
   </div>
 
   <div id="assistant-shell" class="assistant-app-root" style="display: none;">
@@ -1180,6 +1226,7 @@
   <script src="row-ui.js"></script>
   <script src="notes.js"></script>
   <script src="ghost-select.js"></script>
+  <script src="carnet.js"></script>
   <script src="dashboard_app.js"></script>
   <script src="shared.js"></script>
   <script src="app.js"></script>

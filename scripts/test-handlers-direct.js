@@ -231,6 +231,37 @@ function casablancaHourNow() {
   );
 }
 
+async function pauseOverlappingBookings(clinicId, startsAt, durationMin = 20, bufferMin = 10) {
+  const overlapping = await query(
+    `SELECT id, status::text AS status
+     FROM bookings
+     WHERE clinic_id = $1
+       AND status::text NOT IN ('Annule', 'No-show')
+       AND public.booking_busy_range(starts_at, duration_min, buffer_min)
+           && public.booking_busy_range($2::timestamptz, $3::int, $4::int)`,
+    [clinicId, startsAt, durationMin, bufferMin]
+  );
+  const rows = overlapping.rows || [];
+  if (rows.length) {
+    await query(`UPDATE bookings SET status = 'Annule' WHERE id = ANY($1::uuid[])`, [
+      rows.map((row) => row.id),
+    ]);
+  }
+  return rows;
+}
+
+async function restorePausedBookings(rows) {
+  const seen = new Set();
+  for (const row of rows || []) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    await query(`UPDATE bookings SET status = $2::appointment_status WHERE id = $1`, [
+      row.id,
+      row.status,
+    ]);
+  }
+}
+
 async function run() {
   console.log('\n== Direct handler tests (PostgreSQL) ==\n');
 
@@ -251,6 +282,23 @@ async function run() {
     !/#reserver/.test(dashSrc) && !/\benterClientPortal\b/.test(dashSrc)
   );
   ok('app.js does not use demoStorage names', !/\bdemoStorage(Get|Set)\b/.test(appSrc));
+  ok(
+    'app.js maps Planning and Transmissions views',
+    /planning:\s*'view-planning'/.test(appSrc) && /handoff:\s*'view-handoff'/.test(appSrc)
+  );
+  const assistantHtml = fs.readFileSync(path.join(DASHBOARD, 'assistant-shell.html'), 'utf8');
+  const carnetSrc = fs.readFileSync(path.join(DASHBOARD, 'carnet.js'), 'utf8');
+  ok('assistant-shell has Planning and Transmissions pages', /id="view-planning"/.test(assistantHtml) && /id="view-handoff"/.test(assistantHtml));
+  ok(
+    'assistant-shell Walk-in is a visible secondary button',
+    /class="btn-matte-secondary" id="floor-walkin-btn"/.test(assistantHtml)
+  );
+  ok('carnet.js exposes shared DentaFlowCarnet', /DentaFlowCarnet/.test(carnetSrc) && /directory=1/.test(carnetSrc));
+  const indexHtml = fs.readFileSync(path.join(DASHBOARD, 'index.html'), 'utf8');
+  ok(
+    'doctor CRM sheet lives inside #doctor-shell',
+    /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
+  );
   ok('theme-boot.js reads dentaflow_assistant_prefs', /dentaflow_assistant_prefs/.test(themeBootSrc));
   ok('theme-boot.js migrates doctor_theme', /doctor_theme/.test(themeBootSrc));
 
@@ -299,6 +347,41 @@ async function run() {
   );
   await query(roiMigrationSql);
   ok('ROI loops migration applied', true);
+
+  const hoursMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260908_clinic_hours.sql'),
+    'utf8'
+  );
+  await query(hoursMigrationSql);
+  ok('clinic hours migration applied', true);
+  await query(
+    `UPDATE clinics
+     SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
+     WHERE slug = $1`,
+    [CLINIC_SLUG]
+  );
+
+  const { findNextGap } = require(path.join(DASHBOARD, 'api/_lib/roster-ops.js'));
+  const gapAfterClose = findNextGap({
+    now: new Date('2026-09-08T17:30:00.000+01:00'),
+    dateIso: '2026-09-08',
+    durationMin: 30,
+    bufferMin: 10,
+    busyRows: [],
+    openTime: '08:00',
+    closeTime: '18:00',
+  });
+  ok('findNextGap returns null after day_end', gapAfterClose == null);
+  const gapExtendedHours = findNextGap({
+    now: new Date('2026-09-08T17:30:00.000+01:00'),
+    dateIso: '2026-09-08',
+    durationMin: 30,
+    bufferMin: 10,
+    busyRows: [],
+    openTime: '08:00',
+    closeTime: '20:00',
+  });
+  ok('findNextGap uses extended day_end', Boolean(gapExtendedHours?.startsAt));
 
   await query(
     `UPDATE clinics
@@ -1555,13 +1638,22 @@ async function run() {
       })
     );
     if (clinicOpen) {
+      const booked = walkIn.statusCode === 201;
+      const noGap = walkIn.statusCode === 409 && walkIn.body?.code === 'NO_GAP';
       ok(
-        'POST /api/roster walk-in returns 201',
-        walkIn.statusCode === 201,
+        'POST /api/roster walk-in returns 201 or NO_GAP',
+        booked || noGap,
         `status=${walkIn.statusCode} body=${JSON.stringify(walkIn.body)}`
       );
-      ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
-      if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+      if (booked) {
+        ok("walk-in status is En salle d'attente", walkIn.body?.data?.status === "En salle d'attente");
+        if (walkIn.body?.data?.id) floorIds.push(walkIn.body.data.id);
+      } else {
+        ok(
+          'walk-in NO_GAP copy is French hours-aware',
+          /ouverture|fermeture|créneau libre/i.test(String(walkIn.body?.error || ''))
+        );
+      }
     } else if (casablancaHourNow() >= 19) {
       ok(
         'POST /api/roster walk-in after hours is 409 NO_GAP',
@@ -2031,6 +2123,7 @@ async function run() {
   }
 
   const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [] };
+  const pausedBusy = [];
   try {
     const confirmPhone = '0611987101';
     const confirmE164 = '+212611987101';
@@ -2246,6 +2339,13 @@ async function run() {
     if (prevCron == null) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = prevCron;
 
+    const unconfirmedTimes = await query(
+      `SELECT NOW() + INTERVAL '2 hours' AS in_window, NOW() + INTERVAL '5 hours' AS outside_window`
+    );
+    const inWindowAt = unconfirmedTimes.rows[0].in_window;
+    const outsideWindowAt = unconfirmedTimes.rows[0].outside_window;
+    pausedBusy.push(...(await pauseOverlappingBookings(clinicId, inWindowAt)));
+    pausedBusy.push(...(await pauseOverlappingBookings(clinicId, outsideWindowAt)));
     const unconfirmedIn = await query(
       `INSERT INTO bookings (
          clinic_id, patient_name, patient_phone, treatment_name, status,
@@ -2253,10 +2353,10 @@ async function run() {
        )
        VALUES (
          $1, 'Roi Unconfirmed', '0611987105', 'Consultation', 'Confirme',
-         NOW() + INTERVAL '2 hours', 20, 'visit', NOW()
+         $2, 20, 'visit', NOW()
        )
        RETURNING id`,
-      [clinicId]
+      [clinicId, inWindowAt]
     );
     roiIds.bookings.push(unconfirmedIn.rows[0].id);
     const unconfirmedOut = await query(
@@ -2266,10 +2366,10 @@ async function run() {
        )
        VALUES (
          $1, 'Roi Outside Window', '0611987106', 'Consultation', 'Confirme',
-         NOW() + INTERVAL '5 hours', 20, 'visit', NOW()
+         $2, 20, 'visit', NOW()
        )
        RETURNING id`,
-      [clinicId]
+      [clinicId, outsideWindowAt]
     );
     roiIds.bookings.push(unconfirmedOut.rows[0].id);
     const cronUnconfirmed = await invoke(
@@ -2334,6 +2434,89 @@ async function run() {
     ok('GET patient returns 200', patientGet.statusCode === 200 && patientGet.body?.ok === true);
     ok('GET patient stays clinic-scoped', patientGet.body?.data?.id === planPatient.rows[0].id);
 
+    const directoryGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?directory=1',
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET /api/roster?directory=1 returns 200',
+      directoryGet.statusCode === 200 && directoryGet.body?.ok === true,
+      `status=${directoryGet.statusCode}`
+    );
+    ok('directory payload is an array', Array.isArray(directoryGet.body?.data));
+
+    const settingsGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: '/api/roster?action=clinic-settings',
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET clinic-settings returns 200',
+      settingsGet.statusCode === 200 && settingsGet.body?.ok === true,
+      `status=${settingsGet.statusCode} body=${JSON.stringify(settingsGet.body)}`
+    );
+
+    const settingsPatch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=clinic-settings',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { day_start: '08:30', day_end: '20:00', sms_reminders_enabled: false },
+      })
+    );
+    ok(
+      'PATCH clinic-settings returns 200',
+      settingsPatch.statusCode === 200 && settingsPatch.body?.ok === true,
+      `status=${settingsPatch.statusCode} body=${JSON.stringify(settingsPatch.body)}`
+    );
+    ok('PATCH clinic-settings persists day_end', settingsPatch.body?.data?.day_end === '20:00');
+    ok(
+      'PATCH clinic-settings persists SMS pause',
+      settingsPatch.body?.data?.sms_reminders_enabled === false
+    );
+
+    const settingsRestore = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=clinic-settings',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { day_start: '08:00', day_end: '19:00', sms_reminders_enabled: true },
+      })
+    );
+    ok('clinic-settings restore returns 200', settingsRestore.statusCode === 200);
+
+    const patientPatch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: planPatient.rows[0].id,
+          name: 'Roi Plan',
+          allergies: 'Pénicilline',
+          notes: 'Note clinique carnet',
+          smsConsent: false,
+        },
+      })
+    );
+    ok(
+      'PATCH patient clinical fields returns 200',
+      patientPatch.statusCode === 200 && patientPatch.body?.ok === true,
+      `status=${patientPatch.statusCode} body=${JSON.stringify(patientPatch.body)}`
+    );
+    ok('PATCH patient persists allergies', patientPatch.body?.data?.allergies === 'Pénicilline');
+    ok('PATCH patient persists notes', patientPatch.body?.data?.clinical_notes === 'Note clinique carnet');
+
     const beforeDash = await invoke(
       handleDashboard,
       createReq({ method: 'GET', url: '/api/dashboard-data', headers: doctorCookie })
@@ -2395,6 +2578,11 @@ async function run() {
     if (Number(chargeCount.rows[0]?.n) === 0) {
       ok('mad_per_hour stays null when no charge_mad', beforeDash.body?.data?.mad_per_hour == null);
     }
+    const chargedAt = await query(
+      `SELECT ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '05:17')
+         AT TIME ZONE 'Africa/Casablanca' AS starts_at`
+    );
+    pausedBusy.push(...(await pauseOverlappingBookings(clinicId, chargedAt.rows[0].starts_at)));
     const charged = await query(
       `INSERT INTO bookings (
          clinic_id, patient_name, patient_phone, treatment_name, status,
@@ -2402,11 +2590,10 @@ async function run() {
        )
        VALUES (
          $1, 'Roi Charge', '0611987107', 'Consultation', 'Termine',
-         ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '18:50') AT TIME ZONE 'Africa/Casablanca',
-         20, 'visit', 200, NOW()
+         $2, 20, 'visit', 200, NOW()
        )
        RETURNING id`,
-      [clinicId]
+      [clinicId, chargedAt.rows[0].starts_at]
     );
     roiIds.bookings.push(charged.rows[0].id);
     const chargedDash = await invoke(
@@ -2546,6 +2733,7 @@ async function run() {
     if (roiIds.waitlist.length) await query('DELETE FROM waitlist WHERE id = ANY($1::uuid[])', [roiIds.waitlist]);
     if (roiIds.recalls.length) await query('DELETE FROM recalls WHERE id = ANY($1::uuid[])', [roiIds.recalls]);
     if (roiIds.patients.length) await query('DELETE FROM patients WHERE id = ANY($1::uuid[])', [roiIds.patients]);
+    await restorePausedBookings(pausedBusy);
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────

@@ -569,7 +569,7 @@ function validateStatusUpdate(body = {}) {
   if (!bookingId) {
     return {
       ok: false,
-      error: createApiError('VALIDATION_ERROR', 'bookingId is required'),
+      error: createApiError('VALIDATION_ERROR', 'Identifiant de rendez-vous manquant.'),
     };
   }
 
