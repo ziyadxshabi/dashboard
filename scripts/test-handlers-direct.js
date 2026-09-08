@@ -231,6 +231,37 @@ function casablancaHourNow() {
   );
 }
 
+async function pauseOverlappingBookings(clinicId, startsAt, durationMin = 20, bufferMin = 10) {
+  const overlapping = await query(
+    `SELECT id, status::text AS status
+     FROM bookings
+     WHERE clinic_id = $1
+       AND status::text NOT IN ('Annule', 'No-show')
+       AND public.booking_busy_range(starts_at, duration_min, buffer_min)
+           && public.booking_busy_range($2::timestamptz, $3::int, $4::int)`,
+    [clinicId, startsAt, durationMin, bufferMin]
+  );
+  const rows = overlapping.rows || [];
+  if (rows.length) {
+    await query(`UPDATE bookings SET status = 'Annule' WHERE id = ANY($1::uuid[])`, [
+      rows.map((row) => row.id),
+    ]);
+  }
+  return rows;
+}
+
+async function restorePausedBookings(rows) {
+  const seen = new Set();
+  for (const row of rows || []) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    await query(`UPDATE bookings SET status = $2::appointment_status WHERE id = $1`, [
+      row.id,
+      row.status,
+    ]);
+  }
+}
+
 async function run() {
   console.log('\n== Direct handler tests (PostgreSQL) ==\n');
 
@@ -251,6 +282,18 @@ async function run() {
     !/#reserver/.test(dashSrc) && !/\benterClientPortal\b/.test(dashSrc)
   );
   ok('app.js does not use demoStorage names', !/\bdemoStorage(Get|Set)\b/.test(appSrc));
+  ok(
+    'app.js maps Planning and Transmissions views',
+    /planning:\s*'view-planning'/.test(appSrc) && /handoff:\s*'view-handoff'/.test(appSrc)
+  );
+  const assistantHtml = fs.readFileSync(path.join(DASHBOARD, 'assistant-shell.html'), 'utf8');
+  const carnetSrc = fs.readFileSync(path.join(DASHBOARD, 'carnet.js'), 'utf8');
+  ok('assistant-shell has Planning and Transmissions pages', /id="view-planning"/.test(assistantHtml) && /id="view-handoff"/.test(assistantHtml));
+  ok(
+    'assistant-shell Walk-in is a visible secondary button',
+    /class="btn-matte-secondary" id="floor-walkin-btn"/.test(assistantHtml)
+  );
+  ok('carnet.js exposes shared DentaFlowCarnet', /DentaFlowCarnet/.test(carnetSrc) && /directory=1/.test(carnetSrc));
   ok('theme-boot.js reads dentaflow_assistant_prefs', /dentaflow_assistant_prefs/.test(themeBootSrc));
   ok('theme-boot.js migrates doctor_theme', /doctor_theme/.test(themeBootSrc));
 
@@ -2060,6 +2103,7 @@ async function run() {
   }
 
   const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [] };
+  const pausedBusy = [];
   try {
     const confirmPhone = '0611987101';
     const confirmE164 = '+212611987101';
@@ -2275,6 +2319,13 @@ async function run() {
     if (prevCron == null) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = prevCron;
 
+    const unconfirmedTimes = await query(
+      `SELECT NOW() + INTERVAL '2 hours' AS in_window, NOW() + INTERVAL '5 hours' AS outside_window`
+    );
+    const inWindowAt = unconfirmedTimes.rows[0].in_window;
+    const outsideWindowAt = unconfirmedTimes.rows[0].outside_window;
+    pausedBusy.push(...(await pauseOverlappingBookings(clinicId, inWindowAt)));
+    pausedBusy.push(...(await pauseOverlappingBookings(clinicId, outsideWindowAt)));
     const unconfirmedIn = await query(
       `INSERT INTO bookings (
          clinic_id, patient_name, patient_phone, treatment_name, status,
@@ -2282,10 +2333,10 @@ async function run() {
        )
        VALUES (
          $1, 'Roi Unconfirmed', '0611987105', 'Consultation', 'Confirme',
-         NOW() + INTERVAL '2 hours', 20, 'visit', NOW()
+         $2, 20, 'visit', NOW()
        )
        RETURNING id`,
-      [clinicId]
+      [clinicId, inWindowAt]
     );
     roiIds.bookings.push(unconfirmedIn.rows[0].id);
     const unconfirmedOut = await query(
@@ -2295,10 +2346,10 @@ async function run() {
        )
        VALUES (
          $1, 'Roi Outside Window', '0611987106', 'Consultation', 'Confirme',
-         NOW() + INTERVAL '5 hours', 20, 'visit', NOW()
+         $2, 20, 'visit', NOW()
        )
        RETURNING id`,
-      [clinicId]
+      [clinicId, outsideWindowAt]
     );
     roiIds.bookings.push(unconfirmedOut.rows[0].id);
     const cronUnconfirmed = await invoke(
@@ -2507,6 +2558,11 @@ async function run() {
     if (Number(chargeCount.rows[0]?.n) === 0) {
       ok('mad_per_hour stays null when no charge_mad', beforeDash.body?.data?.mad_per_hour == null);
     }
+    const chargedAt = await query(
+      `SELECT ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '05:17')
+         AT TIME ZONE 'Africa/Casablanca' AS starts_at`
+    );
+    pausedBusy.push(...(await pauseOverlappingBookings(clinicId, chargedAt.rows[0].starts_at)));
     const charged = await query(
       `INSERT INTO bookings (
          clinic_id, patient_name, patient_phone, treatment_name, status,
@@ -2514,11 +2570,10 @@ async function run() {
        )
        VALUES (
          $1, 'Roi Charge', '0611987107', 'Consultation', 'Termine',
-         ((NOW() AT TIME ZONE 'Africa/Casablanca')::date + TIME '18:50') AT TIME ZONE 'Africa/Casablanca',
-         20, 'visit', 200, NOW()
+         $2, 20, 'visit', 200, NOW()
        )
        RETURNING id`,
-      [clinicId]
+      [clinicId, chargedAt.rows[0].starts_at]
     );
     roiIds.bookings.push(charged.rows[0].id);
     const chargedDash = await invoke(
@@ -2658,6 +2713,7 @@ async function run() {
     if (roiIds.waitlist.length) await query('DELETE FROM waitlist WHERE id = ANY($1::uuid[])', [roiIds.waitlist]);
     if (roiIds.recalls.length) await query('DELETE FROM recalls WHERE id = ANY($1::uuid[])', [roiIds.recalls]);
     if (roiIds.patients.length) await query('DELETE FROM patients WHERE id = ANY($1::uuid[])', [roiIds.patients]);
+    await restorePausedBookings(pausedBusy);
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────
