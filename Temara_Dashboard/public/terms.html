@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conditions d’utilisation — DentaFlow OS</title>
+  <meta name="description" content="Licence logicielle DentaFlow OS pour cabinets dentaires (paiement unique, hébergement par le cabinet).">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/dentaflow-shared.css">
+  <link rel="stylesheet" href="/legal.css">
+</head>
+<body class="legal-page">
+  <article class="legal-shell">
+    <header>
+      <span class="legal-eyebrow">Licence cabinet</span>
+      <h1>Conditions d’utilisation</h1>
+      <p class="legal-updated">Dernière mise à jour : 10 septembre 2026</p>
+    </header>
+
+    <p>
+      DentaFlow OS est fourni au cabinet sous licence logicielle. Le modèle commercial
+      prévu est un <strong>paiement unique</strong> (exemple : 10 000 MAD). Le cabinet
+      paie ensuite son propre hébergement et ses SMS. Aucun paiement par carte
+      (CMI, Stripe) n’est intégré dans l’application.
+    </p>
+
+    <h2>Usage autorisé</h2>
+    <ul>
+      <li>personnel du cabinet (médecin, assistante) via un compte staff ;</li>
+      <li>patients : page publique de réservation, sans compte patient ;</li>
+      <li>une instance par cabinet, isolée par <code>clinic_id</code>.</li>
+    </ul>
+
+    <h2>Responsabilités</h2>
+    <ul>
+      <li>Le cabinet reste responsable du dossier médical et des déclarations CNDP.</li>
+      <li>Le cabinet choisit la région d’hébergement, les identifiants Twilio et Cal.com, et tourne les mots de passe seed.</li>
+      <li>L’éditeur ne déclare pas l’instance « certifiée CNDP ».</li>
+    </ul>
+
+    <h2>Données et minimisation</h2>
+    <p>
+      N’enregistrez dans DentaFlow que ce qui est nécessaire au soin et au rendez-vous.
+      Pas d’adresse de domicile, pas de CIN. Le consentement SMS est un opt-in
+      (Loi 09-08) : une case vide n’autorise pas l’envoi.
+    </p>
+
+    <h2>Disponibilité</h2>
+    <p>
+      Le logiciel est fourni « en l’état ». La disponibilité dépend de l’hébergeur
+      choisi par le cabinet (Vercel, PostgreSQL, Cal.com, Twilio).
+    </p>
+
+    <nav class="legal-nav" aria-label="Documents légaux">
+      <a href="/">Retour à la connexion</a>
+      <a href="/privacy.html">Politique de confidentialité</a>
+    </nav>
+  </article>
+</body>
+</html>

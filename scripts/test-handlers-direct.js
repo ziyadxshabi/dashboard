@@ -59,7 +59,7 @@ const handleTwilio = require(path.join(DASHBOARD, 'api/webhooks/twilio.js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 const { toE164MA, isValidMaMobileE164 } = require(path.join(DASHBOARD, 'api/_lib/phone-e164.js'));
-const { waitlistRank, pickWaitlistTopN } = require(path.join(DASHBOARD, 'api/_lib/waitlist-blast.js'));
+const { waitlistRank, pickWaitlistTopN, blastWaitlistSlot } = require(path.join(DASHBOARD, 'api/_lib/waitlist-blast.js'));
 const { inReminderWindow, daysBetweenCasablanca, inUnconfirmedWindow } = require(path.join(DASHBOARD, 'api/_lib/cron-notify.js'));
 const { tryAcquireLock } = require(path.join(DASHBOARD, 'api/_lib/notification-locks.js'));
 const {
@@ -299,6 +299,15 @@ async function run() {
     'doctor CRM sheet lives inside #doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );
+  ok(
+    'login footer links privacy and terms pages',
+    /href="\/privacy.html"/.test(indexHtml) && /href="\/terms.html"/.test(indexHtml)
+  );
+  const bookHtml = fs.readFileSync(path.join(DASHBOARD, 'book.html'), 'utf8');
+  ok(
+    'book.html discloses Cal.com, Twilio, and Loi 09-08',
+    /Cal\.com/.test(bookHtml) && /Twilio/.test(bookHtml) && /Loi 09-08/.test(bookHtml)
+  );
   ok('theme-boot.js reads dentaflow_assistant_prefs', /dentaflow_assistant_prefs/.test(themeBootSrc));
   ok('theme-boot.js migrates doctor_theme', /doctor_theme/.test(themeBootSrc));
 
@@ -354,6 +363,13 @@ async function run() {
   );
   await query(hoursMigrationSql);
   ok('clinic hours migration applied', true);
+
+  const consentMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260910_sms_consent_optin.sql'),
+    'utf8'
+  );
+  await query(consentMigrationSql);
+  ok('SMS consent opt-in migration applied', true);
   await query(
     `UPDATE clinics
      SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
@@ -786,12 +802,80 @@ async function run() {
         nom: patientName,
         telephone: '0612345678',
         priorite: 'Haute',
+        consent_sms: true,
       },
     })
   );
   ok('POST /api/waitlist returns 200', waitlistPost.statusCode === 200, `status=${waitlistPost.statusCode} body=${JSON.stringify(waitlistPost.body)}`);
   ok('POST /api/waitlist ok:true', waitlistPost.body?.ok === true);
   ok('POST /api/waitlist returns id', Boolean(waitlistPost.body?.id));
+
+  if (waitlistPost.body?.id) {
+    const consentRow = await query(
+      `SELECT sms_consent, consent_at FROM waitlist WHERE id = $1`,
+      [waitlistPost.body.id]
+    );
+    ok('POST /api/waitlist consent true persists sms_consent', consentRow.rows[0]?.sms_consent === true);
+    ok('POST /api/waitlist consent true persists consent_at', Boolean(consentRow.rows[0]?.consent_at));
+  }
+
+  const waitlistOmitConsent = await invoke(
+    handleWaitlist,
+    createReq({
+      method: 'POST',
+      url: '/api/waitlist',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: {
+        nom: 'Sans Consentement',
+        telephone: '0612345679',
+        priorite: 'Haute',
+      },
+    })
+  );
+  ok(
+    'POST /api/waitlist omit consent returns 400',
+    waitlistOmitConsent.statusCode === 400,
+    `status=${waitlistOmitConsent.statusCode}`
+  );
+
+  const noSmsName = `NoSms ${Date.now()}`;
+  const waitlistNoSms = await invoke(
+    handleWaitlist,
+    createReq({
+      method: 'POST',
+      url: '/api/waitlist',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: {
+        nom: noSmsName,
+        telephone: '0612987654',
+        priorite: 'Urgent',
+        consent_sms: false,
+      },
+    })
+  );
+  ok('POST /api/waitlist consent false returns 200', waitlistNoSms.statusCode === 200 && Boolean(waitlistNoSms.body?.id));
+  if (waitlistNoSms.body?.id) {
+    const noSmsRow = await query(
+      `SELECT sms_consent, consent_at FROM waitlist WHERE id = $1`,
+      [waitlistNoSms.body.id]
+    );
+    ok('POST /api/waitlist consent false stores false', noSmsRow.rows[0]?.sms_consent === false);
+    ok('POST /api/waitlist consent false leaves consent_at null', noSmsRow.rows[0]?.consent_at == null);
+    const others = await query(
+      `SELECT id FROM waitlist WHERE clinic_id = $1 AND status = 'active' AND id <> $2`,
+      [clinicId, waitlistNoSms.body.id]
+    );
+    const blast = await blastWaitlistSlot(clinicId, createReq({ method: 'POST', url: '/api/waitlist' }), {
+      topN: 1,
+      excludeIds: others.rows.map((row) => row.id),
+      batchId: `consent-test-${Date.now()}`,
+    });
+    const skippedNoConsent = (blast.skipped || []).some(
+      (row) => String(row.id) === String(waitlistNoSms.body.id) && row.reason === 'no_consent'
+    );
+    ok('waitlist blast skips sms_consent false', skippedNoConsent, JSON.stringify(blast.skipped || []));
+    await query('DELETE FROM waitlist WHERE id = $1', [waitlistNoSms.body.id]);
+  }
 
   const waitlistAfter = await invoke(
     handleWaitlist,

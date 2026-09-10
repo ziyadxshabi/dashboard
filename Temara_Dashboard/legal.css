@@ -1,0 +1,74 @@
+/* DentaFlow OS — privacy / terms pages (French, static). */
+
+.legal-page {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-sans, Inter, system-ui, sans-serif);
+  background: var(--bg-main, #f4f1ee);
+  color: var(--text-main, #1c1917);
+  line-height: 1.55;
+}
+
+.legal-shell {
+  width: min(44rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 3rem;
+}
+
+.legal-shell header {
+  margin-bottom: 1.75rem;
+}
+
+.legal-eyebrow {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6b635d);
+  margin-bottom: 0.35rem;
+}
+
+.legal-shell h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.legal-updated {
+  margin: 0;
+  color: var(--text-muted, #6b635d);
+  font-size: 0.9rem;
+}
+
+.legal-shell h2 {
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.legal-shell p,
+.legal-shell li {
+  font-size: 0.98rem;
+}
+
+.legal-shell ul {
+  padding-left: 1.2rem;
+}
+
+.legal-shell a {
+  color: inherit;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, rgba(15, 15, 15, 0.08));
+}
+
+.legal-nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}

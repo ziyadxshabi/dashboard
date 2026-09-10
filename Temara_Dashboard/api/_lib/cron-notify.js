@@ -69,7 +69,7 @@ async function runReminders(clinicId, req) {
   const sent = [];
   const skipped = [];
   for (const row of due) {
-    if (row.sms_consent === false) {
+    if (row.sms_consent !== true) {
       skipped.push({ id: row.id, reason: 'no_consent' });
       continue;
     }
@@ -178,7 +178,7 @@ async function runRecalls(clinicId, req) {
   for (const row of result.rows || []) {
     if (row.patient_id) {
       const consent = await query(`SELECT sms_consent FROM patients WHERE id = $1 LIMIT 1`, [row.patient_id]);
-      if (consent.rows[0] && consent.rows[0].sms_consent === false) {
+      if (!consent.rows[0] || consent.rows[0].sms_consent !== true) {
         skipped.push({ id: row.id, reason: 'no_consent' });
         continue;
       }

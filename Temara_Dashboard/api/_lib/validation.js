@@ -220,13 +220,21 @@ function validateWaitlistInput(body = {}) {
   }
 
   const consentRaw = body.consent_sms ?? body.sms_consent ?? body.consentSms;
+  if (consentRaw === undefined || consentRaw === null || consentRaw === '') {
+    return {
+      ok: false,
+      error: createApiError(
+        'VALIDATION_ERROR',
+        'Consentement SMS requis (Loi 09-08).'
+      ),
+      fields: ['sms_consent'],
+    };
+  }
   const smsConsent =
-    consentRaw === undefined || consentRaw === null || consentRaw === ''
-      ? true
-      : consentRaw === true ||
-        consentRaw === 1 ||
-        String(consentRaw).toLowerCase() === 'true' ||
-        String(consentRaw).toLowerCase() === 'oui';
+    consentRaw === true ||
+    consentRaw === 1 ||
+    String(consentRaw).toLowerCase() === 'true' ||
+    String(consentRaw).toLowerCase() === 'oui';
 
   return {
     ok: true,

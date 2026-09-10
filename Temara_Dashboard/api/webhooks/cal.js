@@ -321,6 +321,7 @@ module.exports = async function handler(req, res) {
         const patient = await ensurePatient(clinicId, {
           name: row.patient_name,
           phone: row.patient_phone,
+          smsConsent: true,
         });
         if (patient?.id) {
           await query(

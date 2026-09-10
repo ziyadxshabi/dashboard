@@ -31,7 +31,7 @@ function mapPatient(row) {
     last_xray_on: row.last_xray_on || null,
     insurance_type: row.insurance_type || null,
     insurance_label: insuranceLabel(row.insurance_type),
-    sms_consent: row.sms_consent !== false,
+    sms_consent: row.sms_consent === true,
     clinical_notes: row.clinical_notes || '',
     last_inbound_at: row.last_inbound_at || null,
   };

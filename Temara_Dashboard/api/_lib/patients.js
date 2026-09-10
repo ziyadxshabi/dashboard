@@ -18,7 +18,7 @@ async function ensurePatient(clinicId, { name, phone, smsConsent } = {}) {
   const e164 = toE164MA(phone);
   if (!isValidMaMobileE164(e164)) return null;
   const displayName = sanitizeString(name, 100) || 'Patient';
-  const consent = smsConsent !== false;
+  const consent = smsConsent === true;
 
   const existing = await query(
     `SELECT id, display_name, sms_consent

@@ -200,7 +200,7 @@ ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS sms_last_sid TEXT;
 
 ALTER TABLE waitlist
-  ADD COLUMN IF NOT EXISTS sms_consent BOOLEAN NOT NULL DEFAULT true;
+  ADD COLUMN IF NOT EXISTS sms_consent BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE waitlist
   ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ;
@@ -252,7 +252,7 @@ CREATE TABLE IF NOT EXISTS patients (
   preferred_anesthetic TEXT,
   last_xray_on DATE,
   insurance_type TEXT,
-  sms_consent BOOLEAN NOT NULL DEFAULT true,
+  sms_consent BOOLEAN NOT NULL DEFAULT false,
   email TEXT,
   clinical_notes TEXT,
   last_inbound_at TIMESTAMPTZ,
@@ -377,6 +377,10 @@ CREATE INDEX IF NOT EXISTS idx_sms_messages_clinic_created
 
 CREATE INDEX IF NOT EXISTS idx_sms_messages_sid
   ON sms_messages (twilio_sid);
+
+-- Law 09-08: SMS is opt-in. Existing true rows stay true; new rows default false.
+ALTER TABLE waitlist ALTER COLUMN sms_consent SET DEFAULT false;
+ALTER TABLE patients ALTER COLUMN sms_consent SET DEFAULT false;
 
 -- Seed: Clinique Dentaire Témara Mall
 -- cal_event_type_id matches Temara_Dashboard/book.js DEFAULT_CAL_LINK so the

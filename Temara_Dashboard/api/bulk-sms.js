@@ -80,7 +80,7 @@ async function loadConsentedPatients(clinicId) {
     `SELECT id, display_name AS patient_name, phone_e164 AS patient_phone
      FROM patients
      WHERE clinic_id = $1
-       AND sms_consent IS NOT FALSE
+       AND sms_consent IS TRUE
        AND phone_e164 <> ''
      LIMIT 100`,
     [clinicId]

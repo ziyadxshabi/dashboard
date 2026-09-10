@@ -195,7 +195,7 @@ function mapRosterRow(row) {
     chronic_conditions: row.chronic_conditions || '',
     preferred_anesthetic: row.preferred_anesthetic || '',
     last_xray_on: row.last_xray_on || null,
-    sms_consent: row.sms_consent !== false,
+    sms_consent: row.sms_consent === true,
     patient_email: row.patient_email || '',
     email: row.patient_email || '',
     clinical_notes: row.clinical_notes || '',
