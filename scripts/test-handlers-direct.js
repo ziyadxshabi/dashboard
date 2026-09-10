@@ -884,7 +884,7 @@ async function run() {
     `status=${waitlistOmitConsent.statusCode}`
   );
 
-  const noSmsName = `NoSms ${Date.now()}`;
+  const noSmsName = 'Patient Sans Sms';
   const waitlistNoSms = await invoke(
     handleWaitlist,
     createReq({
@@ -899,7 +899,11 @@ async function run() {
       },
     })
   );
-  ok('POST /api/waitlist consent false returns 200', waitlistNoSms.statusCode === 200 && Boolean(waitlistNoSms.body?.id));
+  ok(
+    'POST /api/waitlist consent false returns 200',
+    waitlistNoSms.statusCode === 200 && Boolean(waitlistNoSms.body?.id),
+    `status=${waitlistNoSms.statusCode} body=${JSON.stringify(waitlistNoSms.body)}`
+  );
   if (waitlistNoSms.body?.id) {
     const noSmsRow = await query(
       `SELECT sms_consent, consent_at FROM waitlist WHERE id = $1`,
