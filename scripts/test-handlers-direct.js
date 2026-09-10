@@ -370,6 +370,13 @@ async function run() {
   );
   await query(consentMigrationSql);
   ok('SMS consent opt-in migration applied', true);
+
+  const auditMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260910_audit_events.sql'),
+    'utf8'
+  );
+  await query(auditMigrationSql);
+  ok('audit_events migration applied', true);
   await query(
     `UPDATE clinics
      SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
@@ -2517,6 +2524,105 @@ async function run() {
     );
     ok('GET patient returns 200', patientGet.statusCode === 200 && patientGet.body?.ok === true);
     ok('GET patient stays clinic-scoped', patientGet.body?.data?.id === planPatient.rows[0].id);
+
+    const patientExport = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient-export&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    const exportJson = JSON.stringify(patientExport.body || {});
+    ok(
+      'GET patient-export returns 200',
+      patientExport.statusCode === 200 && patientExport.body?.ok === true,
+      `status=${patientExport.statusCode}`
+    );
+    ok('patient-export includes dossier', patientExport.body?.data?.patient?.id === planPatient.rows[0].id);
+    ok(
+      'patient-export does not include address or CIN',
+      !/"address"/i.test(exportJson) && !/"cin"/i.test(exportJson)
+    );
+    const exportAudit = await query(
+      `SELECT action FROM audit_events
+       WHERE clinic_id = $1 AND entity_id = $2 AND action = 'patient.export'
+       ORDER BY created_at DESC LIMIT 1`,
+      [clinicId, planPatient.rows[0].id]
+    );
+    ok('patient-export writes audit_events', exportAudit.rows[0]?.action === 'patient.export');
+
+    const foreignExport = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient-export&id=${planPatient.rows[0].id}`,
+        headers: {
+          cookie: cookieHeader(
+            signJwt(
+              {
+                sub: '00000000-0000-4000-8000-000000000099',
+                role: 'doctor',
+                clinic_id: '00000000-0000-4000-8000-000000000001',
+                slug: 'other-clinic',
+              },
+              process.env.JWT_SECRET
+            )
+          ),
+        },
+      })
+    );
+    ok(
+      'patient-export foreign clinic returns 404',
+      foreignExport.statusCode === 404,
+      `status=${foreignExport.statusCode}`
+    );
+
+    const eraseBooking = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, patient_id
+       ) VALUES (
+         $1, 'Roi Plan', '+212611987199', 'Consultation', 'Confirme',
+         NOW() + INTERVAL '9 days', 30, 'visit', $2
+       ) RETURNING id`,
+      [clinicId, planPatient.rows[0].id]
+    );
+    roiIds.bookings.push(eraseBooking.rows[0].id);
+
+    const patientErase = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=patient-erase',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { id: planPatient.rows[0].id },
+      })
+    );
+    ok(
+      'POST patient-erase returns 200',
+      patientErase.statusCode === 200 && patientErase.body?.ok === true,
+      `status=${patientErase.statusCode} body=${JSON.stringify(patientErase.body)}`
+    );
+    ok(
+      'patient-erase anonymizes name',
+      patientErase.body?.data?.display_name === 'Anonymisé'
+    );
+    const erasedBooking = await query(
+      `SELECT patient_name, patient_phone, starts_at FROM bookings WHERE id = $1`,
+      [eraseBooking.rows[0].id]
+    );
+    ok(
+      'patient-erase keeps booking slot',
+      Boolean(erasedBooking.rows[0]?.starts_at) && erasedBooking.rows[0]?.patient_name === 'Anonymisé'
+    );
+    const eraseAudit = await query(
+      `SELECT action FROM audit_events
+       WHERE clinic_id = $1 AND entity_id = $2 AND action = 'patient.erase'
+       ORDER BY created_at DESC LIMIT 1`,
+      [clinicId, planPatient.rows[0].id]
+    );
+    ok('patient-erase writes audit_events', eraseAudit.rows[0]?.action === 'patient.erase');
 
     const directoryGet = await invoke(
       handleRoster,

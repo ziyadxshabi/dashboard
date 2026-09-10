@@ -13,6 +13,7 @@ const {
   validateWaitlistInput,
 } = require('./_lib/validation');
 const { ensurePatient } = require('./_lib/patients');
+const { writeAudit } = require('./_lib/audit');
 
 const WAITLIST_GET_SQL = `
   SELECT id, patient_name, patient_phone, patient_id, priority, notes, status, created_at, sms_consent, last_notified_at
@@ -90,6 +91,7 @@ async function handlePost(req, res, session) {
     patient?.id || null,
   ]);
   const insertedRow = result.rows[0];
+  await writeAudit(session, { action: 'waitlist.insert', entity: 'waitlist', entityId: insertedRow.id });
 
   return res.status(200).json({
     ok: true,

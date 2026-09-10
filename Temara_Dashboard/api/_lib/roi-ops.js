@@ -6,6 +6,7 @@
 
 const { query } = require('./db');
 const { createApiError, sanitizeString, UUID_RE } = require('./validation');
+const { writeAudit } = require('./audit');
 const { toE164MA, isValidMaMobileE164, displayNameUpper } = require('./phone-e164');
 const {
   ensurePatient,
@@ -149,6 +150,8 @@ async function handlePatientPatch(req, res, session) {
       [session.clinic_id, existing.id, phoneE164]
     );
   }
+
+  await writeAudit(session, { action: 'patient.patch', entity: 'patient', entityId: existing.id });
 
   return res.status(200).json({ ok: true, data: mapPatient(updated.rows[0]) });
 }
@@ -458,6 +461,156 @@ async function handleMembershipsGet(res, session) {
   return res.status(200).json({ ok: true, data: result.rows || [] });
 }
 
+async function resolvePatient(session, req) {
+  const body = req.body || {};
+  const id = String(req.query?.id || body.id || body.patientId || body.patient_id || '').trim();
+  const phone = String(req.query?.phone || body.phone || body.telephone || '').trim();
+  if (id) return getPatientForClinic(session.clinic_id, id);
+  if (phone) return findPatientByPhone(session.clinic_id, phone);
+  return null;
+}
+
+async function handlePatientExport(req, res, session) {
+  const row = await resolvePatient(session, req);
+  if (!row) {
+    const id = String(req.query?.id || req.body?.id || '').trim();
+    const phone = String(req.query?.phone || req.body?.phone || '').trim();
+    if (!id && !phone) {
+      return res.status(400).json(createApiError('VALIDATION_ERROR', 'id or phone is required'));
+    }
+    return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
+  }
+
+  const [bookings, waitlist, notes, sms] = await Promise.all([
+    query(
+      `SELECT id, patient_name, patient_phone, patient_email, treatment_name, status::text AS status,
+              starts_at, duration_min, notes, charge_mad, created_at
+       FROM bookings
+       WHERE clinic_id = $1 AND patient_id = $2
+       ORDER BY starts_at DESC`,
+      [session.clinic_id, row.id]
+    ),
+    query(
+      `SELECT id, patient_name, patient_phone, priority::text AS priority, notes, status, sms_consent, consent_at, created_at
+       FROM waitlist
+       WHERE clinic_id = $1 AND patient_id = $2
+       ORDER BY created_at DESC`,
+      [session.clinic_id, row.id]
+    ),
+    query(
+      `SELECT id, patient_name, author_name, content, category, created_at
+       FROM team_notes
+       WHERE clinic_id = $1 AND patient_id = $2
+       ORDER BY created_at DESC`,
+      [session.clinic_id, row.id]
+    ),
+    query(
+      `SELECT id, purpose, to_phone, body, status, created_at
+       FROM sms_messages
+       WHERE clinic_id = $1
+         AND (booking_id IN (SELECT id FROM bookings WHERE clinic_id = $1 AND patient_id = $2)
+           OR waitlist_id IN (SELECT id FROM waitlist WHERE clinic_id = $1 AND patient_id = $2)
+           OR to_phone = $3)
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [session.clinic_id, row.id, row.phone_e164]
+    ),
+  ]);
+
+  await writeAudit(session, { action: 'patient.export', entity: 'patient', entityId: row.id });
+
+  return res.status(200).json({
+    ok: true,
+    data: {
+      patient: mapPatient(row),
+      bookings: bookings.rows || [],
+      waitlist: waitlist.rows || [],
+      team_notes: notes.rows || [],
+      sms_messages: sms.rows || [],
+    },
+  });
+}
+
+async function handlePatientErase(req, res, session) {
+  const row = await resolvePatient(session, req);
+  if (!row) {
+    const id = String(req.query?.id || req.body?.id || '').trim();
+    const phone = String(req.query?.phone || req.body?.phone || '').trim();
+    if (!id && !phone) {
+      return res.status(400).json(createApiError('VALIDATION_ERROR', 'id or phone is required'));
+    }
+    return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
+  }
+
+  const erasedPhone = `erased:${row.id}`;
+  await query(
+    `UPDATE bookings
+     SET patient_name = 'Anonymisé',
+         patient_phone = $3,
+         patient_email = NULL,
+         notes = NULL,
+         updated_at = NOW()
+     WHERE clinic_id = $1 AND patient_id = $2`,
+    [session.clinic_id, row.id, erasedPhone]
+  );
+  await query(
+    `UPDATE waitlist
+     SET patient_name = 'Anonymisé',
+         patient_phone = $3,
+         notes = NULL,
+         sms_consent = false,
+         consent_at = NULL
+     WHERE clinic_id = $1 AND patient_id = $2`,
+    [session.clinic_id, row.id, erasedPhone]
+  );
+  await query(
+    `UPDATE team_notes
+     SET patient_name = 'Anonymisé',
+         content = '[effacé]'
+     WHERE clinic_id = $1 AND patient_id = $2`,
+    [session.clinic_id, row.id]
+  );
+  await query(
+    `UPDATE recalls
+     SET patient_name = 'Anonymisé',
+         patient_phone = $3
+     WHERE clinic_id = $1 AND patient_id = $2`,
+    [session.clinic_id, row.id, erasedPhone]
+  );
+  await query(
+    `UPDATE sms_messages
+     SET to_phone = $3,
+         body = '[effacé]',
+         updated_at = NOW()
+     WHERE clinic_id = $1
+       AND (booking_id IN (SELECT id FROM bookings WHERE clinic_id = $1 AND patient_id = $2)
+         OR waitlist_id IN (SELECT id FROM waitlist WHERE clinic_id = $1 AND patient_id = $2)
+         OR to_phone = $4)`,
+    [session.clinic_id, row.id, erasedPhone, row.phone_e164]
+  );
+  await query(
+    `UPDATE patients
+     SET display_name = 'Anonymisé',
+         phone_e164 = $3,
+         email = NULL,
+         allergies = NULL,
+         chronic_conditions = NULL,
+         preferred_anesthetic = NULL,
+         last_xray_on = NULL,
+         insurance_type = NULL,
+         clinical_notes = NULL,
+         sms_consent = false,
+         updated_at = NOW()
+     WHERE clinic_id = $1 AND id = $2`,
+    [session.clinic_id, row.id, erasedPhone]
+  );
+
+  await writeAudit(session, { action: 'patient.erase', entity: 'patient', entityId: row.id });
+
+  const erased = await getPatientForClinic(session.clinic_id, row.id);
+  return res.status(200).json({ ok: true, data: mapPatient(erased) });
+}
+
 function copayFor(treatmentName, insuranceType) {
   return expectedCopayMad(treatmentName, insuranceType);
 }
@@ -466,6 +619,8 @@ module.exports = {
   mapPatient,
   handlePatientGet,
   handlePatientPatch,
+  handlePatientExport,
+  handlePatientErase,
   handleClinicSettingsGet,
   handleClinicSettingsPatch,
   handlePlansGet,

@@ -12,7 +12,7 @@ This is not a Baserow, Google Sheets, or n8n application. Those prototype paths 
 ## Operational features
 
 - **Unified staff UI** at `/` — one login gate; `doctor` and `assistant` shells after `dentaflow_session` is set.
-- **Public booking** at `/book/:slug` — clinic theme + Cal.com embed, no JWT.
+- **Public booking** at `/book/:slug` — clinic theme + Cal.com embed, no JWT. Privacy notice: `/privacy.html`.
 - **Direct PostgreSQL APIs** — roster, waitlist, fill-gap, team notes, dashboard KPIs, bulk-SMS audit log, status updates.
 - **Cal.com sync** — `POST /api/webhooks/cal` upserts and cancels `bookings`.
 - **Cookie auth** — scrypt password hashes in `staff_users`, HS256 JWT in httpOnly `dentaflow_session`. Usernames/roles accept `docteur`/`doctor` and `assistante`/`assistant`.
@@ -144,6 +144,7 @@ Do not deploy `_attic/`.
 | `scripts/test-handlers-direct.js` | Direct handler tests |
 | `SYSTEM_ARCHITECTURE.md` | Runtime architecture |
 | `ENV_LEDGER.md` | Environment variables |
+| `DATA_INVENTORY.md` | Fields collected, purposes, what is not stored (no address/CIN) |
 | `_attic/` | Deprecated PIN-era assistant UI |
 
 ---

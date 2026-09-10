@@ -91,6 +91,7 @@ Canonical SQL: `supabase/schema.sql`. Access: `Temara_Dashboard/api/_lib/db.js` 
 | `staff_users` | Per-clinic unique `username`, scrypt `password_hash`, role `doctor` \| `assistant`, `display_name` |
 | `bookings` | Appointments (`cal_booking_uid`, patient, `appointment_status`, `starts_at`) |
 | `waitlist` | Active / filled candidates, `waitlist_priority`, `sms_consent`, `last_notified_at` |
+| `audit_events` | Staff actions on dossiers (export, erase, patch, waitlist insert) |
 | `team_notes` | Clinic-scoped notes (`author_name` / `content`, `pinned`, `category`) |
 | `sms_dispatch_log` | Bulk SMS audit rows (message, recipient count, JSON recipients) — written only after a SID |
 | `sms_messages` | Per-message Twilio SID, status, purpose (Concierge / reminder / waitlist / voice) |
