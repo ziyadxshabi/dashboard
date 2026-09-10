@@ -449,6 +449,45 @@ async function run() {
   const waitlistAnon = await invoke(handleWaitlist, createReq({ method: 'GET', url: '/api/waitlist', headers: {} }));
   ok('GET /api/waitlist without cookie returns 401', waitlistAnon.statusCode === 401);
 
+  const slugTenant = await invoke(
+    handleRoster,
+    createReq({
+      method: 'GET',
+      url: '/api/roster',
+      headers: {
+        cookie: cookieHeader(
+          signJwt(
+            { sub: '00000000-0000-4000-8000-000000000099', role: 'assistant', clinic_id: 'temara', slug: 'temara' },
+            process.env.JWT_SECRET
+          )
+        ),
+      },
+    })
+  );
+  ok(
+    'GET /api/roster JWT clinic_id slug returns 401',
+    slugTenant.statusCode === 401,
+    `status=${slugTenant.statusCode}`
+  );
+
+  const missingTenant = await invoke(
+    handleRoster,
+    createReq({
+      method: 'GET',
+      url: '/api/roster',
+      headers: {
+        cookie: cookieHeader(
+          signJwt({ sub: '00000000-0000-4000-8000-000000000099', role: 'assistant', slug: 'temara' }, process.env.JWT_SECRET)
+        ),
+      },
+    })
+  );
+  ok(
+    'GET /api/roster JWT without clinic_id returns 401',
+    missingTenant.statusCode === 401,
+    `status=${missingTenant.statusCode}`
+  );
+
   const notesAnon = await invoke(handleTeamNotes, createReq({ method: 'GET', url: '/api/team-notes', headers: {} }));
   ok('GET /api/team-notes without cookie returns 401', notesAnon.statusCode === 401);
 

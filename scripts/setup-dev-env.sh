@@ -58,7 +58,8 @@ VERCEL_FRONTEND_URL=
 
 # Direct PostgreSQL for Wave 1 operational APIs (roster, waitlist, KPIs, status).
 DATABASE_URL=postgres://dentaflow:dentaflow@127.0.0.1:5432/dentaflow
-CLINIC_ID=temara
+
+# CLINIC_ID is unused. Tenant scope is JWT clinic_id (UUID).
 
 # External integrations are intentionally left unset for local dev.
 # Populate these to exercise remaining n8n/Redis-backed proxy endpoints:

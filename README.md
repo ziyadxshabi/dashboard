@@ -49,7 +49,6 @@ For **Supabase** (typical cloud/dev against production-like data), put the poole
 ```text
 DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-1-<region>.pooler.supabase.com:6543/postgres
 JWT_SECRET=<at-least-32-chars>
-CLINIC_ID=temara
 ```
 
 Optional: `CALCOM_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`. Full list: `ENV_LEDGER.md`.
@@ -122,7 +121,6 @@ The dashboard package forwards the same commands (`Temara_Dashboard/package.json
    | --- | --- |
    | `DATABASE_URL` | Yes (pooler `:6543`) |
    | `JWT_SECRET` | Yes |
-   | `CLINIC_ID` | `temara` unless you change the default slug |
    | `CALCOM_WEBHOOK_SECRET` | Yes in production |
    | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Optional |
 
@@ -145,6 +143,7 @@ Do not deploy `_attic/`.
 | `SYSTEM_ARCHITECTURE.md` | Runtime architecture |
 | `ENV_LEDGER.md` | Environment variables |
 | `DATA_INVENTORY.md` | Fields collected, purposes, what is not stored (no address/CIN) |
+| `docs/deploy-your-clinic.md` | Per-clinic Vercel + Postgres install (licensee hosts) |
 | `_attic/` | Deprecated PIN-era assistant UI |
 
 ---

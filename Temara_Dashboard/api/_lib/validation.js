@@ -57,6 +57,7 @@ const WAITLIST_PRIORITIES = Object.freeze(['Faible', 'Moyenne', 'Haute', 'Urgent
 const BOOKING_KINDS = Object.freeze(['visit', 'block', 'emergency_hold']);
 const CANCEL_REASONS = Object.freeze(['oublie', 'cout', 'reprogramme', 'autre']);
 const ISO_INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ERROR_DEFAULTS = {
   UNAUTHORIZED: 'Unauthorized',
@@ -158,13 +159,13 @@ function requireClinicSession(req, res, options = {}) {
     return null;
   }
 
-  const clinicId = payload.clinic_id || payload.clinicId || process.env.CLINIC_ID || null;
-  if (!clinicId) {
+  const clinicId = payload.clinic_id || payload.clinicId || null;
+  if (!clinicId || !UUID_RE.test(String(clinicId))) {
     res.status(401).json(createApiError('UNAUTHORIZED'));
     return null;
   }
 
-  return { ...payload, clinic_id: clinicId };
+  return { ...payload, clinic_id: String(clinicId) };
 }
 
 function sendDbError(res, err, extras = {}) {
@@ -248,7 +249,6 @@ function validateWaitlistInput(body = {}) {
   };
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLOT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SLOT_TIME_RE = /^\d{2}:\d{2}$/;
 
