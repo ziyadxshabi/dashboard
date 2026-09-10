@@ -144,6 +144,7 @@ Do not deploy `_attic/`.
 | `ENV_LEDGER.md` | Environment variables |
 | `DATA_INVENTORY.md` | Fields collected, purposes, what is not stored (no address/CIN) |
 | `docs/deploy-your-clinic.md` | Per-clinic Vercel + Postgres install (licensee hosts) |
+| `docs/legal/` | DPA-style clauses, CNDP checklist, subprocessors (templates, not a filing) |
 | `_attic/` | Deprecated PIN-era assistant UI |
 
 ---
