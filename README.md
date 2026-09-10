@@ -97,7 +97,9 @@ From the **repository root**:
 npm test
 ```
 
-This runs `node scripts/test-handlers-direct.js` against PostgreSQL using `DATABASE_URL` and `JWT_SECRET` from `.env.local`. Expect **130 passed, 0 failed**.
+This runs `node scripts/check-static-mirrors.js` (source vs `Temara_Dashboard/public/`) then `node scripts/test-handlers-direct.js` against PostgreSQL using `DATABASE_URL` and `JWT_SECRET` from `.env.local`.
+
+CI (`.github/workflows/test.yml`) always checks static mirrors. Handler tests run only when `DATABASE_URL` and `JWT_SECRET` repository secrets are set.
 
 HTTP smoke against the local server (spawns `scripts/dev-server.js` if port 3000 is down):
 

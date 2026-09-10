@@ -1,0 +1,27 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Static mirrors
+        run: node scripts/check-static-mirrors.js
+      - name: Handler tests
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$JWT_SECRET" ]; then
+            echo "Skipping handler tests (DATABASE_URL / JWT_SECRET secrets not set)."
+            exit 0
+          fi
+          npm ci
+          node scripts/test-handlers-direct.js
