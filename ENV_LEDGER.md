@@ -34,13 +34,13 @@ HS256 signing key for the httpOnly `dentaflow_session` cookie.
 - Claims: `sub`, `role`, `clinic_id`, `slug`.
 - Production **and Preview** must both have this set. Missing `JWT_SECRET` makes `POST /api/auth` return 503; anonymous `/api/auth/me` still returns 401.
 
-### `CLINIC_ID` — default tenant slug
+### `CLINIC_ID` — unused leftover
 
-Default clinic slug when a JWT has no `clinic_id` (should not happen after login). Example: `temara`.
+Do **not** use this as a tenant key. `requireClinicSession` requires JWT `clinic_id` to be a UUID (`clinics.id`). A slug such as `temara` is rejected (401).
 
-- Consumer: `requireClinicSession` fallback and public defaults.
-- Authoritative tenant id at runtime is **`clinics.id` (UUID)** on the JWT, not this slug.
-- Public booking still defaults missing `/book/:slug` to `temara`.
+Public booking still defaults a missing `/book/:slug` to `temara` in code (`DEFAULT_SLUG`), not via this env var.
+
+You may delete `CLINIC_ID` from Vercel. It is not read by live handlers.
 
 ### `CALCOM_WEBHOOK_SECRET` — production required
 
@@ -95,7 +95,6 @@ When a doctor creates a Postgres block, DentaFlow may `POST https://api.cal.com/
 ```text
 DATABASE_URL=postgres://dentaflow:dentaflow@127.0.0.1:5432/dentaflow
 JWT_SECRET=<generated>
-CLINIC_ID=temara
 ```
 
 Seeded UI logins (scrypt hashes live in `staff_users`, not in env):
@@ -149,7 +148,7 @@ These names may still exist in an old Vercel project. They are **not** read by l
 | --- | --- | --- |
 | `DATABASE_URL` | Local `:5432` or pooler `:6543` | Supabase pooler `:6543` |
 | `JWT_SECRET` | Generated local secret | Unique production secret |
-| `CLINIC_ID` | `temara` | Default slug only |
+| `CLINIC_ID` | Ignore | Unused leftover |
 | `CALCOM_WEBHOOK_SECRET` | Optional | Set, HMAC on |
 | `TWILIO_ACCOUNT_SID` / `AUTH_TOKEN` / `FROM` | Optional | Set to send SMS |
 | `TWILIO_WEBHOOK_URL` | Optional | Public Twilio callback |

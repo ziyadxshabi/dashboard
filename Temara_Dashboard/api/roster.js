@@ -8,7 +8,8 @@
  * GET /api/roster?catalog=1       → treatment catalog + next free slot
  * GET /api/roster?recalls=open    → due 6-month recalls
  * POST /api/roster                → visit / walk-in / block / emergency_hold
- * POST /api/roster?action=recall|release|delete|status
+ * GET /api/roster?action=patient-export → Loi 09-08 data-subject export
+ * POST /api/roster?action=patient-erase → anonymize dossier, keep booking slots
  */
 'use strict';
 
@@ -195,7 +196,7 @@ function mapRosterRow(row) {
     chronic_conditions: row.chronic_conditions || '',
     preferred_anesthetic: row.preferred_anesthetic || '',
     last_xray_on: row.last_xray_on || null,
-    sms_consent: row.sms_consent !== false,
+    sms_consent: row.sms_consent === true,
     patient_email: row.patient_email || '',
     email: row.patient_email || '',
     clinical_notes: row.clinical_notes || '',
@@ -395,6 +396,15 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    if (action === 'patient-export') {
+      req.query = { ...(req.query || {}), id: searchParam(req, 'id'), phone: searchParam(req, 'phone') };
+      try {
+        return await roiOps.handlePatientExport(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
     if (action === 'clinic-settings') {
       try {
         return await roiOps.handleClinicSettingsGet(req, res, session);
@@ -498,6 +508,9 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'patient') {
       return await roiOps.handlePatientPatch(req, res, session);
+    }
+    if (action === 'patient-erase') {
+      return await roiOps.handlePatientErase(req, res, session);
     }
     if (action === 'clinic-settings') {
       return await roiOps.handleClinicSettingsPatch(req, res, session);

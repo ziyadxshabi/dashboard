@@ -13,6 +13,7 @@ const {
   validateWaitlistInput,
 } = require('./_lib/validation');
 const { ensurePatient } = require('./_lib/patients');
+const { writeAudit } = require('./_lib/audit');
 
 const WAITLIST_GET_SQL = `
   SELECT id, patient_name, patient_phone, patient_id, priority, notes, status, created_at, sms_consent, last_notified_at
@@ -57,7 +58,7 @@ function mapWaitlistRow(row) {
     notes,
     created_at: row.created_at,
     status: row.status,
-    sms_consent: row.sms_consent !== false,
+    sms_consent: row.sms_consent === true,
     last_notified_at: row.last_notified_at || null,
   };
 }
@@ -78,7 +79,7 @@ async function handlePost(req, res, session) {
   const patient = await ensurePatient(session.clinic_id, {
     name: patientName,
     phone,
-    smsConsent: smsConsent !== false,
+    smsConsent,
   });
   const result = await query(WAITLIST_INSERT_SQL, [
     session.clinic_id,
@@ -86,10 +87,11 @@ async function handlePost(req, res, session) {
     phone,
     priority,
     notes,
-    smsConsent !== false,
+    smsConsent === true,
     patient?.id || null,
   ]);
   const insertedRow = result.rows[0];
+  await writeAudit(session, { action: 'waitlist.insert', entity: 'waitlist', entityId: insertedRow.id });
 
   return res.status(200).json({
     ok: true,

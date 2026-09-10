@@ -79,7 +79,7 @@ async function blastWaitlistSlot(clinicId, req, options = {}) {
   const skipped = [];
 
   for (const row of top) {
-    if (row.sms_consent === false) {
+    if (row.sms_consent !== true) {
       skipped.push({ id: row.id, reason: 'no_consent' });
       continue;
     }

@@ -209,6 +209,20 @@
       outline-offset: 2px;
     }
 
+    .book-legal {
+      margin: 1.25rem 0 0;
+      max-width: 42rem;
+      color: var(--text-muted, #9E948C);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .book-legal a {
+      color: inherit;
+      text-decoration: underline;
+      min-height: 44px;
+    }
+
     .book-error {
       min-height: 70dvh;
       place-items: center;
@@ -277,6 +291,14 @@
       <span id="book-clinic-name-footer"></span>
       <a id="book-footer-phone" hidden href="#"></a>
     </footer>
+    <p class="book-legal">
+      En réservant, vous communiquez votre nom et téléphone au cabinet via Cal.com.
+      Un SMS de confirmation peut être envoyé (Twilio). Les rappels SMS nécessitent
+      un consentement explicite (Loi 09-08).
+      <a href="/privacy.html">Politique de confidentialité</a>
+      —
+      <a href="/terms.html">Conditions d’utilisation</a>
+    </p>
   </div>
 
   <div id="book-error" class="book-error" hidden>

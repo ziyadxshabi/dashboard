@@ -59,7 +59,7 @@ const handleTwilio = require(path.join(DASHBOARD, 'api/webhooks/twilio.js'));
 const { query } = require(path.join(DASHBOARD, 'api/_lib/db.js'));
 const { hashPassword, verifyPassword, signJwt } = require(path.join(DASHBOARD, 'api/_lib/auth-crypto.js'));
 const { toE164MA, isValidMaMobileE164 } = require(path.join(DASHBOARD, 'api/_lib/phone-e164.js'));
-const { waitlistRank, pickWaitlistTopN } = require(path.join(DASHBOARD, 'api/_lib/waitlist-blast.js'));
+const { waitlistRank, pickWaitlistTopN, blastWaitlistSlot } = require(path.join(DASHBOARD, 'api/_lib/waitlist-blast.js'));
 const { inReminderWindow, daysBetweenCasablanca, inUnconfirmedWindow } = require(path.join(DASHBOARD, 'api/_lib/cron-notify.js'));
 const { tryAcquireLock } = require(path.join(DASHBOARD, 'api/_lib/notification-locks.js'));
 const {
@@ -299,6 +299,15 @@ async function run() {
     'doctor CRM sheet lives inside #doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );
+  ok(
+    'login footer links privacy and terms pages',
+    /href="\/privacy.html"/.test(indexHtml) && /href="\/terms.html"/.test(indexHtml)
+  );
+  const bookHtml = fs.readFileSync(path.join(DASHBOARD, 'book.html'), 'utf8');
+  ok(
+    'book.html discloses Cal.com, Twilio, and Loi 09-08',
+    /Cal\.com/.test(bookHtml) && /Twilio/.test(bookHtml) && /Loi 09-08/.test(bookHtml)
+  );
   ok('theme-boot.js reads dentaflow_assistant_prefs', /dentaflow_assistant_prefs/.test(themeBootSrc));
   ok('theme-boot.js migrates doctor_theme', /doctor_theme/.test(themeBootSrc));
 
@@ -354,6 +363,20 @@ async function run() {
   );
   await query(hoursMigrationSql);
   ok('clinic hours migration applied', true);
+
+  const consentMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260910_sms_consent_optin.sql'),
+    'utf8'
+  );
+  await query(consentMigrationSql);
+  ok('SMS consent opt-in migration applied', true);
+
+  const auditMigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260910_audit_events.sql'),
+    'utf8'
+  );
+  await query(auditMigrationSql);
+  ok('audit_events migration applied', true);
   await query(
     `UPDATE clinics
      SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
@@ -425,6 +448,45 @@ async function run() {
 
   const waitlistAnon = await invoke(handleWaitlist, createReq({ method: 'GET', url: '/api/waitlist', headers: {} }));
   ok('GET /api/waitlist without cookie returns 401', waitlistAnon.statusCode === 401);
+
+  const slugTenant = await invoke(
+    handleRoster,
+    createReq({
+      method: 'GET',
+      url: '/api/roster',
+      headers: {
+        cookie: cookieHeader(
+          signJwt(
+            { sub: '00000000-0000-4000-8000-000000000099', role: 'assistant', clinic_id: 'temara', slug: 'temara' },
+            process.env.JWT_SECRET
+          )
+        ),
+      },
+    })
+  );
+  ok(
+    'GET /api/roster JWT clinic_id slug returns 401',
+    slugTenant.statusCode === 401,
+    `status=${slugTenant.statusCode}`
+  );
+
+  const missingTenant = await invoke(
+    handleRoster,
+    createReq({
+      method: 'GET',
+      url: '/api/roster',
+      headers: {
+        cookie: cookieHeader(
+          signJwt({ sub: '00000000-0000-4000-8000-000000000099', role: 'assistant', slug: 'temara' }, process.env.JWT_SECRET)
+        ),
+      },
+    })
+  );
+  ok(
+    'GET /api/roster JWT without clinic_id returns 401',
+    missingTenant.statusCode === 401,
+    `status=${missingTenant.statusCode}`
+  );
 
   const notesAnon = await invoke(handleTeamNotes, createReq({ method: 'GET', url: '/api/team-notes', headers: {} }));
   ok('GET /api/team-notes without cookie returns 401', notesAnon.statusCode === 401);
@@ -786,12 +848,84 @@ async function run() {
         nom: patientName,
         telephone: '0612345678',
         priorite: 'Haute',
+        consent_sms: true,
       },
     })
   );
   ok('POST /api/waitlist returns 200', waitlistPost.statusCode === 200, `status=${waitlistPost.statusCode} body=${JSON.stringify(waitlistPost.body)}`);
   ok('POST /api/waitlist ok:true', waitlistPost.body?.ok === true);
   ok('POST /api/waitlist returns id', Boolean(waitlistPost.body?.id));
+
+  if (waitlistPost.body?.id) {
+    const consentRow = await query(
+      `SELECT sms_consent, consent_at FROM waitlist WHERE id = $1`,
+      [waitlistPost.body.id]
+    );
+    ok('POST /api/waitlist consent true persists sms_consent', consentRow.rows[0]?.sms_consent === true);
+    ok('POST /api/waitlist consent true persists consent_at', Boolean(consentRow.rows[0]?.consent_at));
+  }
+
+  const waitlistOmitConsent = await invoke(
+    handleWaitlist,
+    createReq({
+      method: 'POST',
+      url: '/api/waitlist',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: {
+        nom: 'Sans Consentement',
+        telephone: '0612345679',
+        priorite: 'Haute',
+      },
+    })
+  );
+  ok(
+    'POST /api/waitlist omit consent returns 400',
+    waitlistOmitConsent.statusCode === 400,
+    `status=${waitlistOmitConsent.statusCode}`
+  );
+
+  const noSmsName = 'Patient Sans Sms';
+  const waitlistNoSms = await invoke(
+    handleWaitlist,
+    createReq({
+      method: 'POST',
+      url: '/api/waitlist',
+      headers: { ...assistantCookie, 'content-type': 'application/json' },
+      body: {
+        nom: noSmsName,
+        telephone: '0612987654',
+        priorite: 'Urgent',
+        consent_sms: false,
+      },
+    })
+  );
+  ok(
+    'POST /api/waitlist consent false returns 200',
+    waitlistNoSms.statusCode === 200 && Boolean(waitlistNoSms.body?.id),
+    `status=${waitlistNoSms.statusCode} body=${JSON.stringify(waitlistNoSms.body)}`
+  );
+  if (waitlistNoSms.body?.id) {
+    const noSmsRow = await query(
+      `SELECT sms_consent, consent_at FROM waitlist WHERE id = $1`,
+      [waitlistNoSms.body.id]
+    );
+    ok('POST /api/waitlist consent false stores false', noSmsRow.rows[0]?.sms_consent === false);
+    ok('POST /api/waitlist consent false leaves consent_at null', noSmsRow.rows[0]?.consent_at == null);
+    const others = await query(
+      `SELECT id FROM waitlist WHERE clinic_id = $1 AND status = 'active' AND id <> $2`,
+      [clinicId, waitlistNoSms.body.id]
+    );
+    const blast = await blastWaitlistSlot(clinicId, createReq({ method: 'POST', url: '/api/waitlist' }), {
+      topN: 1,
+      excludeIds: others.rows.map((row) => row.id),
+      batchId: `consent-test-${Date.now()}`,
+    });
+    const skippedNoConsent = (blast.skipped || []).some(
+      (row) => String(row.id) === String(waitlistNoSms.body.id) && row.reason === 'no_consent'
+    );
+    ok('waitlist blast skips sms_consent false', skippedNoConsent, JSON.stringify(blast.skipped || []));
+    await query('DELETE FROM waitlist WHERE id = $1', [waitlistNoSms.body.id]);
+  }
 
   const waitlistAfter = await invoke(
     handleWaitlist,
@@ -2433,6 +2567,105 @@ async function run() {
     );
     ok('GET patient returns 200', patientGet.statusCode === 200 && patientGet.body?.ok === true);
     ok('GET patient stays clinic-scoped', patientGet.body?.data?.id === planPatient.rows[0].id);
+
+    const patientExport = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient-export&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    const exportJson = JSON.stringify(patientExport.body || {});
+    ok(
+      'GET patient-export returns 200',
+      patientExport.statusCode === 200 && patientExport.body?.ok === true,
+      `status=${patientExport.statusCode}`
+    );
+    ok('patient-export includes dossier', patientExport.body?.data?.patient?.id === planPatient.rows[0].id);
+    ok(
+      'patient-export does not include address or CIN',
+      !/"address"/i.test(exportJson) && !/"cin"/i.test(exportJson)
+    );
+    const exportAudit = await query(
+      `SELECT action FROM audit_events
+       WHERE clinic_id = $1 AND entity_id = $2 AND action = 'patient.export'
+       ORDER BY created_at DESC LIMIT 1`,
+      [clinicId, planPatient.rows[0].id]
+    );
+    ok('patient-export writes audit_events', exportAudit.rows[0]?.action === 'patient.export');
+
+    const foreignExport = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient-export&id=${planPatient.rows[0].id}`,
+        headers: {
+          cookie: cookieHeader(
+            signJwt(
+              {
+                sub: '00000000-0000-4000-8000-000000000099',
+                role: 'doctor',
+                clinic_id: '00000000-0000-4000-8000-000000000001',
+                slug: 'other-clinic',
+              },
+              process.env.JWT_SECRET
+            )
+          ),
+        },
+      })
+    );
+    ok(
+      'patient-export foreign clinic returns 404',
+      foreignExport.statusCode === 404,
+      `status=${foreignExport.statusCode}`
+    );
+
+    const eraseBooking = await query(
+      `INSERT INTO bookings (
+         clinic_id, patient_name, patient_phone, treatment_name, status,
+         starts_at, duration_min, booking_kind, patient_id
+       ) VALUES (
+         $1, 'Roi Plan', '+212611987199', 'Consultation', 'Confirme',
+         NOW() + INTERVAL '9 days', 30, 'visit', $2
+       ) RETURNING id`,
+      [clinicId, planPatient.rows[0].id]
+    );
+    roiIds.bookings.push(eraseBooking.rows[0].id);
+
+    const patientErase = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=patient-erase',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { id: planPatient.rows[0].id },
+      })
+    );
+    ok(
+      'POST patient-erase returns 200',
+      patientErase.statusCode === 200 && patientErase.body?.ok === true,
+      `status=${patientErase.statusCode} body=${JSON.stringify(patientErase.body)}`
+    );
+    ok(
+      'patient-erase anonymizes name',
+      patientErase.body?.data?.display_name === 'Anonymisé'
+    );
+    const erasedBooking = await query(
+      `SELECT patient_name, patient_phone, starts_at FROM bookings WHERE id = $1`,
+      [eraseBooking.rows[0].id]
+    );
+    ok(
+      'patient-erase keeps booking slot',
+      Boolean(erasedBooking.rows[0]?.starts_at) && erasedBooking.rows[0]?.patient_name === 'Anonymisé'
+    );
+    const eraseAudit = await query(
+      `SELECT action FROM audit_events
+       WHERE clinic_id = $1 AND entity_id = $2 AND action = 'patient.erase'
+       ORDER BY created_at DESC LIMIT 1`,
+      [clinicId, planPatient.rows[0].id]
+    );
+    ok('patient-erase writes audit_events', eraseAudit.rows[0]?.action === 'patient.erase');
 
     const directoryGet = await invoke(
       handleRoster,

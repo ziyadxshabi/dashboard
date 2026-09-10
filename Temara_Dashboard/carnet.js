@@ -85,7 +85,7 @@
           preferred_anesthetic: row.preferred_anesthetic || '',
           last_xray_on: row.last_xray_on || '',
           clinical_notes: row.clinical_notes || row.notes || '',
-          sms_consent: row.sms_consent !== false,
+          sms_consent: row.sms_consent === true,
           insurance: row.insurance || row.insurance_type || '',
           copay_mad: row.copay_mad,
           visits: [],
@@ -234,7 +234,7 @@
     setField('crm-edit-anesthetic', patient.preferred_anesthetic);
     setField('crm-edit-xray', patient.last_xray_on ? String(patient.last_xray_on).slice(0, 10) : '');
     setField('crm-edit-notes', patient.clinical_notes);
-    setField('crm-edit-sms', patient.sms_consent !== false);
+    setField('crm-edit-sms', patient.sms_consent === true);
     if ($('crm-panel-copay')) $('crm-panel-copay').textContent = madLabel(patient.lastVisit?.copay_mad);
     if ($('crm-edit-id')) $('crm-edit-id').value = patient.patient_id || '';
 

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Politique de confidentialité — DentaFlow OS</title>
+  <meta name="description" content="Traitement des données de santé et de rendez-vous dans DentaFlow OS (Loi 09-08).">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/dentaflow-shared.css">
+  <link rel="stylesheet" href="/legal.css">
+</head>
+<body class="legal-page">
+  <article class="legal-shell">
+    <header>
+      <span class="legal-eyebrow">Loi 09-08</span>
+      <h1>Politique de confidentialité</h1>
+      <p class="legal-updated">Dernière mise à jour : 10 septembre 2026</p>
+    </header>
+
+    <p>
+      DentaFlow OS est un logiciel de cabinet dentaire. Cette page décrit les données
+      traitées par l’instance que vous utilisez. Elle n’est pas une autorisation CNDP
+      et ne remplace pas le dossier que le cabinet dépose auprès de la CNDP.
+    </p>
+
+    <h2>Qui est responsable</h2>
+    <p>
+      Le <strong>cabinet dentaire</strong> qui exploite cette instance est le responsable
+      de traitement du dossier patient (rendez-vous, liste d’attente, notes cliniques,
+      SMS). L’éditeur du logiciel est un <strong>sous-traitant</strong> : il fournit
+      le code et, le cas échéant, un accompagnement. Chaque cabinet choisit et paie
+      son hébergement (Vercel, PostgreSQL, Twilio, Cal.com).
+    </p>
+
+    <h2>Données collectées</h2>
+    <p>Le logiciel enregistre uniquement ce qui sert au soin et à l’organisation du cabinet :</p>
+    <ul>
+      <li>identité de rendez-vous : nom, téléphone marocain, e-mail optionnel ;</li>
+      <li>créneaux, actes, statut de visite, montant d’acte (MAD) pour le suivi interne ;</li>
+      <li>données cliniques optionnelles : allergies, antécédents, anesthésie, notes, type d’assurance ;</li>
+      <li>consentement SMS (case à cocher Loi 09-08) et horodatage ;</li>
+      <li>comptes staff : identifiant, mot de passe haché (scrypt), rôle médecin ou assistante.</li>
+    </ul>
+    <p>
+      DentaFlow <strong>ne collecte pas</strong> l’adresse du domicile, le CIN, ni
+      d’autres pièces d’identité. N’ajoutez pas ces champs dans le logiciel.
+    </p>
+
+    <h2>Finalités</h2>
+    <ul>
+      <li>prise et suivi des rendez-vous ;</li>
+      <li>liste d’attente et remplissage des créneaux ;</li>
+      <li>rappels et confirmations SMS ou e-mail, seulement si le consentement SMS est explicite (sauf SMS transactionnel lié à une réservation que le patient vient de demander) ;</li>
+      <li>carnet clinique interne au cabinet ;</li>
+      <li>journal d’audit des accès et modifications sensibles.</li>
+    </ul>
+
+    <h2>Sous-traitants techniques</h2>
+    <p>Selon la configuration du cabinet, les données peuvent transiter par :</p>
+    <ul>
+      <li>l’hébergeur de l’application (Vercel) ;</li>
+      <li>PostgreSQL (souvent Supabase) — région recommandée dans l’Union européenne ;</li>
+      <li>Cal.com pour le calendrier public de réservation ;</li>
+      <li>Twilio pour les SMS ;</li>
+      <li>Resend (e-mails) et Upstash (limitation des tentatives de connexion), s’ils sont activés.</li>
+    </ul>
+    <p>
+      Ces services n’ont en général pas de région au Maroc. Le transfert hors Maroc
+      relève d’une autorisation CNDP du cabinet, pas d’un badge affiché dans l’interface.
+    </p>
+
+    <h2>Conservation et droits</h2>
+    <p>
+      Les données sont conservées tant que le cabinet en a besoin pour le suivi des
+      soins, puis peuvent être exportées ou anonymisées depuis le logiciel
+      (export / effacement du dossier, réservés au staff authentifié).
+    </p>
+    <p>
+      Pour un droit d’accès, de rectification, d’opposition ou de suppression,
+      contactez <strong>le cabinet</strong> (téléphone affiché sur la page de
+      réservation). Réclamation possible auprès de la CNDP.
+    </p>
+
+    <nav class="legal-nav" aria-label="Documents légaux">
+      <a href="/">Retour à la connexion</a>
+      <a href="/terms.html">Conditions d’utilisation</a>
+      <a href="/book/temara">Prendre rendez-vous</a>
+    </nav>
+  </article>
+</body>
+</html>
