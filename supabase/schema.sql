@@ -225,7 +225,8 @@ BEGIN
     ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
       REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
 
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin')
+       AND pg_has_role(current_user, 'supabase_admin', 'MEMBER') THEN
       ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
         REVOKE ALL ON TABLES FROM anon, authenticated;
       ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
