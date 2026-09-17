@@ -83,6 +83,8 @@ psql "$DATABASE_URL" -f supabase/schema.sql
 
 The file is idempotent (`CREATE … IF NOT EXISTS`, enum `duplicate_object` guards, `ON CONFLICT DO NOTHING` seeds).
 
+`public` is **server-pool only**. Staff APIs connect as `postgres` via `DATABASE_URL`. Client roles (`anon`, `authenticated`) have no table grants and an explicit deny RLS policy — do not query these tables with the publishable/anon key. Incremental lockdown: `supabase/migrations/20260917120000_lockdown_public_data_api.sql`.
+
 Tables: `clinics`, `staff_users`, `bookings`, `waitlist`, `team_notes`, `sms_dispatch_log`.
 
 Handlers also add missing columns defensively where needed (`bookings.updated_at`, `team_notes.pinned` / `category`, `sms_dispatch_log`). Prefer applying `schema.sql` in production rather than relying on first-request `ALTER`s.
