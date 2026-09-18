@@ -4,7 +4,9 @@
  *
  * GET /api/roster                 → today's roster (Africa/Casablanca)
  * GET /api/roster?from&to         → inclusive date range, max 42 days
- * GET /api/roster?q=              → name/phone search, last 90 days
+ * GET /api/roster?q=              → name/phone search on bookings, last 90 days
+ * GET /api/roster?directory=1     → patients carnet (all-time; year/month/q optional)
+ * GET /api/roster?patient_id=     → visit history for one patient
  * GET /api/roster?catalog=1       → treatment catalog + next free slot
  * GET /api/roster?recalls=open    → due 6-month recalls
  * POST /api/roster                → visit / walk-in / block / emergency_hold
@@ -117,16 +119,154 @@ const ROSTER_SEARCH_SQL = `
   ORDER BY bookings.starts_at DESC
 `;
 
-const ROSTER_DIRECTORY_SQL = `
+const PATIENT_DIRECTORY_SQL = `
+  SELECT
+    p.id,
+    p.display_name,
+    p.phone_e164,
+    p.email,
+    p.allergies,
+    p.chronic_conditions,
+    p.preferred_anesthetic,
+    p.last_xray_on,
+    p.sms_consent,
+    p.insurance_type,
+    p.clinical_notes,
+    p.created_at,
+    last.starts_at AS last_starts_at,
+    last.treatment_name AS last_treatment,
+    last.status AS last_status,
+    last.charge_mad AS last_charge_mad,
+    (
+      SELECT COUNT(*)::int
+      FROM bookings n
+      WHERE n.clinic_id = p.clinic_id
+        AND COALESCE(n.booking_kind, 'visit') = 'visit'
+        AND n.status = 'No-show'
+        AND (
+          n.patient_id = p.id
+          OR (n.patient_phone <> '' AND n.patient_phone = p.phone_e164)
+        )
+    ) AS noshow_count,
+    (
+      SELECT COUNT(*)::int
+      FROM bookings hon
+      WHERE hon.clinic_id = p.clinic_id
+        AND COALESCE(hon.booking_kind, 'visit') = 'visit'
+        AND hon.status::text NOT IN ('Annule', 'Annulé', 'No-show', 'No-Show')
+        AND hon.charge_mad IS NOT NULL
+        AND (
+          hon.patient_id = p.id
+          OR (hon.patient_phone <> '' AND hon.patient_phone = p.phone_e164)
+        )
+    ) AS honoraires_rows,
+    (
+      SELECT COALESCE(SUM(hon.charge_mad), 0)
+      FROM bookings hon
+      WHERE hon.clinic_id = p.clinic_id
+        AND COALESCE(hon.booking_kind, 'visit') = 'visit'
+        AND hon.status::text NOT IN ('Annule', 'Annulé', 'No-show', 'No-Show')
+        AND hon.charge_mad IS NOT NULL
+        AND (
+          hon.patient_id = p.id
+          OR (hon.patient_phone <> '' AND hon.patient_phone = p.phone_e164)
+        )
+    ) AS honoraires_saisis
+  FROM patients p
+  LEFT JOIN LATERAL (
+    SELECT
+      bookings.starts_at,
+      bookings.treatment_name,
+      bookings.status,
+      bookings.charge_mad
+    FROM bookings
+    WHERE bookings.clinic_id = p.clinic_id
+      AND COALESCE(bookings.booking_kind, 'visit') = 'visit'
+      AND (
+        bookings.patient_id = p.id
+        OR (bookings.patient_phone <> '' AND bookings.patient_phone = p.phone_e164)
+      )
+    ORDER BY bookings.starts_at DESC
+    LIMIT 1
+  ) last ON true
+  WHERE p.clinic_id = $1
+    AND (
+      $2::text IS NULL
+      OR p.display_name ILIKE $2
+      OR p.phone_e164 ILIKE $2
+      OR COALESCE(p.email, '') ILIKE $2
+    )
+    AND (
+      $2::text IS NOT NULL
+      OR $3::int IS NULL
+      OR EXTRACT(YEAR FROM last.starts_at AT TIME ZONE 'Africa/Casablanca') = $3
+    )
+    AND (
+      $2::text IS NOT NULL
+      OR $4::int IS NULL
+      OR EXTRACT(MONTH FROM last.starts_at AT TIME ZONE 'Africa/Casablanca') = $4
+    )
+  ORDER BY LOWER(NULLIF(TRIM(p.display_name), '')) ASC NULLS LAST, p.created_at DESC
+`;
+
+const DIRECTORY_YEARS_SQL = `
+  SELECT DISTINCT EXTRACT(YEAR FROM last.starts_at AT TIME ZONE 'Africa/Casablanca')::int AS year
+  FROM patients p
+  LEFT JOIN LATERAL (
+    SELECT bookings.starts_at
+    FROM bookings
+    WHERE bookings.clinic_id = p.clinic_id
+      AND COALESCE(bookings.booking_kind, 'visit') = 'visit'
+      AND (
+        bookings.patient_id = p.id
+        OR (bookings.patient_phone <> '' AND bookings.patient_phone = p.phone_e164)
+      )
+    ORDER BY bookings.starts_at DESC
+    LIMIT 1
+  ) last ON true
+  WHERE p.clinic_id = $1
+    AND last.starts_at IS NOT NULL
+  ORDER BY year DESC
+`;
+
+const DIRECTORY_MONTHS_SQL = `
+  SELECT DISTINCT EXTRACT(MONTH FROM last.starts_at AT TIME ZONE 'Africa/Casablanca')::int AS month
+  FROM patients p
+  LEFT JOIN LATERAL (
+    SELECT bookings.starts_at
+    FROM bookings
+    WHERE bookings.clinic_id = p.clinic_id
+      AND COALESCE(bookings.booking_kind, 'visit') = 'visit'
+      AND (
+        bookings.patient_id = p.id
+        OR (bookings.patient_phone <> '' AND bookings.patient_phone = p.phone_e164)
+      )
+    ORDER BY bookings.starts_at DESC
+    LIMIT 1
+  ) last ON true
+  WHERE p.clinic_id = $1
+    AND last.starts_at IS NOT NULL
+    AND EXTRACT(YEAR FROM last.starts_at AT TIME ZONE 'Africa/Casablanca') = $2
+  ORDER BY month
+`;
+
+const ROSTER_PATIENT_VISITS_SQL = `
   SELECT ${ROSTER_COLUMNS}
   ${ROSTER_FROM}
   WHERE bookings.clinic_id = $1
-    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date
-      >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - ${SEARCH_LOOKBACK_DAYS}
-    AND (bookings.starts_at AT TIME ZONE 'Africa/Casablanca')::date
-      <= (NOW() AT TIME ZONE 'Africa/Casablanca')::date
     AND COALESCE(bookings.booking_kind, 'visit') = 'visit'
-    AND ($2::uuid IS NULL OR bookings.staff_id = $2)
+    AND (
+      bookings.patient_id = $2
+      OR (
+        bookings.patient_phone <> ''
+        AND bookings.patient_phone = (
+          SELECT patients.phone_e164
+          FROM patients
+          WHERE patients.id = $2
+            AND patients.clinic_id = $1
+        )
+      )
+    )
   ORDER BY bookings.starts_at DESC
 `;
 
@@ -298,6 +438,70 @@ function parseStaffId(req) {
   return UUID_RE.test(raw) ? raw : null;
 }
 
+function parseYearMonth(req) {
+  const yearRaw = searchParam(req, 'year');
+  const monthRaw = searchParam(req, 'month');
+  let year = null;
+  let month = null;
+  if (yearRaw) {
+    const n = Number(yearRaw);
+    if (!Number.isInteger(n) || n < 1990 || n > 2100) {
+      return {
+        ok: false,
+        error: createApiError('VALIDATION_ERROR', 'year must be a valid calendar year'),
+      };
+    }
+    year = n;
+  }
+  if (monthRaw) {
+    const n = Number(monthRaw);
+    if (!Number.isInteger(n) || n < 1 || n > 12) {
+      return {
+        ok: false,
+        error: createApiError('VALIDATION_ERROR', 'month must be 1–12'),
+      };
+    }
+    if (year == null) {
+      return {
+        ok: false,
+        error: createApiError('VALIDATION_ERROR', 'month requires year'),
+      };
+    }
+    month = n;
+  }
+  return { ok: true, year, month };
+}
+
+function mapDirectoryPatient(row) {
+  const honorairesRows = Number(row.honoraires_rows) || 0;
+  const honoraires = honorairesRows > 0 ? Number(row.honoraires_saisis) || 0 : null;
+  return {
+    id: row.id,
+    patient_id: row.id,
+    name: row.display_name || '',
+    display_name: row.display_name || '',
+    phone: row.phone_e164 || '',
+    phone_e164: row.phone_e164 || '',
+    email: row.email || '',
+    allergies: row.allergies || '',
+    chronic_conditions: row.chronic_conditions || '',
+    preferred_anesthetic: row.preferred_anesthetic || '',
+    last_xray_on: row.last_xray_on || null,
+    sms_consent: row.sms_consent === true,
+    insurance_type: row.insurance_type || null,
+    insurance: insuranceLabel(row.insurance_type) || '',
+    clinical_notes: row.clinical_notes || '',
+    created_at: row.created_at,
+    last_starts_at: row.last_starts_at || null,
+    last_treatment: row.last_treatment || '',
+    last_status: row.last_status || '',
+    last_charge_mad: row.last_charge_mad == null ? null : Number(row.last_charge_mad),
+    noshow_count: Number(row.noshow_count) || 0,
+    honoraires_rows: honorairesRows,
+    honoraires_saisis: honoraires,
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(res, 'GET, POST, PATCH, OPTIONS');
@@ -459,6 +663,50 @@ module.exports = async function handler(req, res) {
       const like = parsedQuery.q ? `%${parsedQuery.q}%` : '';
       const staffId = parseStaffId(req);
       const directory = searchParam(req, 'directory') === '1';
+      const patientIdRaw = searchParam(req, 'patient_id') || searchParam(req, 'patientId');
+      if (patientIdRaw) {
+        if (!UUID_RE.test(patientIdRaw)) {
+          return res.status(400).json(createApiError('VALIDATION_ERROR', 'patient_id must be a UUID'));
+        }
+        const visits = await query(ROSTER_PATIENT_VISITS_SQL, [session.clinic_id, patientIdRaw]);
+        return res.status(200).json({
+          ok: true,
+          data: (visits.rows || []).map(mapRosterRow),
+        });
+      }
+      if (directory) {
+        const parsedPeriod = parseYearMonth(req);
+        if (!parsedPeriod.ok) {
+          return res.status(400).json(parsedPeriod.error);
+        }
+        const yearFilter = like ? null : parsedPeriod.year;
+        const monthFilter = like ? null : parsedPeriod.month;
+        const [dirResult, yearsResult, monthsResult] = await Promise.all([
+          query(PATIENT_DIRECTORY_SQL, [
+            session.clinic_id,
+            like || null,
+            yearFilter,
+            monthFilter,
+          ]),
+          query(DIRECTORY_YEARS_SQL, [session.clinic_id]),
+          parsedPeriod.year
+            ? query(DIRECTORY_MONTHS_SQL, [session.clinic_id, parsedPeriod.year])
+            : Promise.resolve({ rows: [] }),
+        ]);
+        const patients = (dirResult.rows || []).map(mapDirectoryPatient);
+        return res.status(200).json({
+          ok: true,
+          data: {
+            patients,
+            years: (yearsResult.rows || []).map((row) => Number(row.year)).filter(Number.isFinite),
+            months: (monthsResult.rows || []).map((row) => Number(row.month)).filter(Number.isFinite),
+            total: patients.length,
+            year: yearFilter,
+            month: monthFilter,
+            q: parsedQuery.q || '',
+          },
+        });
+      }
       let result;
       if (parsedRange.range && like) {
         result = await query(ROSTER_RANGE_SEARCH_SQL, [
@@ -470,8 +718,6 @@ module.exports = async function handler(req, res) {
         ]);
       } else if (like) {
         result = await query(ROSTER_SEARCH_SQL, [session.clinic_id, like, staffId]);
-      } else if (directory) {
-        result = await query(ROSTER_DIRECTORY_SQL, [session.clinic_id, staffId]);
       } else if (parsedRange.range) {
         result = await query(ROSTER_RANGE_SQL, [
           session.clinic_id,

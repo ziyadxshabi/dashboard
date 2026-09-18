@@ -22,9 +22,9 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  --radius-sm:   8px;
-  --radius-md:   10px;
-  --radius-lg:   12px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
   --radius:      var(--radius-md);
   --radius-pill: 9999px;
   --transition:  color 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -509,7 +509,7 @@ html:not(.book-portal) .df-confirm-actions {
 html:not(.book-portal) .df-confirm-btn {
   min-height: 44px;
   padding: 8px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 15px;
   font-weight: 600;
 }

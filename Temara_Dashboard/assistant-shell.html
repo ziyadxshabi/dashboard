@@ -22,6 +22,7 @@
       </div>
 
       <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale">
+        <p class="sidebar-section-label">Cabinet</p>
         <a href="#" class="nav-link is-active" data-nav="overview" aria-current="page">
           <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
           <span>Vue du jour</span>
@@ -38,6 +39,7 @@
           <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
           <span>Calendrier</span>
         </a>
+        <p class="sidebar-section-label">Patients</p>
         <a href="#" class="nav-link" data-nav="waitlist">
           <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
           <span>Liste d'attente</span>
@@ -46,6 +48,42 @@
           <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
           <span>Dossiers Patients</span>
         </a>
+      <div class="sidebar-superpouvoirs">
+        <button
+          type="button"
+          class="nav-accordion-header"
+          id="superpouvoirs-header"
+          aria-expanded="false"
+          aria-controls="superpouvoirs-panel"
+        >
+          <span class="nav-accordion-header__label">Superpouvoirs</span>
+          <i data-lucide="chevron-down" class="nav-accordion-header__chevron" aria-hidden="true"></i>
+        </button>
+        <div id="superpouvoirs-accordion" class="superpouvoirs-accordion">
+          <div class="superpouvoirs-content">
+            <div id="superpouvoirs-panel" class="superpowers-grid">
+              <button type="button" class="btn-super btn-super--compact" id="btn-fill-gap">
+                <span class="btn-super__icon" aria-hidden="true">
+                  <i data-lucide="user-plus"></i>
+                </span>
+                <span class="btn-super__text">
+                  <span class="btn-super__label">Proposer un patient</span>
+                  <span class="btn-super__hint">Placer quelqu’un de la liste d’attente</span>
+                </span>
+              </button>
+              <button type="button" class="btn-super btn-super--compact" id="btn-force-sms">
+                <span class="btn-super__icon" aria-hidden="true">
+                  <i data-lucide="message-square"></i>
+                </span>
+                <span class="btn-super__text">
+                  <span class="btn-super__label">SMS demain</span>
+                  <span class="btn-super__hint">Rappel des visites de demain</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       </nav>
 
       <div class="account-card" data-popover-root>
@@ -316,47 +354,51 @@
           </div>
 
           <form class="handoff-compose" id="handoff-form" aria-label="Ajouter une note d'équipe">
-            <label class="visually-hidden" for="handoff-booking">Patient du jour</label>
-            <select class="handoff-compose__booking" id="handoff-booking" name="handoff-booking">
-              <option value="">Note générale</option>
-            </select>
-            <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
-            <input
-              type="text"
-              class="handoff-compose__input"
-              id="handoff-input"
-              name="handoff-text"
-              placeholder="Ajouter une note d'équipe..."
-              autocomplete="off"
-              maxlength="280"
-              required
-              aria-required="true"
-            />
-            <div class="ghost-select" id="handoff-category-root" data-ghost-select>
-              <input type="hidden" id="handoff-category" name="handoff-category" value="Info" />
-              <button
-                type="button"
-                class="ghost-select__trigger"
-                id="handoff-category-trigger"
-                aria-haspopup="listbox"
-                aria-expanded="false"
-                aria-controls="handoff-category-list"
-                aria-label="Catégorie de la note"
-              >
-                <span class="ghost-select__value" id="handoff-category-label">Info</span>
-                <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
-              </button>
-              <ul class="ghost-select__list" id="handoff-category-list" role="listbox" aria-label="Catégories" hidden>
-                <li class="ghost-select__option is-selected" role="option" data-value="Info" aria-selected="true" tabindex="-1">Info</li>
-                <li class="ghost-select__option" role="option" data-value="Urgent" aria-selected="false" tabindex="-1">Urgent</li>
-                <li class="ghost-select__option" role="option" data-value="Planning" aria-selected="false" tabindex="-1">Planning</li>
-              </ul>
+            <div class="handoff-compose__toolbar">
+              <label class="visually-hidden" for="handoff-booking">Patient du jour</label>
+              <select class="handoff-compose__booking" id="handoff-booking" name="handoff-booking">
+                <option value="">Note générale</option>
+              </select>
+              <div class="ghost-select" id="handoff-category-root" data-ghost-select>
+                <input type="hidden" id="handoff-category" name="handoff-category" value="Info" />
+                <button
+                  type="button"
+                  class="ghost-select__trigger"
+                  id="handoff-category-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="handoff-category-list"
+                  aria-label="Catégorie de la note"
+                >
+                  <span class="ghost-select__value" id="handoff-category-label">Info</span>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                </button>
+                <ul class="ghost-select__list" id="handoff-category-list" role="listbox" aria-label="Catégories" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="Info" aria-selected="true" tabindex="-1">Info</li>
+                  <li class="ghost-select__option" role="option" data-value="Urgent" aria-selected="false" tabindex="-1">Urgent</li>
+                  <li class="ghost-select__option" role="option" data-value="Planning" aria-selected="false" tabindex="-1">Planning</li>
+                </ul>
+              </div>
+              <label class="handoff-compose__pin">
+                <input type="checkbox" id="handoff-pin" name="handoff-pin" />
+                <span>Épingler</span>
+              </label>
             </div>
-            <label class="handoff-compose__pin">
-              <input type="checkbox" id="handoff-pin" name="handoff-pin" />
-              <span>Pin</span>
-            </label>
-            <button type="submit" class="handoff-compose__submit btn-matte-primary">Publier</button>
+            <div class="handoff-compose__editor">
+              <label class="visually-hidden" for="handoff-input">Note d'équipe</label>
+              <input
+                type="text"
+                class="handoff-compose__input"
+                id="handoff-input"
+                name="handoff-text"
+                placeholder="Note pour la relève…"
+                autocomplete="off"
+                maxlength="280"
+                required
+                aria-required="true"
+              />
+              <button type="submit" class="handoff-compose__submit">Envoyer</button>
+            </div>
           </form>
 
           <div class="handoff-feed" id="handoff-feed" role="feed" aria-labelledby="handoff-title">
@@ -580,11 +622,11 @@
         </div>
       </section>
 
-      <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
+      <section id="view-crm" class="dashboard-view" aria-label="Carnet patients" aria-hidden="true">
         <header class="view-page-header view-page-header--row">
           <div>
-            <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">90 derniers jours. Cliquez une ligne pour ouvrir et modifier le dossier.</p>
+            <h2 class="view-page-title">Carnet patients</h2>
+            <p class="view-page-sub">Tous les dossiers du cabinet. Choisissez une période, puis ouvrez une fiche.</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -592,13 +634,13 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Nom ou téléphone (90 derniers jours)"
+              placeholder="Nom, téléphone ou e-mail"
               autocomplete="off"
             />
           </div>
         </header>
 
-        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
+        <article class="crm-table-panel carnet-book-panel" aria-label="Carnet patients" id="crm-container">
           <div class="skeleton-wrapper" id="crm-skeleton">
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text short"></div>
@@ -607,26 +649,20 @@
             <div class="skeleton skeleton-table-row"></div>
           </div>
           <div id="crm-content" hidden>
-          <div id="crm-empty-state" class="ios-empty" hidden>
-            <p class="ios-empty__title">Aucun dossier à afficher</p>
-            <p class="ios-empty__text">Recherchez un nom ou un téléphone sur les 90 derniers jours.</p>
-          </div>
-          <div class="crm-table-scroll" role="region" aria-label="Tableau des dossiers patients" tabindex="0">
-            <table class="crm-table" id="crm-patient-table">
-              <thead>
-                <tr>
-                  <th scope="col">Nom</th>
-                  <th scope="col">Téléphone</th>
-                  <th scope="col">Dernière visite</th>
-                  <th scope="col">Soin</th>
-                  <th scope="col">Solde</th>
-                  <th scope="col">No-shows (90 j)</th>
-                </tr>
-              </thead>
-              <tbody id="crm-table-body">
-              </tbody>
-            </table>
-          </div>
+            <div class="carnet-timeline" aria-label="Période du carnet">
+              <div class="carnet-chip-row" id="crm-timeline-years" role="group" aria-label="Année"></div>
+              <div class="carnet-chip-row" id="crm-timeline-months" role="group" aria-label="Mois" hidden></div>
+            </div>
+            <div id="crm-empty-state" class="ios-empty" hidden>
+              <p class="ios-empty__title">Aucun dossier au fichier</p>
+              <p class="ios-empty__text">Les patients apparaissent ici dès qu’un dossier est créé.</p>
+            </div>
+            <div class="carnet-book-layout">
+              <nav class="carnet-index" id="crm-index-rail" aria-label="Index alphabétique"></nav>
+              <div class="crm-book-scroll crm-table-scroll" role="region" aria-label="Liste des dossiers patients" tabindex="0">
+                <ul class="carnet-book" id="crm-book-list"></ul>
+              </div>
+            </div>
           </div>
         </article>
       </section>
@@ -890,7 +926,7 @@
             <h3 class="crm-side-panel-section-title">Comptes</h3>
             <dl class="crm-side-panel-dl">
               <div class="crm-side-panel-field">
-                <dt>Reste à charge (indicatif)</dt>
+                <dt>Honoraires saisis</dt>
                 <dd id="crm-panel-copay">—</dd>
               </div>
             </dl>

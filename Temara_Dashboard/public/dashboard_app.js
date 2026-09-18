@@ -249,6 +249,7 @@ function initializeDoctorDashboard() {
   window.initSettingsPrefsState?.();
   window.DentaFlowCarnet?.init?.();
   initSmsCampaign();
+  initDoctorSuperpouvoirs();
   initDoctorHub();
   initDoctorCustomSms();
   initOperationalCharts();
@@ -1934,6 +1935,73 @@ function initDoctorCustomSms() {
   });
 }
 
+function initDoctorSuperpouvoirs() {
+  const header = doctorEl('superpouvoirs-header');
+  const accordion = doctorEl('superpouvoirs-accordion');
+  if (header && accordion && header.dataset.wired !== 'true') {
+    header.dataset.wired = 'true';
+    const setOpen = (open) => {
+      accordion.classList.toggle('is-open', open);
+      header.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    const toggle = () => setOpen(!accordion.classList.contains('is-open'));
+    header.addEventListener('click', toggle);
+    header.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      toggle();
+    });
+  }
+
+  const forceSms = doctorEl('btn-force-sms');
+  if (forceSms && forceSms.dataset.forceSmsWired !== 'true') {
+    forceSms.dataset.forceSmsWired = 'true';
+    forceSms.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const confirmed = await askConfirm(
+        'Envoyer un rappel SMS à tous les patients de demain ? Cette action est irréversible.'
+      );
+      if (!confirmed) return;
+      try {
+        const response = await fetch(CONFIG.BULK_SMS_PROXY, {
+          method: 'POST',
+          credentials: 'include',
+          headers: getApiAuthHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+          body: JSON.stringify({ action: 'force-tomorrow' }),
+        });
+        assertAuthorizedResponse(response);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        const count = Number(payload?.dispatchedCount || 0);
+        if (count > 0) {
+          showDashboardToast(count === 1 ? 'SMS envoyé.' : `${count} SMS envoyés.`, 'success');
+        } else if (payload?.twilioConfigured === false) {
+          showDashboardToast("SMS non envoyé. Twilio n'est pas configuré.", 'warning');
+        } else {
+          showDashboardToast('Aucun SMS envoyé.', 'warning');
+        }
+      } catch (error) {
+        console.error('[Force SMS] Failed:', error?.message || error);
+        showDashboardToast("Échec de l'envoi SMS.", 'error');
+      }
+    });
+  }
+
+  const blockBtn = doctorEl('btn-block-slot');
+  if (blockBtn && blockBtn.dataset.blockWired !== 'true') {
+    blockBtn.dataset.blockWired = 'true';
+    blockBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      doctorQuery('.nav-link[data-nav="calendar"]')?.click();
+      doctorEl('view-calendar')?.scrollIntoView({ block: 'start' });
+      doctorQuery('.calendar-os-stage')?.focus?.();
+      showDashboardToast('Choisissez un créneau vide dans l’agenda pour le bloquer.', 'info');
+    });
+  }
+}
+
 function initSmsCampaign() {
   const form     = doctorEl('sms-campaign-form');
   const textarea = doctorEl('sms-campaign-body');
@@ -2099,12 +2167,21 @@ function getEmptyDashboardData() {
     reserved_min:    0,
     open_min:        CONFIG.OPEN_MINUTES || 660,
     treatment_mix:   [],
+    mix_visits:      0,
+    mix_month_label: '',
+    patients_total:  0,
+    waitlist_active: 0,
+    honoraires_mois: null,
+    honoraires_mois_rows: 0,
+    charge_sum:      null,
+    charge_rows:     0,
+    plans_open:      0,
     returning_phones: 0,
     new_phones:      0,
   };
 }
 
-/** Pristine empty UI: zeros in stat cards, catalog mix at 0, no error strings in KPIs. */
+/** Pristine empty UI: zeros in stat cards, no fabricated mix catalog. */
 function renderDashboardFallback() {
   clearSkeletonState();
 
@@ -2261,8 +2338,13 @@ function normaliseData(raw) {
         if (item && typeof item === 'object' && !Array.isArray(item)) return item;
         return asMetric(item);
       });
-    } else if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
-      out[k] = Number(v);
+    } else if (typeof v === 'string') {
+      const trimmed = v.trim();
+      if (trimmed !== '' && !Number.isNaN(Number(trimmed)) && !/^\d{1,2}:\d{2}/.test(trimmed)) {
+        out[k] = Number(trimmed);
+      } else {
+        out[k] = v;
+      }
     } else if (typeof v === 'boolean') {
       out[k] = v;
     } else if (v != null && typeof v !== 'object') {
@@ -2736,58 +2818,110 @@ function renderDoctorHubCharts(data = {}) {
   renderDynamicChart(data, 'doctor-weekly-trend-chart', { unit: 'patients' });
 }
 
+function formatHonoraires(value, rows) {
+  if (rows === 0 || value == null) return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `${Math.round(n)} MAD`;
+}
+
+function formatClockLabel(value, fallback) {
+  const raw = String(value || fallback || '').trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback || raw;
+  return `${Number(match[1])} h`;
+}
+
 function renderLoadMixFidelity(data = {}) {
+  const patientsToday = asMetric(data?.patients_today);
   const reserved = asMetric(data?.reserved_min);
   const open = asMetric(data?.open_min) || CONFIG.OPEN_MINUTES;
+  const dayStart = data?.day_start || '08:00';
+  const dayEnd = data?.day_end || '19:00';
+
+  const loadSub = doctorEl('load-sub');
+  if (loadSub) {
+    loadSub.textContent = `Ouverture ${formatClockLabel(dayStart, '8 h')} – ${formatClockLabel(dayEnd, '19 h')}`;
+  }
+
+  const emptyEl = doctorEl('load-empty');
+  const statsEl = doctorEl('load-stats');
+  const quiet = patientsToday === 0 && reserved === 0;
+  if (emptyEl) emptyEl.hidden = !quiet;
+  if (statsEl) statsEl.hidden = quiet;
+
+  setText('load-visits', String(patientsToday));
   const loadEl = doctorEl('load-reserved');
   if (loadEl) loadEl.textContent = `${reserved} / ${open} min`;
-  const fill = doctorEl('load-meter-fill');
-  if (fill) {
-    fill.style.width = `${Math.min(100, open > 0 ? (reserved / open) * 100 : 0)}%`;
-  }
+  setText('load-honoraires', formatHonoraires(data?.charge_sum, asMetric(data?.charge_rows)));
 
-  const DEFAULT_TREATMENT_MIX = [
-    { name: 'Consultation', count: 0 },
-    { name: 'Détartrage', count: 0 },
-    { name: 'Soin', count: 0 },
-    { name: 'Extraction', count: 0 },
-    { name: 'Dévitalisation', count: 0 },
-    { name: 'Couronne', count: 0 },
-    { name: 'Blanchiment', count: 0 },
-    { name: 'Urgence', count: 0 },
-  ];
+  const hoursHost = doctorEl('load-hours');
+  if (hoursHost) {
+    const hours = [];
+    for (let hour = 8; hour <= 18; hour += 1) {
+      const key = `hour_${String(hour).padStart(2, '0')}`;
+      hours.push({ hour, count: asMetric(data?.[key]) });
+    }
+    const any = hours.some((entry) => entry.count > 0);
+    hoursHost.hidden = !any;
+    hoursHost.replaceChildren();
+    if (any) {
+      hours.forEach((entry) => {
+        const tick = document.createElement('span');
+        tick.className = `load-hours__tick${entry.count > 0 ? ' is-busy' : ''}`;
+        tick.title = `${entry.hour} h · ${entry.count} visite${entry.count > 1 ? 's' : ''}`;
+        tick.textContent = String(entry.count);
+        hoursHost.appendChild(tick);
+      });
+    }
+  }
 
   const mixHost = doctorEl('treatment-mix-list');
+  const mixSub = doctorEl('mix-sub');
+  const mixLabel = data?.mix_month_label || '';
+  const mixVisits = asMetric(data?.mix_visits);
+  if (mixSub) {
+    mixSub.textContent = mixLabel
+      ? `${mixLabel} · ${mixVisits} visite${mixVisits === 1 ? '' : 's'}`
+      : 'Visites du mois en cours';
+  }
   if (mixHost) {
-    const mix = Array.isArray(data?.treatment_mix) && data.treatment_mix.length
-      ? data.treatment_mix
-      : DEFAULT_TREATMENT_MIX;
+    const mix = Array.isArray(data?.treatment_mix) ? data.treatment_mix : [];
     mixHost.replaceChildren();
-    const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
-    mix.forEach((item) => {
-      const row = document.createElement('div');
-      row.className = 'mix-row';
-      const name = document.createElement('span');
-      name.textContent = item.name || 'Non précisé';
-      const count = document.createElement('span');
-      count.textContent = String(item.count || 0);
-      const track = document.createElement('div');
-      track.className = 'mix-row__track';
-      const bar = document.createElement('div');
-      bar.className = 'mix-row__fill';
-      bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
-      track.appendChild(bar);
-      row.append(name, count, track);
-      mixHost.appendChild(row);
-    });
+    if (!mix.length) {
+      const empty = document.createElement('p');
+      empty.className = 'mix-empty';
+      empty.textContent = 'Aucun soin ce mois.';
+      mixHost.appendChild(empty);
+    } else {
+      const max = Math.max(...mix.map((item) => Number(item.count) || 0), 1);
+      mix.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'mix-row';
+        const name = document.createElement('span');
+        name.textContent = item.name || 'Non précisé';
+        const count = document.createElement('span');
+        count.textContent = String(item.count || 0);
+        const track = document.createElement('div');
+        track.className = 'mix-row__track';
+        const bar = document.createElement('div');
+        bar.className = 'mix-row__fill';
+        bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
+        track.appendChild(bar);
+        row.append(name, count, track);
+        mixHost.appendChild(row);
+      });
+    }
   }
 
-  setText('fidelity-returning', String(asMetric(data?.returning_phones)));
-  setText('fidelity-new', String(asMetric(data?.new_phones)));
+  setText('cabinet-patients', String(asMetric(data?.patients_total)));
+  setText('cabinet-waitlist', String(asMetric(data?.waitlist_active)));
+  setText('cabinet-honoraires', formatHonoraires(data?.honoraires_mois, asMetric(data?.honoraires_mois_rows)));
+  setText('cabinet-plans', String(asMetric(data?.plans_open)));
 
   const chargeEl = doctorEl('hub-val-charge');
   if (chargeEl) chargeEl.textContent = `${reserved}/${open}`;
-  setText('hub-delta-charge', 'Temps réservé / ouverture');
+  setText('hub-delta-charge', 'Minutes réservées / ouverture');
 }
 
 function renderKPICards(data) {
@@ -4238,7 +4372,7 @@ function createTeamNoteElement(note) {
     const pinSpan = document.createElement('span');
     pinSpan.className = 'team-message__pin';
     pinSpan.setAttribute('aria-label', 'Message épinglé');
-    pinSpan.textContent = 'Épinglé';
+    pinSpan.textContent = '·';
     meta.appendChild(pinSpan);
   }
 

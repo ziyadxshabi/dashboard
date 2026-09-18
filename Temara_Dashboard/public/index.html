@@ -137,6 +137,7 @@
       </div>
 
       <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale" data-lenis-prevent>
+        <p class="sidebar-section-label">Cabinet</p>
         <a href="#overview" class="nav-link is-active" data-nav="overview" aria-current="page">
           <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
           <span>Vue d'ensemble</span>
@@ -149,6 +150,7 @@
           <i data-lucide="calendar-clock" class="nav-icon" aria-hidden="true"></i>
           <span>Calendrier</span>
         </a>
+        <p class="sidebar-section-label">Patients</p>
         <a href="#waitlist" class="nav-link" data-nav="waitlist">
           <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
           <span>Liste d'attente</span>
@@ -157,6 +159,7 @@
           <i data-lucide="clipboard-list" class="nav-icon" aria-hidden="true"></i>
           <span>Dossiers Patients</span>
         </a>
+        <p class="sidebar-section-label">Pilotage</p>
         <a href="#analytics" class="nav-link" data-nav="analytics">
           <i data-lucide="bar-chart-2" class="nav-icon" aria-hidden="true"></i>
           <span>Performances</span>
@@ -165,6 +168,42 @@
           <i data-lucide="messages-square" class="nav-icon" aria-hidden="true"></i>
           <span>Campagnes SMS</span>
         </a>
+      <div class="sidebar-superpouvoirs">
+        <button
+          type="button"
+          class="nav-accordion-header"
+          id="superpouvoirs-header"
+          aria-expanded="false"
+          aria-controls="superpouvoirs-panel"
+        >
+          <span class="nav-accordion-header__label">Superpouvoirs</span>
+          <i data-lucide="chevron-down" class="nav-accordion-header__chevron" aria-hidden="true"></i>
+        </button>
+        <div id="superpouvoirs-accordion" class="superpouvoirs-accordion">
+          <div class="superpouvoirs-content">
+            <div id="superpouvoirs-panel" class="superpowers-grid">
+              <button type="button" class="btn-super btn-super--compact" id="btn-force-sms">
+                <span class="btn-super__icon" aria-hidden="true">
+                  <i data-lucide="message-square"></i>
+                </span>
+                <span class="btn-super__text">
+                  <span class="btn-super__label">SMS demain</span>
+                  <span class="btn-super__hint">Rappel des visites de demain</span>
+                </span>
+              </button>
+              <button type="button" class="btn-super btn-super--compact" id="btn-block-slot">
+                <span class="btn-super__icon" aria-hidden="true">
+                  <i data-lucide="ban"></i>
+                </span>
+                <span class="btn-super__text">
+                  <span class="btn-super__label">Bloquer un créneau</span>
+                  <span class="btn-super__hint">Déjeuner, labo ou absence</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       </nav>
     </aside>
 
@@ -358,34 +397,64 @@
           </div>
         </section>
 
-        <section class="load-mix-row" aria-label="Charge, mix et fidélité">
+        <section class="load-mix-row" aria-label="Journée, mix et fichier">
           <article class="load-card" aria-labelledby="load-title">
-            <h3 class="chart-title" id="load-title">Charge du jour</h3>
-            <p class="chart-sub">Temps réservé, 8 h à 19 h.</p>
-            <p class="load-card__value kinetic-value" id="load-reserved">0 / 660 min</p>
-            <div class="load-meter" aria-hidden="true">
-              <div class="load-meter__fill" id="load-meter-fill"></div>
+            <h3 class="chart-title" id="load-title">Aujourd'hui</h3>
+            <p class="chart-sub" id="load-sub">Visites, minutes et honoraires saisis</p>
+            <div id="load-today-body" class="load-card__body">
+              <p class="load-card__empty" id="load-empty" hidden>Cabinet calme — aucune visite aujourd'hui</p>
+              <dl class="cabinet-stat-list" id="load-stats">
+                <div class="cabinet-stat">
+                  <dt>Visites</dt>
+                  <dd id="load-visits">0</dd>
+                </div>
+                <div class="cabinet-stat">
+                  <dt>Minutes réservées</dt>
+                  <dd id="load-reserved">0 / 0 min</dd>
+                </div>
+                <div class="cabinet-stat">
+                  <dt>Honoraires saisis</dt>
+                  <dd id="load-honoraires">—</dd>
+                </div>
+              </dl>
+              <div class="load-hours" id="load-hours" hidden aria-label="Patients par heure"></div>
             </div>
           </article>
           <article class="mix-card" aria-labelledby="mix-title">
             <h3 class="chart-title" id="mix-title">Mix de soins</h3>
-            <p class="chart-sub">Répartition des soins cette semaine</p>
+            <p class="chart-sub" id="mix-sub">Visites du mois en cours</p>
             <div id="treatment-mix-list" class="mix-list"></div>
           </article>
           <article class="fidelity-card" aria-labelledby="fidelity-title">
-            <h3 class="chart-title" id="fidelity-title">Revenus / nouveaux</h3>
-            <p class="chart-sub">Par téléphone · fenêtre 90 jours</p>
-            <p class="fidelity-card__line"><span id="fidelity-returning">0</span> revenus</p>
-            <p class="fidelity-card__line"><span id="fidelity-new">0</span> nouveaux</p>
+            <h3 class="chart-title" id="fidelity-title">Fichier cabinet</h3>
+            <p class="chart-sub" id="fidelity-sub">Effectifs et honoraires saisis ce mois</p>
+            <dl class="cabinet-stat-list">
+              <div class="cabinet-stat">
+                <dt>Patients au fichier</dt>
+                <dd id="cabinet-patients">0</dd>
+              </div>
+              <div class="cabinet-stat">
+                <dt>Liste d'attente</dt>
+                <dd id="cabinet-waitlist">0</dd>
+              </div>
+              <div class="cabinet-stat">
+                <dt>Honoraires ce mois</dt>
+                <dd id="cabinet-honoraires">—</dd>
+              </div>
+              <div class="cabinet-stat">
+                <dt>Plans ouverts</dt>
+                <dd id="cabinet-plans">0</dd>
+              </div>
+            </dl>
           </article>
         </section>
 
-        <section class="team-messages-panel" aria-label="Messages de l'équipe">
+        <section class="team-messages-panel" aria-label="Notes d'équipe">
           <article class="team-messages-card">
             <header class="team-messages-header">
               <div>
-                <h3 class="chart-title">Messages de l'équipe</h3>
-                <p class="chart-sub">Notes de l'assistante, synchronisées en direct</p>
+                <h3 class="chart-title">Notes d'équipe</h3>
+                <p class="chart-sub">Relève du cabinet, en direct</p>
               </div>
               <span class="team-messages-sync" id="team-notes-sync" aria-live="polite">Chargement…</span>
             </header>
@@ -731,11 +800,11 @@
         </div>
       </section>
 
-      <section id="view-crm" class="dashboard-view" aria-label="Dossiers patients" aria-hidden="true">
+      <section id="view-crm" class="dashboard-view" aria-label="Carnet patients" aria-hidden="true">
         <header class="view-page-header view-page-header--row">
           <div>
-            <h2 class="view-page-title">Dossiers Patients</h2>
-            <p class="view-page-sub">90 derniers jours. Cliquez une ligne pour ouvrir et modifier le dossier.</p>
+            <h2 class="view-page-title">Carnet patients</h2>
+            <p class="view-page-sub">Tous les dossiers du cabinet. Choisissez une période, puis ouvrez une fiche.</p>
           </div>
           <div class="crm-search-wrap">
             <label class="visually-hidden" for="crm-search">Rechercher un patient</label>
@@ -743,13 +812,13 @@
               class="waitlist-input crm-search-input"
               type="search"
               id="crm-search"
-              placeholder="Nom ou téléphone (90 derniers jours)"
+              placeholder="Nom, téléphone ou e-mail"
               autocomplete="off"
             />
           </div>
         </header>
 
-        <article class="crm-table-panel" aria-label="Liste des patients" id="crm-container">
+        <article class="crm-table-panel carnet-book-panel" aria-label="Carnet patients" id="crm-container">
           <div class="skeleton-wrapper" id="crm-skeleton">
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text short"></div>
@@ -759,25 +828,20 @@
             <div class="skeleton skeleton-table-row"></div>
           </div>
           <div id="crm-content" hidden>
-          <div id="crm-empty-state" class="ios-empty" hidden>
-            <p class="ios-empty__title">Aucun dossier à afficher</p>
-            <p class="ios-empty__text">Recherchez un nom ou un téléphone sur les 90 derniers jours.</p>
-          </div>
-          <div class="crm-table-scroll" data-lenis-prevent role="region" aria-label="Tableau des dossiers patients" tabindex="0">
-            <table class="crm-table" id="crm-patient-table">
-              <thead>
-                <tr>
-                  <th scope="col">Nom</th>
-                  <th scope="col">Téléphone</th>
-                  <th scope="col">Dernière visite</th>
-                  <th scope="col">Soin</th>
-                  <th scope="col">Solde</th>
-                  <th scope="col">No-shows (90 j)</th>
-                </tr>
-              </thead>
-              <tbody id="crm-table-body"></tbody>
-            </table>
-          </div>
+            <div class="carnet-timeline" aria-label="Période du carnet">
+              <div class="carnet-chip-row" id="crm-timeline-years" role="group" aria-label="Année"></div>
+              <div class="carnet-chip-row" id="crm-timeline-months" role="group" aria-label="Mois" hidden></div>
+            </div>
+            <div id="crm-empty-state" class="ios-empty" hidden>
+              <p class="ios-empty__title">Aucun dossier au fichier</p>
+              <p class="ios-empty__text">Les patients apparaissent ici dès qu’un dossier est créé.</p>
+            </div>
+            <div class="carnet-book-layout">
+              <nav class="carnet-index" id="crm-index-rail" aria-label="Index alphabétique"></nav>
+              <div class="crm-book-scroll crm-table-scroll" data-lenis-prevent role="region" aria-label="Liste des dossiers patients" tabindex="0">
+                <ul class="carnet-book" id="crm-book-list"></ul>
+              </div>
+            </div>
           </div>
         </article>
       </section>
@@ -1178,7 +1242,7 @@
             <h3 class="crm-side-panel-section-title">Comptes</h3>
             <dl class="crm-side-panel-dl">
               <div class="crm-side-panel-field">
-                <dt>Reste à charge (indicatif)</dt>
+                <dt>Honoraires saisis</dt>
                 <dd id="crm-panel-copay">—</dd>
               </div>
             </dl>
