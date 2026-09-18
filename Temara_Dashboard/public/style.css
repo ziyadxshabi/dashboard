@@ -1709,7 +1709,7 @@ html[data-theme="pearl-clinic"] .btn-primary:hover:not(:disabled) {
 }
 
 .sidebar-superpouvoirs {
-  margin-top: auto;
+  margin-top: 8px;
   padding: 8px 4px 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;

@@ -2469,9 +2469,11 @@ html:not(.book-portal) .nav-link.is-active {
 }
 
 html:not(.book-portal) .sidebar-superpouvoirs {
-  margin-top: auto;
-  padding: 12px 4px 8px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  padding: 8px 0 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 html:not(.book-portal) .nav-accordion-header {

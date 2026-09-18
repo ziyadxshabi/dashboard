@@ -2168,6 +2168,7 @@ function getEmptyDashboardData() {
     open_min:        CONFIG.OPEN_MINUTES || 660,
     treatment_mix:   [],
     mix_visits:      0,
+    mix_month_label: '',
     patients_total:  0,
     waitlist_active: 0,
     honoraires_mois: null,
@@ -2337,8 +2338,13 @@ function normaliseData(raw) {
         if (item && typeof item === 'object' && !Array.isArray(item)) return item;
         return asMetric(item);
       });
-    } else if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
-      out[k] = Number(v);
+    } else if (typeof v === 'string') {
+      const trimmed = v.trim();
+      if (trimmed !== '' && !Number.isNaN(Number(trimmed)) && !/^\d{1,2}:\d{2}/.test(trimmed)) {
+        out[k] = Number(trimmed);
+      } else {
+        out[k] = v;
+      }
     } else if (typeof v === 'boolean') {
       out[k] = v;
     } else if (v != null && typeof v !== 'object') {
@@ -2877,7 +2883,7 @@ function renderLoadMixFidelity(data = {}) {
   if (mixSub) {
     mixSub.textContent = mixLabel
       ? `${mixLabel} · ${mixVisits} visite${mixVisits === 1 ? '' : 's'}`
-      : 'Répartition des visites du mois';
+      : 'Visites du mois en cours';
   }
   if (mixHost) {
     const mix = Array.isArray(data?.treatment_mix) ? data.treatment_mix : [];

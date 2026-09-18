@@ -6003,7 +6003,7 @@ html[data-theme="pearl-clinic"] .waitlist-table tbody tr:hover {
 /* ── Premium Doctor Shell refresh ───────────────────────────────────────── */
 
 #doctor-shell .sidebar {
-  padding: 18px 10px 14px;
+  padding: 18px 10px 120px;
 }
 
 #doctor-shell .sidebar-brand {

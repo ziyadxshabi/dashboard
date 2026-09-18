@@ -305,6 +305,12 @@ async function run() {
     !/DEFAULT_TREATMENT_MIX/.test(dashSrc)
   );
   ok(
+    'dashboard_app.js keeps mix_month_label and other non-numeric strings',
+    /mix_month_label/.test(dashSrc) &&
+      /typeof v === 'string'/.test(dashSrc) &&
+      /out\[k\] = v/.test(dashSrc)
+  );
+  ok(
     'doctor and assistant restore Superpouvoirs',
     /id="superpouvoirs-accordion"/.test(indexHtml) &&
       /id="btn-force-sms"/.test(indexHtml) &&
