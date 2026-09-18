@@ -2626,24 +2626,27 @@ html:not(.book-portal) .chair-glance__panel {
 
 .carnet-index {
   position: absolute;
-  top: 8px;
-  right: 2px;
-  z-index: 2;
+  top: 12px;
+  right: 14px;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 18px;
+  width: 20px;
   gap: 0;
+  padding: 6px 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-card, #fff) 82%, transparent);
   pointer-events: auto;
 }
 
 .carnet-index__letter {
-  width: 18px;
-  min-height: 14px;
+  width: 20px;
+  min-height: 15px;
   border: 0;
   background: transparent;
-  color: var(--text-muted);
-  font-size: 9px;
+  color: #5c6570;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
@@ -2661,7 +2664,7 @@ html:not(.book-portal) .chair-glance__panel {
 .carnet-book-layout .crm-book-scroll {
   max-height: min(70vh, 640px);
   overflow-y: auto;
-  padding-right: 22px;
+  padding-right: 36px;
 }
 
 .carnet-book {
