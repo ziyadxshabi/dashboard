@@ -293,8 +293,30 @@ async function run() {
     'assistant-shell Walk-in is a visible secondary button',
     /class="btn-matte-secondary" id="floor-walkin-btn"/.test(assistantHtml)
   );
-  ok('carnet.js exposes shared DentaFlowCarnet', /DentaFlowCarnet/.test(carnetSrc) && /directory=1/.test(carnetSrc));
   const indexHtml = fs.readFileSync(path.join(DASHBOARD, 'index.html'), 'utf8');
+  ok('carnet.js exposes shared DentaFlowCarnet', /DentaFlowCarnet/.test(carnetSrc) && /directory=1/.test(carnetSrc));
+  ok('carnet.js uses the patients book list', /crm-book-list/.test(carnetSrc));
+  ok(
+    'carnet copy is all-time, not a 90-day dump',
+    !/90 derniers/.test(carnetSrc) && !/90 derniers/.test(indexHtml) && !/90 derniers/.test(assistantHtml)
+  );
+  ok(
+    'dashboard_app.js does not inject a fake mix catalog',
+    !/DEFAULT_TREATMENT_MIX/.test(dashSrc)
+  );
+  ok(
+    'doctor and assistant restore Superpouvoirs',
+    /id="superpouvoirs-accordion"/.test(indexHtml) &&
+      /id="btn-force-sms"/.test(indexHtml) &&
+      /id="btn-block-slot"/.test(indexHtml) &&
+      /id="superpouvoirs-accordion"/.test(assistantHtml) &&
+      /id="btn-fill-gap"/.test(assistantHtml) &&
+      /id="btn-force-sms"/.test(assistantHtml)
+  );
+  ok(
+    'doctor overview cards are sourced',
+    /id="cabinet-patients"/.test(indexHtml) && /id="load-visits"/.test(indexHtml) && /Fichier cabinet/.test(indexHtml)
+  );
   ok(
     'doctor CRM sheet lives inside #doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
@@ -1350,11 +1372,33 @@ async function run() {
     typeof dash.body?.data?.reserved_min === 'number' && Number.isFinite(dash.body.data.reserved_min),
     `reserved_min=${dash.body?.data?.reserved_min}`
   );
-  ok('GET /api/dashboard-data open_min is 660', dash.body?.data?.open_min === 660, `open_min=${dash.body?.data?.open_min}`);
+  ok(
+    'GET /api/dashboard-data open_min is a positive number',
+    typeof dash.body?.data?.open_min === 'number' && dash.body.data.open_min > 0,
+    `open_min=${dash.body?.data?.open_min}`
+  );
   ok(
     'GET /api/dashboard-data treatment_mix is an array',
     Array.isArray(dash.body?.data?.treatment_mix),
     JSON.stringify(dash.body?.data?.treatment_mix)
+  );
+  ok(
+    'GET /api/dashboard-data treatment_mix has no zero-count catalog rows',
+    (dash.body?.data?.treatment_mix || []).every((row) => Number(row?.count) > 0),
+    JSON.stringify(dash.body?.data?.treatment_mix)
+  );
+  ok(
+    'GET /api/dashboard-data exposes cabinet snapshot',
+    typeof dash.body?.data?.patients_total === 'number' &&
+      typeof dash.body?.data?.waitlist_active === 'number' &&
+      typeof dash.body?.data?.mix_visits === 'number' &&
+      typeof dash.body?.data?.mix_month_label === 'string',
+    JSON.stringify({
+      patients_total: dash.body?.data?.patients_total,
+      waitlist_active: dash.body?.data?.waitlist_active,
+      mix_visits: dash.body?.data?.mix_visits,
+      mix_month_label: dash.body?.data?.mix_month_label,
+    })
   );
   ok(
     'GET /api/dashboard-data returning_phones is a number',
@@ -2680,7 +2724,89 @@ async function run() {
       directoryGet.statusCode === 200 && directoryGet.body?.ok === true,
       `status=${directoryGet.statusCode}`
     );
-    ok('directory payload is an array', Array.isArray(directoryGet.body?.data));
+    const directoryData = directoryGet.body?.data;
+    ok(
+      'directory payload is a patients carnet',
+      directoryData &&
+        !Array.isArray(directoryData) &&
+        Array.isArray(directoryData.patients) &&
+        Array.isArray(directoryData.years) &&
+        typeof directoryData.total === 'number',
+      JSON.stringify({
+        total: directoryData?.total,
+        years: directoryData?.years,
+        patients: directoryData?.patients?.length,
+      })
+    );
+    const firstPatientId = directoryData?.patients?.find((row) => row?.patient_id)?.patient_id;
+    if (firstPatientId) {
+      const visitsGet = await invoke(
+        handleRoster,
+        createReq({
+          method: 'GET',
+          url: `/api/roster?patient_id=${firstPatientId}`,
+          headers: doctorCookie,
+        })
+      );
+      ok(
+        'GET /api/roster?patient_id returns visit rows',
+        visitsGet.statusCode === 200 && Array.isArray(visitsGet.body?.data),
+        `status=${visitsGet.statusCode}`
+      );
+    }
+    const yearFilter = Array.isArray(directoryData?.years) ? directoryData.years[0] : null;
+    if (yearFilter) {
+      const yearGet = await invoke(
+        handleRoster,
+        createReq({
+          method: 'GET',
+          url: `/api/roster?directory=1&year=${yearFilter}`,
+          headers: doctorCookie,
+        })
+      );
+      ok(
+        'GET /api/roster?directory=1&year filters carnet',
+        yearGet.statusCode === 200 && Array.isArray(yearGet.body?.data?.patients),
+        `status=${yearGet.statusCode}`
+      );
+      const monthFilter = Array.isArray(yearGet.body?.data?.months) ? yearGet.body.data.months[0] : null;
+      if (monthFilter) {
+        const monthGet = await invoke(
+          handleRoster,
+          createReq({
+            method: 'GET',
+            url: `/api/roster?directory=1&year=${yearFilter}&month=${monthFilter}`,
+            headers: doctorCookie,
+          })
+        );
+        ok(
+          'GET /api/roster?directory=1&year&month filters carnet',
+          monthGet.statusCode === 200 && Array.isArray(monthGet.body?.data?.patients),
+          `status=${monthGet.statusCode}`
+        );
+      }
+    }
+    const searchName = String(directoryData?.patients?.[0]?.display_name || directoryData?.patients?.[0]?.name || '').trim();
+    if (searchName) {
+      const qToken = searchName.split(/\s+/)[0].slice(0, 12);
+      const qGet = await invoke(
+        handleRoster,
+        createReq({
+          method: 'GET',
+          url: `/api/roster?directory=1&q=${encodeURIComponent(qToken)}`,
+          headers: doctorCookie,
+        })
+      );
+      ok(
+        'GET /api/roster?directory=1&q searches patients without a 90-day cap',
+        qGet.statusCode === 200 &&
+          Array.isArray(qGet.body?.data?.patients) &&
+          qGet.body.data.patients.some((row) =>
+            String(row?.display_name || row?.name || '').toLowerCase().includes(qToken.toLowerCase())
+          ),
+        `status=${qGet.statusCode} q=${qToken}`
+      );
+    }
 
     const settingsGet = await invoke(
       handleRoster,

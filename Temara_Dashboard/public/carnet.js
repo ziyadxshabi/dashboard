@@ -1,17 +1,56 @@
 /**
- * Shared Dossiers Patients (carnet) — doctor + assistant.
- * 90-day directory, iOS detail sheet, PATCH /api/roster?action=patient.
+ * Shared Carnet patients — doctor + assistant.
+ * All-time patients directory via GET /api/roster?directory=1, year/month timeline, iOS detail sheet.
  */
 (function (global) {
   'use strict';
 
   const ROSTER_URL = '/api/roster';
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const MONTH_LABELS = [
+    'Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin',
+    'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.',
+  ];
 
   let groups = [];
   let groupsById = {};
+  let years = [];
+  let months = [];
+  let selectedYear = null;
+  let selectedMonth = null;
   let searchTimer = null;
+  let letterFilter = '';
   const boundRoots = new WeakSet();
+
+  function storageKey() {
+    const role = document.body.classList.contains('mode-assistant') ? 'assistant' : 'doctor';
+    return `dentaflow:carnet-period:${role}`;
+  }
+
+  function readStoredPeriod() {
+    try {
+      const raw = sessionStorage.getItem(storageKey());
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      selectedYear = Number.isInteger(parsed?.year) ? parsed.year : null;
+      selectedMonth = Number.isInteger(parsed?.month) ? parsed.month : null;
+    } catch {
+      selectedYear = null;
+      selectedMonth = null;
+    }
+  }
+
+  function writeStoredPeriod() {
+    try {
+      sessionStorage.setItem(storageKey(), JSON.stringify({
+        year: selectedYear,
+        month: selectedMonth,
+      }));
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
 
   function carnetRoot() {
     if (document.body.classList.contains('mode-assistant')) {
@@ -45,7 +84,7 @@
   }
 
   function formatWhen(row) {
-    const raw = row?.starts_at || row?.rawDate || row?.startTime;
+    const raw = row?.starts_at || row?.last_starts_at || row?.rawDate || row?.startTime;
     const parsed = raw ? new Date(raw) : null;
     if (!parsed || Number.isNaN(parsed.getTime())) return row?.time || '';
     return parsed.toLocaleString('fr-FR', {
@@ -58,74 +97,64 @@
     });
   }
 
-  function madLabel(value) {
+  function formatDay(raw) {
+    const parsed = raw ? new Date(raw) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Africa/Casablanca',
+    });
+  }
+
+  function madLabel(value, rows) {
+    if (rows === 0) return '—';
     const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return '—';
+    if (!Number.isFinite(n) || n < 0) return '—';
     return `${Math.round(n)} MAD`;
   }
 
-  function groupBookings(rows) {
-    const map = new Map();
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-      if (String(row.booking_kind || row.bookingKind || 'visit') !== 'visit') return;
-      const phone = String(row.phone || row.patient_phone || '').trim();
-      const name = String(row.name || row.patient_name || row.patient_display_name || '').trim();
-      const patientId = row.patient_id || row.patientId || '';
-      const key = String(patientId || phone || name.toLowerCase());
-      if (!key) return;
-      if (!map.has(key)) {
-        map.set(key, {
-          id: patientId || key,
-          patient_id: patientId || null,
-          name: name || 'Non spécifié',
-          phone,
-          email: row.email || row.patient_email || '',
-          allergies: row.allergies || '',
-          chronic_conditions: row.chronic_conditions || '',
-          preferred_anesthetic: row.preferred_anesthetic || '',
-          last_xray_on: row.last_xray_on || '',
-          clinical_notes: row.clinical_notes || row.notes || '',
-          sms_consent: row.sms_consent === true,
-          insurance: row.insurance || row.insurance_type || '',
-          copay_mad: row.copay_mad,
-          visits: [],
-        });
-      }
-      const group = map.get(key);
-      if (name && group.name === 'Non spécifié') group.name = name;
-      if (phone && !group.phone) group.phone = phone;
-      if (patientId) group.patient_id = patientId;
-      if (row.email || row.patient_email) group.email = row.email || row.patient_email;
-      if (row.allergies) group.allergies = row.allergies;
-      if (row.chronic_conditions) group.chronic_conditions = row.chronic_conditions;
-      if (row.preferred_anesthetic) group.preferred_anesthetic = row.preferred_anesthetic;
-      if (row.last_xray_on) group.last_xray_on = row.last_xray_on;
-      if (row.clinical_notes) group.clinical_notes = row.clinical_notes;
-      if (typeof row.sms_consent === 'boolean') group.sms_consent = row.sms_consent;
-      group.visits.push(row);
-    });
-    return [...map.values()].map((group) => {
-      group.visits.sort((a, b) => String(b.starts_at || '').localeCompare(String(a.starts_at || '')));
-      group.lastVisit = group.visits[0] || null;
-      group.motif = group.lastVisit?.treatment || group.lastVisit?.treatment_name || 'Consultation';
-      group.statut = group.lastVisit?.status || 'Non renseigné';
-      group.lastWhen = formatWhen(group.lastVisit || {});
-      const fromApi = Number(group.lastVisit?.noshow_90d);
-      group.noshow90 = Number.isFinite(fromApi)
-        ? fromApi
-        : group.visits.filter((visit) => /no-?show/i.test(String(visit.status || ''))).length;
-      group.solde = group.visits.reduce((sum, visit) => {
-        const copay = Number(visit.copay_mad);
-        const unpaid = /no-?show|annul|attente/i.test(String(visit.status || '')) ? 0 : copay;
-        return sum + (Number.isFinite(unpaid) ? unpaid : 0);
-      }, 0);
-      return group;
-    });
+  function letterFor(name) {
+    const ch = String(name || '').trim().charAt(0).toLocaleUpperCase('fr-FR');
+    return LETTERS.includes(ch) ? ch : '#';
+  }
+
+  function mapPatient(row) {
+    const lastWhen = row.last_starts_at ? formatWhen({ starts_at: row.last_starts_at }) : '';
+    return {
+      id: row.patient_id || row.id,
+      patient_id: row.patient_id || row.id,
+      name: row.name || row.display_name || 'Non spécifié',
+      phone: row.phone || row.phone_e164 || '',
+      email: row.email || '',
+      allergies: row.allergies || '',
+      chronic_conditions: row.chronic_conditions || '',
+      preferred_anesthetic: row.preferred_anesthetic || '',
+      last_xray_on: row.last_xray_on || '',
+      clinical_notes: row.clinical_notes || '',
+      sms_consent: row.sms_consent === true,
+      insurance: row.insurance || row.insurance_type || '',
+      last_starts_at: row.last_starts_at || null,
+      lastWhen,
+      motif: row.last_treatment || '',
+      statut: row.last_status || '',
+      honoraires_saisis: row.honoraires_saisis,
+      honoraires_rows: Number(row.honoraires_rows) || 0,
+      noshow_count: Number(row.noshow_count) || 0,
+      letter: letterFor(row.name || row.display_name),
+      visits: [],
+    };
+  }
+
+  function listHost() {
+    return $('crm-book-list') || $('crm-table-body');
   }
 
   function setEmpty(visible, title, message) {
     const host = $('crm-empty-state');
-    const scroll = document.querySelector('#view-crm .crm-table-scroll');
+    const layout = carnetRoot().querySelector('#view-crm .carnet-book-layout');
+    const scroll = carnetRoot().querySelector('#view-crm .crm-book-scroll, #view-crm .crm-table-scroll');
     if (host) {
       host.hidden = !visible;
       const t = host.querySelector('.ios-empty__title');
@@ -133,64 +162,174 @@
       if (t && title) t.textContent = title;
       if (m && message) m.textContent = message;
     }
+    if (layout) layout.hidden = Boolean(visible);
     if (scroll) scroll.hidden = Boolean(visible);
   }
 
-  function renderTable() {
-    const tbody = $('crm-table-body');
-    if (!tbody) return;
-    tbody.replaceChildren();
+  function emptyCopy() {
+    const q = $('crm-search')?.value.trim() || '';
+    if (q) {
+      return {
+        title: 'Aucun patient trouvé',
+        message: `Aucun dossier ne correspond à « ${q} ».`,
+      };
+    }
+    if (selectedYear || selectedMonth) {
+      return {
+        title: 'Aucun patient cette période',
+        message: 'Choisissez une autre année, un autre mois, ou Tous.',
+      };
+    }
+    return {
+      title: 'Aucun dossier au fichier',
+      message: 'Les patients apparaissent ici dès qu’un dossier est créé.',
+    };
+  }
+
+  function visibleGroups() {
+    if (!letterFilter) return groups;
+    return groups.filter((patient) => patient.letter === letterFilter);
+  }
+
+  function renderTimeline() {
+    const yearHost = $('crm-timeline-years');
+    const monthHost = $('crm-timeline-months');
+    if (yearHost) {
+      yearHost.replaceChildren();
+      const tous = document.createElement('button');
+      tous.type = 'button';
+      tous.className = `carnet-chip${selectedYear == null ? ' is-active' : ''}`;
+      tous.textContent = 'Tous';
+      tous.setAttribute('aria-pressed', selectedYear == null ? 'true' : 'false');
+      tous.addEventListener('click', () => {
+        selectedYear = null;
+        selectedMonth = null;
+        writeStoredPeriod();
+        void load();
+      });
+      yearHost.appendChild(tous);
+      years.forEach((year) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `carnet-chip${selectedYear === year ? ' is-active' : ''}`;
+        btn.textContent = String(year);
+        btn.setAttribute('aria-pressed', selectedYear === year ? 'true' : 'false');
+        btn.addEventListener('click', () => {
+          selectedYear = year;
+          selectedMonth = null;
+          writeStoredPeriod();
+          void load();
+        });
+        yearHost.appendChild(btn);
+      });
+    }
+    if (monthHost) {
+      monthHost.replaceChildren();
+      monthHost.hidden = selectedYear == null;
+      if (selectedYear != null) {
+        months.forEach((month) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `carnet-chip carnet-chip--month${selectedMonth === month ? ' is-active' : ''}`;
+          btn.textContent = MONTH_LABELS[month - 1] || String(month);
+          btn.setAttribute('aria-pressed', selectedMonth === month ? 'true' : 'false');
+          btn.addEventListener('click', () => {
+            selectedMonth = selectedMonth === month ? null : month;
+            writeStoredPeriod();
+            void load();
+          });
+          monthHost.appendChild(btn);
+        });
+      }
+    }
+  }
+
+  function renderIndex(visible) {
+    const rail = $('crm-index-rail');
+    if (!rail) return;
+    const present = new Set(visible.map((patient) => patient.letter));
+    rail.replaceChildren();
+    LETTERS.forEach((letter) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `carnet-index__letter${letterFilter === letter ? ' is-active' : ''}`;
+      btn.textContent = letter;
+      btn.disabled = !present.has(letter);
+      btn.setAttribute('aria-label', `Lettre ${letter}`);
+      if (present.has(letter)) {
+        btn.addEventListener('click', () => {
+          letterFilter = letterFilter === letter ? '' : letter;
+          renderBook();
+        });
+      }
+      rail.appendChild(btn);
+    });
+  }
+
+  function renderBook() {
+    const host = listHost();
+    if (!host) return;
+    host.replaceChildren();
     groupsById = {};
     const skeleton = $('crm-skeleton');
     const content = $('crm-content');
     if (skeleton) skeleton.hidden = true;
     if (content) content.hidden = false;
 
+    renderTimeline();
+
     if (!groups.length) {
-      setEmpty(true, 'Aucun dossier à afficher', 'Recherchez un nom ou un téléphone sur les 90 derniers jours.');
+      const copy = emptyCopy();
+      setEmpty(true, copy.title, copy.message);
+      renderIndex([]);
+      return;
+    }
+
+    const visible = visibleGroups();
+    renderIndex(groups);
+    if (!visible.length) {
+      setEmpty(true, 'Aucun patient sur cette lettre', 'Choisissez une autre lettre dans l’index.');
       return;
     }
     setEmpty(false);
 
     const fragment = document.createDocumentFragment();
-    groups.forEach((patient) => {
+    let currentLetter = '';
+    visible.forEach((patient) => {
       const id = String(patient.id);
       groupsById[id] = patient;
-      const tr = document.createElement('tr');
-      tr.className = 'crm-table-row';
-      tr.tabIndex = 0;
-      tr.setAttribute('role', 'button');
-      tr.dataset.patientId = id;
+      const sectionLetter = patient.last_starts_at ? patient.letter : 'Sans rendez-vous';
+      if (sectionLetter !== currentLetter) {
+        currentLetter = sectionLetter;
+        const heading = document.createElement('li');
+        heading.className = 'carnet-book__section';
+        heading.textContent = sectionLetter;
+        fragment.appendChild(heading);
+      }
 
-      const nameCell = document.createElement('td');
-      nameCell.textContent = patient.name || 'Non spécifié';
+      const item = document.createElement('li');
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'carnet-book__row crm-table-row';
+      row.dataset.patientId = id;
 
-      const phoneCell = document.createElement('td');
-      phoneCell.textContent = patient.phone || 'Non renseigné';
+      const name = document.createElement('span');
+      name.className = 'carnet-book__name';
+      name.textContent = patient.name || 'Non spécifié';
 
-      const lastCell = document.createElement('td');
-      lastCell.textContent = patient.lastWhen || '—';
+      const meta = document.createElement('span');
+      meta.className = 'carnet-book__meta';
+      const phone = patient.phone || 'Sans téléphone';
+      const visit = patient.lastWhen || 'Sans rendez-vous';
+      const soin = patient.motif || '';
+      meta.textContent = soin ? `${phone} · ${visit} · ${soin}` : `${phone} · ${visit}`;
 
-      const motifCell = document.createElement('td');
-      motifCell.textContent = patient.motif || '—';
-
-      const soldeCell = document.createElement('td');
-      soldeCell.textContent = madLabel(patient.solde);
-
-      const noshowCell = document.createElement('td');
-      noshowCell.textContent = `${patient.noshow90 || 0} (90 j)`;
-
-      tr.append(nameCell, phoneCell, lastCell, motifCell, soldeCell, noshowCell);
-      tr.addEventListener('click', () => openSheet(patient));
-      tr.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openSheet(patient);
-        }
-      });
-      fragment.appendChild(tr);
+      row.append(name, meta);
+      row.addEventListener('click', () => openSheet(patient));
+      item.appendChild(row);
+      fragment.appendChild(item);
     });
-    tbody.appendChild(fragment);
+    host.appendChild(fragment);
     global.refreshLucideIcons?.($('view-crm') || document);
   }
 
@@ -208,20 +347,76 @@
     return el.value;
   }
 
+  function markSelected(patientId) {
+    carnetRoot().querySelectorAll('.crm-table-row.is-selected, .carnet-book__row.is-selected').forEach((row) => {
+      row.classList.remove('is-selected');
+    });
+    carnetRoot().querySelector(`.carnet-book__row[data-patient-id="${CSS.escape(String(patientId))}"]`)
+      ?.classList.add('is-selected');
+  }
+
+  function renderVisits(visits) {
+    const host = $('crm-panel-visits');
+    if (!host) return;
+    host.replaceChildren();
+    const rows = Array.isArray(visits) ? visits : [];
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'chair-glance__empty';
+      empty.textContent = 'Aucune visite enregistrée.';
+      host.appendChild(empty);
+      return;
+    }
+    rows.slice(0, 12).forEach((visit) => {
+      const row = document.createElement('div');
+      row.className = 'carnet-visit';
+      const left = document.createElement('span');
+      left.textContent = `${formatWhen(visit)} · ${visit.treatment || visit.treatment_name || 'Soin'}`;
+      const right = document.createElement('span');
+      right.textContent = visit.status || '';
+      row.append(left, right);
+      host.appendChild(row);
+    });
+  }
+
+  async function loadVisits(patient) {
+    if (!UUID_RE.test(String(patient.patient_id || ''))) {
+      patient.visits = [];
+      renderVisits([]);
+      return;
+    }
+    renderVisits([]);
+    try {
+      const response = await fetch(`${ROSTER_URL}?patient_id=${encodeURIComponent(patient.patient_id)}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: authHeaders({ Accept: 'application/json' }),
+        cache: 'no-store',
+      });
+      assertAuthorized(response);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      const rows = Array.isArray(payload?.data) ? payload.data : [];
+      patient.visits = rows;
+      renderVisits(rows);
+    } catch {
+      renderVisits([]);
+    }
+  }
+
   function openSheet(patient) {
     const root = $('crm-side-panel');
     if (!root || !patient) return;
-    document.querySelectorAll('.crm-table-row.is-selected').forEach((row) => {
-      row.classList.remove('is-selected');
-    });
-    document.querySelector(`.crm-table-row[data-patient-id="${CSS.escape(String(patient.id))}"]`)
-      ?.classList.add('is-selected');
+    markSelected(patient.id);
 
     if ($('crm-panel-name')) $('crm-panel-name').textContent = patient.name || 'Dossier';
     if ($('crm-panel-subtitle')) {
+      const last = patient.lastWhen || formatDay(patient.last_starts_at) || 'Sans rendez-vous';
       $('crm-panel-subtitle').textContent = patient.phone
-        ? `${patient.phone} · ${patient.lastWhen || 'Sans visite récente'}`
-        : (patient.lastWhen || 'Sans visite récente');
+        ? `${patient.phone} · ${last}`
+        : last;
     }
     const statusEl = $('crm-panel-status') || $('crm-panel-statut');
     if (statusEl) statusEl.textContent = patient.statut || '';
@@ -235,29 +430,10 @@
     setField('crm-edit-xray', patient.last_xray_on ? String(patient.last_xray_on).slice(0, 10) : '');
     setField('crm-edit-notes', patient.clinical_notes);
     setField('crm-edit-sms', patient.sms_consent === true);
-    if ($('crm-panel-copay')) $('crm-panel-copay').textContent = madLabel(patient.lastVisit?.copay_mad);
-    if ($('crm-edit-id')) $('crm-edit-id').value = patient.patient_id || '';
-
-    const visits = $('crm-panel-visits');
-    if (visits) {
-      visits.replaceChildren();
-      (patient.visits || []).slice(0, 8).forEach((visit) => {
-        const row = document.createElement('div');
-        row.className = 'carnet-visit';
-        const left = document.createElement('span');
-        left.textContent = `${formatWhen(visit)} · ${visit.treatment || visit.treatment_name || 'Soin'}`;
-        const right = document.createElement('span');
-        right.textContent = visit.status || '';
-        row.append(left, right);
-        visits.appendChild(row);
-      });
-      if (!patient.visits?.length) {
-        const empty = document.createElement('p');
-        empty.className = 'chair-glance__empty';
-        empty.textContent = 'Aucune visite récente.';
-        visits.appendChild(empty);
-      }
+    if ($('crm-panel-copay')) {
+      $('crm-panel-copay').textContent = madLabel(patient.honoraires_saisis, patient.honoraires_rows);
     }
+    if ($('crm-edit-id')) $('crm-edit-id').value = patient.patient_id || '';
 
     const saveBtn = $('crm-edit-save');
     if (saveBtn) saveBtn.disabled = !UUID_RE.test(String(patient.patient_id || ''));
@@ -265,6 +441,7 @@
     root.classList.add('is-active');
     root.setAttribute('aria-hidden', 'false');
     $('crm-side-panel-close')?.focus();
+    void loadVisits(patient);
   }
 
   function closeSheet() {
@@ -272,7 +449,7 @@
     if (!root) return;
     root.classList.remove('is-active');
     root.setAttribute('aria-hidden', 'true');
-    document.querySelectorAll('.crm-table-row.is-selected').forEach((row) => {
+    carnetRoot().querySelectorAll('.crm-table-row.is-selected, .carnet-book__row.is-selected').forEach((row) => {
       row.classList.remove('is-selected');
     });
   }
@@ -319,15 +496,23 @@
     }
   }
 
-  async function load(query) {
-    const tbody = $('crm-table-body');
-    if (!tbody) return;
+  function directoryUrl(query) {
+    const params = new URLSearchParams({ directory: '1' });
     const q = String(query || '').trim();
-    const url = q
-      ? `${ROSTER_URL}?directory=1&q=${encodeURIComponent(q)}`
-      : `${ROSTER_URL}?directory=1`;
+    if (q) params.set('q', q);
+    else {
+      if (selectedYear != null) params.set('year', String(selectedYear));
+      if (selectedMonth != null) params.set('month', String(selectedMonth));
+    }
+    return `${ROSTER_URL}?${params.toString()}`;
+  }
+
+  async function load(query) {
+    const host = listHost();
+    if (!host) return;
+    const q = query != null ? String(query).trim() : ($('crm-search')?.value.trim() || '');
     try {
-      const response = await fetch(url, {
+      const response = await fetch(directoryUrl(q), {
         method: 'GET',
         credentials: 'include',
         headers: authHeaders({ Accept: 'application/json' }),
@@ -338,12 +523,32 @@
       if (!response.ok || payload?.ok === false) {
         throw new Error(payload?.error || `HTTP ${response.status}`);
       }
-      const rows = Array.isArray(payload?.data) ? payload.data : [];
-      groups = groupBookings(rows);
-      renderTable();
+      const bundle = payload?.data && !Array.isArray(payload.data) ? payload.data : {};
+      const rows = Array.isArray(bundle.patients)
+        ? bundle.patients
+        : (Array.isArray(payload?.data) ? payload.data : []);
+      years = Array.isArray(bundle.years) ? bundle.years : [];
+      months = Array.isArray(bundle.months) ? bundle.months : [];
+      if (selectedYear != null && !years.includes(selectedYear)) {
+        selectedYear = null;
+        selectedMonth = null;
+        writeStoredPeriod();
+      }
+      if (selectedMonth != null && !months.includes(selectedMonth)) {
+        selectedMonth = null;
+        writeStoredPeriod();
+      }
+      groups = rows.map(mapPatient).slice().sort((a, b) => {
+        const aKey = a.last_starts_at ? `0${a.letter}${a.name}` : `1${a.name}`;
+        const bKey = b.last_starts_at ? `0${b.letter}${b.name}` : `1${b.name}`;
+        return aKey.localeCompare(bKey, 'fr', { sensitivity: 'base' });
+      });
+      renderBook();
     } catch (err) {
       groups = [];
-      renderTable();
+      years = [];
+      months = [];
+      renderBook();
       setEmpty(true, 'Dossiers indisponibles', err?.message || 'Réessayez dans un instant.');
     }
   }
@@ -352,13 +557,15 @@
     const root = carnetRoot();
     if (boundRoots.has(root)) return;
     const searchEl = $('crm-search');
-    const tbody = $('crm-table-body');
-    if (!searchEl || !tbody) return;
+    const host = listHost();
+    if (!searchEl || !host) return;
     boundRoots.add(root);
+    readStoredPeriod();
 
     searchEl.addEventListener('input', () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => {
+        letterFilter = '';
         void load(searchEl.value.trim());
       }, 280);
     });

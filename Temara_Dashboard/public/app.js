@@ -484,7 +484,7 @@ let handoffNotes = [];
       pinBadge.className = 'handoff-note__pin-badge';
       pinBadge.setAttribute('aria-label', 'Note épinglée');
       pinBadge.innerHTML = PIN_BADGE_SVG;
-      pinBadge.appendChild(document.createTextNode(' Épinglé'));
+      pinBadge.appendChild(document.createTextNode(''));
       meta.appendChild(pinBadge);
     }
 
@@ -1248,7 +1248,7 @@ let handoffNotes = [];
       const text = input?.value.trim();
 
       if (!text) {
-        showToast('Saisissez une note avant de publier.', 'error');
+        showToast('Saisissez une note avant d\'envoyer.', 'error');
         input?.focus();
         return;
       }
@@ -1701,7 +1701,6 @@ let handoffNotes = [];
   function guardDeployingFeatureButtons() {
     wireDeployingFeatureButton($('btn-daily-report'), DEPLOYING_FEATURE_NOTICES.dailyReport);
     wireDeployingFeatureButton($('btn-force-reminders'), DEPLOYING_FEATURE_NOTICES.forceReminders);
-    wireDeployingFeatureButton($('btn-block-slot'), DEPLOYING_FEATURE_NOTICES.blockSlot);
     wireDeployingFeatureButton($('btn-alerte-retard'), DEPLOYING_FEATURE_NOTICES.delayAlert);
     wireDeployingFeatureButton($('waitlist-popover-export'), DEPLOYING_FEATURE_NOTICES.dailyReport);
   }

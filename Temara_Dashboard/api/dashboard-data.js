@@ -89,6 +89,30 @@ const CHARGE_TODAY_SQL = `
     AND status::text NOT IN ('Annule', 'Annulé')
 `;
 
+const CHARGE_MONTH_SQL = `
+  SELECT
+    COALESCE(SUM(charge_mad), 0)::numeric AS charge_sum,
+    COUNT(*) FILTER (WHERE charge_mad IS NOT NULL)::int AS charge_rows
+  FROM bookings
+  WHERE clinic_id = $1
+    AND COALESCE(booking_kind, 'visit') = 'visit'
+    AND date_trunc('month', starts_at AT TIME ZONE 'Africa/Casablanca')
+      = date_trunc('month', NOW() AT TIME ZONE 'Africa/Casablanca')
+    AND status::text NOT IN ('Annule', 'Annulé', 'No-show', 'No-Show')
+`;
+
+const CABINET_SNAPSHOT_SQL = `
+  SELECT
+    (SELECT COUNT(*)::int FROM patients WHERE clinic_id = $1) AS patients_total,
+    (SELECT COUNT(*)::int FROM waitlist WHERE clinic_id = $1 AND status = 'active') AS waitlist_active
+`;
+
+const CLINIC_HOURS_SQL = `
+  SELECT day_start, day_end
+  FROM clinics
+  WHERE id = $1
+`;
+
 const PLANS_SQL = `
   SELECT
     COUNT(*) FILTER (WHERE status = 'done')::int AS plans_done,
@@ -97,7 +121,7 @@ const PLANS_SQL = `
   WHERE clinic_id = $1
 `;
 
-const OPEN_MINUTES = 11 * 60; // 08:00–19:00 Casablanca clinic grid
+const OPEN_MINUTES_FALLBACK = 11 * 60; // 08:00–19:00 Casablanca clinic grid
 
 const RESERVED_TODAY_SQL = `
   SELECT COALESCE(SUM(duration_min), 0)::int AS reserved_min
@@ -116,8 +140,8 @@ const TREATMENT_MIX_SQL = `
   FROM bookings
   WHERE clinic_id = $1
     AND COALESCE(booking_kind, 'visit') = 'visit'
-    AND (starts_at AT TIME ZONE 'Africa/Casablanca')::date
-      >= (NOW() AT TIME ZONE 'Africa/Casablanca')::date - 6
+    AND date_trunc('month', starts_at AT TIME ZONE 'Africa/Casablanca')
+      = date_trunc('month', NOW() AT TIME ZONE 'Africa/Casablanca')
     AND status::text NOT IN ('Annule', 'Annulé')
   GROUP BY 1
   ORDER BY count DESC, name ASC
@@ -203,6 +227,31 @@ function emptyHourCounts() {
   return counts;
 }
 
+function parseClockToMinutes(value, fallback) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return fallback;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return fallback;
+  return hours * 60 + minutes;
+}
+
+function openMinutesFromHours(dayStart, dayEnd) {
+  const start = parseClockToMinutes(dayStart, 8 * 60);
+  const end = parseClockToMinutes(dayEnd, 19 * 60);
+  return Math.max(0, end - start) || OPEN_MINUTES_FALLBACK;
+}
+
+function casablancaMonthLabel(date = new Date()) {
+  const label = date.toLocaleDateString('fr-FR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Africa/Casablanca',
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function mapHourlyRows(rows) {
   const counts = emptyHourCounts();
   for (const row of rows || []) {
@@ -230,7 +279,20 @@ module.exports = async function handler(req, res) {
   if (!session) return;
 
   try {
-    const [kpiResult, weekResult, hourlyResult, monthResult, reservedResult, mixResult, fidelityResult, chargeResult, plansResult] =
+    const [
+      kpiResult,
+      weekResult,
+      hourlyResult,
+      monthResult,
+      reservedResult,
+      mixResult,
+      fidelityResult,
+      chargeResult,
+      chargeMonthResult,
+      plansResult,
+      snapshotResult,
+      hoursResult,
+    ] =
       await Promise.all([
         query(DASHBOARD_KPI_SQL, [session.clinic_id]),
         query(WEEK_PATIENTS_SQL, [session.clinic_id]),
@@ -240,7 +302,10 @@ module.exports = async function handler(req, res) {
         query(TREATMENT_MIX_SQL, [session.clinic_id]),
         query(PHONE_FIDELITY_SQL, [session.clinic_id]),
         query(CHARGE_TODAY_SQL, [session.clinic_id]),
+        query(CHARGE_MONTH_SQL, [session.clinic_id]),
         query(PLANS_SQL, [session.clinic_id]),
+        query(CABINET_SNAPSHOT_SQL, [session.clinic_id]),
+        query(CLINIC_HOURS_SQL, [session.clinic_id]),
       ]);
     const row = kpiResult.rows[0] || {};
     const weekPatients = (weekResult.rows || []).map((entry) => Number(entry.patients) || 0);
@@ -251,15 +316,24 @@ module.exports = async function handler(req, res) {
     const chargeRow = chargeResult.rows[0] || {};
     const chargeRows = Number(chargeRow.charge_rows) || 0;
     const chargeSum = Number(chargeRow.charge_sum) || 0;
+    const chargeMonth = chargeMonthResult.rows[0] || {};
+    const honorairesMoisRows = Number(chargeMonth.charge_rows) || 0;
+    const honorairesMois = honorairesMoisRows > 0 ? Number(chargeMonth.charge_sum) || 0 : null;
+    const hoursRow = hoursResult.rows[0] || {};
+    const dayStart = hoursRow.day_start || '08:00';
+    const dayEnd = hoursRow.day_end || '19:00';
+    const openMin = openMinutesFromHours(dayStart, dayEnd);
     const madPerHour = chargeRows > 0 && reservedMin > 0
       ? Math.round((chargeSum / (reservedMin / 60)) * 100) / 100
       : null;
     const plans = plansResult.rows[0] || {};
+    const snapshot = snapshotResult.rows[0] || {};
     const fidelity = fidelityResult.rows[0] || {};
     const treatmentMix = (mixResult.rows || []).map((entry) => ({
       name: String(entry.name || 'Non précisé'),
       count: Number(entry.count) || 0,
     }));
+    const mixVisits = treatmentMix.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
 
     return res.status(200).json({
       ok: true,
@@ -269,10 +343,20 @@ module.exports = async function handler(req, res) {
         pending_plans: Number(row.pending_plans) || 0,
         no_shows: Number(row.no_shows) || 0,
         reserved_min: reservedMin,
-        open_min: OPEN_MINUTES,
+        open_min: openMin,
+        day_start: dayStart,
+        day_end: dayEnd,
         mad_per_hour: madPerHour,
+        charge_sum: chargeRows > 0 ? chargeSum : null,
+        charge_rows: chargeRows,
         plans_done: Number(plans.plans_done) || 0,
         plans_open: Number(plans.plans_open) || 0,
+        patients_total: Number(snapshot.patients_total) || 0,
+        waitlist_active: Number(snapshot.waitlist_active) || 0,
+        honoraires_mois: honorairesMois,
+        honoraires_mois_rows: honorairesMoisRows,
+        mix_month_label: casablancaMonthLabel(),
+        mix_visits: mixVisits,
         treatment_mix: treatmentMix,
         returning_phones: Number(fidelity.returning_phones) || 0,
         new_phones: Number(fidelity.new_phones) || 0,
