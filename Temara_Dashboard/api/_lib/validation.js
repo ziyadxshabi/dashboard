@@ -290,6 +290,110 @@ function sanitizeString(value, maxLen) {
   return text.length > limit ? text.slice(0, limit) : text;
 }
 
+function parseOptionalBoolean(body, key, aliases = []) {
+  const keys = [key, ...aliases];
+  const found = keys.find((name) => Object.prototype.hasOwnProperty.call(body, name));
+  if (!found) return { present: false, value: true };
+  const raw = body[found];
+  if (raw === true || raw === 1) return { present: true, value: true };
+  if (raw === false || raw === 0) return { present: true, value: false };
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (text === 'true' || text === '1' || text === 'oui' || text === 'yes') {
+    return { present: true, value: true };
+  }
+  if (text === 'false' || text === '0' || text === 'non' || text === 'no') {
+    return { present: true, value: false };
+  }
+  return { present: true, value: Boolean(raw) };
+}
+
+const PAYMENT_METHODS = new Set(['especes', 'cheque', 'carte', 'virement']);
+
+function validatePaymentBody(body = {}) {
+  const patientId = String(body.patient_id ?? body.patientId ?? '').trim();
+  if (!UUID_RE.test(patientId)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'patient_id is required'),
+    };
+  }
+  const amountRaw = body.amount_mad ?? body.amountMad ?? body.amount;
+  if (amountRaw == null || amountRaw === '') {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'amount_mad is required'),
+    };
+  }
+  const amountNum = Number(amountRaw);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'amount_mad must be a number > 0'),
+    };
+  }
+  const method = String(body.method || '').trim().toLowerCase();
+  if (!PAYMENT_METHODS.has(method)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'method must be especes, cheque, carte or virement'),
+    };
+  }
+  const bookingRaw = String(body.booking_id ?? body.bookingId ?? '').trim();
+  const planRaw = String(body.plan_id ?? body.planId ?? '').trim();
+  if (bookingRaw && !UUID_RE.test(bookingRaw)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'booking_id must be a UUID'),
+    };
+  }
+  if (planRaw && !UUID_RE.test(planRaw)) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'plan_id must be a UUID'),
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      patientId,
+      amountMad: Math.round(amountNum * 100) / 100,
+      method,
+      bookingId: bookingRaw || null,
+      planId: planRaw || null,
+      note: sanitizeString(body.note, 500) || null,
+    },
+  };
+}
+
+function validateActPriceBody(body = {}) {
+  const actCode = sanitizeString(body.act_code ?? body.actCode, 16);
+  const customLabel = sanitizeString(body.custom_label ?? body.customLabel, 120);
+  const priceRaw = body.price_mad ?? body.priceMad;
+  const priceNum = priceRaw == null || priceRaw === '' ? NaN : Number(priceRaw);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'price_mad must be a number ≥ 0'),
+    };
+  }
+  if (!actCode && !customLabel) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'act_code or custom_label is required'),
+    };
+  }
+  const active = parseOptionalBoolean(body, 'active');
+  return {
+    ok: true,
+    value: {
+      actCode: actCode || null,
+      customLabel: customLabel || null,
+      priceMad: Math.round(priceNum * 100) / 100,
+      active: active.value,
+    },
+  };
+}
+
 function parsePinned(value) {
   if (value === true || value === 1) return true;
   const raw = String(value ?? '').trim().toLowerCase();
@@ -642,6 +746,9 @@ module.exports = {
   validateRosterCreate,
   validatePhone,
   sanitizeString,
+  PAYMENT_METHODS,
+  validatePaymentBody,
+  validateActPriceBody,
   validateTeamNoteInput,
   validateFillGapInput,
   validateBulkSmsInput,

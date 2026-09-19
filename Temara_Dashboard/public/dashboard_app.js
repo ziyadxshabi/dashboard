@@ -856,7 +856,11 @@ function switchTab(hashId) {
   if (!viewKey) return;
 
   const targetId = VIEW_MAP[viewKey];
-  if (!targetId || viewKey === activeView) return;
+  if (!targetId) return;
+  if (viewKey === activeView) {
+    if (viewKey === 'settings') void loadTarifsCabinet();
+    return;
+  }
 
   const views = doctorQueryAll('.dashboard-view');
   const target = doctorEl(targetId);
@@ -903,6 +907,10 @@ function switchTab(hashId) {
 
   if (viewKey === 'crm') {
     window.DentaFlowCarnet?.init?.();
+  }
+
+  if (viewKey === 'settings') {
+    void loadTarifsCabinet();
   }
 
   if (viewKey === 'doctor-hub') {
@@ -1455,6 +1463,14 @@ function initSettings() {
     emailToggle.disabled = true;
     emailToggle.setAttribute('aria-disabled', 'true');
   }
+
+  const tarifsRetry = doctorEl('settings-tarifs-retry');
+  if (tarifsRetry && tarifsRetry.dataset.bound !== 'true') {
+    tarifsRetry.dataset.bound = 'true';
+    tarifsRetry.addEventListener('click', () => {
+      void loadTarifsCabinet();
+    });
+  }
 }
 
 function applyDoctorDailyGoal(value) {
@@ -1503,6 +1519,158 @@ function showDashboardToast(message, type = 'info') {
   securityToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
 }
 window.showToast = showDashboardToast;
+
+function formatTarifMad(value) {
+  if (value == null || value === '') return '';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return String(Number.isInteger(n) ? n : Math.round(n * 100) / 100);
+}
+
+function setTarifsCabinetChrome({ empty = false, error = false, countText = '' } = {}) {
+  const list = doctorEl('settings-tarifs-list');
+  const emptyEl = doctorEl('settings-tarifs-empty');
+  const errorEl = doctorEl('settings-tarifs-error');
+  const countEl = doctorEl('settings-tarifs-count');
+  if (list) list.hidden = error;
+  if (emptyEl) emptyEl.hidden = !empty;
+  if (errorEl) errorEl.hidden = !error;
+  if (countEl) {
+    countEl.textContent = countText;
+    countEl.hidden = !countText || error;
+  }
+}
+
+function showTarifsCabinetError(status) {
+  const list = doctorEl('settings-tarifs-list');
+  if (list) list.replaceChildren();
+  setTarifsCabinetChrome({ empty: false, error: true });
+  console.error('[Settings] acts GET failed', { status });
+}
+
+function renderTarifsCabinet(payload) {
+  const list = doctorEl('settings-tarifs-list');
+  if (!list) return;
+  list.replaceChildren();
+  const data = payload?.data || {};
+  const custom = Array.isArray(data.custom) ? data.custom : [];
+  const reference = Array.isArray(data.reference) ? data.reference : [];
+  const rows = [...custom, ...reference];
+  const countText = rows.length
+    ? `${reference.length} actes NGAP · ${custom.length} hors nomenclature`
+    : '';
+  setTarifsCabinetChrome({ empty: rows.length === 0, error: false, countText });
+  rows.forEach((row) => {
+    const item = document.createElement('li');
+    item.className = 'settings-tarifs-row';
+    const nameWrap = document.createElement('div');
+    const name = document.createElement('span');
+    name.className = 'settings-tarifs-name';
+    name.textContent = row.label || row.code || 'Acte';
+    const meta = document.createElement('span');
+    meta.className = 'settings-tarifs-meta';
+    const bits = [];
+    if (row.code) bits.push(row.code);
+    if (row.tnrMad != null) bits.push(`TNR ${formatTarifMad(row.tnrMad)} MAD`);
+    if (!row.insurable) bits.push('Hors nomenclature');
+    meta.textContent = bits.join(' · ');
+    nameWrap.append(name);
+    if (bits.length) nameWrap.append(meta);
+    const input = document.createElement('input');
+    input.className = 'waitlist-input settings-input';
+    input.type = 'number';
+    input.min = '0';
+    input.step = '50';
+    input.inputMode = 'decimal';
+    input.setAttribute('aria-label', `Prix MAD — ${row.label || row.code || 'acte'}`);
+    input.value = formatTarifMad(row.priceMad);
+    input.dataset.actCode = row.code || '';
+    input.dataset.customLabel = row.code ? '' : (row.label || '');
+    input.dataset.savedValue = input.value;
+    input.addEventListener('change', () => {
+      void saveTarifCabinetRow(input);
+    });
+    input.addEventListener('blur', () => {
+      if (input.value !== input.dataset.savedValue) void saveTarifCabinetRow(input);
+    });
+    item.append(nameWrap, input);
+    list.appendChild(item);
+  });
+}
+
+async function loadTarifsCabinet() {
+  const list = doctorEl('settings-tarifs-list');
+  if (!list) return;
+  try {
+    const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=acts`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ Accept: 'application/json' }),
+      cache: 'no-store',
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      showTarifsCabinetError(response.status);
+      return;
+    }
+    renderTarifsCabinet(payload);
+  } catch (err) {
+    const status = Number(err?.status) || (isUnauthorizedError(err) ? 401 : 0);
+    console.error('[Settings] acts GET failed', { status, message: err?.message || String(err) });
+    if (isUnauthorizedError(err)) return;
+    showTarifsCabinetError(status);
+  }
+}
+
+async function saveTarifCabinetRow(input) {
+  if (!input || input.dataset.saving === '1') return;
+  const raw = String(input.value ?? '').trim();
+  if (!raw) {
+    if (!input.dataset.savedValue) return;
+    input.value = input.dataset.savedValue;
+    showDashboardToast('Prix invalide', 'error');
+    return;
+  }
+  const next = Number(raw);
+  if (!Number.isFinite(next) || next < 0) {
+    input.value = input.dataset.savedValue || '';
+    showDashboardToast('Prix invalide', 'error');
+    return;
+  }
+  if (raw === input.dataset.savedValue) return;
+  const body = { price_mad: next };
+  const actCode = String(input.dataset.actCode || '').trim();
+  const customLabel = String(input.dataset.customLabel || '').trim();
+  if (actCode) body.act_code = actCode;
+  else if (customLabel) body.custom_label = customLabel;
+  else {
+    input.value = input.dataset.savedValue || '';
+    return;
+  }
+  input.dataset.saving = '1';
+  try {
+    const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=act-price`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: getApiAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    });
+    assertAuthorizedResponse(response);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    input.dataset.savedValue = formatTarifMad(payload?.data?.priceMad ?? next);
+    input.value = input.dataset.savedValue;
+    showDashboardToast('Tarif enregistré', 'success');
+  } catch (err) {
+    input.value = input.dataset.savedValue || '';
+    showDashboardToast(err?.message || 'Impossible d\'enregistrer le tarif.', 'error');
+  } finally {
+    delete input.dataset.saving;
+  }
+}
 
 function initSecurityAccountSelect() {
   return window.DentaFlowSelect?.init?.({

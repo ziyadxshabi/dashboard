@@ -12,6 +12,10 @@
  * POST /api/roster                → visit / walk-in / block / emergency_hold
  * GET /api/roster?action=patient-export → Loi 09-08 data-subject export
  * POST /api/roster?action=patient-erase → anonymize dossier, keep booking slots
+ * GET /api/roster?action=acts           → NGAP catalog + clinic prices
+ * PUT /api/roster?action=act-price      → doctor upsert of clinic_act_prices
+ * GET /api/roster?action=payments&patient_id= → money-in payments for one patient
+ * POST /api/roster?action=payments      → record a payment (no PATCH/DELETE)
  */
 'use strict';
 
@@ -131,6 +135,11 @@ const PATIENT_DIRECTORY_SQL = `
     p.last_xray_on,
     p.sms_consent,
     p.insurance_type,
+    p.insurance_member_number,
+    p.mutuelle_name,
+    p.beneficiary_of_patient_id,
+    p.beneficiary_relation,
+    b.display_name AS beneficiary_name,
     p.clinical_notes,
     p.created_at,
     last.starts_at AS last_starts_at,
@@ -173,6 +182,9 @@ const PATIENT_DIRECTORY_SQL = `
         )
     ) AS honoraires_saisis
   FROM patients p
+  LEFT JOIN patients b
+    ON b.id = p.beneficiary_of_patient_id
+   AND b.clinic_id = p.clinic_id
   LEFT JOIN LATERAL (
     SELECT
       bookings.starts_at,
@@ -489,7 +501,18 @@ function mapDirectoryPatient(row) {
     last_xray_on: row.last_xray_on || null,
     sms_consent: row.sms_consent === true,
     insurance_type: row.insurance_type || null,
+    insuranceType: row.insurance_type || null,
     insurance: insuranceLabel(row.insurance_type) || '',
+    insurance_member_number: row.insurance_member_number || null,
+    insuranceMemberNumber: row.insurance_member_number || null,
+    mutuelle_name: row.mutuelle_name || null,
+    mutuelleName: row.mutuelle_name || null,
+    beneficiary_of_patient_id: row.beneficiary_of_patient_id || null,
+    beneficiaryOfPatientId: row.beneficiary_of_patient_id || null,
+    beneficiary_name: row.beneficiary_name || null,
+    beneficiaryName: row.beneficiary_name || null,
+    beneficiary_relation: row.beneficiary_relation || null,
+    beneficiaryRelation: row.beneficiary_relation || null,
     clinical_notes: row.clinical_notes || '',
     created_at: row.created_at,
     last_starts_at: row.last_starts_at || null,
@@ -504,7 +527,7 @@ function mapDirectoryPatient(row) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    applyCors(res, 'GET, POST, PATCH, OPTIONS');
+    applyCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
     return res.status(204).end();
   }
 
@@ -573,11 +596,22 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  if (req.method === 'PUT' && action === 'act-price') {
+    applyCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
+    const session = requireClinicSession(req, res, { allowedRoles: ['doctor'] });
+    if (!session) return;
+    try {
+      return await roiOps.handleActPricePut(req, res, session);
+    } catch (err) {
+      return sendDbError(res, err);
+    }
+  }
+
   if (req.method === 'PATCH' || (req.method === 'POST' && action === 'status')) {
     return handleStatusUpdate(req, res);
   }
 
-  applyCors(res, 'GET, POST, PATCH, OPTIONS');
+  applyCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
 
   if (req.method === 'GET') {
     const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
@@ -612,6 +646,26 @@ module.exports = async function handler(req, res) {
     if (action === 'clinic-settings') {
       try {
         return await roiOps.handleClinicSettingsGet(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'acts') {
+      try {
+        return await roiOps.handleActsGet(res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'payments') {
+      req.query = {
+        ...(req.query || {}),
+        patient_id: searchParam(req, 'patient_id') || searchParam(req, 'patientId'),
+      };
+      try {
+        return await roiOps.handlePaymentsGet(req, res, session);
       } catch (err) {
         return sendDbError(res, err);
       }
@@ -775,6 +829,9 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'referral') {
       return await roiOps.handleReferral(req, res, session);
+    }
+    if (action === 'payments') {
+      return await roiOps.handlePaymentsPost(req, res, session);
     }
 
     const parsed = validateRosterCreate(req.body ?? {});

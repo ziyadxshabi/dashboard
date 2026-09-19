@@ -268,6 +268,30 @@ CREATE TABLE IF NOT EXISTS patients (
 CREATE INDEX IF NOT EXISTS idx_patients_clinic_phone
   ON patients (clinic_id, phone_e164);
 
+-- Insurance profile v2 (do not alter insurance_type CHECK above).
+ALTER TABLE patients
+  ADD COLUMN IF NOT EXISTS insurance_member_number TEXT,
+  ADD COLUMN IF NOT EXISTS mutuelle_name TEXT,
+  ADD COLUMN IF NOT EXISTS beneficiary_of_patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS beneficiary_relation TEXT;
+
+DO $$
+BEGIN
+  ALTER TABLE patients DROP CONSTRAINT IF EXISTS patients_beneficiary_relation_check;
+  ALTER TABLE patients
+    ADD CONSTRAINT patients_beneficiary_relation_check
+    CHECK (
+      beneficiary_relation IS NULL
+      OR beneficiary_relation IN ('conjoint', 'enfant', 'parent')
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_patients_beneficiary
+  ON patients (clinic_id, beneficiary_of_patient_id)
+  WHERE beneficiary_of_patient_id IS NOT NULL;
+
 ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS patient_id UUID REFERENCES patients(id) ON DELETE SET NULL;
 
@@ -390,6 +414,78 @@ CREATE TABLE IF NOT EXISTS audit_events (
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_clinic_created
   ON audit_events (clinic_id, created_at DESC);
+
+-- NGAP nomenclature is the intentional global exception to clinic_id tenancy.
+-- Clinic prices remain clinic-scoped. Deactivate catalog rows; never delete.
+CREATE TABLE IF NOT EXISTS act_reference (
+  code TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN (
+    'soins', 'chirurgie', 'prothese', 'orthodontie', 'parodontologie'
+  )),
+  coefficient NUMERIC NULL,
+  letter_key TEXT NOT NULL DEFAULT 'soins' CHECK (letter_key IN ('soins', 'prothese')),
+  tnr_mad NUMERIC(12, 2) NULL,
+  requires_prior_approval BOOLEAN NOT NULL DEFAULT false,
+  active BOOLEAN NOT NULL DEFAULT true
+);
+
+CREATE TABLE IF NOT EXISTS clinic_act_prices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  act_code TEXT REFERENCES act_reference(code),
+  custom_label TEXT,
+  price_mad NUMERIC(12, 2) NOT NULL CHECK (price_mad >= 0),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (act_code IS NOT NULL OR NULLIF(custom_label, '') IS NOT NULL)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic_act
+  ON clinic_act_prices (clinic_id, act_code)
+  WHERE act_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic
+  ON clinic_act_prices (clinic_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  amount_mad NUMERIC(12, 2) NOT NULL CHECK (amount_mad > 0),
+  method TEXT NOT NULL CHECK (method IN ('especes', 'cheque', 'carte', 'virement')),
+  booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+  plan_id UUID REFERENCES treatment_plans(id) ON DELETE SET NULL,
+  note TEXT,
+  paid_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES staff_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_patient
+  ON payments (clinic_id, patient_id, paid_at DESC);
+
+ALTER TABLE act_reference ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clinic_act_prices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    DROP POLICY IF EXISTS deny_client_roles ON act_reference;
+    CREATE POLICY deny_client_roles ON act_reference
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    DROP POLICY IF EXISTS deny_client_roles ON clinic_act_prices;
+    CREATE POLICY deny_client_roles ON clinic_act_prices
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    DROP POLICY IF EXISTS deny_client_roles ON payments;
+    CREATE POLICY deny_client_roles ON payments
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    REVOKE ALL ON TABLE act_reference FROM anon, authenticated;
+    REVOKE ALL ON TABLE clinic_act_prices FROM anon, authenticated;
+    REVOKE ALL ON TABLE payments FROM anon, authenticated;
+  END IF;
+END $$;
 
 -- Law 09-08: SMS is opt-in. Existing true rows stay true; new rows default false.
 ALTER TABLE waitlist ALTER COLUMN sms_consent SET DEFAULT false;

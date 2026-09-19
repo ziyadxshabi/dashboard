@@ -2348,8 +2348,15 @@ html:not(.book-portal) .crm-edit-field label {
 
 html:not(.book-portal) .crm-edit-field input,
 html:not(.book-portal) .crm-edit-field textarea,
-html:not(.book-portal) .crm-edit-field select {
+html:not(.book-portal) .crm-edit-field select,
+html:not(.book-portal) .crm-edit-field .ghost-select,
+html:not(.book-portal) .crm-edit-field .ghost-select__trigger {
   width: 100%;
+}
+
+html:not(.book-portal) .crm-edit-field .ghost-select__list {
+  max-height: 220px;
+  overflow: auto;
 }
 
 html:not(.book-portal) .crm-edit-save {
@@ -2360,6 +2367,40 @@ html:not(.book-portal) .crm-edit-save {
 html:not(.book-portal) .carnet-visits {
   display: grid;
   gap: 8px;
+}
+
+html:not(.book-portal) .crm-payments {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+html:not(.book-portal) .crm-payments-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .crm-payments-list {
+  display: grid;
+  gap: 0;
+}
+
+html:not(.book-portal) .crm-payment-row {
+  padding: 8px 0;
+  border-bottom: var(--border-hairline);
+  font-size: 13px;
+}
+
+html:not(.book-portal) .crm-payments-add {
+  display: grid;
+  gap: 8px;
+}
+
+html:not(.book-portal) .crm-payments-add .btn-matte-secondary {
+  min-height: 44px;
 }
 
 html:not(.book-portal) .carnet-visit {
@@ -2391,6 +2432,61 @@ html:not(.book-portal) .settings-blocked-list li {
 html:not(.book-portal) .settings-blocked-empty {
   color: var(--text-muted);
   border-bottom: 0 !important;
+}
+
+html:not(.book-portal) .settings-tarifs-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  max-height: 420px;
+  overflow: auto;
+}
+
+html:not(.book-portal) .settings-tarifs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: var(--border-hairline);
+}
+
+html:not(.book-portal) .settings-tarifs-name {
+  font-size: 13px;
+  min-width: 0;
+}
+
+html:not(.book-portal) .settings-tarifs-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .settings-tarifs-count {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .settings-tarifs-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+html:not(.book-portal) .settings-tarifs-error[hidden] {
+  display: none;
+}
+
+html:not(.book-portal) .settings-tarifs-error p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-main);
 }
 
 html:not(.book-portal) .hours-label {

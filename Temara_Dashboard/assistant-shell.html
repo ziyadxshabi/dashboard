@@ -898,6 +898,84 @@
               <label for="crm-edit-email">E-mail</label>
               <input class="waitlist-input" type="email" id="crm-edit-email" autocomplete="email">
             </div>
+            <div class="crm-edit-field">
+              <label id="crm-edit-insurance-label" for="crm-edit-insurance-trigger">Assurance</label>
+              <div class="ghost-select" id="crm-edit-insurance-root" data-ghost-select>
+                <input type="hidden" id="crm-edit-insurance" value="">
+                <button
+                  type="button"
+                  class="ghost-select__trigger waitlist-input"
+                  id="crm-edit-insurance-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="crm-edit-insurance-list"
+                  aria-labelledby="crm-edit-insurance-label crm-edit-insurance-value"
+                >
+                  <span class="ghost-select__value" id="crm-edit-insurance-value">Non renseigné</span>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                </button>
+                <ul class="ghost-select__list" id="crm-edit-insurance-list" role="listbox" aria-labelledby="crm-edit-insurance-label" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="" aria-selected="true" tabindex="-1">Non renseigné</li>
+                  <li class="ghost-select__option" role="option" data-value="none" aria-selected="false" tabindex="-1">Aucun</li>
+                  <li class="ghost-select__option" role="option" data-value="cnss" aria-selected="false" tabindex="-1">CNSS</li>
+                  <li class="ghost-select__option" role="option" data-value="cnops" aria-selected="false" tabindex="-1">CNOPS</li>
+                  <li class="ghost-select__option" role="option" data-value="prive" aria-selected="false" tabindex="-1">Privé</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-member">N° adhérent</label>
+              <input class="waitlist-input" type="text" id="crm-edit-member" autocomplete="off">
+            </div>
+            <div class="crm-edit-field">
+              <label for="crm-edit-mutuelle">Mutuelle</label>
+              <input class="waitlist-input" type="text" id="crm-edit-mutuelle" autocomplete="off">
+            </div>
+            <div class="crm-edit-field">
+              <label id="crm-edit-beneficiary-label" for="crm-edit-beneficiary-trigger">Ayant droit de</label>
+              <div class="ghost-select" id="crm-edit-beneficiary-root" data-ghost-select>
+                <input type="hidden" id="crm-edit-beneficiary" value="">
+                <button
+                  type="button"
+                  class="ghost-select__trigger waitlist-input"
+                  id="crm-edit-beneficiary-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="crm-edit-beneficiary-list"
+                  aria-labelledby="crm-edit-beneficiary-label crm-edit-beneficiary-value"
+                >
+                  <span class="ghost-select__value" id="crm-edit-beneficiary-value">—</span>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                </button>
+                <ul class="ghost-select__list" id="crm-edit-beneficiary-list" role="listbox" aria-labelledby="crm-edit-beneficiary-label" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="" aria-selected="true" tabindex="-1">—</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crm-edit-field">
+              <label id="crm-edit-relation-label" for="crm-edit-relation-trigger">Lien</label>
+              <div class="ghost-select" id="crm-edit-relation-root" data-ghost-select>
+                <input type="hidden" id="crm-edit-relation" value="">
+                <button
+                  type="button"
+                  class="ghost-select__trigger waitlist-input"
+                  id="crm-edit-relation-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="crm-edit-relation-list"
+                  aria-labelledby="crm-edit-relation-label crm-edit-relation-value"
+                >
+                  <span class="ghost-select__value" id="crm-edit-relation-value">—</span>
+                  <i data-lucide="chevron-down" class="ghost-select__chevron icon-xs" aria-hidden="true"></i>
+                </button>
+                <ul class="ghost-select__list" id="crm-edit-relation-list" role="listbox" aria-labelledby="crm-edit-relation-label" hidden>
+                  <li class="ghost-select__option is-selected" role="option" data-value="" aria-selected="true" tabindex="-1">—</li>
+                  <li class="ghost-select__option" role="option" data-value="conjoint" aria-selected="false" tabindex="-1">Conjoint</li>
+                  <li class="ghost-select__option" role="option" data-value="enfant" aria-selected="false" tabindex="-1">Enfant</li>
+                  <li class="ghost-select__option" role="option" data-value="parent" aria-selected="false" tabindex="-1">Parent</li>
+                </ul>
+              </div>
+            </div>
           </section>
           <section class="crm-side-panel-section" aria-label="Clinique">
             <h3 class="crm-side-panel-section-title">Clinique</h3>
@@ -930,6 +1008,30 @@
                 <dd id="crm-panel-copay">—</dd>
               </div>
             </dl>
+            <div class="crm-payments" id="crm-payments">
+              <h4 class="crm-payments-title">Règlements</h4>
+              <div id="crm-payments-list" class="crm-payments-list"></div>
+              <div class="crm-payments-add">
+                <div class="crm-edit-field">
+                  <label for="crm-pay-amount">Montant (MAD)</label>
+                  <input class="waitlist-input" type="number" id="crm-pay-amount" min="0.01" step="0.01" inputmode="decimal">
+                </div>
+                <div class="crm-edit-field">
+                  <label for="crm-pay-method">Mode</label>
+                  <select class="waitlist-input" id="crm-pay-method">
+                    <option value="especes">Espèces</option>
+                    <option value="cheque">Chèque</option>
+                    <option value="carte">Carte</option>
+                    <option value="virement">Virement</option>
+                  </select>
+                </div>
+                <div class="crm-edit-field">
+                  <label for="crm-pay-note">Note</label>
+                  <input class="waitlist-input" type="text" id="crm-pay-note" autocomplete="off">
+                </div>
+                <button type="button" class="btn-matte-secondary" id="crm-pay-save">Enregistrer</button>
+              </div>
+            </div>
           </section>
           <section class="crm-side-panel-section" aria-label="Consentement SMS">
             <h3 class="crm-side-panel-section-title">Consentement SMS</h3>

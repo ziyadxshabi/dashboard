@@ -324,7 +324,75 @@ async function run() {
     /id="cabinet-patients"/.test(indexHtml) && /id="load-visits"/.test(indexHtml) && /Fichier cabinet/.test(indexHtml)
   );
   ok(
-    'doctor CRM sheet lives inside #doctor-shell',
+    'doctor settings has Tarifs cabinet',
+    /id="settings-tarifs-list"/.test(indexHtml) && /Tarifs cabinet/.test(indexHtml)
+  );
+  ok(
+    'assistant settings has no Tarifs cabinet editor',
+    !/id="settings-tarifs-list"/.test(assistantHtml)
+  );
+  ok(
+    'doctor dashboard loads acts when settings opens',
+    /action=acts/.test(dashSrc) && /loadTarifsCabinet/.test(dashSrc)
+  );
+  ok(
+    'Tarifs cabinet never fails silently',
+    /Tarifs indisponibles — réessayer/.test(indexHtml) &&
+      /id="settings-tarifs-retry"/.test(indexHtml) &&
+      /Aucun acte tarifé/.test(indexHtml) &&
+      /showTarifsCabinetError/.test(dashSrc) &&
+      /console\.error\('\[Settings\] acts GET failed'/.test(dashSrc)
+  );
+  ok(
+    'Tarifs cabinet lists all NGAP acts, not only priced rows',
+    /\[\.\.\.custom, \.\.\.reference\]/.test(dashSrc) && !/pricedNgap/.test(dashSrc)
+  );
+  ok(
+    'carnet Identité has insurance v2 fields',
+    /id="crm-edit-insurance"/.test(indexHtml) &&
+      /N° adhérent/.test(indexHtml) &&
+      /id="crm-edit-member"/.test(indexHtml) &&
+      /id="crm-edit-mutuelle"/.test(indexHtml) &&
+      /Ayant droit de/.test(indexHtml) &&
+      /id="crm-edit-beneficiary"/.test(indexHtml) &&
+      /id="crm-edit-relation"/.test(indexHtml)
+  );
+  ok(
+    'assistant carnet Identité has insurance v2 fields',
+    /id="crm-edit-insurance"/.test(assistantHtml) &&
+      /N° adhérent/.test(assistantHtml) &&
+      /id="crm-edit-member"/.test(assistantHtml) &&
+      /id="crm-edit-beneficiary"/.test(assistantHtml)
+  );
+  ok(
+    'carnet.js PATCHes insurance v2 fields',
+    /insurance_type/.test(carnetSrc) &&
+      /insurance_member_number/.test(carnetSrc) &&
+      /beneficiary_of_patient_id/.test(carnetSrc) &&
+      /beneficiary_relation/.test(carnetSrc)
+  );
+  ok(
+    'carnet Comptes has Règlements',
+    /Règlements/.test(indexHtml) &&
+      /id="crm-payments-list"/.test(indexHtml) &&
+      /id="crm-pay-amount"/.test(indexHtml) &&
+      /id="crm-pay-save"/.test(indexHtml)
+  );
+  ok(
+    'assistant carnet has Règlements',
+    /Règlements/.test(assistantHtml) && /id="crm-payments-list"/.test(assistantHtml)
+  );
+  ok(
+    'carnet.js loads payments in parallel with visits',
+    /Promise\.all/.test(carnetSrc) && /action=payments/.test(carnetSrc)
+  );
+  const treatmentsSrc = fs.readFileSync(path.join(DASHBOARD, 'api/_lib/treatments.js'), 'utf8');
+  ok(
+    'PATIENT_SHARE TODO stays display-only',
+    /TODO\(phase1\): PATIENT_SHARE/.test(treatmentsSrc) && /cnss: 0\.3/.test(treatmentsSrc)
+  );
+  ok(
+    'CRM panel lives inside doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );
   ok(
@@ -405,6 +473,30 @@ async function run() {
   );
   await query(auditMigrationSql);
   ok('audit_events migration applied', true);
+
+  const phase0MigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260919_phase0_foundations.sql'),
+    'utf8'
+  );
+  await query(phase0MigrationSql);
+  ok('phase 0 catalog migration applied', true);
+  const actSeedSql = fs.readFileSync(path.join(ROOT, 'supabase/seeds/act_reference_seed.sql'), 'utf8');
+  await query(actSeedSql);
+  ok('act_reference seed applied', true);
+  await query(phase0MigrationSql);
+  ok('phase 0 placeholder prices are idempotent', true);
+  const customPriceCount = await query(
+    `SELECT COUNT(*)::int AS n
+     FROM clinic_act_prices p
+     JOIN clinics c ON c.id = p.clinic_id
+     WHERE c.slug = $1 AND p.act_code IS NULL`,
+    [CLINIC_SLUG]
+  );
+  ok(
+    'temara custom act placeholders stay unique',
+    Number(customPriceCount.rows[0]?.n) === 4,
+    `n=${customPriceCount.rows[0]?.n}`
+  );
   await query(
     `UPDATE clinics
      SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
@@ -2306,7 +2398,7 @@ async function run() {
     else process.env.TWILIO_WA_FROM = prevWa;
   }
 
-  const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [] };
+  const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [], payments: [] };
   const pausedBusy = [];
   try {
     const confirmPhone = '0611987101';
@@ -2859,6 +2951,97 @@ async function run() {
     );
     ok('clinic-settings restore returns 200', settingsRestore.statusCode === 200);
 
+    const actsDoctor = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: doctorCookie })
+    );
+    ok(
+      'GET acts as doctor returns 200',
+      actsDoctor.statusCode === 200 && actsDoctor.body?.ok === true,
+      `status=${actsDoctor.statusCode}`
+    );
+    const actsAssistant = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: assistantCookie })
+    );
+    ok(
+      'GET acts as assistant returns 200',
+      actsAssistant.statusCode === 200 && actsAssistant.body?.ok === true,
+      `status=${actsAssistant.statusCode}`
+    );
+    const referenceCodes = new Set(
+      (actsDoctor.body?.data?.reference || []).map((row) => row.code).filter(Boolean)
+    );
+    ok('GET acts returns 107 reference codes', referenceCodes.size === 107, `n=${referenceCodes.size}`);
+    ok(
+      'GET acts includes D700 D708 D773',
+      referenceCodes.has('D700') && referenceCodes.has('D708') && referenceCodes.has('D773')
+    );
+    const customLabels = (actsDoctor.body?.data?.custom || []).map((row) => row.label);
+    ok(
+      'GET acts includes custom Consultation for temara',
+      customLabels.includes('Consultation'),
+      `custom=${customLabels.join(',')}`
+    );
+
+    const actsAnon = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: {} })
+    );
+    ok('GET acts without cookie returns 401', actsAnon.statusCode === 401);
+
+    const assistantPut = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D700', price_mad: 410 },
+      })
+    );
+    ok('assistant PUT act-price returns 403', assistantPut.statusCode === 403, `status=${assistantPut.statusCode}`);
+
+    const unknownPut = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D999', price_mad: 10 },
+      })
+    );
+    ok('doctor PUT unknown act_code returns 400', unknownPut.statusCode === 400, `status=${unknownPut.statusCode}`);
+
+    const doctorPut = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D700', price_mad: 425 },
+      })
+    );
+    ok(
+      'doctor PUT act-price upserts D700',
+      doctorPut.statusCode === 200 && Number(doctorPut.body?.data?.priceMad) === 425,
+      `status=${doctorPut.statusCode} body=${JSON.stringify(doctorPut.body)}`
+    );
+    const actsAfterPut = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: doctorCookie })
+    );
+    const d700 = (actsAfterPut.body?.data?.reference || []).find((row) => row.code === 'D700');
+    ok('GET acts reflects D700 upsert', Number(d700?.priceMad) === 425, `priceMad=${d700?.priceMad}`);
+    await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D700', price_mad: 400 },
+      })
+    );
+
     const patientPatch = await invoke(
       handleRoster,
       createReq({
@@ -2881,6 +3064,242 @@ async function run() {
     );
     ok('PATCH patient persists allergies', patientPatch.body?.data?.allergies === 'Pénicilline');
     ok('PATCH patient persists notes', patientPatch.body?.data?.clinical_notes === 'Note clinique carnet');
+
+    const sponsorPatient = await query(
+      `INSERT INTO patients (clinic_id, phone_e164, display_name)
+       VALUES ($1, '+212611987188', 'Roi Tuteur')
+       ON CONFLICT (clinic_id, phone_e164) DO UPDATE
+         SET display_name = 'Roi Tuteur', updated_at = NOW()
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.patients.push(sponsorPatient.rows[0].id);
+
+    const insurancePatch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: planPatient.rows[0].id,
+          insurance_type: 'cnss',
+          insurance_member_number: 'CNSS-9988',
+          mutuelle_name: 'MCMA',
+          beneficiary_of_patient_id: sponsorPatient.rows[0].id,
+          beneficiary_relation: 'enfant',
+        },
+      })
+    );
+    ok(
+      'PATCH patient insurance v2 returns 200',
+      insurancePatch.statusCode === 200 && insurancePatch.body?.ok === true,
+      `status=${insurancePatch.statusCode} body=${JSON.stringify(insurancePatch.body)}`
+    );
+    ok(
+      'PATCH patient persists insurance_member_number',
+      insurancePatch.body?.data?.insurance_member_number === 'CNSS-9988'
+    );
+    ok('PATCH patient persists mutuelle_name', insurancePatch.body?.data?.mutuelle_name === 'MCMA');
+    ok(
+      'PATCH patient persists beneficiary_of_patient_id',
+      String(insurancePatch.body?.data?.beneficiary_of_patient_id) === String(sponsorPatient.rows[0].id)
+    );
+    ok('PATCH patient persists beneficiary_relation', insurancePatch.body?.data?.beneficiary_relation === 'enfant');
+    ok(
+      'PATCH patient insurance aliases match snake_case',
+      insurancePatch.body?.data?.insuranceType === 'cnss' &&
+        insurancePatch.body?.data?.insuranceMemberNumber === 'CNSS-9988' &&
+        insurancePatch.body?.data?.mutuelleName === 'MCMA' &&
+        String(insurancePatch.body?.data?.beneficiaryOfPatientId) === String(sponsorPatient.rows[0].id) &&
+        insurancePatch.body?.data?.beneficiaryRelation === 'enfant'
+    );
+
+    const insuranceGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET patient returns insurance v2 aliases',
+      insuranceGet.body?.data?.insuranceType === insuranceGet.body?.data?.insurance_type &&
+        insuranceGet.body?.data?.insuranceMemberNumber === 'CNSS-9988'
+    );
+
+    const insuranceExport = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient-export&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'patient-export includes insurance v2 fields',
+      insuranceExport.body?.data?.patient?.insurance_member_number === 'CNSS-9988' &&
+        insuranceExport.body?.data?.patient?.mutuelle_name === 'MCMA'
+    );
+
+    const badRelation = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { id: planPatient.rows[0].id, beneficiary_relation: 'cousin' },
+      })
+    );
+    ok(
+      'PATCH invalid beneficiary_relation returns 400',
+      badRelation.statusCode === 400 && badRelation.body?.code === 'VALIDATION_ERROR',
+      `status=${badRelation.statusCode}`
+    );
+
+    const crossBeneficiary = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: planPatient.rows[0].id,
+          beneficiary_of_patient_id: '00000000-0000-4000-8000-000000000001',
+        },
+      })
+    );
+    ok(
+      'PATCH cross-clinic beneficiary returns 400',
+      crossBeneficiary.statusCode === 400 && crossBeneficiary.body?.code === 'VALIDATION_ERROR',
+      `status=${crossBeneficiary.statusCode}`
+    );
+
+    const paymentsAnon = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=payments&patient_id=${planPatient.rows[0].id}`,
+        headers: {},
+      })
+    );
+    ok('GET payments without cookie returns 401', paymentsAnon.statusCode === 401);
+
+    const paymentsPostAnon = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { 'content-type': 'application/json' },
+        body: { patient_id: planPatient.rows[0].id, amount_mad: 250, method: 'especes' },
+      })
+    );
+    ok('POST payments without cookie returns 401', paymentsPostAnon.statusCode === 401);
+
+    const paymentsEmpty = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=payments&patient_id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET payments empty array',
+      paymentsEmpty.statusCode === 200 &&
+        Array.isArray(paymentsEmpty.body?.data) &&
+        paymentsEmpty.body.data.length === 0,
+      `status=${paymentsEmpty.statusCode} body=${JSON.stringify(paymentsEmpty.body)}`
+    );
+
+    const payPost = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          patient_id: planPatient.rows[0].id,
+          amount_mad: 250,
+          method: 'especes',
+          note: 'Acompte',
+        },
+      })
+    );
+    ok(
+      'assistant can POST payments',
+      payPost.statusCode === 200 && payPost.body?.ok === true && Number(payPost.body?.data?.amount_mad) === 250,
+      `status=${payPost.statusCode} body=${JSON.stringify(payPost.body)}`
+    );
+    if (payPost.body?.data?.id) roiIds.payments.push(payPost.body.data.id);
+
+    const doctorPayPost = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { patient_id: planPatient.rows[0].id, amount_mad: 100, method: 'carte' },
+      })
+    );
+    ok(
+      'POST payments returns 200',
+      doctorPayPost.statusCode === 200 && doctorPayPost.body?.ok === true,
+      `status=${doctorPayPost.statusCode}`
+    );
+    if (doctorPayPost.body?.data?.id) roiIds.payments.push(doctorPayPost.body.data.id);
+
+    const paymentsAfter = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=payments&patient_id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET payments includes row',
+      paymentsAfter.statusCode === 200 &&
+        (paymentsAfter.body?.data || []).some(
+          (row) => Number(row.amount_mad) === 250 && row.method === 'especes' && row.note === 'Acompte'
+        ),
+      `status=${paymentsAfter.statusCode} body=${JSON.stringify(paymentsAfter.body)}`
+    );
+
+    const missingAmount = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { patient_id: planPatient.rows[0].id, method: 'especes' },
+      })
+    );
+    ok(
+      'POST payments missing amount returns 400',
+      missingAmount.statusCode === 400 && missingAmount.body?.code === 'VALIDATION_ERROR',
+      `status=${missingAmount.statusCode}`
+    );
+
+    const otherClinicPay = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          patient_id: '00000000-0000-4000-8000-000000000001',
+          amount_mad: 50,
+          method: 'especes',
+        },
+      })
+    );
+    ok(
+      'POST payments other-clinic patient returns 404',
+      otherClinicPay.statusCode === 404,
+      `status=${otherClinicPay.statusCode}`
+    );
 
     const beforeDash = await invoke(
       handleDashboard,
@@ -3083,6 +3502,12 @@ async function run() {
         && Number(bulkPatients.body?.dispatchedCount || 0) === 0
     );
   } finally {
+    if (roiIds.payments.length) {
+      await query('DELETE FROM payments WHERE id = ANY($1::uuid[])', [roiIds.payments]);
+    }
+    if (roiIds.patients.length) {
+      await query('DELETE FROM payments WHERE patient_id = ANY($1::uuid[])', [roiIds.patients]);
+    }
     if (roiIds.plans.length) {
       await query('DELETE FROM plan_steps WHERE plan_id = ANY($1::uuid[])', [roiIds.plans]);
       await query('DELETE FROM treatment_plans WHERE id = ANY($1::uuid[])', [roiIds.plans]);

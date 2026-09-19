@@ -5,7 +5,7 @@
 'use strict';
 
 const { query } = require('./db');
-const { createApiError, sanitizeString, UUID_RE } = require('./validation');
+const { createApiError, sanitizeString, UUID_RE, validateActPriceBody, validatePaymentBody } = require('./validation');
 const { writeAudit } = require('./audit');
 const { toE164MA, isValidMaMobileE164, displayNameUpper } = require('./phone-e164');
 const {
@@ -13,13 +13,24 @@ const {
   getPatientForClinic,
   findPatientByPhone,
   normalizeInsurance,
+  normalizeBeneficiaryRelation,
 } = require('./patients');
 const { expectedCopayMad, insuranceLabel } = require('./treatments');
 const { dispatchSms } = require('./notify');
 const { referralSms } = require('./sms-templates');
 
+function hasBodyKey(body, keys) {
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+}
+
 function mapPatient(row) {
   if (!row) return null;
+  const insuranceType = row.insurance_type || null;
+  const memberNumber = row.insurance_member_number || null;
+  const mutuelleName = row.mutuelle_name || null;
+  const beneficiaryId = row.beneficiary_of_patient_id || null;
+  const beneficiaryRelation = row.beneficiary_relation || null;
+  const beneficiaryName = row.beneficiary_name || null;
   return {
     id: row.id,
     clinic_id: row.clinic_id,
@@ -30,8 +41,19 @@ function mapPatient(row) {
     chronic_conditions: row.chronic_conditions || '',
     preferred_anesthetic: row.preferred_anesthetic || '',
     last_xray_on: row.last_xray_on || null,
-    insurance_type: row.insurance_type || null,
-    insurance_label: insuranceLabel(row.insurance_type),
+    insurance_type: insuranceType,
+    insuranceType,
+    insurance_label: insuranceLabel(insuranceType),
+    insurance_member_number: memberNumber,
+    insuranceMemberNumber: memberNumber,
+    mutuelle_name: mutuelleName,
+    mutuelleName,
+    beneficiary_of_patient_id: beneficiaryId,
+    beneficiaryOfPatientId: beneficiaryId,
+    beneficiary_name: beneficiaryName,
+    beneficiaryName,
+    beneficiary_relation: beneficiaryRelation,
+    beneficiaryRelation,
     sms_consent: row.sms_consent === true,
     clinical_notes: row.clinical_notes || '',
     last_inbound_at: row.last_inbound_at || null,
@@ -64,10 +86,52 @@ async function handlePatientPatch(req, res, session) {
     return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
   }
 
-  const insurance = Object.prototype.hasOwnProperty.call(body, 'insurance_type')
-    || Object.prototype.hasOwnProperty.call(body, 'insuranceType')
+  const insurance = hasBodyKey(body, ['insurance_type', 'insuranceType'])
     ? normalizeInsurance(body.insurance_type ?? body.insuranceType)
     : existing.insurance_type;
+
+  let memberNumber = existing.insurance_member_number || null;
+  if (hasBodyKey(body, ['insurance_member_number', 'insuranceMemberNumber'])) {
+    memberNumber = sanitizeString(body.insurance_member_number ?? body.insuranceMemberNumber, 80) || null;
+  }
+
+  let mutuelleName = existing.mutuelle_name || null;
+  if (hasBodyKey(body, ['mutuelle_name', 'mutuelleName'])) {
+    mutuelleName = sanitizeString(body.mutuelle_name ?? body.mutuelleName, 120) || null;
+  }
+
+  let relation = existing.beneficiary_relation || null;
+  if (hasBodyKey(body, ['beneficiary_relation', 'beneficiaryRelation'])) {
+    const parsed = normalizeBeneficiaryRelation(body.beneficiary_relation ?? body.beneficiaryRelation);
+    if (!parsed.ok) {
+      return res.status(400).json(
+        createApiError('VALIDATION_ERROR', 'beneficiary_relation must be conjoint, enfant or parent')
+      );
+    }
+    relation = parsed.value;
+  }
+
+  let beneficiaryId = existing.beneficiary_of_patient_id || null;
+  let beneficiaryName = existing.beneficiary_name || null;
+  if (hasBodyKey(body, ['beneficiary_of_patient_id', 'beneficiaryOfPatientId'])) {
+    const raw = String(body.beneficiary_of_patient_id ?? body.beneficiaryOfPatientId ?? '').trim();
+    if (!raw) {
+      beneficiaryId = null;
+      beneficiaryName = null;
+    } else {
+      if (!UUID_RE.test(raw)) {
+        return res.status(400).json(createApiError('VALIDATION_ERROR', 'beneficiary_of_patient_id must be a UUID'));
+      }
+      const sponsor = await getPatientForClinic(session.clinic_id, raw);
+      if (!sponsor) {
+        return res.status(400).json(
+          createApiError('VALIDATION_ERROR', 'beneficiary_of_patient_id must belong to this clinic')
+        );
+      }
+      beneficiaryId = sponsor.id;
+      beneficiaryName = sponsor.display_name || null;
+    }
+  }
 
   let phoneE164 = existing.phone_e164;
   const phoneRaw = body.phone || body.phone_e164 || body.phoneE164 || body.telephone;
@@ -107,6 +171,10 @@ async function handlePatientPatch(req, res, session) {
          insurance_type = $10,
          sms_consent = COALESCE($11, sms_consent),
          clinical_notes = $12,
+         insurance_member_number = $13,
+         mutuelle_name = $14,
+         beneficiary_of_patient_id = $15,
+         beneficiary_relation = $16,
          updated_at = NOW()
      WHERE clinic_id = $1 AND id = $2
      RETURNING *`,
@@ -131,6 +199,10 @@ async function handlePatientPatch(req, res, session) {
       insurance,
       typeof body.sms_consent === 'boolean' ? body.sms_consent : (typeof body.smsConsent === 'boolean' ? body.smsConsent : null),
       notes,
+      memberNumber,
+      mutuelleName,
+      beneficiaryId,
+      relation,
     ]
   );
 
@@ -153,7 +225,10 @@ async function handlePatientPatch(req, res, session) {
 
   await writeAudit(session, { action: 'patient.patch', entity: 'patient', entityId: existing.id });
 
-  return res.status(200).json({ ok: true, data: mapPatient(updated.rows[0]) });
+  return res.status(200).json({
+    ok: true,
+    data: mapPatient({ ...(updated.rows[0] || {}), beneficiary_name: beneficiaryName }),
+  });
 }
 
 function normalizeHmSetting(raw, fallback) {
@@ -598,6 +673,10 @@ async function handlePatientErase(req, res, session) {
          preferred_anesthetic = NULL,
          last_xray_on = NULL,
          insurance_type = NULL,
+         insurance_member_number = NULL,
+         mutuelle_name = NULL,
+         beneficiary_of_patient_id = NULL,
+         beneficiary_relation = NULL,
          clinical_notes = NULL,
          sms_consent = false,
          updated_at = NOW()
@@ -615,14 +694,276 @@ function copayFor(treatmentName, insuranceType) {
   return expectedCopayMad(treatmentName, insuranceType);
 }
 
+function numOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapActRow(row, kind) {
+  const code = row.code || row.act_code || null;
+  const label = row.label || row.custom_label || '';
+  return {
+    code,
+    label,
+    category: row.category || null,
+    coefficient: numOrNull(row.coefficient),
+    letter_key: row.letter_key || null,
+    tnrMad: numOrNull(row.tnr_mad),
+    requiresPriorApproval: row.requires_prior_approval === true,
+    priceMad: numOrNull(row.price_mad),
+    priceId: row.price_id || null,
+    insurable: kind === 'reference' && Boolean(code),
+    active: row.price_active == null ? true : row.price_active === true,
+  };
+}
+
+const ACTS_CATALOG_SQL = `
+  SELECT
+    code,
+    label,
+    category,
+    coefficient,
+    letter_key,
+    tnr_mad,
+    requires_prior_approval,
+    price_id,
+    price_mad,
+    price_active,
+    row_kind
+  FROM (
+    SELECT
+      r.code,
+      r.label,
+      r.category,
+      r.coefficient,
+      r.letter_key,
+      r.tnr_mad,
+      r.requires_prior_approval,
+      p.id AS price_id,
+      p.price_mad,
+      p.active AS price_active,
+      'reference'::text AS row_kind
+    FROM act_reference r
+    LEFT JOIN clinic_act_prices p
+      ON p.clinic_id = $1
+     AND p.act_code = r.code
+     AND p.active = true
+    WHERE r.active = true
+    UNION ALL
+    SELECT
+      NULL::text AS code,
+      p.custom_label AS label,
+      NULL::text AS category,
+      NULL::numeric AS coefficient,
+      NULL::text AS letter_key,
+      NULL::numeric AS tnr_mad,
+      false AS requires_prior_approval,
+      p.id AS price_id,
+      p.price_mad,
+      p.active AS price_active,
+      'custom'::text AS row_kind
+    FROM clinic_act_prices p
+    WHERE p.clinic_id = $1
+      AND p.act_code IS NULL
+      AND p.active = true
+  ) catalog
+  ORDER BY row_kind DESC, code NULLS LAST, label ASC
+`;
+
+async function handleActsGet(res, session) {
+  const result = await query(ACTS_CATALOG_SQL, [session.clinic_id]);
+  const reference = [];
+  const custom = [];
+  for (const row of result.rows || []) {
+    if (row.row_kind === 'custom') custom.push(mapActRow(row, 'custom'));
+    else reference.push(mapActRow(row, 'reference'));
+  }
+  return res.status(200).json({ ok: true, data: { reference, custom } });
+}
+
+async function handleActPricePut(req, res, session) {
+  const parsed = validateActPriceBody(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(400).json(parsed.error);
+  }
+  const { actCode, customLabel, priceMad, active } = parsed.value;
+
+  if (actCode) {
+    const known = await query(
+      `SELECT code FROM act_reference WHERE code = $1 AND active = true LIMIT 1`,
+      [actCode]
+    );
+    if (!known.rows[0]) {
+      return res.status(400).json(createApiError('VALIDATION_ERROR', 'Unknown act_code'));
+    }
+    const upserted = await query(
+      `INSERT INTO clinic_act_prices (clinic_id, act_code, custom_label, price_mad, active)
+       VALUES ($1, $2, NULL, $3, $4)
+       ON CONFLICT (clinic_id, act_code) WHERE act_code IS NOT NULL
+       DO UPDATE SET price_mad = EXCLUDED.price_mad, active = EXCLUDED.active
+       RETURNING id, clinic_id, act_code, custom_label, price_mad, active`,
+      [session.clinic_id, actCode, priceMad, active]
+    );
+    const row = upserted.rows[0];
+    return res.status(200).json({
+      ok: true,
+      data: mapActRow(
+        {
+          code: row.act_code,
+          label: row.custom_label,
+          price_id: row.id,
+          price_mad: row.price_mad,
+          price_active: row.active,
+        },
+        'reference'
+      ),
+    });
+  }
+
+  const updated = await query(
+    `UPDATE clinic_act_prices
+     SET price_mad = $3, active = $4
+     WHERE clinic_id = $1
+       AND act_code IS NULL
+       AND custom_label = $2
+     RETURNING id, clinic_id, act_code, custom_label, price_mad, active`,
+    [session.clinic_id, customLabel, priceMad, active]
+  );
+  const row = updated.rows[0]
+    ? updated.rows[0]
+    : (
+        await query(
+          `INSERT INTO clinic_act_prices (clinic_id, act_code, custom_label, price_mad, active)
+           VALUES ($1, NULL, $2, $3, $4)
+           RETURNING id, clinic_id, act_code, custom_label, price_mad, active`,
+          [session.clinic_id, customLabel, priceMad, active]
+        )
+      ).rows[0];
+  return res.status(200).json({
+    ok: true,
+    data: mapActRow(
+      {
+        code: null,
+        label: row.custom_label,
+        custom_label: row.custom_label,
+        price_id: row.id,
+        price_mad: row.price_mad,
+        price_active: row.active,
+      },
+      'custom'
+    ),
+  });
+}
+
+function mapPayment(row) {
+  if (!row) return null;
+  const amount = Number(row.amount_mad);
+  return {
+    id: row.id,
+    clinic_id: row.clinic_id,
+    patient_id: row.patient_id,
+    patientId: row.patient_id,
+    amount_mad: amount,
+    amountMad: amount,
+    method: row.method,
+    booking_id: row.booking_id || null,
+    bookingId: row.booking_id || null,
+    plan_id: row.plan_id || null,
+    planId: row.plan_id || null,
+    note: row.note || '',
+    paid_at: row.paid_at,
+    paidAt: row.paid_at,
+    created_by: row.created_by || null,
+  };
+}
+
+async function handlePaymentsGet(req, res, session) {
+  const patientId = String(req.query?.patient_id || req.query?.patientId || '').trim();
+  if (!patientId) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'patient_id is required'));
+  }
+  if (!UUID_RE.test(patientId)) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'patient_id must be a UUID'));
+  }
+  const patient = await getPatientForClinic(session.clinic_id, patientId);
+  if (!patient) {
+    return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
+  }
+  const result = await query(
+    `SELECT id, clinic_id, patient_id, amount_mad, method, booking_id, plan_id, note, paid_at, created_by
+     FROM payments
+     WHERE clinic_id = $1 AND patient_id = $2
+     ORDER BY paid_at DESC`,
+    [session.clinic_id, patient.id]
+  );
+  return res.status(200).json({
+    ok: true,
+    data: (result.rows || []).map(mapPayment),
+  });
+}
+
+async function handlePaymentsPost(req, res, session) {
+  const parsed = validatePaymentBody(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(400).json(parsed.error);
+  }
+  const { patientId, amountMad, method, bookingId, planId, note } = parsed.value;
+  const patient = await getPatientForClinic(session.clinic_id, patientId);
+  if (!patient) {
+    return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
+  }
+
+  const bookingPromise = bookingId
+    ? query(
+        `SELECT id FROM bookings WHERE clinic_id = $1 AND id::text = $2 LIMIT 1`,
+        [session.clinic_id, bookingId]
+      )
+    : null;
+  const planPromise = planId
+    ? query(
+        `SELECT id FROM treatment_plans WHERE clinic_id = $1 AND id::text = $2 LIMIT 1`,
+        [session.clinic_id, planId]
+      )
+    : null;
+  const [bookingRow, planRow] = await Promise.all([
+    bookingPromise,
+    planPromise,
+  ]);
+  if (bookingId && !bookingRow?.rows?.[0]) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'booking_id must belong to this clinic'));
+  }
+  if (planId && !planRow?.rows?.[0]) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'plan_id must belong to this clinic'));
+  }
+
+  const createdBy = UUID_RE.test(String(session.sub || '')) ? session.sub : null;
+  const inserted = await query(
+    `INSERT INTO payments (
+       clinic_id, patient_id, amount_mad, method, booking_id, plan_id, note, created_by
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, clinic_id, patient_id, amount_mad, method, booking_id, plan_id, note, paid_at, created_by`,
+    [session.clinic_id, patient.id, amountMad, method, bookingId, planId, note, createdBy]
+  );
+  const row = inserted.rows[0];
+  await writeAudit(session, { action: 'payment.create', entity: 'payment', entityId: row.id });
+  return res.status(200).json({ ok: true, data: mapPayment(row) });
+}
+
 module.exports = {
   mapPatient,
+  mapPayment,
   handlePatientGet,
   handlePatientPatch,
   handlePatientExport,
   handlePatientErase,
   handleClinicSettingsGet,
   handleClinicSettingsPatch,
+  handleActsGet,
+  handleActPricePut,
+  handlePaymentsGet,
+  handlePaymentsPost,
   handlePlansGet,
   handlePlanCreate,
   handlePlanStepPatch,
