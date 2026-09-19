@@ -332,8 +332,8 @@ async function run() {
     !/id="settings-tarifs-list"/.test(assistantHtml)
   );
   ok(
-    'app.js loads acts when settings opens',
-    /action=acts/.test(appSrc) && /loadTarifsCabinet/.test(appSrc)
+    'doctor dashboard loads acts when settings opens',
+    /action=acts/.test(dashSrc) && /loadTarifsCabinet/.test(dashSrc)
   );
   ok(
     'doctor CRM sheet lives inside #doctor-shell',
