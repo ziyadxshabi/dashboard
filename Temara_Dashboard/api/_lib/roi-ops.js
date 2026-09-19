@@ -13,13 +13,24 @@ const {
   getPatientForClinic,
   findPatientByPhone,
   normalizeInsurance,
+  normalizeBeneficiaryRelation,
 } = require('./patients');
 const { expectedCopayMad, insuranceLabel } = require('./treatments');
 const { dispatchSms } = require('./notify');
 const { referralSms } = require('./sms-templates');
 
+function hasBodyKey(body, keys) {
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+}
+
 function mapPatient(row) {
   if (!row) return null;
+  const insuranceType = row.insurance_type || null;
+  const memberNumber = row.insurance_member_number || null;
+  const mutuelleName = row.mutuelle_name || null;
+  const beneficiaryId = row.beneficiary_of_patient_id || null;
+  const beneficiaryRelation = row.beneficiary_relation || null;
+  const beneficiaryName = row.beneficiary_name || null;
   return {
     id: row.id,
     clinic_id: row.clinic_id,
@@ -30,8 +41,19 @@ function mapPatient(row) {
     chronic_conditions: row.chronic_conditions || '',
     preferred_anesthetic: row.preferred_anesthetic || '',
     last_xray_on: row.last_xray_on || null,
-    insurance_type: row.insurance_type || null,
-    insurance_label: insuranceLabel(row.insurance_type),
+    insurance_type: insuranceType,
+    insuranceType,
+    insurance_label: insuranceLabel(insuranceType),
+    insurance_member_number: memberNumber,
+    insuranceMemberNumber: memberNumber,
+    mutuelle_name: mutuelleName,
+    mutuelleName,
+    beneficiary_of_patient_id: beneficiaryId,
+    beneficiaryOfPatientId: beneficiaryId,
+    beneficiary_name: beneficiaryName,
+    beneficiaryName,
+    beneficiary_relation: beneficiaryRelation,
+    beneficiaryRelation,
     sms_consent: row.sms_consent === true,
     clinical_notes: row.clinical_notes || '',
     last_inbound_at: row.last_inbound_at || null,
@@ -64,10 +86,52 @@ async function handlePatientPatch(req, res, session) {
     return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
   }
 
-  const insurance = Object.prototype.hasOwnProperty.call(body, 'insurance_type')
-    || Object.prototype.hasOwnProperty.call(body, 'insuranceType')
+  const insurance = hasBodyKey(body, ['insurance_type', 'insuranceType'])
     ? normalizeInsurance(body.insurance_type ?? body.insuranceType)
     : existing.insurance_type;
+
+  let memberNumber = existing.insurance_member_number || null;
+  if (hasBodyKey(body, ['insurance_member_number', 'insuranceMemberNumber'])) {
+    memberNumber = sanitizeString(body.insurance_member_number ?? body.insuranceMemberNumber, 80) || null;
+  }
+
+  let mutuelleName = existing.mutuelle_name || null;
+  if (hasBodyKey(body, ['mutuelle_name', 'mutuelleName'])) {
+    mutuelleName = sanitizeString(body.mutuelle_name ?? body.mutuelleName, 120) || null;
+  }
+
+  let relation = existing.beneficiary_relation || null;
+  if (hasBodyKey(body, ['beneficiary_relation', 'beneficiaryRelation'])) {
+    const parsed = normalizeBeneficiaryRelation(body.beneficiary_relation ?? body.beneficiaryRelation);
+    if (!parsed.ok) {
+      return res.status(400).json(
+        createApiError('VALIDATION_ERROR', 'beneficiary_relation must be conjoint, enfant or parent')
+      );
+    }
+    relation = parsed.value;
+  }
+
+  let beneficiaryId = existing.beneficiary_of_patient_id || null;
+  let beneficiaryName = existing.beneficiary_name || null;
+  if (hasBodyKey(body, ['beneficiary_of_patient_id', 'beneficiaryOfPatientId'])) {
+    const raw = String(body.beneficiary_of_patient_id ?? body.beneficiaryOfPatientId ?? '').trim();
+    if (!raw) {
+      beneficiaryId = null;
+      beneficiaryName = null;
+    } else {
+      if (!UUID_RE.test(raw)) {
+        return res.status(400).json(createApiError('VALIDATION_ERROR', 'beneficiary_of_patient_id must be a UUID'));
+      }
+      const sponsor = await getPatientForClinic(session.clinic_id, raw);
+      if (!sponsor) {
+        return res.status(400).json(
+          createApiError('VALIDATION_ERROR', 'beneficiary_of_patient_id must belong to this clinic')
+        );
+      }
+      beneficiaryId = sponsor.id;
+      beneficiaryName = sponsor.display_name || null;
+    }
+  }
 
   let phoneE164 = existing.phone_e164;
   const phoneRaw = body.phone || body.phone_e164 || body.phoneE164 || body.telephone;
@@ -107,6 +171,10 @@ async function handlePatientPatch(req, res, session) {
          insurance_type = $10,
          sms_consent = COALESCE($11, sms_consent),
          clinical_notes = $12,
+         insurance_member_number = $13,
+         mutuelle_name = $14,
+         beneficiary_of_patient_id = $15,
+         beneficiary_relation = $16,
          updated_at = NOW()
      WHERE clinic_id = $1 AND id = $2
      RETURNING *`,
@@ -131,6 +199,10 @@ async function handlePatientPatch(req, res, session) {
       insurance,
       typeof body.sms_consent === 'boolean' ? body.sms_consent : (typeof body.smsConsent === 'boolean' ? body.smsConsent : null),
       notes,
+      memberNumber,
+      mutuelleName,
+      beneficiaryId,
+      relation,
     ]
   );
 
@@ -153,7 +225,10 @@ async function handlePatientPatch(req, res, session) {
 
   await writeAudit(session, { action: 'patient.patch', entity: 'patient', entityId: existing.id });
 
-  return res.status(200).json({ ok: true, data: mapPatient(updated.rows[0]) });
+  return res.status(200).json({
+    ok: true,
+    data: mapPatient({ ...(updated.rows[0] || {}), beneficiary_name: beneficiaryName }),
+  });
 }
 
 function normalizeHmSetting(raw, fallback) {
@@ -598,6 +673,10 @@ async function handlePatientErase(req, res, session) {
          preferred_anesthetic = NULL,
          last_xray_on = NULL,
          insurance_type = NULL,
+         insurance_member_number = NULL,
+         mutuelle_name = NULL,
+         beneficiary_of_patient_id = NULL,
+         beneficiary_relation = NULL,
          clinical_notes = NULL,
          sms_consent = false,
          updated_at = NOW()

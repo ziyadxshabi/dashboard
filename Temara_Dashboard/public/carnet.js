@@ -22,6 +22,11 @@
   let searchTimer = null;
   let letterFilter = '';
   const boundRoots = new WeakSet();
+  const sheetSelects = {
+    insurance: null,
+    beneficiary: null,
+    relation: null,
+  };
 
   function storageKey() {
     const role = document.body.classList.contains('mode-assistant') ? 'assistant' : 'doctor';
@@ -134,7 +139,13 @@
       last_xray_on: row.last_xray_on || '',
       clinical_notes: row.clinical_notes || '',
       sms_consent: row.sms_consent === true,
-      insurance: row.insurance || row.insurance_type || '',
+      insurance: row.insurance || '',
+      insurance_type: row.insurance_type || row.insuranceType || '',
+      insurance_member_number: row.insurance_member_number || row.insuranceMemberNumber || '',
+      mutuelle_name: row.mutuelle_name || row.mutuelleName || '',
+      beneficiary_of_patient_id: row.beneficiary_of_patient_id || row.beneficiaryOfPatientId || '',
+      beneficiary_name: row.beneficiary_name || row.beneficiaryName || '',
+      beneficiary_relation: row.beneficiary_relation || row.beneficiaryRelation || '',
       last_starts_at: row.last_starts_at || null,
       lastWhen,
       motif: row.last_treatment || '',
@@ -333,6 +344,65 @@
     global.refreshLucideIcons?.($('view-crm') || document);
   }
 
+  function initSheetSelect(key, ids, defaultValue) {
+    const api = global.DentaFlowSelect?.init?.({
+      root: $(ids.root),
+      hidden: $(ids.hidden),
+      trigger: $(ids.trigger),
+      list: $(ids.list),
+      label: $(ids.label),
+      defaultValue,
+    });
+    if (api) sheetSelects[key] = api;
+    return api;
+  }
+
+  function optionEl(value, label, selected) {
+    const li = document.createElement('li');
+    li.className = selected ? 'ghost-select__option is-selected' : 'ghost-select__option';
+    li.setAttribute('role', 'option');
+    li.dataset.value = value;
+    li.dataset.label = label;
+    li.setAttribute('aria-selected', selected ? 'true' : 'false');
+    li.tabIndex = -1;
+    li.textContent = label;
+    return li;
+  }
+
+  function fillBeneficiaryOptions(patient) {
+    const list = $('crm-edit-beneficiary-list');
+    if (!list) return;
+    const currentId = String(patient.patient_id || '');
+    const selected = String(patient.beneficiary_of_patient_id || '');
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(optionEl('', '—', !selected));
+    const seen = new Set(['']);
+    groups.forEach((row) => {
+      const id = String(row.patient_id || '');
+      if (!id || id === currentId || seen.has(id)) return;
+      seen.add(id);
+      fragment.appendChild(optionEl(id, row.name || id, id === selected));
+    });
+    if (selected && !seen.has(selected)) {
+      fragment.appendChild(optionEl(
+        selected,
+        patient.beneficiary_name || selected,
+        true
+      ));
+    }
+    list.replaceChildren(fragment);
+    if (!sheetSelects.beneficiary) {
+      initSheetSelect('beneficiary', {
+        root: 'crm-edit-beneficiary-root',
+        hidden: 'crm-edit-beneficiary',
+        trigger: 'crm-edit-beneficiary-trigger',
+        list: 'crm-edit-beneficiary-list',
+        label: 'crm-edit-beneficiary-value',
+      }, '');
+    }
+    sheetSelects.beneficiary?.refresh({ initialValue: selected });
+  }
+
   function setField(id, value) {
     const el = $(id);
     if (!el) return;
@@ -430,6 +500,11 @@
     setField('crm-edit-xray', patient.last_xray_on ? String(patient.last_xray_on).slice(0, 10) : '');
     setField('crm-edit-notes', patient.clinical_notes);
     setField('crm-edit-sms', patient.sms_consent === true);
+    setField('crm-edit-member', patient.insurance_member_number);
+    setField('crm-edit-mutuelle', patient.mutuelle_name);
+    sheetSelects.insurance?.setValue(patient.insurance_type || '');
+    sheetSelects.relation?.setValue(patient.beneficiary_relation || '');
+    fillBeneficiaryOptions(patient);
     if ($('crm-panel-copay')) {
       $('crm-panel-copay').textContent = madLabel(patient.honoraires_saisis, patient.honoraires_rows);
     }
@@ -478,6 +553,11 @@
           last_xray_on: fieldValue('crm-edit-xray') || null,
           notes: fieldValue('crm-edit-notes'),
           smsConsent: Boolean(fieldValue('crm-edit-sms')),
+          insurance_type: fieldValue('crm-edit-insurance') || null,
+          insurance_member_number: fieldValue('crm-edit-member'),
+          mutuelle_name: fieldValue('crm-edit-mutuelle'),
+          beneficiary_of_patient_id: fieldValue('crm-edit-beneficiary') || null,
+          beneficiary_relation: fieldValue('crm-edit-relation') || null,
         }),
       });
       assertAuthorized(response);
@@ -561,6 +641,28 @@
     if (!searchEl || !host) return;
     boundRoots.add(root);
     readStoredPeriod();
+
+    initSheetSelect('insurance', {
+      root: 'crm-edit-insurance-root',
+      hidden: 'crm-edit-insurance',
+      trigger: 'crm-edit-insurance-trigger',
+      list: 'crm-edit-insurance-list',
+      label: 'crm-edit-insurance-value',
+    }, '');
+    initSheetSelect('relation', {
+      root: 'crm-edit-relation-root',
+      hidden: 'crm-edit-relation',
+      trigger: 'crm-edit-relation-trigger',
+      list: 'crm-edit-relation-list',
+      label: 'crm-edit-relation-value',
+    }, '');
+    initSheetSelect('beneficiary', {
+      root: 'crm-edit-beneficiary-root',
+      hidden: 'crm-edit-beneficiary',
+      trigger: 'crm-edit-beneficiary-trigger',
+      list: 'crm-edit-beneficiary-list',
+      label: 'crm-edit-beneficiary-value',
+    }, '');
 
     searchEl.addEventListener('input', () => {
       clearTimeout(searchTimer);

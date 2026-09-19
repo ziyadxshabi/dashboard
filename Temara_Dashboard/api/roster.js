@@ -133,6 +133,11 @@ const PATIENT_DIRECTORY_SQL = `
     p.last_xray_on,
     p.sms_consent,
     p.insurance_type,
+    p.insurance_member_number,
+    p.mutuelle_name,
+    p.beneficiary_of_patient_id,
+    p.beneficiary_relation,
+    b.display_name AS beneficiary_name,
     p.clinical_notes,
     p.created_at,
     last.starts_at AS last_starts_at,
@@ -175,6 +180,9 @@ const PATIENT_DIRECTORY_SQL = `
         )
     ) AS honoraires_saisis
   FROM patients p
+  LEFT JOIN patients b
+    ON b.id = p.beneficiary_of_patient_id
+   AND b.clinic_id = p.clinic_id
   LEFT JOIN LATERAL (
     SELECT
       bookings.starts_at,
@@ -491,7 +499,18 @@ function mapDirectoryPatient(row) {
     last_xray_on: row.last_xray_on || null,
     sms_consent: row.sms_consent === true,
     insurance_type: row.insurance_type || null,
+    insuranceType: row.insurance_type || null,
     insurance: insuranceLabel(row.insurance_type) || '',
+    insurance_member_number: row.insurance_member_number || null,
+    insuranceMemberNumber: row.insurance_member_number || null,
+    mutuelle_name: row.mutuelle_name || null,
+    mutuelleName: row.mutuelle_name || null,
+    beneficiary_of_patient_id: row.beneficiary_of_patient_id || null,
+    beneficiaryOfPatientId: row.beneficiary_of_patient_id || null,
+    beneficiary_name: row.beneficiary_name || null,
+    beneficiaryName: row.beneficiary_name || null,
+    beneficiary_relation: row.beneficiary_relation || null,
+    beneficiaryRelation: row.beneficiary_relation || null,
     clinical_notes: row.clinical_notes || '',
     created_at: row.created_at,
     last_starts_at: row.last_starts_at || null,

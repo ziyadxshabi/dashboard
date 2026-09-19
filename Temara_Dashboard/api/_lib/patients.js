@@ -5,12 +5,28 @@ const { toE164MA, isValidMaMobileE164 } = require('./phone-e164');
 const { sanitizeString } = require('./validation');
 
 const INSURANCE_TYPES = new Set(['none', 'cnss', 'cnops', 'prive']);
+const BENEFICIARY_RELATIONS = new Set(['conjoint', 'enfant', 'parent']);
+
+const PATIENT_SELECT_SQL = `
+  SELECT p.*, b.display_name AS beneficiary_name
+  FROM patients p
+  LEFT JOIN patients b
+    ON b.id = p.beneficiary_of_patient_id
+   AND b.clinic_id = p.clinic_id
+`;
 
 function normalizeInsurance(raw) {
   const value = String(raw || '').trim().toLowerCase();
   if (!value) return null;
   if (INSURANCE_TYPES.has(value)) return value;
   return null;
+}
+
+function normalizeBeneficiaryRelation(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (!value) return { ok: true, value: null };
+  if (BENEFICIARY_RELATIONS.has(value)) return { ok: true, value };
+  return { ok: false, value: null };
 }
 
 async function ensurePatient(clinicId, { name, phone, smsConsent } = {}) {
@@ -57,9 +73,8 @@ async function ensurePatient(clinicId, { name, phone, smsConsent } = {}) {
 async function getPatientForClinic(clinicId, patientId) {
   if (!clinicId || !patientId) return null;
   const result = await query(
-    `SELECT *
-     FROM patients
-     WHERE clinic_id = $1 AND id::text = $2
+    `${PATIENT_SELECT_SQL}
+     WHERE p.clinic_id = $1 AND p.id::text = $2
      LIMIT 1`,
     [clinicId, String(patientId)]
   );
@@ -70,9 +85,8 @@ async function findPatientByPhone(clinicId, phone) {
   const e164 = toE164MA(phone);
   if (!clinicId || !isValidMaMobileE164(e164)) return null;
   const result = await query(
-    `SELECT *
-     FROM patients
-     WHERE clinic_id = $1 AND phone_e164 = $2
+    `${PATIENT_SELECT_SQL}
+     WHERE p.clinic_id = $1 AND p.phone_e164 = $2
      LIMIT 1`,
     [clinicId, e164]
   );
@@ -138,7 +152,9 @@ async function hasOpenMessagingSession(e164) {
 
 module.exports = {
   INSURANCE_TYPES,
+  BENEFICIARY_RELATIONS,
   normalizeInsurance,
+  normalizeBeneficiaryRelation,
   ensurePatient,
   getPatientForClinic,
   findPatientByPhone,

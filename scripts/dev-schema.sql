@@ -65,6 +65,10 @@ CREATE TABLE IF NOT EXISTS sms_messages (
 CREATE INDEX IF NOT EXISTS waitlist_clinic_status_idx
   ON waitlist (clinic_id, status, created_at DESC);
 
+-- Patient identity (UUID clinics) lives in supabase/schema.sql.
+-- Insurance v2 columns: insurance_member_number, mutuelle_name,
+-- beneficiary_of_patient_id, beneficiary_relation.
+
 -- Local mirror of Phase 0 catalog. clinic_id stays TEXT in this file.
 CREATE TABLE IF NOT EXISTS act_reference (
   code TEXT PRIMARY KEY,

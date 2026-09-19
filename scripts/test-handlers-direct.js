@@ -348,7 +348,31 @@ async function run() {
     /\[\.\.\.custom, \.\.\.reference\]/.test(dashSrc) && !/pricedNgap/.test(dashSrc)
   );
   ok(
-    'doctor CRM sheet lives inside #doctor-shell',
+    'carnet Identité has insurance v2 fields',
+    /id="crm-edit-insurance"/.test(indexHtml) &&
+      /N° adhérent/.test(indexHtml) &&
+      /id="crm-edit-member"/.test(indexHtml) &&
+      /id="crm-edit-mutuelle"/.test(indexHtml) &&
+      /Ayant droit de/.test(indexHtml) &&
+      /id="crm-edit-beneficiary"/.test(indexHtml) &&
+      /id="crm-edit-relation"/.test(indexHtml)
+  );
+  ok(
+    'assistant carnet Identité has insurance v2 fields',
+    /id="crm-edit-insurance"/.test(assistantHtml) &&
+      /N° adhérent/.test(assistantHtml) &&
+      /id="crm-edit-member"/.test(assistantHtml) &&
+      /id="crm-edit-beneficiary"/.test(assistantHtml)
+  );
+  ok(
+    'carnet.js PATCHes insurance v2 fields',
+    /insurance_type/.test(carnetSrc) &&
+      /insurance_member_number/.test(carnetSrc) &&
+      /beneficiary_of_patient_id/.test(carnetSrc) &&
+      /beneficiary_relation/.test(carnetSrc)
+  );
+  ok(
+    'CRM panel lives inside doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );
   ok(
@@ -3020,6 +3044,117 @@ async function run() {
     );
     ok('PATCH patient persists allergies', patientPatch.body?.data?.allergies === 'Pénicilline');
     ok('PATCH patient persists notes', patientPatch.body?.data?.clinical_notes === 'Note clinique carnet');
+
+    const sponsorPatient = await query(
+      `INSERT INTO patients (clinic_id, phone_e164, display_name)
+       VALUES ($1, '+212611987188', 'Roi Tuteur')
+       ON CONFLICT (clinic_id, phone_e164) DO UPDATE
+         SET display_name = 'Roi Tuteur', updated_at = NOW()
+       RETURNING id`,
+      [clinicId]
+    );
+    roiIds.patients.push(sponsorPatient.rows[0].id);
+
+    const insurancePatch = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: planPatient.rows[0].id,
+          insurance_type: 'cnss',
+          insurance_member_number: 'CNSS-9988',
+          mutuelle_name: 'MCMA',
+          beneficiary_of_patient_id: sponsorPatient.rows[0].id,
+          beneficiary_relation: 'enfant',
+        },
+      })
+    );
+    ok(
+      'PATCH patient insurance v2 returns 200',
+      insurancePatch.statusCode === 200 && insurancePatch.body?.ok === true,
+      `status=${insurancePatch.statusCode} body=${JSON.stringify(insurancePatch.body)}`
+    );
+    ok(
+      'PATCH patient persists insurance_member_number',
+      insurancePatch.body?.data?.insurance_member_number === 'CNSS-9988'
+    );
+    ok('PATCH patient persists mutuelle_name', insurancePatch.body?.data?.mutuelle_name === 'MCMA');
+    ok(
+      'PATCH patient persists beneficiary_of_patient_id',
+      String(insurancePatch.body?.data?.beneficiary_of_patient_id) === String(sponsorPatient.rows[0].id)
+    );
+    ok('PATCH patient persists beneficiary_relation', insurancePatch.body?.data?.beneficiary_relation === 'enfant');
+    ok(
+      'PATCH patient insurance aliases match snake_case',
+      insurancePatch.body?.data?.insuranceType === 'cnss' &&
+        insurancePatch.body?.data?.insuranceMemberNumber === 'CNSS-9988' &&
+        insurancePatch.body?.data?.mutuelleName === 'MCMA' &&
+        String(insurancePatch.body?.data?.beneficiaryOfPatientId) === String(sponsorPatient.rows[0].id) &&
+        insurancePatch.body?.data?.beneficiaryRelation === 'enfant'
+    );
+
+    const insuranceGet = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET patient returns insurance v2 aliases',
+      insuranceGet.body?.data?.insuranceType === insuranceGet.body?.data?.insurance_type &&
+        insuranceGet.body?.data?.insuranceMemberNumber === 'CNSS-9988'
+    );
+
+    const insuranceExport = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=patient-export&id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'patient-export includes insurance v2 fields',
+      insuranceExport.body?.data?.patient?.insurance_member_number === 'CNSS-9988' &&
+        insuranceExport.body?.data?.patient?.mutuelle_name === 'MCMA'
+    );
+
+    const badRelation = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { id: planPatient.rows[0].id, beneficiary_relation: 'cousin' },
+      })
+    );
+    ok(
+      'PATCH invalid beneficiary_relation returns 400',
+      badRelation.statusCode === 400 && badRelation.body?.code === 'VALIDATION_ERROR',
+      `status=${badRelation.statusCode}`
+    );
+
+    const crossBeneficiary = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PATCH',
+        url: '/api/roster?action=patient',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          id: planPatient.rows[0].id,
+          beneficiary_of_patient_id: '00000000-0000-4000-8000-000000000001',
+        },
+      })
+    );
+    ok(
+      'PATCH cross-clinic beneficiary returns 400',
+      crossBeneficiary.statusCode === 400 && crossBeneficiary.body?.code === 'VALIDATION_ERROR',
+      `status=${crossBeneficiary.statusCode}`
+    );
 
     const beforeDash = await invoke(
       handleDashboard,

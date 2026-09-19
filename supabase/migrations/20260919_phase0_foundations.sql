@@ -13,6 +13,9 @@
 -- Apply NGAP rows with: psql -f supabase/seeds/act_reference_seed.sql
 -- Placeholder prices target clinics.slug = 'temara' only (beta). Future
 -- clinics set prices via the doctor Réglages UI.
+--
+-- Chunk 2 adds insurance profile columns on patients (do not alter the
+-- insurance_type CHECK). Chunk 3 adds clinic-scoped payments.
 
 CREATE TABLE IF NOT EXISTS act_reference (
   code TEXT PRIMARY KEY,
@@ -99,3 +102,27 @@ WHERE c.slug = 'temara'
       AND p.act_code IS NOT DISTINCT FROM v.act_code
       AND p.custom_label IS NOT DISTINCT FROM v.custom_label
   );
+
+-- Chunk 2 — insurance profile v2. Do not touch insurance_type CHECK.
+ALTER TABLE patients
+  ADD COLUMN IF NOT EXISTS insurance_member_number TEXT,
+  ADD COLUMN IF NOT EXISTS mutuelle_name TEXT,
+  ADD COLUMN IF NOT EXISTS beneficiary_of_patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS beneficiary_relation TEXT;
+
+DO $$
+BEGIN
+  ALTER TABLE patients DROP CONSTRAINT IF EXISTS patients_beneficiary_relation_check;
+  ALTER TABLE patients
+    ADD CONSTRAINT patients_beneficiary_relation_check
+    CHECK (
+      beneficiary_relation IS NULL
+      OR beneficiary_relation IN ('conjoint', 'enfant', 'parent')
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_patients_beneficiary
+  ON patients (clinic_id, beneficiary_of_patient_id)
+  WHERE beneficiary_of_patient_id IS NOT NULL;

@@ -268,6 +268,30 @@ CREATE TABLE IF NOT EXISTS patients (
 CREATE INDEX IF NOT EXISTS idx_patients_clinic_phone
   ON patients (clinic_id, phone_e164);
 
+-- Insurance profile v2 (do not alter insurance_type CHECK above).
+ALTER TABLE patients
+  ADD COLUMN IF NOT EXISTS insurance_member_number TEXT,
+  ADD COLUMN IF NOT EXISTS mutuelle_name TEXT,
+  ADD COLUMN IF NOT EXISTS beneficiary_of_patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS beneficiary_relation TEXT;
+
+DO $$
+BEGIN
+  ALTER TABLE patients DROP CONSTRAINT IF EXISTS patients_beneficiary_relation_check;
+  ALTER TABLE patients
+    ADD CONSTRAINT patients_beneficiary_relation_check
+    CHECK (
+      beneficiary_relation IS NULL
+      OR beneficiary_relation IN ('conjoint', 'enfant', 'parent')
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_patients_beneficiary
+  ON patients (clinic_id, beneficiary_of_patient_id)
+  WHERE beneficiary_of_patient_id IS NOT NULL;
+
 ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS patient_id UUID REFERENCES patients(id) ON DELETE SET NULL;
 
