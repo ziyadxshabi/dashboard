@@ -14,6 +14,8 @@
  * POST /api/roster?action=patient-erase → anonymize dossier, keep booking slots
  * GET /api/roster?action=acts           → NGAP catalog + clinic prices
  * PUT /api/roster?action=act-price      → doctor upsert of clinic_act_prices
+ * GET /api/roster?action=payments&patient_id= → money-in payments for one patient
+ * POST /api/roster?action=payments      → record a payment (no PATCH/DELETE)
  */
 'use strict';
 
@@ -657,6 +659,18 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    if (action === 'payments') {
+      req.query = {
+        ...(req.query || {}),
+        patient_id: searchParam(req, 'patient_id') || searchParam(req, 'patientId'),
+      };
+      try {
+        return await roiOps.handlePaymentsGet(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
     if (action === 'plans') {
       req.query = { ...(req.query || {}), patientId: searchParam(req, 'patientId') || searchParam(req, 'patient_id') };
       try {
@@ -815,6 +829,9 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'referral') {
       return await roiOps.handleReferral(req, res, session);
+    }
+    if (action === 'payments') {
+      return await roiOps.handlePaymentsPost(req, res, session);
     }
 
     const parsed = validateRosterCreate(req.body ?? {});

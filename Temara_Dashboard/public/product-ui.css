@@ -2369,6 +2369,40 @@ html:not(.book-portal) .carnet-visits {
   gap: 8px;
 }
 
+html:not(.book-portal) .crm-payments {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+html:not(.book-portal) .crm-payments-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .crm-payments-list {
+  display: grid;
+  gap: 0;
+}
+
+html:not(.book-portal) .crm-payment-row {
+  padding: 8px 0;
+  border-bottom: var(--border-hairline);
+  font-size: 13px;
+}
+
+html:not(.book-portal) .crm-payments-add {
+  display: grid;
+  gap: 8px;
+}
+
+html:not(.book-portal) .crm-payments-add .btn-matte-secondary {
+  min-height: 44px;
+}
+
 html:not(.book-portal) .carnet-visit {
   display: flex;
   justify-content: space-between;

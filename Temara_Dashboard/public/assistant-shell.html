@@ -1008,6 +1008,30 @@
                 <dd id="crm-panel-copay">—</dd>
               </div>
             </dl>
+            <div class="crm-payments" id="crm-payments">
+              <h4 class="crm-payments-title">Règlements</h4>
+              <div id="crm-payments-list" class="crm-payments-list"></div>
+              <div class="crm-payments-add">
+                <div class="crm-edit-field">
+                  <label for="crm-pay-amount">Montant (MAD)</label>
+                  <input class="waitlist-input" type="number" id="crm-pay-amount" min="0.01" step="0.01" inputmode="decimal">
+                </div>
+                <div class="crm-edit-field">
+                  <label for="crm-pay-method">Mode</label>
+                  <select class="waitlist-input" id="crm-pay-method">
+                    <option value="especes">Espèces</option>
+                    <option value="cheque">Chèque</option>
+                    <option value="carte">Carte</option>
+                    <option value="virement">Virement</option>
+                  </select>
+                </div>
+                <div class="crm-edit-field">
+                  <label for="crm-pay-note">Note</label>
+                  <input class="waitlist-input" type="text" id="crm-pay-note" autocomplete="off">
+                </div>
+                <button type="button" class="btn-matte-secondary" id="crm-pay-save">Enregistrer</button>
+              </div>
+            </div>
           </section>
           <section class="crm-side-panel-section" aria-label="Consentement SMS">
             <h3 class="crm-side-panel-section-title">Consentement SMS</h3>

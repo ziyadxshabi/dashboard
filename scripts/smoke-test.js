@@ -221,6 +221,33 @@ async function run() {
   ok('GET /api/roster authenticated returns 200', roster.status === 200, `status=${roster.status} body=${roster.text}`);
   ok('GET /api/roster ok:true with data[]', roster.json?.ok === true && Array.isArray(roster.json?.data));
 
+  const actsAnon = await request('/api/roster?action=acts');
+  ok('GET /api/roster?action=acts without cookie returns 401', actsAnon.status === 401);
+  const acts = await request('/api/roster?action=acts', { jar: doctorJar });
+  ok(
+    'GET /api/roster?action=acts authenticated returns 200',
+    acts.status === 200 && acts.json?.ok === true,
+    `status=${acts.status}`
+  );
+
+  const payAnon = await request('/api/roster?action=payments&patient_id=00000000-0000-4000-8000-000000000099');
+  ok('GET /api/roster?action=payments without cookie returns 401', payAnon.status === 401);
+  const directory = await request('/api/roster?directory=1', { jar: doctorJar });
+  const firstPatientId = directory.json?.data?.patients?.[0]?.id || directory.json?.data?.patients?.[0]?.patient_id;
+  if (firstPatientId) {
+    const pay = await request(
+      `/api/roster?action=payments&patient_id=${firstPatientId}`,
+      { jar: doctorJar }
+    );
+    ok(
+      'GET /api/roster?action=payments authenticated returns 200',
+      pay.status === 200 && Array.isArray(pay.json?.data),
+      `status=${pay.status}`
+    );
+  } else {
+    skip('GET /api/roster?action=payments authenticated returns 200', 'no patients in directory');
+  }
+
   console.log('\n[waitlist]');
   const waitlistGet = await request('/api/waitlist', { jar: assistantJar });
   ok('GET /api/waitlist authenticated returns 200', waitlistGet.status === 200, `status=${waitlistGet.status}`);

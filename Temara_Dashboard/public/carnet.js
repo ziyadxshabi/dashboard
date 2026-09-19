@@ -7,6 +7,12 @@
 
   const ROSTER_URL = '/api/roster';
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const PAYMENT_LABELS = {
+    especes: 'Espèces',
+    cheque: 'Chèque',
+    carte: 'Carte',
+    virement: 'Virement',
+  };
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const MONTH_LABELS = [
     'Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin',
@@ -449,30 +455,121 @@
     });
   }
 
-  async function loadVisits(patient) {
+  function paymentAmountLabel(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const rounded = Math.round(n * 100) / 100;
+    return Number.isInteger(rounded) ? `${rounded} MAD` : `${rounded.toFixed(2)} MAD`;
+  }
+
+  function renderPayments(rows) {
+    const host = $('crm-payments-list');
+    if (!host) return;
+    host.replaceChildren();
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      const empty = document.createElement('p');
+      empty.className = 'chair-glance__empty';
+      empty.textContent = 'Aucun règlement.';
+      host.appendChild(empty);
+      return;
+    }
+    list.forEach((row) => {
+      const el = document.createElement('div');
+      el.className = 'crm-payment-row';
+      const when = formatWhen({ starts_at: row.paid_at || row.paidAt });
+      const method = PAYMENT_LABELS[row.method] || row.method || '';
+      const amount = paymentAmountLabel(row.amount_mad ?? row.amountMad);
+      const note = String(row.note || '').trim();
+      el.textContent = [when, method, amount, note].filter(Boolean).join(' · ');
+      host.appendChild(el);
+    });
+  }
+
+  async function loadVisitsAndPayments(patient) {
     if (!UUID_RE.test(String(patient.patient_id || ''))) {
       patient.visits = [];
       renderVisits([]);
+      renderPayments([]);
       return;
     }
     renderVisits([]);
+    renderPayments([]);
+    const headers = authHeaders({ Accept: 'application/json' });
+    const visitsUrl = `${ROSTER_URL}?patient_id=${encodeURIComponent(patient.patient_id)}`;
+    const payUrl = `${ROSTER_URL}?action=payments&patient_id=${encodeURIComponent(patient.patient_id)}`;
     try {
-      const response = await fetch(`${ROSTER_URL}?patient_id=${encodeURIComponent(patient.patient_id)}`, {
-        method: 'GET',
+      const [visitRes, payRes] = await Promise.all([
+        fetch(visitsUrl, { method: 'GET', credentials: 'include', headers, cache: 'no-store' }),
+        fetch(payUrl, { method: 'GET', credentials: 'include', headers, cache: 'no-store' }),
+      ]);
+      assertAuthorized(visitRes);
+      assertAuthorized(payRes);
+      const [visitPayload, payPayload] = await Promise.all([
+        visitRes.json().catch(() => ({})),
+        payRes.json().catch(() => ({})),
+      ]);
+      if (visitRes.ok && visitPayload?.ok !== false) {
+        patient.visits = Array.isArray(visitPayload?.data) ? visitPayload.data : [];
+        renderVisits(patient.visits);
+      } else {
+        renderVisits([]);
+      }
+      if (payRes.ok && payPayload?.ok !== false) {
+        renderPayments(Array.isArray(payPayload?.data) ? payPayload.data : []);
+      } else {
+        renderPayments([]);
+      }
+    } catch {
+      renderVisits([]);
+      renderPayments([]);
+    }
+  }
+
+  function resetPaymentForm() {
+    setField('crm-pay-amount', '');
+    setField('crm-pay-note', '');
+    const methodEl = $('crm-pay-method');
+    if (methodEl) methodEl.value = 'especes';
+  }
+
+  async function savePayment() {
+    const patientId = fieldValue('crm-edit-id');
+    const saveBtn = $('crm-pay-save');
+    if (!UUID_RE.test(String(patientId))) {
+      global.showToast?.('Ce dossier n\'a pas encore d\'identité patient. Posez un rendez-vous pour le lier.', 'warning');
+      return;
+    }
+    const amount = fieldValue('crm-pay-amount');
+    if (amount === '' || amount == null) {
+      global.showToast?.('Indiquez le montant.', 'warning');
+      return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const response = await fetch(`${ROSTER_URL}?action=payments`, {
+        method: 'POST',
         credentials: 'include',
-        headers: authHeaders({ Accept: 'application/json' }),
-        cache: 'no-store',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          patient_id: patientId,
+          amount_mad: Number(amount),
+          method: fieldValue('crm-pay-method') || 'especes',
+          note: fieldValue('crm-pay-note'),
+        }),
       });
       assertAuthorized(response);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload?.ok === false) {
         throw new Error(payload?.error || `HTTP ${response.status}`);
       }
-      const rows = Array.isArray(payload?.data) ? payload.data : [];
-      patient.visits = rows;
-      renderVisits(rows);
-    } catch {
-      renderVisits([]);
+      global.showToast?.('Règlement enregistré.', 'success');
+      resetPaymentForm();
+      await loadVisitsAndPayments(groupsById[String(patientId)] || { patient_id: patientId });
+    } catch (err) {
+      global.showToast?.(err?.message || 'Impossible d\'enregistrer le règlement.', 'error');
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
     }
   }
 
@@ -509,14 +606,17 @@
       $('crm-panel-copay').textContent = madLabel(patient.honoraires_saisis, patient.honoraires_rows);
     }
     if ($('crm-edit-id')) $('crm-edit-id').value = patient.patient_id || '';
+    resetPaymentForm();
 
     const saveBtn = $('crm-edit-save');
     if (saveBtn) saveBtn.disabled = !UUID_RE.test(String(patient.patient_id || ''));
+    const payBtn = $('crm-pay-save');
+    if (payBtn) payBtn.disabled = !UUID_RE.test(String(patient.patient_id || ''));
 
     root.classList.add('is-active');
     root.setAttribute('aria-hidden', 'false');
     $('crm-side-panel-close')?.focus();
-    void loadVisits(patient);
+    void loadVisitsAndPayments(patient);
   }
 
   function closeSheet() {
@@ -677,6 +777,10 @@
     $('crm-edit-save')?.addEventListener('click', (event) => {
       event.preventDefault();
       void saveSheet();
+    });
+    $('crm-pay-save')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      void savePayment();
     });
     $('crm-edit-form')?.addEventListener('submit', (event) => {
       event.preventDefault();

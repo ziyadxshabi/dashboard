@@ -100,3 +100,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic_act
 
 CREATE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic
   ON clinic_act_prices (clinic_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id TEXT NOT NULL,
+  patient_id TEXT NOT NULL,
+  amount_mad NUMERIC(12, 2) NOT NULL CHECK (amount_mad > 0),
+  method TEXT NOT NULL CHECK (method IN ('especes', 'cheque', 'carte', 'virement')),
+  booking_id TEXT,
+  plan_id TEXT,
+  note TEXT,
+  paid_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_patient
+  ON payments (clinic_id, patient_id, paid_at DESC);

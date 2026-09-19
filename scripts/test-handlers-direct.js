@@ -372,6 +372,26 @@ async function run() {
       /beneficiary_relation/.test(carnetSrc)
   );
   ok(
+    'carnet Comptes has Règlements',
+    /Règlements/.test(indexHtml) &&
+      /id="crm-payments-list"/.test(indexHtml) &&
+      /id="crm-pay-amount"/.test(indexHtml) &&
+      /id="crm-pay-save"/.test(indexHtml)
+  );
+  ok(
+    'assistant carnet has Règlements',
+    /Règlements/.test(assistantHtml) && /id="crm-payments-list"/.test(assistantHtml)
+  );
+  ok(
+    'carnet.js loads payments in parallel with visits',
+    /Promise\.all/.test(carnetSrc) && /action=payments/.test(carnetSrc)
+  );
+  const treatmentsSrc = fs.readFileSync(path.join(DASHBOARD, 'api/_lib/treatments.js'), 'utf8');
+  ok(
+    'PATIENT_SHARE TODO stays display-only',
+    /TODO\(phase1\): PATIENT_SHARE/.test(treatmentsSrc) && /cnss: 0\.3/.test(treatmentsSrc)
+  );
+  ok(
     'CRM panel lives inside doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );
@@ -2378,7 +2398,7 @@ async function run() {
     else process.env.TWILIO_WA_FROM = prevWa;
   }
 
-  const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [] };
+  const roiIds = { bookings: [], waitlist: [], recalls: [], patients: [], plans: [], stock: [], payments: [] };
   const pausedBusy = [];
   try {
     const confirmPhone = '0611987101';
@@ -3156,6 +3176,131 @@ async function run() {
       `status=${crossBeneficiary.statusCode}`
     );
 
+    const paymentsAnon = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=payments&patient_id=${planPatient.rows[0].id}`,
+        headers: {},
+      })
+    );
+    ok('GET payments without cookie returns 401', paymentsAnon.statusCode === 401);
+
+    const paymentsPostAnon = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { 'content-type': 'application/json' },
+        body: { patient_id: planPatient.rows[0].id, amount_mad: 250, method: 'especes' },
+      })
+    );
+    ok('POST payments without cookie returns 401', paymentsPostAnon.statusCode === 401);
+
+    const paymentsEmpty = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=payments&patient_id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET payments empty array',
+      paymentsEmpty.statusCode === 200 &&
+        Array.isArray(paymentsEmpty.body?.data) &&
+        paymentsEmpty.body.data.length === 0,
+      `status=${paymentsEmpty.statusCode} body=${JSON.stringify(paymentsEmpty.body)}`
+    );
+
+    const payPost = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          patient_id: planPatient.rows[0].id,
+          amount_mad: 250,
+          method: 'especes',
+          note: 'Acompte',
+        },
+      })
+    );
+    ok(
+      'assistant can POST payments',
+      payPost.statusCode === 200 && payPost.body?.ok === true && Number(payPost.body?.data?.amount_mad) === 250,
+      `status=${payPost.statusCode} body=${JSON.stringify(payPost.body)}`
+    );
+    if (payPost.body?.data?.id) roiIds.payments.push(payPost.body.data.id);
+
+    const doctorPayPost = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { patient_id: planPatient.rows[0].id, amount_mad: 100, method: 'carte' },
+      })
+    );
+    ok(
+      'POST payments returns 200',
+      doctorPayPost.statusCode === 200 && doctorPayPost.body?.ok === true,
+      `status=${doctorPayPost.statusCode}`
+    );
+    if (doctorPayPost.body?.data?.id) roiIds.payments.push(doctorPayPost.body.data.id);
+
+    const paymentsAfter = await invoke(
+      handleRoster,
+      createReq({
+        method: 'GET',
+        url: `/api/roster?action=payments&patient_id=${planPatient.rows[0].id}`,
+        headers: doctorCookie,
+      })
+    );
+    ok(
+      'GET payments includes row',
+      paymentsAfter.statusCode === 200 &&
+        (paymentsAfter.body?.data || []).some(
+          (row) => Number(row.amount_mad) === 250 && row.method === 'especes' && row.note === 'Acompte'
+        ),
+      `status=${paymentsAfter.statusCode} body=${JSON.stringify(paymentsAfter.body)}`
+    );
+
+    const missingAmount = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { patient_id: planPatient.rows[0].id, method: 'especes' },
+      })
+    );
+    ok(
+      'POST payments missing amount returns 400',
+      missingAmount.statusCode === 400 && missingAmount.body?.code === 'VALIDATION_ERROR',
+      `status=${missingAmount.statusCode}`
+    );
+
+    const otherClinicPay = await invoke(
+      handleRoster,
+      createReq({
+        method: 'POST',
+        url: '/api/roster?action=payments',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: {
+          patient_id: '00000000-0000-4000-8000-000000000001',
+          amount_mad: 50,
+          method: 'especes',
+        },
+      })
+    );
+    ok(
+      'POST payments other-clinic patient returns 404',
+      otherClinicPay.statusCode === 404,
+      `status=${otherClinicPay.statusCode}`
+    );
+
     const beforeDash = await invoke(
       handleDashboard,
       createReq({ method: 'GET', url: '/api/dashboard-data', headers: doctorCookie })
@@ -3357,6 +3502,12 @@ async function run() {
         && Number(bulkPatients.body?.dispatchedCount || 0) === 0
     );
   } finally {
+    if (roiIds.payments.length) {
+      await query('DELETE FROM payments WHERE id = ANY($1::uuid[])', [roiIds.payments]);
+    }
+    if (roiIds.patients.length) {
+      await query('DELETE FROM payments WHERE patient_id = ANY($1::uuid[])', [roiIds.patients]);
+    }
     if (roiIds.plans.length) {
       await query('DELETE FROM plan_steps WHERE plan_id = ANY($1::uuid[])', [roiIds.plans]);
       await query('DELETE FROM treatment_plans WHERE id = ANY($1::uuid[])', [roiIds.plans]);

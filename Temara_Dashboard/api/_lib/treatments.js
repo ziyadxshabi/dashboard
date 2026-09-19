@@ -27,6 +27,7 @@ const ANAM_TARIFF_MAD = Object.freeze({
   Urgence: 200,
 });
 
+// TODO(phase1): PATIENT_SHARE stays display-only — do not change CNSS 70/30 or write a feuille de soins.
 const PATIENT_SHARE = Object.freeze({
   none: 1,
   prive: 1,

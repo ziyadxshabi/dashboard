@@ -448,8 +448,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic_act
 CREATE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic
   ON clinic_act_prices (clinic_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  amount_mad NUMERIC(12, 2) NOT NULL CHECK (amount_mad > 0),
+  method TEXT NOT NULL CHECK (method IN ('especes', 'cheque', 'carte', 'virement')),
+  booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+  plan_id UUID REFERENCES treatment_plans(id) ON DELETE SET NULL,
+  note TEXT,
+  paid_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES staff_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_patient
+  ON payments (clinic_id, patient_id, paid_at DESC);
+
 ALTER TABLE act_reference ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clinic_act_prices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
@@ -460,8 +478,12 @@ BEGIN
     DROP POLICY IF EXISTS deny_client_roles ON clinic_act_prices;
     CREATE POLICY deny_client_roles ON clinic_act_prices
       FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    DROP POLICY IF EXISTS deny_client_roles ON payments;
+    CREATE POLICY deny_client_roles ON payments
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
     REVOKE ALL ON TABLE act_reference FROM anon, authenticated;
     REVOKE ALL ON TABLE clinic_act_prices FROM anon, authenticated;
+    REVOKE ALL ON TABLE payments FROM anon, authenticated;
   END IF;
 END $$;
 

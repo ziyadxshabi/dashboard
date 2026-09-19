@@ -15,7 +15,7 @@
 -- clinics set prices via the doctor Réglages UI.
 --
 -- Chunk 2 adds insurance profile columns on patients (do not alter the
--- insurance_type CHECK). Chunk 3 adds clinic-scoped payments.
+-- insurance_type CHECK). Chunk 3 adds clinic-scoped money-in payments.
 
 CREATE TABLE IF NOT EXISTS act_reference (
   code TEXT PRIMARY KEY,
@@ -126,3 +126,33 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_patients_beneficiary
   ON patients (clinic_id, beneficiary_of_patient_id)
   WHERE beneficiary_of_patient_id IS NOT NULL;
+
+-- Chunk 3 — money-in payments only. No UPDATE/DELETE, no solde/impayés.
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  amount_mad NUMERIC(12, 2) NOT NULL CHECK (amount_mad > 0),
+  method TEXT NOT NULL CHECK (method IN ('especes', 'cheque', 'carte', 'virement')),
+  booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+  plan_id UUID REFERENCES treatment_plans(id) ON DELETE SET NULL,
+  note TEXT,
+  paid_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES staff_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_patient
+  ON payments (clinic_id, patient_id, paid_at DESC);
+
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    DROP POLICY IF EXISTS deny_client_roles ON payments;
+    CREATE POLICY deny_client_roles ON payments
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    REVOKE ALL ON TABLE payments FROM anon, authenticated;
+  END IF;
+END $$;

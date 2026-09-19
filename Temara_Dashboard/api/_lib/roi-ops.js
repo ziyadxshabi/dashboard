@@ -5,7 +5,7 @@
 'use strict';
 
 const { query } = require('./db');
-const { createApiError, sanitizeString, UUID_RE, validateActPriceBody } = require('./validation');
+const { createApiError, sanitizeString, UUID_RE, validateActPriceBody, validatePaymentBody } = require('./validation');
 const { writeAudit } = require('./audit');
 const { toE164MA, isValidMaMobileE164, displayNameUpper } = require('./phone-e164');
 const {
@@ -856,8 +856,104 @@ async function handleActPricePut(req, res, session) {
   });
 }
 
+function mapPayment(row) {
+  if (!row) return null;
+  const amount = Number(row.amount_mad);
+  return {
+    id: row.id,
+    clinic_id: row.clinic_id,
+    patient_id: row.patient_id,
+    patientId: row.patient_id,
+    amount_mad: amount,
+    amountMad: amount,
+    method: row.method,
+    booking_id: row.booking_id || null,
+    bookingId: row.booking_id || null,
+    plan_id: row.plan_id || null,
+    planId: row.plan_id || null,
+    note: row.note || '',
+    paid_at: row.paid_at,
+    paidAt: row.paid_at,
+    created_by: row.created_by || null,
+  };
+}
+
+async function handlePaymentsGet(req, res, session) {
+  const patientId = String(req.query?.patient_id || req.query?.patientId || '').trim();
+  if (!patientId) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'patient_id is required'));
+  }
+  if (!UUID_RE.test(patientId)) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'patient_id must be a UUID'));
+  }
+  const patient = await getPatientForClinic(session.clinic_id, patientId);
+  if (!patient) {
+    return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
+  }
+  const result = await query(
+    `SELECT id, clinic_id, patient_id, amount_mad, method, booking_id, plan_id, note, paid_at, created_by
+     FROM payments
+     WHERE clinic_id = $1 AND patient_id = $2
+     ORDER BY paid_at DESC`,
+    [session.clinic_id, patient.id]
+  );
+  return res.status(200).json({
+    ok: true,
+    data: (result.rows || []).map(mapPayment),
+  });
+}
+
+async function handlePaymentsPost(req, res, session) {
+  const parsed = validatePaymentBody(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(400).json(parsed.error);
+  }
+  const { patientId, amountMad, method, bookingId, planId, note } = parsed.value;
+  const patient = await getPatientForClinic(session.clinic_id, patientId);
+  if (!patient) {
+    return res.status(404).json(createApiError('NOT_FOUND', 'Patient introuvable'));
+  }
+
+  const bookingPromise = bookingId
+    ? query(
+        `SELECT id FROM bookings WHERE clinic_id = $1 AND id::text = $2 LIMIT 1`,
+        [session.clinic_id, bookingId]
+      )
+    : null;
+  const planPromise = planId
+    ? query(
+        `SELECT id FROM treatment_plans WHERE clinic_id = $1 AND id::text = $2 LIMIT 1`,
+        [session.clinic_id, planId]
+      )
+    : null;
+  const [bookingRow, planRow] = await Promise.all([
+    bookingPromise,
+    planPromise,
+  ]);
+  if (bookingId && !bookingRow?.rows?.[0]) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'booking_id must belong to this clinic'));
+  }
+  if (planId && !planRow?.rows?.[0]) {
+    return res.status(400).json(createApiError('VALIDATION_ERROR', 'plan_id must belong to this clinic'));
+  }
+
+  const createdBy = UUID_RE.test(String(session.sub || '')) ? session.sub : null;
+  const inserted = await query(
+    `INSERT INTO payments (
+       clinic_id, patient_id, amount_mad, method, booking_id, plan_id, note, created_by
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, clinic_id, patient_id, amount_mad, method, booking_id, plan_id, note, paid_at, created_by`,
+    [session.clinic_id, patient.id, amountMad, method, bookingId, planId, note, createdBy]
+  );
+  const row = inserted.rows[0];
+  await writeAudit(session, { action: 'payment.create', entity: 'payment', entityId: row.id });
+  return res.status(200).json({ ok: true, data: mapPayment(row) });
+}
+
 module.exports = {
   mapPatient,
+  mapPayment,
   handlePatientGet,
   handlePatientPatch,
   handlePatientExport,
@@ -866,6 +962,8 @@ module.exports = {
   handleClinicSettingsPatch,
   handleActsGet,
   handleActPricePut,
+  handlePaymentsGet,
+  handlePaymentsPost,
   handlePlansGet,
   handlePlanCreate,
   handlePlanStepPatch,
