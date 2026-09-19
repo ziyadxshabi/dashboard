@@ -336,6 +336,18 @@ async function run() {
     /action=acts/.test(dashSrc) && /loadTarifsCabinet/.test(dashSrc)
   );
   ok(
+    'Tarifs cabinet never fails silently',
+    /Tarifs indisponibles — réessayer/.test(indexHtml) &&
+      /id="settings-tarifs-retry"/.test(indexHtml) &&
+      /Aucun acte tarifé/.test(indexHtml) &&
+      /showTarifsCabinetError/.test(dashSrc) &&
+      /console\.error\('\[Settings\] acts GET failed'/.test(dashSrc)
+  );
+  ok(
+    'Tarifs cabinet lists all NGAP acts, not only priced rows',
+    /\[\.\.\.custom, \.\.\.reference\]/.test(dashSrc) && !/pricedNgap/.test(dashSrc)
+  );
+  ok(
     'doctor CRM sheet lives inside #doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );

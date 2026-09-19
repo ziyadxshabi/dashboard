@@ -1091,8 +1091,13 @@
               Prix du cabinet pour les actes NGAP tarifés et les actes hors nomenclature.
               Les actes personnalisés ne figurent pas sur les documents d'assurance.
             </p>
+            <p class="settings-tarifs-count" id="settings-tarifs-count" hidden></p>
             <ul class="settings-tarifs-list" id="settings-tarifs-list"></ul>
-            <p class="settings-tarifs-empty" id="settings-tarifs-empty" hidden>Aucun tarif enregistré.</p>
+            <p class="settings-tarifs-empty" id="settings-tarifs-empty" hidden>Aucun acte tarifé.</p>
+            <div class="settings-tarifs-error" id="settings-tarifs-error" hidden>
+              <p>Tarifs indisponibles — réessayer</p>
+              <button type="button" class="btn-matte-secondary" id="settings-tarifs-retry">Réessayer</button>
+            </div>
           </article>
 
           <!-- Card: Indisponibilités -->

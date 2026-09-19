@@ -45,6 +45,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic_act
 CREATE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic
   ON clinic_act_prices (clinic_id, created_at DESC);
 
+-- Match Data API lockdown: staff use the postgres pool (BYPASSRLS).
+-- Local Docker has no anon/authenticated roles; skip policy/revoke there.
+ALTER TABLE act_reference ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clinic_act_prices ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    DROP POLICY IF EXISTS deny_client_roles ON act_reference;
+    CREATE POLICY deny_client_roles ON act_reference
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    DROP POLICY IF EXISTS deny_client_roles ON clinic_act_prices;
+    CREATE POLICY deny_client_roles ON clinic_act_prices
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    REVOKE ALL ON TABLE act_reference FROM anon, authenticated;
+    REVOKE ALL ON TABLE clinic_act_prices FROM anon, authenticated;
+  END IF;
+END $$;
+
 -- PLACEHOLDER prices — clinic edits real prices via UI (doctor role)
 -- NGAP rows are skipped until act_reference is seeded (FK-safe re-run).
 -- Custom acts (act_code IS NULL) are not covered by the partial unique

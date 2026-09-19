@@ -1463,6 +1463,14 @@ function initSettings() {
     emailToggle.disabled = true;
     emailToggle.setAttribute('aria-disabled', 'true');
   }
+
+  const tarifsRetry = doctorEl('settings-tarifs-retry');
+  if (tarifsRetry && tarifsRetry.dataset.bound !== 'true') {
+    tarifsRetry.dataset.bound = 'true';
+    tarifsRetry.addEventListener('click', () => {
+      void loadTarifsCabinet();
+    });
+  }
 }
 
 function applyDoctorDailyGoal(value) {
@@ -1519,18 +1527,39 @@ function formatTarifMad(value) {
   return String(Number.isInteger(n) ? n : Math.round(n * 100) / 100);
 }
 
+function setTarifsCabinetChrome({ empty = false, error = false, countText = '' } = {}) {
+  const list = doctorEl('settings-tarifs-list');
+  const emptyEl = doctorEl('settings-tarifs-empty');
+  const errorEl = doctorEl('settings-tarifs-error');
+  const countEl = doctorEl('settings-tarifs-count');
+  if (list) list.hidden = error;
+  if (emptyEl) emptyEl.hidden = !empty;
+  if (errorEl) errorEl.hidden = !error;
+  if (countEl) {
+    countEl.textContent = countText;
+    countEl.hidden = !countText || error;
+  }
+}
+
+function showTarifsCabinetError(status) {
+  const list = doctorEl('settings-tarifs-list');
+  if (list) list.replaceChildren();
+  setTarifsCabinetChrome({ empty: false, error: true });
+  console.error('[Settings] acts GET failed', { status });
+}
+
 function renderTarifsCabinet(payload) {
   const list = doctorEl('settings-tarifs-list');
-  const empty = doctorEl('settings-tarifs-empty');
   if (!list) return;
   list.replaceChildren();
   const data = payload?.data || {};
   const custom = Array.isArray(data.custom) ? data.custom : [];
-  const pricedNgap = (Array.isArray(data.reference) ? data.reference : []).filter(
-    (row) => row && row.priceMad != null
-  );
-  const rows = [...custom, ...pricedNgap];
-  if (empty) empty.hidden = rows.length > 0;
+  const reference = Array.isArray(data.reference) ? data.reference : [];
+  const rows = [...custom, ...reference];
+  const countText = rows.length
+    ? `${reference.length} actes NGAP · ${custom.length} hors nomenclature`
+    : '';
+  setTarifsCabinetChrome({ empty: rows.length === 0, error: false, countText });
   rows.forEach((row) => {
     const item = document.createElement('li');
     item.className = 'settings-tarifs-row';
@@ -1561,6 +1590,9 @@ function renderTarifsCabinet(payload) {
     input.addEventListener('change', () => {
       void saveTarifCabinetRow(input);
     });
+    input.addEventListener('blur', () => {
+      if (input.value !== input.dataset.savedValue) void saveTarifCabinetRow(input);
+    });
     item.append(nameWrap, input);
     list.appendChild(item);
   });
@@ -1577,23 +1609,36 @@ async function loadTarifsCabinet() {
       cache: 'no-store',
     });
     assertAuthorizedResponse(response);
-    if (!response.ok) return;
     const payload = await response.json().catch(() => ({}));
-    if (payload?.ok === false) return;
+    if (!response.ok || payload?.ok === false) {
+      showTarifsCabinetError(response.status);
+      return;
+    }
     renderTarifsCabinet(payload);
   } catch (err) {
-    console.warn('[Settings] acts GET failed:', err?.message || err);
+    const status = Number(err?.status) || (isUnauthorizedError(err) ? 401 : 0);
+    console.error('[Settings] acts GET failed', { status, message: err?.message || String(err) });
+    if (isUnauthorizedError(err)) return;
+    showTarifsCabinetError(status);
   }
 }
 
 async function saveTarifCabinetRow(input) {
-  if (!input) return;
-  const next = Number(input.value);
+  if (!input || input.dataset.saving === '1') return;
+  const raw = String(input.value ?? '').trim();
+  if (!raw) {
+    if (!input.dataset.savedValue) return;
+    input.value = input.dataset.savedValue;
+    showDashboardToast('Prix invalide', 'error');
+    return;
+  }
+  const next = Number(raw);
   if (!Number.isFinite(next) || next < 0) {
     input.value = input.dataset.savedValue || '';
     showDashboardToast('Prix invalide', 'error');
     return;
   }
+  if (raw === input.dataset.savedValue) return;
   const body = { price_mad: next };
   const actCode = String(input.dataset.actCode || '').trim();
   const customLabel = String(input.dataset.customLabel || '').trim();
@@ -1603,6 +1648,7 @@ async function saveTarifCabinetRow(input) {
     input.value = input.dataset.savedValue || '';
     return;
   }
+  input.dataset.saving = '1';
   try {
     const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=act-price`, {
       method: 'PUT',
@@ -1621,6 +1667,8 @@ async function saveTarifCabinetRow(input) {
   } catch (err) {
     input.value = input.dataset.savedValue || '';
     showDashboardToast(err?.message || 'Impossible d\'enregistrer le tarif.', 'error');
+  } finally {
+    delete input.dataset.saving;
   }
 }
 

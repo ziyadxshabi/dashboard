@@ -2424,6 +2424,30 @@ html:not(.book-portal) .settings-tarifs-meta {
   color: var(--text-muted);
 }
 
+html:not(.book-portal) .settings-tarifs-count {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+html:not(.book-portal) .settings-tarifs-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+html:not(.book-portal) .settings-tarifs-error[hidden] {
+  display: none;
+}
+
+html:not(.book-portal) .settings-tarifs-error p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
 html:not(.book-portal) .hours-label {
   display: grid;
   gap: 4px;

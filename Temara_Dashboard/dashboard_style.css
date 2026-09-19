@@ -1104,6 +1104,30 @@ body.mode-assistant #view-waitlist .waitlist-form.is-processing .ghost-select__t
   color: var(--text-muted);
 }
 
+.settings-tarifs-count {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-tarifs-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.settings-tarifs-error[hidden] {
+  display: none;
+}
+
+.settings-tarifs-error p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
 /* macOS-style toggle switches */
 .settings-toggle-row {
   display: flex;
