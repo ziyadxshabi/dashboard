@@ -324,6 +324,18 @@ async function run() {
     /id="cabinet-patients"/.test(indexHtml) && /id="load-visits"/.test(indexHtml) && /Fichier cabinet/.test(indexHtml)
   );
   ok(
+    'doctor settings has Tarifs cabinet',
+    /id="settings-tarifs-list"/.test(indexHtml) && /Tarifs cabinet/.test(indexHtml)
+  );
+  ok(
+    'assistant settings has no Tarifs cabinet editor',
+    !/id="settings-tarifs-list"/.test(assistantHtml)
+  );
+  ok(
+    'app.js loads acts when settings opens',
+    /action=acts/.test(appSrc) && /loadTarifsCabinet/.test(appSrc)
+  );
+  ok(
     'doctor CRM sheet lives inside #doctor-shell',
     /id="doctor-shell"[\s\S]*id="crm-side-panel"[\s\S]*id="assistant-shell"/.test(indexHtml)
   );
@@ -405,6 +417,30 @@ async function run() {
   );
   await query(auditMigrationSql);
   ok('audit_events migration applied', true);
+
+  const phase0MigrationSql = fs.readFileSync(
+    path.join(ROOT, 'supabase/migrations/20260919_phase0_foundations.sql'),
+    'utf8'
+  );
+  await query(phase0MigrationSql);
+  ok('phase 0 catalog migration applied', true);
+  const actSeedSql = fs.readFileSync(path.join(ROOT, 'supabase/seeds/act_reference_seed.sql'), 'utf8');
+  await query(actSeedSql);
+  ok('act_reference seed applied', true);
+  await query(phase0MigrationSql);
+  ok('phase 0 placeholder prices are idempotent', true);
+  const customPriceCount = await query(
+    `SELECT COUNT(*)::int AS n
+     FROM clinic_act_prices p
+     JOIN clinics c ON c.id = p.clinic_id
+     WHERE c.slug = $1 AND p.act_code IS NULL`,
+    [CLINIC_SLUG]
+  );
+  ok(
+    'temara custom act placeholders stay unique',
+    Number(customPriceCount.rows[0]?.n) === 4,
+    `n=${customPriceCount.rows[0]?.n}`
+  );
   await query(
     `UPDATE clinics
      SET day_start = '08:00', day_end = '19:00', sms_reminders_enabled = true
@@ -2858,6 +2894,97 @@ async function run() {
       })
     );
     ok('clinic-settings restore returns 200', settingsRestore.statusCode === 200);
+
+    const actsDoctor = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: doctorCookie })
+    );
+    ok(
+      'GET acts as doctor returns 200',
+      actsDoctor.statusCode === 200 && actsDoctor.body?.ok === true,
+      `status=${actsDoctor.statusCode}`
+    );
+    const actsAssistant = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: assistantCookie })
+    );
+    ok(
+      'GET acts as assistant returns 200',
+      actsAssistant.statusCode === 200 && actsAssistant.body?.ok === true,
+      `status=${actsAssistant.statusCode}`
+    );
+    const referenceCodes = new Set(
+      (actsDoctor.body?.data?.reference || []).map((row) => row.code).filter(Boolean)
+    );
+    ok('GET acts returns 107 reference codes', referenceCodes.size === 107, `n=${referenceCodes.size}`);
+    ok(
+      'GET acts includes D700 D708 D773',
+      referenceCodes.has('D700') && referenceCodes.has('D708') && referenceCodes.has('D773')
+    );
+    const customLabels = (actsDoctor.body?.data?.custom || []).map((row) => row.label);
+    ok(
+      'GET acts includes custom Consultation for temara',
+      customLabels.includes('Consultation'),
+      `custom=${customLabels.join(',')}`
+    );
+
+    const actsAnon = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: {} })
+    );
+    ok('GET acts without cookie returns 401', actsAnon.statusCode === 401);
+
+    const assistantPut = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...assistantCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D700', price_mad: 410 },
+      })
+    );
+    ok('assistant PUT act-price returns 403', assistantPut.statusCode === 403, `status=${assistantPut.statusCode}`);
+
+    const unknownPut = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D999', price_mad: 10 },
+      })
+    );
+    ok('doctor PUT unknown act_code returns 400', unknownPut.statusCode === 400, `status=${unknownPut.statusCode}`);
+
+    const doctorPut = await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D700', price_mad: 425 },
+      })
+    );
+    ok(
+      'doctor PUT act-price upserts D700',
+      doctorPut.statusCode === 200 && Number(doctorPut.body?.data?.priceMad) === 425,
+      `status=${doctorPut.statusCode} body=${JSON.stringify(doctorPut.body)}`
+    );
+    const actsAfterPut = await invoke(
+      handleRoster,
+      createReq({ method: 'GET', url: '/api/roster?action=acts', headers: doctorCookie })
+    );
+    const d700 = (actsAfterPut.body?.data?.reference || []).find((row) => row.code === 'D700');
+    ok('GET acts reflects D700 upsert', Number(d700?.priceMad) === 425, `priceMad=${d700?.priceMad}`);
+    await invoke(
+      handleRoster,
+      createReq({
+        method: 'PUT',
+        url: '/api/roster?action=act-price',
+        headers: { ...doctorCookie, 'content-type': 'application/json' },
+        body: { act_code: 'D700', price_mad: 400 },
+      })
+    );
 
     const patientPatch = await invoke(
       handleRoster,

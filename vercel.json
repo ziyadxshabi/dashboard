@@ -5,7 +5,9 @@
     { "source": "/api/auth/me", "destination": "/api/auth?action=me" },
     { "source": "/api/auth/logout", "destination": "/api/auth?action=logout" },
     { "source": "/api/auth/password", "destination": "/api/auth?action=password" },
-    { "source": "/api/update-status", "destination": "/api/roster?action=status" }
+    { "source": "/api/update-status", "destination": "/api/roster?action=status" },
+    { "source": "/api/acts", "destination": "/api/roster?action=acts" },
+    { "source": "/api/acts/price", "destination": "/api/roster?action=act-price" }
   ],
   "crons": [
     { "path": "/api/roster?action=cron-reminders", "schedule": "0 7 * * *" },

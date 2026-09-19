@@ -5,7 +5,7 @@
 'use strict';
 
 const { query } = require('./db');
-const { createApiError, sanitizeString, UUID_RE } = require('./validation');
+const { createApiError, sanitizeString, UUID_RE, validateActPriceBody } = require('./validation');
 const { writeAudit } = require('./audit');
 const { toE164MA, isValidMaMobileE164, displayNameUpper } = require('./phone-e164');
 const {
@@ -615,6 +615,168 @@ function copayFor(treatmentName, insuranceType) {
   return expectedCopayMad(treatmentName, insuranceType);
 }
 
+function numOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapActRow(row, kind) {
+  const code = row.code || row.act_code || null;
+  const label = row.label || row.custom_label || '';
+  return {
+    code,
+    label,
+    category: row.category || null,
+    coefficient: numOrNull(row.coefficient),
+    letter_key: row.letter_key || null,
+    tnrMad: numOrNull(row.tnr_mad),
+    requiresPriorApproval: row.requires_prior_approval === true,
+    priceMad: numOrNull(row.price_mad),
+    priceId: row.price_id || null,
+    insurable: kind === 'reference' && Boolean(code),
+    active: row.price_active == null ? true : row.price_active === true,
+  };
+}
+
+const ACTS_CATALOG_SQL = `
+  SELECT
+    code,
+    label,
+    category,
+    coefficient,
+    letter_key,
+    tnr_mad,
+    requires_prior_approval,
+    price_id,
+    price_mad,
+    price_active,
+    row_kind
+  FROM (
+    SELECT
+      r.code,
+      r.label,
+      r.category,
+      r.coefficient,
+      r.letter_key,
+      r.tnr_mad,
+      r.requires_prior_approval,
+      p.id AS price_id,
+      p.price_mad,
+      p.active AS price_active,
+      'reference'::text AS row_kind
+    FROM act_reference r
+    LEFT JOIN clinic_act_prices p
+      ON p.clinic_id = $1
+     AND p.act_code = r.code
+     AND p.active = true
+    WHERE r.active = true
+    UNION ALL
+    SELECT
+      NULL::text AS code,
+      p.custom_label AS label,
+      NULL::text AS category,
+      NULL::numeric AS coefficient,
+      NULL::text AS letter_key,
+      NULL::numeric AS tnr_mad,
+      false AS requires_prior_approval,
+      p.id AS price_id,
+      p.price_mad,
+      p.active AS price_active,
+      'custom'::text AS row_kind
+    FROM clinic_act_prices p
+    WHERE p.clinic_id = $1
+      AND p.act_code IS NULL
+      AND p.active = true
+  ) catalog
+  ORDER BY row_kind DESC, code NULLS LAST, label ASC
+`;
+
+async function handleActsGet(res, session) {
+  const result = await query(ACTS_CATALOG_SQL, [session.clinic_id]);
+  const reference = [];
+  const custom = [];
+  for (const row of result.rows || []) {
+    if (row.row_kind === 'custom') custom.push(mapActRow(row, 'custom'));
+    else reference.push(mapActRow(row, 'reference'));
+  }
+  return res.status(200).json({ ok: true, data: { reference, custom } });
+}
+
+async function handleActPricePut(req, res, session) {
+  const parsed = validateActPriceBody(req.body ?? {});
+  if (!parsed.ok) {
+    return res.status(400).json(parsed.error);
+  }
+  const { actCode, customLabel, priceMad, active } = parsed.value;
+
+  if (actCode) {
+    const known = await query(
+      `SELECT code FROM act_reference WHERE code = $1 AND active = true LIMIT 1`,
+      [actCode]
+    );
+    if (!known.rows[0]) {
+      return res.status(400).json(createApiError('VALIDATION_ERROR', 'Unknown act_code'));
+    }
+    const upserted = await query(
+      `INSERT INTO clinic_act_prices (clinic_id, act_code, custom_label, price_mad, active)
+       VALUES ($1, $2, NULL, $3, $4)
+       ON CONFLICT (clinic_id, act_code) WHERE act_code IS NOT NULL
+       DO UPDATE SET price_mad = EXCLUDED.price_mad, active = EXCLUDED.active
+       RETURNING id, clinic_id, act_code, custom_label, price_mad, active`,
+      [session.clinic_id, actCode, priceMad, active]
+    );
+    const row = upserted.rows[0];
+    return res.status(200).json({
+      ok: true,
+      data: mapActRow(
+        {
+          code: row.act_code,
+          label: row.custom_label,
+          price_id: row.id,
+          price_mad: row.price_mad,
+          price_active: row.active,
+        },
+        'reference'
+      ),
+    });
+  }
+
+  const updated = await query(
+    `UPDATE clinic_act_prices
+     SET price_mad = $3, active = $4
+     WHERE clinic_id = $1
+       AND act_code IS NULL
+       AND custom_label = $2
+     RETURNING id, clinic_id, act_code, custom_label, price_mad, active`,
+    [session.clinic_id, customLabel, priceMad, active]
+  );
+  const row = updated.rows[0]
+    ? updated.rows[0]
+    : (
+        await query(
+          `INSERT INTO clinic_act_prices (clinic_id, act_code, custom_label, price_mad, active)
+           VALUES ($1, NULL, $2, $3, $4)
+           RETURNING id, clinic_id, act_code, custom_label, price_mad, active`,
+          [session.clinic_id, customLabel, priceMad, active]
+        )
+      ).rows[0];
+  return res.status(200).json({
+    ok: true,
+    data: mapActRow(
+      {
+        code: null,
+        label: row.custom_label,
+        custom_label: row.custom_label,
+        price_id: row.id,
+        price_mad: row.price_mad,
+        price_active: row.active,
+      },
+      'custom'
+    ),
+  });
+}
+
 module.exports = {
   mapPatient,
   handlePatientGet,
@@ -623,6 +785,8 @@ module.exports = {
   handlePatientErase,
   handleClinicSettingsGet,
   handleClinicSettingsPatch,
+  handleActsGet,
+  handleActPricePut,
   handlePlansGet,
   handlePlanCreate,
   handlePlanStepPatch,

@@ -12,6 +12,8 @@
  * POST /api/roster                → visit / walk-in / block / emergency_hold
  * GET /api/roster?action=patient-export → Loi 09-08 data-subject export
  * POST /api/roster?action=patient-erase → anonymize dossier, keep booking slots
+ * GET /api/roster?action=acts           → NGAP catalog + clinic prices
+ * PUT /api/roster?action=act-price      → doctor upsert of clinic_act_prices
  */
 'use strict';
 
@@ -504,7 +506,7 @@ function mapDirectoryPatient(row) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    applyCors(res, 'GET, POST, PATCH, OPTIONS');
+    applyCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
     return res.status(204).end();
   }
 
@@ -573,11 +575,22 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  if (req.method === 'PUT' && action === 'act-price') {
+    applyCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
+    const session = requireClinicSession(req, res, { allowedRoles: ['doctor'] });
+    if (!session) return;
+    try {
+      return await roiOps.handleActPricePut(req, res, session);
+    } catch (err) {
+      return sendDbError(res, err);
+    }
+  }
+
   if (req.method === 'PATCH' || (req.method === 'POST' && action === 'status')) {
     return handleStatusUpdate(req, res);
   }
 
-  applyCors(res, 'GET, POST, PATCH, OPTIONS');
+  applyCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
 
   if (req.method === 'GET') {
     const session = requireClinicSession(req, res, { allowedRoles: ['assistant', 'doctor'] });
@@ -612,6 +625,14 @@ module.exports = async function handler(req, res) {
     if (action === 'clinic-settings') {
       try {
         return await roiOps.handleClinicSettingsGet(req, res, session);
+      } catch (err) {
+        return sendDbError(res, err);
+      }
+    }
+
+    if (action === 'acts') {
+      try {
+        return await roiOps.handleActsGet(res, session);
       } catch (err) {
         return sendDbError(res, err);
       }

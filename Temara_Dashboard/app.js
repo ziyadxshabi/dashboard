@@ -1612,6 +1612,116 @@ let handoffNotes = [];
     }
   }
 
+  function formatTarifMad(value) {
+    if (value == null || value === '') return '';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '';
+    return String(Number.isInteger(n) ? n : Math.round(n * 100) / 100);
+  }
+
+  function renderTarifsCabinet(payload) {
+    const list = $('settings-tarifs-list');
+    const empty = $('settings-tarifs-empty');
+    if (!list) return;
+    list.replaceChildren();
+    const data = payload?.data || {};
+    const custom = Array.isArray(data.custom) ? data.custom : [];
+    const pricedNgap = (Array.isArray(data.reference) ? data.reference : []).filter(
+      (row) => row && row.priceMad != null
+    );
+    const rows = [...custom, ...pricedNgap];
+    if (empty) empty.hidden = rows.length > 0;
+    rows.forEach((row) => {
+      const item = document.createElement('li');
+      item.className = 'settings-tarifs-row';
+      const nameWrap = document.createElement('div');
+      const name = document.createElement('span');
+      name.className = 'settings-tarifs-name';
+      name.textContent = row.label || row.code || 'Acte';
+      const meta = document.createElement('span');
+      meta.className = 'settings-tarifs-meta';
+      const bits = [];
+      if (row.code) bits.push(row.code);
+      if (row.tnrMad != null) bits.push(`TNR ${formatTarifMad(row.tnrMad)} MAD`);
+      if (!row.insurable) bits.push('Hors nomenclature');
+      meta.textContent = bits.join(' · ');
+      nameWrap.append(name);
+      if (bits.length) nameWrap.append(meta);
+      const input = document.createElement('input');
+      input.className = 'waitlist-input settings-input';
+      input.type = 'number';
+      input.min = '0';
+      input.step = '50';
+      input.inputMode = 'decimal';
+      input.setAttribute('aria-label', `Prix MAD — ${row.label || row.code || 'acte'}`);
+      input.value = formatTarifMad(row.priceMad);
+      input.dataset.actCode = row.code || '';
+      input.dataset.customLabel = row.code ? '' : (row.label || '');
+      input.dataset.savedValue = input.value;
+      input.addEventListener('change', () => {
+        void saveTarifCabinetRow(input);
+      });
+      item.append(nameWrap, input);
+      list.appendChild(item);
+    });
+  }
+
+  async function loadTarifsCabinet() {
+    const list = $('settings-tarifs-list');
+    if (!list) return;
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=acts`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: clinicSettingsHeaders({ Accept: 'application/json' }),
+        cache: 'no-store',
+      });
+      if (!response.ok) return;
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.ok === false) return;
+      renderTarifsCabinet(payload);
+    } catch (err) {
+      console.warn('[Settings] acts GET failed:', err?.message || err);
+    }
+  }
+
+  async function saveTarifCabinetRow(input) {
+    if (!input) return;
+    const next = Number(input.value);
+    if (!Number.isFinite(next) || next < 0) {
+      input.value = input.dataset.savedValue || '';
+      showToast('Prix invalide', 'error');
+      return;
+    }
+    const body = { price_mad: next };
+    const actCode = String(input.dataset.actCode || '').trim();
+    const customLabel = String(input.dataset.customLabel || '').trim();
+    if (actCode) body.act_code = actCode;
+    else if (customLabel) body.custom_label = customLabel;
+    else {
+      input.value = input.dataset.savedValue || '';
+      return;
+    }
+    try {
+      const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=act-price`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: clinicSettingsHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      input.dataset.savedValue = formatTarifMad(payload?.data?.priceMad ?? next);
+      input.value = input.dataset.savedValue;
+      showToast('Tarif enregistré', 'success');
+    } catch (err) {
+      input.value = input.dataset.savedValue || '';
+      showToast(err?.message || 'Impossible d\'enregistrer le tarif.', 'error');
+    }
+  }
+
   async function patchClinicSettings(partial) {
     try {
       const response = await fetch(`${CONFIG.ROSTER_PROXY}?action=clinic-settings`, {
@@ -4794,6 +4904,9 @@ let handoffNotes = [];
     }
     if (key === 'crm') {
       window.DentaFlowCarnet?.init?.();
+    }
+    if (key === 'settings') {
+      void loadTarifsCabinet();
     }
   }
 

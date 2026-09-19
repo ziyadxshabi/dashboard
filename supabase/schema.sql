@@ -391,6 +391,39 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS idx_audit_events_clinic_created
   ON audit_events (clinic_id, created_at DESC);
 
+-- NGAP nomenclature is the intentional global exception to clinic_id tenancy.
+-- Clinic prices remain clinic-scoped. Deactivate catalog rows; never delete.
+CREATE TABLE IF NOT EXISTS act_reference (
+  code TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN (
+    'soins', 'chirurgie', 'prothese', 'orthodontie', 'parodontologie'
+  )),
+  coefficient NUMERIC NULL,
+  letter_key TEXT NOT NULL DEFAULT 'soins' CHECK (letter_key IN ('soins', 'prothese')),
+  tnr_mad NUMERIC(12, 2) NULL,
+  requires_prior_approval BOOLEAN NOT NULL DEFAULT false,
+  active BOOLEAN NOT NULL DEFAULT true
+);
+
+CREATE TABLE IF NOT EXISTS clinic_act_prices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  act_code TEXT REFERENCES act_reference(code),
+  custom_label TEXT,
+  price_mad NUMERIC(12, 2) NOT NULL CHECK (price_mad >= 0),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (act_code IS NOT NULL OR NULLIF(custom_label, '') IS NOT NULL)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic_act
+  ON clinic_act_prices (clinic_id, act_code)
+  WHERE act_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_clinic_act_prices_clinic
+  ON clinic_act_prices (clinic_id, created_at DESC);
+
 -- Law 09-08: SMS is opt-in. Existing true rows stay true; new rows default false.
 ALTER TABLE waitlist ALTER COLUMN sms_consent SET DEFAULT false;
 ALTER TABLE patients ALTER COLUMN sms_consent SET DEFAULT false;

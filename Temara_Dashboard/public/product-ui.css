@@ -2393,6 +2393,37 @@ html:not(.book-portal) .settings-blocked-empty {
   border-bottom: 0 !important;
 }
 
+html:not(.book-portal) .settings-tarifs-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  max-height: 420px;
+  overflow: auto;
+}
+
+html:not(.book-portal) .settings-tarifs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: var(--border-hairline);
+}
+
+html:not(.book-portal) .settings-tarifs-name {
+  font-size: 13px;
+  min-width: 0;
+}
+
+html:not(.book-portal) .settings-tarifs-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 html:not(.book-portal) .hours-label {
   display: grid;
   gap: 4px;

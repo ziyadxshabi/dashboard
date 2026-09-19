@@ -290,6 +290,52 @@ function sanitizeString(value, maxLen) {
   return text.length > limit ? text.slice(0, limit) : text;
 }
 
+function parseOptionalBoolean(body, key, aliases = []) {
+  const keys = [key, ...aliases];
+  const found = keys.find((name) => Object.prototype.hasOwnProperty.call(body, name));
+  if (!found) return { present: false, value: true };
+  const raw = body[found];
+  if (raw === true || raw === 1) return { present: true, value: true };
+  if (raw === false || raw === 0) return { present: true, value: false };
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (text === 'true' || text === '1' || text === 'oui' || text === 'yes') {
+    return { present: true, value: true };
+  }
+  if (text === 'false' || text === '0' || text === 'non' || text === 'no') {
+    return { present: true, value: false };
+  }
+  return { present: true, value: Boolean(raw) };
+}
+
+function validateActPriceBody(body = {}) {
+  const actCode = sanitizeString(body.act_code ?? body.actCode, 16);
+  const customLabel = sanitizeString(body.custom_label ?? body.customLabel, 120);
+  const priceRaw = body.price_mad ?? body.priceMad;
+  const priceNum = priceRaw == null || priceRaw === '' ? NaN : Number(priceRaw);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'price_mad must be a number ≥ 0'),
+    };
+  }
+  if (!actCode && !customLabel) {
+    return {
+      ok: false,
+      error: createApiError('VALIDATION_ERROR', 'act_code or custom_label is required'),
+    };
+  }
+  const active = parseOptionalBoolean(body, 'active');
+  return {
+    ok: true,
+    value: {
+      actCode: actCode || null,
+      customLabel: customLabel || null,
+      priceMad: Math.round(priceNum * 100) / 100,
+      active: active.value,
+    },
+  };
+}
+
 function parsePinned(value) {
   if (value === true || value === 1) return true;
   const raw = String(value ?? '').trim().toLowerCase();
@@ -642,6 +688,7 @@ module.exports = {
   validateRosterCreate,
   validatePhone,
   sanitizeString,
+  validateActPriceBody,
   validateTeamNoteInput,
   validateFillGapInput,
   validateBulkSmsInput,
